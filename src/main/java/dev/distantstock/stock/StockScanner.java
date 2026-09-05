@@ -1,5 +1,7 @@
 package dev.distantstock.stock;
 
+import dev.distantstock.config.StockConfig;
+
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -15,6 +17,7 @@ public final class StockScanner {
     }
 
     public static void scan() {
+        NetworkDirectory.replaceLocal(CreateStock.openNetworks(StockConfig.selfId()));
         Set<UUID> freqs = new LinkedHashSet<>(StockCache.watched(5 * 60_000L));
         for (Supplier<Iterable<UUID>> src : EXTRA) {
             Iterable<UUID> it = src.get();

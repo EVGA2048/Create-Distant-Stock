@@ -18,10 +18,10 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 
 public abstract class WallPanelBlock extends BaseEntityBlock {
     public static final DirectionProperty FACING = HorizontalDirectionalBlock.FACING;
-    private static final VoxelShape NORTH = Block.box(0, 0, 14, 16, 16, 16);
-    private static final VoxelShape SOUTH = Block.box(0, 0, 0, 16, 16, 2);
-    private static final VoxelShape WEST = Block.box(14, 0, 0, 16, 16, 16);
-    private static final VoxelShape EAST = Block.box(0, 0, 0, 2, 16, 16);
+    private static final VoxelShape NORTH = Block.box(0, 0, 12, 16, 16, 16);
+    private static final VoxelShape SOUTH = Block.box(0, 0, 0, 16, 16, 4);
+    private static final VoxelShape WEST = Block.box(12, 0, 0, 16, 16, 16);
+    private static final VoxelShape EAST = Block.box(0, 0, 0, 4, 16, 16);
 
     protected WallPanelBlock(Properties props) {
         super(props);

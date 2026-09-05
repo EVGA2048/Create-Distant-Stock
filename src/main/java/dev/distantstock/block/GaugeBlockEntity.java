@@ -4,7 +4,8 @@ import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.link.OrderService;
 import dev.distantstock.stock.StockCache;
-import net.minecraft.ChatFormatting;
+import dev.distantstock.config.StockConfig;
+import dev.distantstock.link.LinkSnapshot;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -55,9 +56,13 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
     }
 
     public void refreshCache() {
-        if (freq != null) {
-            StockCache.watch(freq);
+        if (freq == null) {
+            catalog = 0;
+            dataLocal = false;
+            cacheAgeSec = -1;
+            return;
         }
+        StockCache.watch(freq);
         catalog = StockCache.size(freq);
         dataLocal = StockCache.isLocal(freq);
         long age = StockCache.ageMs(freq);
@@ -69,7 +74,22 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
             return;
         }
         be.refreshCache();
+        be.updateLit();
         be.sync();
+    }
+
+    private void updateLit() {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+        BlockState state = getBlockState();
+        if (!state.hasProperty(GaugeBlock.LIT)) {
+            return;
+        }
+        boolean lit = LinkSnapshot.peerUp || !StockConfig.hasPeer();
+        if (state.getValue(GaugeBlock.LIT) != lit) {
+            level.setBlock(worldPosition, state.setValue(GaugeBlock.LIT, lit), 3);
+        }
     }
 
     @Override
@@ -82,30 +102,19 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
         }
         GoggleText.line(tip, "goggle.distantstock.address", address.isBlank() ? "—" : address);
         GoggleText.line(tip, "goggle.distantstock.catalog", catalog);
-        if (lastOrder == OrderService.Result.QUEUED) {
-            GoggleText.value(tip, "goggle.distantstock.last.order.queued", ChatFormatting.GREEN);
-        } else if (lastOrder == OrderService.Result.FAIL || lastOrder == OrderService.Result.NO_PEER) {
-            GoggleText.value(tip, "goggle.distantstock.last.order.fail", ChatFormatting.RED);
-        } else {
-            GoggleText.line(tip, "goggle.distantstock.last.order.none");
-        }
-        if (sneaking) {
-            GoggleText.line(tip, dataLocal ? "goggle.distantstock.data.local" : "goggle.distantstock.data.peer");
-            GoggleText.line(tip, "goggle.distantstock.cache_age", cacheAgeSec < 0 ? "—" : cacheAgeSec + "s");
-        }
         return true;
     }
 
     @Override
     public void onLoad() {
         super.onLoad();
-        LoadedLinkers.add(this);
+        LoadedDocks.add(this);
         refreshCache();
     }
 
     @Override
     public void setRemoved() {
-        LoadedLinkers.remove(this);
+        LoadedDocks.remove(this);
         super.setRemoved();
     }
 

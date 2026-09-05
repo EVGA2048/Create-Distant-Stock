@@ -3,6 +3,8 @@ package dev.distantstock.net;
 import dev.distantstock.DistantStock;
 import dev.distantstock.item.RequesterFind;
 import dev.distantstock.item.RequesterItem;
+import dev.distantstock.item.RequesterData;
+import dev.distantstock.menu.MenuSync;
 import dev.distantstock.menu.RequesterMenu;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -39,10 +41,7 @@ public record OpenRequesterC2S() implements CustomPacketPayload {
             player.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> new RequesterMenu(id, inv, hand),
                     Component.translatable("gui.distantstock.title")
-            ), buf -> {
-                buf.writeBoolean(false);
-                buf.writeEnum(hand);
-            });
+            ), buf -> MenuSync.writeItem(buf, hand, RequesterData.freq(stack)));
         });
     }
 }

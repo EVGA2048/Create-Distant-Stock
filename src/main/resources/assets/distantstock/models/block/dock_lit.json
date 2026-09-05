@@ -1,0 +1,8 @@
+{
+  "parent": "distantstock:block/dock",
+  "textures": {
+    "front": "distantstock:block/dock_front_lit",
+    "side": "distantstock:block/dock_side_lit",
+    "top": "distantstock:block/dock_top_lit"
+  }
+}

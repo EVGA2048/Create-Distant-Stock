@@ -4,6 +4,8 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import dev.distantstock.menu.RequesterMenu;
 import dev.distantstock.net.PlaceOrderC2S;
 import dev.distantstock.net.SetAddressC2S;
+import dev.distantstock.net.JoinNetworkC2S;
+import dev.distantstock.stock.NetworkDirectory;
 import dev.distantstock.stock.StockCache;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.ChatFormatting;
@@ -154,6 +156,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
+        boolean tuned = menu.tuned(minecraft.player);
+        search.setVisible(tuned);
+        address.setVisible(tuned);
         renderBackground(g, mouseX, mouseY, partial);
         super.render(g, mouseX, mouseY, partial);
         ItemStack hover = hoveredStock(mouseX, mouseY);
@@ -184,6 +189,13 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         }
         CreateSheets.FOOTER.render(g, x - 15, by);
 
+        Component title = Component.translatable("gui.distantstock.title");
+        g.drawString(font, title, x + WINDOW_W / 2 - font.width(title) / 2, y + 4, TITLE, false);
+        if (!menu.tuned(minecraft.player)) {
+            renderNetworks(g, x, y);
+            return;
+        }
+
         if (address.getValue().isBlank() && !address.isFocused()) {
             g.drawString(font, Component.translatable("create.gui.stock_keeper.package_address")
                     .withStyle(ChatFormatting.ITALIC), address.getX(), address.getY(), HINT, false);
@@ -211,8 +223,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (isConfirmHovered(mouseX, mouseY) && !justSent) {
             CreateSheets.SEND_HOVER.render(g, x + WINDOW_W - 81, y + imageHeight - 41);
         }
-        Component title = Component.translatable("gui.distantstock.title");
-        g.drawString(font, title, x + WINDOW_W / 2 - font.width(title) / 2, y + 4, TITLE, false);
         Component send = Component.translatable("create.gui.stock_keeper.send");
         if (justSent) {
             float alpha = Mth.clamp((successTicks + partial - 5f) / 5f, 0f, 1f);
@@ -331,8 +341,60 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     protected void renderLabels(GuiGraphics g, int mouseX, int mouseY) {
     }
 
+    private void renderNetworks(GuiGraphics g, int x, int y) {
+        Component heading = Component.translatable("gui.distantstock.networks");
+        g.drawString(font, heading, x + WINDOW_W / 2 - font.width(heading) / 2, y + 25, INK, false);
+        if (menu.networks.isEmpty()) {
+            Component empty = Component.translatable("gui.distantstock.networks.empty");
+            for (int i = 0; i < font.split(empty, 164).size(); i++) {
+                FormattedCharSequence line = font.split(empty, 164).get(i);
+                g.drawString(font, line, x + WINDOW_W / 2 - font.width(line) / 2,
+                        y + 54 + i * 11, INK, false);
+            }
+            return;
+        }
+        int shown = Math.min(menu.networks.size(), networkRows());
+        for (int i = 0; i < shown; i++) {
+            NetworkDirectory.Entry entry = menu.networks.get(i);
+            int ry = y + 42 + i * 22;
+            g.fill(x + 25, ry, x + WINDOW_W - 25, ry + 18, 0x33FFFFFF);
+            g.fill(x + 25, ry + 17, x + WINDOW_W - 25, ry + 18, 0xFFB89C78);
+            g.drawString(font, entry.server(), x + 31, ry + 3, INK, false);
+            String id = entry.freq().toString().substring(0, 8);
+            g.drawString(font, id, x + 31, ry + 10, 0x3A7774, false);
+            Component links = Component.translatable("gui.distantstock.networks.links", entry.links());
+            g.drawString(font, links, x + WINDOW_W - 31 - font.width(links), ry + 6, TITLE, false);
+        }
+    }
+
+    private int networkRows() {
+        return Math.max(1, (imageHeight - 96) / 22);
+    }
+
+    private int networkIndex(double mx, double my) {
+        if (menu.tuned(minecraft.player)) {
+            return -1;
+        }
+        int x = leftPos;
+        int y = topPos;
+        if (mx < x + 25 || mx >= x + WINDOW_W - 25 || my < y + 42) {
+            return -1;
+        }
+        int index = (int) ((my - y - 42) / 22);
+        int rowY = y + 42 + index * 22;
+        return index >= 0 && index < menu.networks.size() && index < networkRows() && my < rowY + 18 ? index : -1;
+    }
+
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
+        int network = networkIndex(mx, my);
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && network >= 0) {
+            NetworkDirectory.Entry entry = menu.networks.get(network);
+            menu.selectedFreq = entry.freq();
+            PacketDistributor.sendToServer(new JoinNetworkC2S(entry.freq()));
+            uiSound(SoundEvents.UI_BUTTON_CLICK.value(), 1f, 1.1f);
+            return true;
+        }
         boolean rmb = button == GLFW.GLFW_MOUSE_BUTTON_RIGHT;
         if (rmb && search.isMouseOver(mx, my)) {
             search.setValue("");

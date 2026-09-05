@@ -9,15 +9,15 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-public final class LoadedLinkers {
-    private static final Set<LinkerBlockEntity> ALL = ConcurrentHashMap.newKeySet();
+public final class LoadedDocks {
+    private static final Set<DockBlockEntity> ALL = ConcurrentHashMap.newKeySet();
     private static final Set<GaugeBlockEntity> GAUGES = ConcurrentHashMap.newKeySet();
 
-    public static void add(LinkerBlockEntity be) {
+    public static void add(DockBlockEntity be) {
         ALL.add(be);
     }
 
-    public static void remove(LinkerBlockEntity be) {
+    public static void remove(DockBlockEntity be) {
         ALL.remove(be);
     }
 
@@ -31,7 +31,7 @@ public final class LoadedLinkers {
 
     public static List<UUID> watched() {
         List<UUID> out = new ArrayList<>();
-        for (LinkerBlockEntity be : ALL) {
+        for (DockBlockEntity be : ALL) {
             if (be.freq() != null) {
                 out.add(be.freq());
             }
@@ -44,9 +44,9 @@ public final class LoadedLinkers {
         return out;
     }
 
-    public static LinkerBlockEntity importFor(ItemStack pkg) {
-        LinkerBlockEntity full = null;
-        for (LinkerBlockEntity be : ALL) {
+    public static DockBlockEntity importFor(ItemStack pkg) {
+        DockBlockEntity full = null;
+        for (DockBlockEntity be : ALL) {
             if (!be.isImport() || be.isRemoved()) {
                 continue;
             }
@@ -63,7 +63,7 @@ public final class LoadedLinkers {
     }
 
     public static void noMatch(ItemStack pkg) {
-        for (LinkerBlockEntity be : ALL) {
+        for (DockBlockEntity be : ALL) {
             if (!be.isImport() || be.isRemoved()) {
                 continue;
             }
@@ -74,6 +74,6 @@ public final class LoadedLinkers {
         }
     }
 
-    private LoadedLinkers() {
+    private LoadedDocks() {
     }
 }

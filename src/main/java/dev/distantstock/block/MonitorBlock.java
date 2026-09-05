@@ -2,6 +2,7 @@ package dev.distantstock.block;
 
 import com.mojang.serialization.MapCodec;
 import dev.distantstock.link.LinkSnapshot;
+import dev.distantstock.net.AdminConfigS2C;
 import dev.distantstock.net.LinkSnapshotS2C;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
@@ -58,7 +59,11 @@ public final class MonitorBlock extends WallPanelBlock {
 
     private static void open(Level level, Player player) {
         if (!level.isClientSide && player instanceof ServerPlayer sp) {
-            PacketDistributor.sendToPlayer(sp, new LinkSnapshotS2C(LinkSnapshot.view()));
+            if (player.isShiftKeyDown() && player.hasPermissions(2)) {
+                PacketDistributor.sendToPlayer(sp, AdminConfigS2C.fromConfig());
+            } else {
+                PacketDistributor.sendToPlayer(sp, new LinkSnapshotS2C(LinkSnapshot.view()));
+            }
         }
     }
 }

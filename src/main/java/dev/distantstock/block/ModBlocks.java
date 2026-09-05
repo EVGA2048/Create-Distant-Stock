@@ -12,19 +12,18 @@ public final class ModBlocks {
     public static final DeferredRegister<net.minecraft.world.level.block.Block> BLOCKS =
             DeferredRegister.create(Registries.BLOCK, DistantStock.MODID);
 
-    public static final DeferredHolder<net.minecraft.world.level.block.Block, LinkerBlock> LINKER =
-            BLOCKS.register("linker", () -> new LinkerBlock(machine()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, DockBlock> DOCK =
+            BLOCKS.register("dock", () -> new DockBlock(machine()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, GaugeBlock> GAUGE =
-            BLOCKS.register("gauge", () -> new GaugeBlock(panel()));
+            BLOCKS.register("gauge", () -> new GaugeBlock(machine().noOcclusion()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, MonitorBlock> MONITOR =
             BLOCKS.register("monitor", () -> new MonitorBlock(panel()));
 
     private static BlockBehaviour.Properties machine() {
         return BlockBehaviour.Properties.of()
-                .mapColor(MapColor.WARPED_STEM)
+                .mapColor(MapColor.STONE)
                 .strength(1.5f)
-                .sound(SoundType.WOOD)
-                .noOcclusion();
+                .sound(SoundType.COPPER);
     }
 
     private static BlockBehaviour.Properties panel() {

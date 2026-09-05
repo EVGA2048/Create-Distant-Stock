@@ -7,6 +7,7 @@ import dev.distantstock.item.RequesterData;
 import dev.distantstock.item.RequesterFind;
 import dev.distantstock.item.RequesterItem;
 import dev.distantstock.stock.StockCache;
+import dev.distantstock.stock.NetworkDirectory;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.InteractionHand;
@@ -23,27 +24,37 @@ public final class RequesterMenu extends AbstractContainerMenu {
     public final InteractionHand hand;
     public final BlockPos gaugePos;
     public List<StockCache.Entry> stock = new ArrayList<>();
+    public List<NetworkDirectory.Entry> networks = new ArrayList<>();
+    public UUID selectedFreq;
     public boolean demo;
 
     public RequesterMenu(int id, Inventory inv, InteractionHand hand) {
         super(ModMenus.REQUESTER.get(), id);
         this.hand = hand;
         this.gaugePos = null;
-        refresh(inv.player);
+        if (!inv.player.level().isClientSide) {
+            refresh(inv.player);
+        }
     }
 
     public RequesterMenu(int id, Inventory inv, BlockPos gaugePos) {
         super(ModMenus.REQUESTER.get(), id);
         this.hand = InteractionHand.MAIN_HAND;
         this.gaugePos = gaugePos;
-        refresh(inv.player);
+        if (!inv.player.level().isClientSide) {
+            refresh(inv.player);
+        }
     }
 
     public static RequesterMenu fromNetwork(int id, Inventory inv, FriendlyByteBuf buf) {
+        RequesterMenu menu = buf.readBoolean()
+                ? new RequesterMenu(id, inv, buf.readBlockPos())
+                : new RequesterMenu(id, inv, buf.readEnum(InteractionHand.class));
         if (buf.readBoolean()) {
-            return new RequesterMenu(id, inv, buf.readBlockPos());
+            menu.selectedFreq = buf.readUUID();
         }
-        return new RequesterMenu(id, inv, buf.readEnum(InteractionHand.class));
+        MenuSync.readCatalog(menu, buf);
+        return menu;
     }
 
     public boolean isGauge() {
@@ -58,6 +69,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
     }
 
     public UUID freq(Player player) {
+        if (selectedFreq != null) {
+            return selectedFreq;
+        }
         GaugeBlockEntity be = gauge(player);
         if (be != null) {
             return be.freq();
@@ -102,7 +116,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
 
     public void refresh(Player player) {
         UUID freq = freq(player);
-        StockCache.watch(freq);
+        MenuSync.warm(freq);
         stock = new ArrayList<>(StockCache.get(freq));
         demo = StockConfig.DEMO_STOCK.get();
     }

@@ -31,6 +31,8 @@ public record LinkSnapshotS2C(LinkSnapshot.View view) implements CustomPacketPay
         buf.writeDouble(v.peerMspt());
         buf.writeDouble(v.peerRttMs());
         buf.writeVarInt(v.peerFails());
+        buf.writeVarInt(v.peersUp());
+        buf.writeVarInt(v.peersTotal());
     }
 
     private static LinkSnapshotS2C read(RegistryFriendlyByteBuf buf) {
@@ -46,6 +48,8 @@ public record LinkSnapshotS2C(LinkSnapshot.View view) implements CustomPacketPay
                 buf.readDouble(),
                 buf.readDouble(),
                 buf.readDouble(),
+                buf.readVarInt(),
+                buf.readVarInt(),
                 buf.readVarInt()
         ));
     }

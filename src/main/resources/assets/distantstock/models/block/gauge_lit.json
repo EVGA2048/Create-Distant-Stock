@@ -1,0 +1,6 @@
+{
+  "parent": "distantstock:block/gauge",
+  "textures": {
+    "face": "distantstock:block/gauge_face_lit"
+  }
+}

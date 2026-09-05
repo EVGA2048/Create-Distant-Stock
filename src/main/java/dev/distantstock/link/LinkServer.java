@@ -23,6 +23,7 @@ public final class LinkServer {
             InetSocketAddress addr = LinkHttp.parseBind(StockConfig.BIND.get());
             server = HttpServer.create(addr, 0);
             server.createContext("/stock", new StockHandler());
+            server.createContext("/networks", new NetworksHandler());
             server.createContext("/status", new StatusHandler());
             server.createContext("/order", new OrderHandler());
             server.createContext("/package", new PackageHandler());

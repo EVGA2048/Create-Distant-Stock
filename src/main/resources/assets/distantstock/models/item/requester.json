@@ -1,5 +1,5 @@
 {
-	"credit": "Layout from Create: Mobile Packages (MIT, Tim Heidler). Wood remapped to stripped warped stem.",
+	"credit": "Layout and original texture from Create: Mobile Packages (MIT, Tim Heidler). Distant Stock warm metal, wood and brass recolor; cyan interconnection accents.",
 	"texture_size": [32, 32],
 	"textures": {
 		"1": "distantstock:item/requester",

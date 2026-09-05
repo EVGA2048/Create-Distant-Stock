@@ -98,6 +98,9 @@ public final class StockCache {
     }
 
     public static long ageMs(UUID freq) {
+        if (freq == null) {
+            return -1;
+        }
         Long t = WRITTEN.get(freq);
         return t == null ? -1 : Math.max(0, System.currentTimeMillis() - t);
     }

@@ -1,29 +1,149 @@
 {
   "parent": "minecraft:block/block",
   "textures": {
-    "particle": "create:block/andesite_casing",
-    "back": "create:block/andesite_casing",
-    "front": "create:block/andesite_casing",
-    "accent": "create:block/brass_casing"
+    "wood": "distantstock:block/machine_wood",
+    "metal": "distantstock:block/machine_metal",
+    "brass": "distantstock:block/machine_brass",
+    "face": "distantstock:block/monitor_face",
+    "particle": "create:block/andesite_casing"
   },
   "elements": [
     {
-      "from": [0, 0, 14],
-      "to": [16, 16, 16],
+      "name": "wall_backplate",
+      "from": [
+        0,
+        0,
+        14
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
       "faces": {
-        "north": { "uv": [0, 0, 16, 16], "texture": "#front" },
-        "south": { "uv": [0, 0, 16, 16], "texture": "#back" },
-        "east": { "uv": [14, 0, 16, 16], "texture": "#accent" },
-        "west": { "uv": [0, 0, 2, 16], "texture": "#accent" },
-        "up": { "uv": [0, 0, 16, 2], "texture": "#accent" },
-        "down": { "uv": [0, 14, 16, 16], "texture": "#accent" }
+        "north": {
+          "texture": "#wood",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "south": {
+          "texture": "#wood",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "west": {
+          "texture": "#wood",
+          "uv": [
+            14,
+            0,
+            16,
+            16
+          ]
+        },
+        "east": {
+          "texture": "#wood",
+          "uv": [
+            0,
+            0,
+            2,
+            16
+          ]
+        },
+        "up": {
+          "texture": "#wood",
+          "uv": [
+            0,
+            14,
+            16,
+            16
+          ]
+        },
+        "down": {
+          "texture": "#wood",
+          "uv": [
+            0,
+            0,
+            16,
+            2
+          ]
+        }
       }
     },
     {
-      "from": [2, 3, 13.9],
-      "to": [14, 13, 14],
+      "name": "instrument_housing",
+      "from": [
+        1,
+        1,
+        12
+      ],
+      "to": [
+        15,
+        15,
+        14
+      ],
       "faces": {
-        "north": { "uv": [2, 3, 14, 13], "texture": "#accent" }
+        "north": {
+          "texture": "#face",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "south": {
+          "texture": "#metal",
+          "uv": [
+            1,
+            1,
+            15,
+            15
+          ]
+        },
+        "west": {
+          "texture": "#metal",
+          "uv": [
+            12,
+            1,
+            14,
+            15
+          ]
+        },
+        "east": {
+          "texture": "#metal",
+          "uv": [
+            2,
+            1,
+            4,
+            15
+          ]
+        },
+        "up": {
+          "texture": "#metal",
+          "uv": [
+            1,
+            12,
+            15,
+            14
+          ]
+        },
+        "down": {
+          "texture": "#metal",
+          "uv": [
+            1,
+            2,
+            15,
+            4
+          ]
+        }
       }
     }
   ]

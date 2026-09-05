@@ -10,7 +10,7 @@ import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 public final class ModCapabilities {
     @SubscribeEvent
     public static void caps(RegisterCapabilitiesEvent e) {
-        e.registerBlockEntity(Capabilities.ItemHandler.BLOCK, ModBlockEntities.LINKER.get(),
+        e.registerBlockEntity(Capabilities.ItemHandler.BLOCK, ModBlockEntities.DOCK.get(),
                 (be, side) -> be.inv);
     }
 

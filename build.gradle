@@ -54,8 +54,28 @@ tasks.named('jar', Jar).configure {
 }
 
 def createJar = file("${System.getProperty('user.home')}/Documents/minecraft_launcher/.minecraft/versions/ES2_Firmament_1.21.1_9th_9.3.2_SunlightSignal/mods/create-1.21.1-6.0.10.jar")
+def ponderJar = file("libs/ponder-neoforge-1.0.82+mc1.21.1.jar")
+
+tasks.register('extractPonder') {
+    onlyIf { !ponderJar.exists() }
+    doLast {
+        copy {
+            from zipTree(createJar)
+            include 'META-INF/jarjar/ponder-neoforge-1.0.82+mc1.21.1.jar'
+            eachFile { it.path = it.name }
+            into 'libs'
+            includeEmptyDirs = false
+        }
+    }
+}
+
+tasks.named('compileJava').configure {
+    dependsOn 'extractPonder'
+}
+
 dependencies {
     compileOnly files(createJar)
+    compileOnly files(ponderJar)
 }
 
 tasks.withType(JavaCompile).configureEach {

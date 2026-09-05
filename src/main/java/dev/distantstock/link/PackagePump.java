@@ -1,8 +1,8 @@
 package dev.distantstock.link;
 
 import com.simibubi.create.content.logistics.box.PackageItem;
-import dev.distantstock.block.LinkerBlockEntity;
-import dev.distantstock.block.LoadedLinkers;
+import dev.distantstock.block.DockBlockEntity;
+import dev.distantstock.block.LoadedDocks;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.ItemStack;
 
@@ -15,9 +15,9 @@ public final class PackagePump {
             if (pkg.isEmpty() || !PackageItem.isPackage(pkg)) {
                 continue;
             }
-            LinkerBlockEntity dest = LoadedLinkers.importFor(pkg);
+            DockBlockEntity dest = LoadedDocks.importFor(pkg);
             if (dest == null) {
-                LoadedLinkers.noMatch(pkg);
+                LoadedDocks.noMatch(pkg);
                 continue;
             }
             if (dest.isFull() || !dest.insert(pkg)) {

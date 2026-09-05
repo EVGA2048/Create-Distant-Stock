@@ -60,11 +60,6 @@ public final class MonitorBlockEntity extends BlockEntity implements IHaveGoggle
             GoggleText.value(tip, "goggle.distantstock.peer_down", ChatFormatting.RED);
         }
         GoggleText.line(tip, "goggle.distantstock.pressure", backlog, rtt < 0 ? "—" : rtt);
-        if (sneaking) {
-            GoggleText.line(tip, "goggle.distantstock.role", role);
-            GoggleText.line(tip, "goggle.distantstock.fails", fails);
-            GoggleText.line(tip, "goggle.distantstock.in_flight", inFlight);
-        }
         return true;
     }
 

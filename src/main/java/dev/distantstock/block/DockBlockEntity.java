@@ -6,8 +6,10 @@ import dev.distantstock.item.RequesterData;
 import dev.distantstock.link.LinkQueues;
 import dev.distantstock.link.LinkSnapshot;
 import dev.distantstock.link.PackageCodec;
+import dev.distantstock.link.ReturnRoute;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -18,33 +20,30 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.items.ItemStackHandler;
 
 import java.util.List;
 import java.util.UUID;
 
-public final class LinkerBlockEntity extends BlockEntity implements IHaveGoggleInformation {
+public final class DockBlockEntity extends BlockEntity implements IHaveGoggleInformation {
     public static final int SLOTS = 9;
     final ItemStackHandler inv = new ItemStackHandler(SLOTS) {
         @Override
         protected void onContentsChanged(int slot) {
             setChanged();
+            updateVisual();
         }
     };
 
     private UUID freq;
     private String address = "";
-    private long lastReceiveMs;
-    private int rejects;
     private boolean linkUp;
     private int backlogOrders;
     private int inFlight;
-    private int lastRtt;
-    private LinkQueues.PackResult lastPack;
-    private long lastFailMs;
 
-    public LinkerBlockEntity(BlockPos pos, BlockState state) {
-        super(ModBlockEntities.LINKER.get(), pos, state);
+    public DockBlockEntity(BlockPos pos, BlockState state) {
+        super(ModBlockEntities.DOCK.get(), pos, state);
     }
 
     public UUID freq() {
@@ -94,7 +93,6 @@ public final class LinkerBlockEntity extends BlockEntity implements IHaveGoggleI
     }
 
     public void rejected() {
-        rejects++;
         sync();
     }
 
@@ -104,7 +102,6 @@ public final class LinkerBlockEntity extends BlockEntity implements IHaveGoggleI
             left = inv.insertItem(i, left, false);
         }
         if (left.getCount() < pkg.getCount()) {
-            lastReceiveMs = System.currentTimeMillis();
             sync();
         }
         return left.isEmpty();
@@ -120,23 +117,47 @@ public final class LinkerBlockEntity extends BlockEntity implements IHaveGoggleI
                 .append(Component.literal(" " + addr).withStyle(ChatFormatting.WHITE));
     }
 
-    public static void serverTick(Level level, BlockPos pos, BlockState state, LinkerBlockEntity be) {
+    public static void serverTick(Level level, BlockPos pos, BlockState state, DockBlockEntity be) {
         if (level.getGameTime() % 10 != 0) {
             return;
         }
         be.linkUp = LinkSnapshot.peerUp || !dev.distantstock.config.StockConfig.hasPeer();
         be.backlogOrders = LinkSnapshot.orderDepth;
         be.inFlight = LinkSnapshot.inFlight;
-        be.lastRtt = (int) LinkSnapshot.peerRttMs;
-        be.lastPack = LinkQueues.lastPack(be.freq);
-        if (!be.linkUp) {
-            be.lastFailMs = System.currentTimeMillis();
-        }
         if (be.isExport()) {
+            be.pullAdjacent(level, pos);
             be.ship(level);
         }
+        be.updateVisual();
         be.setChanged();
-        level.sendBlockUpdated(pos, state, state, 3);
+    }
+
+    private void pullAdjacent(Level level, BlockPos pos) {
+        if (isFull()) {
+            return;
+        }
+        for (Direction d : Direction.values()) {
+            var handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos.relative(d), d.getOpposite());
+            if (handler == null) {
+                continue;
+            }
+            for (int i = 0; i < handler.getSlots(); i++) {
+                if (!PackageItem.isPackage(handler.getStackInSlot(i))) {
+                    continue;
+                }
+                ItemStack take = handler.extractItem(i, 1, false);
+                if (take.isEmpty()) {
+                    continue;
+                }
+                if (!insert(take)) {
+                    handler.insertItem(i, take, false);
+                    continue;
+                }
+                if (isFull()) {
+                    return;
+                }
+            }
+        }
     }
 
     private void ship(Level level) {
@@ -150,7 +171,7 @@ public final class LinkerBlockEntity extends BlockEntity implements IHaveGoggleI
                 continue;
             }
             String dest = PackageItem.getAddress(stack);
-            if (LinkQueues.offerOutboundPackage(new LinkQueues.Parcel(nbt, dest))) {
+            if (LinkQueues.offerOutboundPackage(new LinkQueues.Parcel(nbt, dest, ReturnRoute.peek(dest)))) {
                 inv.extractItem(i, 1, false);
                 dev.distantstock.link.LinkClient.wake();
             }
@@ -160,71 +181,37 @@ public final class LinkerBlockEntity extends BlockEntity implements IHaveGoggleI
 
     @Override
     public boolean addToGoggleTooltip(List<Component> tip, boolean sneaking) {
-        GoggleText.title(tip, "block.distantstock.linker");
+        GoggleText.title(tip, "block.distantstock.dock");
         if (isExport()) {
             GoggleText.line(tip, "goggle.distantstock.mode.export");
             GoggleText.line(tip, "goggle.distantstock.freq", RequesterData.shortFreq(freq));
-            linkLine(tip);
             GoggleText.line(tip, "goggle.distantstock.backlog", backlogOrders, inFlight);
-            if (sneaking) {
-                if (lastPack == LinkQueues.PackResult.SUCCESS) {
-                    GoggleText.value(tip, "goggle.distantstock.last.pack.ok", ChatFormatting.GREEN);
-                } else if (lastPack == LinkQueues.PackResult.NO_STOCK) {
-                    GoggleText.value(tip, "goggle.distantstock.last.pack.stock", ChatFormatting.GOLD);
-                } else {
-                    GoggleText.value(tip, "goggle.distantstock.last.pack.unloaded", ChatFormatting.YELLOW);
-                }
-                if (linkUp && lastRtt >= 0) {
-                    GoggleText.line(tip, "goggle.distantstock.rtt", lastRtt);
-                } else {
-                    GoggleText.value(tip, "goggle.distantstock.last.fail", ChatFormatting.RED);
-                }
-            }
         } else {
             GoggleText.line(tip, "goggle.distantstock.mode.import");
             GoggleText.line(tip, "goggle.distantstock.address", address.isBlank() ? "*" : address);
             if (isFull()) {
-                GoggleText.value(tip, "goggle.distantstock.slots.full", ChatFormatting.GOLD);
+                GoggleText.line(tip, "goggle.distantstock.slots.full");
             } else {
                 GoggleText.line(tip, "goggle.distantstock.slots", usedSlots(), SLOTS);
             }
-            linkLine(tip);
-            if (sneaking) {
-                GoggleText.line(tip, "goggle.distantstock.last.recv", ago(lastReceiveMs));
-                GoggleText.line(tip, "goggle.distantstock.reject", rejects);
-            }
         }
-        return true;
-    }
-
-    private void linkLine(List<Component> tip) {
         if (linkUp) {
             GoggleText.value(tip, "goggle.distantstock.link.up", ChatFormatting.GREEN);
         } else {
             GoggleText.value(tip, "goggle.distantstock.link.down", ChatFormatting.RED);
         }
-    }
-
-    private static String ago(long ms) {
-        if (ms <= 0) {
-            return "—";
-        }
-        long s = Math.max(0, (System.currentTimeMillis() - ms) / 1000);
-        if (s < 60) {
-            return s + "s";
-        }
-        return (s / 60) + "m";
+        return true;
     }
 
     @Override
     public void onLoad() {
         super.onLoad();
-        LoadedLinkers.add(this);
+        LoadedDocks.add(this);
     }
 
     @Override
     public void setRemoved() {
-        LoadedLinkers.remove(this);
+        LoadedDocks.remove(this);
         super.setRemoved();
     }
 
@@ -236,15 +223,7 @@ public final class LinkerBlockEntity extends BlockEntity implements IHaveGoggleI
         }
         tag.putString("Address", address);
         tag.put("Inv", inv.serializeNBT(regs));
-        tag.putLong("LastRecv", lastReceiveMs);
-        tag.putInt("Rejects", rejects);
         tag.putBoolean("LinkUp", linkUp);
-        tag.putInt("Backlog", backlogOrders);
-        tag.putInt("InFlight", inFlight);
-        tag.putInt("Rtt", lastRtt);
-        if (lastPack != null) {
-            tag.putString("LastPack", lastPack.name());
-        }
     }
 
     @Override
@@ -255,18 +234,7 @@ public final class LinkerBlockEntity extends BlockEntity implements IHaveGoggleI
         if (tag.contains("Inv")) {
             inv.deserializeNBT(regs, tag.getCompound("Inv"));
         }
-        lastReceiveMs = tag.getLong("LastRecv");
-        rejects = tag.getInt("Rejects");
         linkUp = tag.getBoolean("LinkUp");
-        backlogOrders = tag.getInt("Backlog");
-        inFlight = tag.getInt("InFlight");
-        lastRtt = tag.getInt("Rtt");
-        if (tag.contains("LastPack")) {
-            try {
-                lastPack = LinkQueues.PackResult.valueOf(tag.getString("LastPack"));
-            } catch (Exception ignored) {
-            }
-        }
     }
 
     @Override
@@ -279,8 +247,26 @@ public final class LinkerBlockEntity extends BlockEntity implements IHaveGoggleI
         return ClientboundBlockEntityDataPacket.create(this);
     }
 
+    private void updateVisual() {
+        if (level == null || level.isClientSide) {
+            return;
+        }
+        BlockState state = getBlockState();
+        BlockState next = state;
+        if (state.hasProperty(DockBlock.LOADED)) {
+            next = next.setValue(DockBlock.LOADED, usedSlots() > 0);
+        }
+        if (state.hasProperty(DockBlock.LIT)) {
+            next = next.setValue(DockBlock.LIT, linkUp);
+        }
+        if (next != state) {
+            level.setBlock(worldPosition, next, 3);
+        }
+    }
+
     private void sync() {
         setChanged();
+        updateVisual();
         if (level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
         }

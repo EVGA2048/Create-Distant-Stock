@@ -1,8 +1,12 @@
 {
   "variants": {
-    "facing=north": { "model": "distantstock:block/gauge" },
-    "facing=south": { "model": "distantstock:block/gauge", "y": 180 },
-    "facing=west": { "model": "distantstock:block/gauge", "y": 270 },
-    "facing=east": { "model": "distantstock:block/gauge", "y": 90 }
+    "facing=north,lit=false": { "model": "distantstock:block/gauge" },
+    "facing=south,lit=false": { "model": "distantstock:block/gauge", "y": 180 },
+    "facing=west,lit=false": { "model": "distantstock:block/gauge", "y": 270 },
+    "facing=east,lit=false": { "model": "distantstock:block/gauge", "y": 90 },
+    "facing=north,lit=true": { "model": "distantstock:block/gauge_lit" },
+    "facing=south,lit=true": { "model": "distantstock:block/gauge_lit", "y": 180 },
+    "facing=west,lit=true": { "model": "distantstock:block/gauge_lit", "y": 270 },
+    "facing=east,lit=true": { "model": "distantstock:block/gauge_lit", "y": 90 }
   }
 }

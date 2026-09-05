@@ -10,11 +10,17 @@ public final class LinkQueues {
     public static final class Order {
         public final UUID freq;
         public final String address;
+        public final String from;
         public final List<Line> items;
 
         public Order(UUID freq, String address, List<Line> items) {
+            this(freq, address, items, "");
+        }
+
+        public Order(UUID freq, String address, List<Line> items, String from) {
             this.freq = freq;
             this.address = address == null ? "" : address;
+            this.from = from == null ? "" : from;
             this.items = List.copyOf(items);
         }
     }
@@ -25,11 +31,17 @@ public final class LinkQueues {
     public static final class Parcel {
         public final String nbt;
         public final String address;
+        public final String to;
         public int tries;
 
         public Parcel(String nbt, String address) {
+            this(nbt, address, "");
+        }
+
+        public Parcel(String nbt, String address, String to) {
             this.nbt = nbt;
             this.address = address == null ? "" : address;
+            this.to = to == null ? "" : to;
         }
     }
 

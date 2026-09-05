@@ -12,39 +12,42 @@ Cross-server Create warehouse. Logistics stays on one JVM; the hop is sealed pac
 
 ---
 
-**Create: Distant Stock** (机械动力：远仓) is a NeoForge 1.21.1 addon for Create 6. Each side loads the same jar. Admins set `host` / `peer` and an address in toml; players only tune a frequency and type a package address. **Blocks never ask for an IP.** Version is [`gradle.properties`](gradle.properties) and [Releases](https://github.com/EVGA2048/Create-Distant-Stock/releases).
+**Create: Distant Stock** (机械动力：远仓) is a NeoForge 1.21.1 addon for Create 6. Each server loads the same jar. The warehouse listens; outer servers connect to it (star: one warehouse, many survival worlds). Players only tune a frequency and type a package address. **Blocks never ask for an IP.** Version is [`gradle.properties`](gradle.properties) and [Releases](https://github.com/EVGA2048/Create-Distant-Stock/releases).
 
 Mod id: `distantstock`. HTTP **18772**, header `X-DistantStock-Token`. Code uses `self.id` from config — **do not hardcode server names**.
 
 ## What it is not
 
-- No third hub process. `host` listens; `peer` connects out.
+- No third hub process. Warehouse `self.id=host` listens; outer servers connect only to the warehouse.
 - Clients never speak HTTP. This server’s io thread polls the other side into a cache.
 - Two Stock Link networks stay separate. Only unopened `PackageItem` NBT crosses the wire.
-- Not Create: Mobile Packages. No bees. The handheld item is a stock-keeper window; the hop is the linker.
+- It does not use Mobile Packages' drone logic. The Distant Dock only borrows the transport-bee port's industrial bay language; transport remains a cross-server package hop.
+- No remote packager. The warehouse uses a vanilla Create packager.
 - The main thread never does HTTP and never joins on a reply.
 
 ## Pieces
 
 | Name | id | Role |
 |------|-----|------|
-| Portable Distant Requester | `requester` | Hands or Curios `body`. Right-click a Stock Link to copy freq. **H** opens the menu. |
-| Distant Linker | `linker` | Export = freq (ship packages). Import = address only (restore packages). |
-| Distant Gauge | `gauge` | Wall requester; same GUI as the portable item. |
+| Portable Distant Requester | `requester` | Hands or Curios `body`. Join from the open-network list. **H** opens the menu. |
+| Distant Dock | `dock` | Export = freq (ship packages). Import = address only (restore packages). |
+| Distant Request Desk | `gauge` | Floor ticker; same GUI as the portable item. |
 | Distant Monitor | `monitor` | Wall dashboard: local/peer TPS and link pressure. |
+| Distant Stock Manual | `manual` | Creative tab. `giveManual` (default on) gives one on first join. |
 
-All three blocks implement Create goggles. Sneak for extra lines. Never show `peer.host`, port, or token.
+All three blocks implement Create goggles. Live data only; the tutorial is the manual. Never show `peer.host`, port, or token.
 
 Same-JVM frequency calls `broadcastPackageRequest`. Otherwise `POST /order`; packed boxes come back as `POST /package`.
 
 ## Install
 
 1. Drop `Create-Distant-Stock-<ver>+mc1.21.1.jar` into both `mods/` folders (Create required).
-2. Edit `config/distantstock-common.toml`:
-   - One side: `self.id = "host"`, `self.bind = "0.0.0.0:18772"`.
-   - Other side: `self.id = "peer"`, `peer.host` / `peer.port` pointing at host.
-   - **Same `token` on both sides.** Empty token is for dev only.
-3. Restart. Missing keys are filled in; existing values are not overwritten.
+2. In-game as **OP**, open link setup (writes this server’s `config/distantstock-common.toml` and restarts the listener):
+   - `/distantstock`, or sneak-click a Distant Monitor.
+   - **Host**: self id, listen `0.0.0.0:18772`, client list `id@host:port` (comma), password.
+   - **Client**: unique self id, listen (needed to receive packages), warehouse `host@host:port`, **same password**.
+   - Toml still works: `self.role` / `self.id` / `peers` / `token`. Legacy `peer.host` / `peer.port` count as one `id=peer`.
+3. Missing keys are filled in; existing values are not overwritten.
 
 `debug.demoStock` defaults to `false`. Turn it on only to preview the UI.
 
@@ -56,7 +59,7 @@ Token header required when `token` is set. Server io thread only.
 |--|------|--|
 | `GET` | `/stock?freq=` | Cached catalog |
 | `GET` | `/status` | Local TPS/MSPT, queue depth, `self.id` |
-| `POST` | `/order` | Enqueue `{freq, address, items[]}` |
+| `POST` | `/order` | Enqueue `{freq, address, from, items[]}`. `from` is who gets the package back. |
 | `POST` | `/package` | Enqueue package NBT |
 
 `503` means the queue is full; the peer retries.

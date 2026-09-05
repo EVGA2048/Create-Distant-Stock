@@ -1,22 +1,296 @@
 {
   "parent": "minecraft:block/block",
   "textures": {
-    "particle": "create:block/andesite_casing",
-    "back": "create:block/andesite_casing",
-    "front": "create:block/brass_casing",
-    "accent": "minecraft:block/stripped_warped_stem"
+    "wood": "distantstock:block/machine_wood",
+    "metal": "distantstock:block/machine_metal",
+    "brass": "distantstock:block/machine_brass",
+    "face": "distantstock:block/gauge_face",
+    "particle": "create:block/andesite_casing"
   },
   "elements": [
     {
-      "from": [0, 0, 14],
-      "to": [16, 16, 16],
+      "name": "plinth",
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        3,
+        16
+      ],
       "faces": {
-        "north": { "uv": [0, 0, 16, 16], "texture": "#front" },
-        "south": { "uv": [0, 0, 16, 16], "texture": "#back" },
-        "east": { "uv": [14, 0, 16, 16], "texture": "#accent" },
-        "west": { "uv": [0, 0, 2, 16], "texture": "#accent" },
-        "up": { "uv": [0, 0, 16, 2], "texture": "#accent" },
-        "down": { "uv": [0, 14, 16, 16], "texture": "#accent" }
+        "north": {
+          "texture": "#wood",
+          "uv": [
+            0,
+            13,
+            16,
+            16
+          ]
+        },
+        "south": {
+          "texture": "#wood",
+          "uv": [
+            0,
+            13,
+            16,
+            16
+          ]
+        },
+        "west": {
+          "texture": "#wood",
+          "uv": [
+            0,
+            13,
+            16,
+            16
+          ]
+        },
+        "east": {
+          "texture": "#wood",
+          "uv": [
+            0,
+            13,
+            16,
+            16
+          ]
+        },
+        "up": {
+          "texture": "#wood",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "down": {
+          "texture": "#wood",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        }
+      }
+    },
+    {
+      "name": "pedestal",
+      "from": [
+        2,
+        3,
+        3
+      ],
+      "to": [
+        14,
+        8,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#wood",
+          "uv": [
+            2,
+            8,
+            14,
+            13
+          ]
+        },
+        "south": {
+          "texture": "#wood",
+          "uv": [
+            2,
+            8,
+            14,
+            13
+          ]
+        },
+        "west": {
+          "texture": "#wood",
+          "uv": [
+            3,
+            8,
+            14,
+            13
+          ]
+        },
+        "east": {
+          "texture": "#wood",
+          "uv": [
+            2,
+            8,
+            13,
+            13
+          ]
+        },
+        "up": {
+          "texture": "#wood",
+          "uv": [
+            2,
+            3,
+            14,
+            14
+          ]
+        },
+        "down": {
+          "texture": "#wood",
+          "uv": [
+            2,
+            2,
+            14,
+            13
+          ]
+        }
+      }
+    },
+    {
+      "name": "rear_housing",
+      "from": [
+        2,
+        8,
+        10
+      ],
+      "to": [
+        14,
+        11,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#wood",
+          "uv": [
+            2,
+            5,
+            14,
+            8
+          ]
+        },
+        "south": {
+          "texture": "#wood",
+          "uv": [
+            2,
+            5,
+            14,
+            8
+          ]
+        },
+        "west": {
+          "texture": "#wood",
+          "uv": [
+            10,
+            5,
+            14,
+            8
+          ]
+        },
+        "east": {
+          "texture": "#wood",
+          "uv": [
+            2,
+            5,
+            6,
+            8
+          ]
+        },
+        "up": {
+          "texture": "#wood",
+          "uv": [
+            2,
+            10,
+            14,
+            14
+          ]
+        },
+        "down": {
+          "texture": "#wood",
+          "uv": [
+            2,
+            2,
+            14,
+            6
+          ]
+        }
+      }
+    },
+    {
+      "name": "sloped_control_panel",
+      "from": [
+        1,
+        8,
+        2
+      ],
+      "to": [
+        15,
+        10,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#metal",
+          "uv": [
+            1,
+            6,
+            15,
+            8
+          ]
+        },
+        "south": {
+          "texture": "#metal",
+          "uv": [
+            1,
+            6,
+            15,
+            8
+          ]
+        },
+        "west": {
+          "texture": "#metal",
+          "uv": [
+            2,
+            6,
+            14,
+            8
+          ]
+        },
+        "east": {
+          "texture": "#metal",
+          "uv": [
+            2,
+            6,
+            14,
+            8
+          ]
+        },
+        "up": {
+          "texture": "#face",
+          "uv": [
+            1,
+            2,
+            15,
+            14
+          ]
+        },
+        "down": {
+          "texture": "#metal",
+          "uv": [
+            1,
+            2,
+            15,
+            14
+          ]
+        }
+      },
+      "rotation": {
+        "origin": [
+          8,
+          9,
+          8
+        ],
+        "axis": "x",
+        "angle": -22.5
       }
     }
   ]

@@ -1,6 +1,7 @@
 package dev.distantstock.link;
 
 import dev.distantstock.config.StockConfig;
+import dev.distantstock.stock.NetworkDirectory;
 import dev.distantstock.stock.StockCache;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -15,13 +16,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-/** 本服 io 线程拉对面。客户端零 HTTP。 */
+/** 本服 io 线程拉对面。客户端零 HTTP。星型：订单去仓库；包裹按 to 寄回下单那一台。 */
 public final class LinkClient {
     private static final Logger LOG = LogManager.getLogger();
+    private static final Pattern NETWORK = Pattern.compile(
+            "\\{\"freq\":\"([^\"]+)\",\"server\":\"([^\"]*)\",\"links\":(\\d+)\\}");
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .connectTimeout(Duration.ofMillis(1500))
             .build();
@@ -62,6 +67,9 @@ public final class LinkClient {
             return;
         }
         pullStatus();
+        if (!StockConfig.isHost()) {
+            pullNetworks();
+        }
         for (UUID freq : StockCache.watched(5 * 60_000L)) {
             if (StockCache.isLocal(freq) && StockCache.ageMs(freq) < 15_000L) {
                 continue;
@@ -73,7 +81,7 @@ public final class LinkClient {
     private static void flushOrders() {
         LinkQueues.Order order;
         while ((order = LinkQueues.pollOutboundOrder()) != null) {
-            if (!post("/order", orderJson(order))) {
+            if (!postTo(StockConfig.first(), "/order", orderJson(order))) {
                 LinkQueues.offerOutboundOrder(order);
                 break;
             }
@@ -83,9 +91,10 @@ public final class LinkClient {
     private static void flushPackages() {
         LinkQueues.Parcel p;
         while ((p = LinkQueues.pollOutboundPackage()) != null) {
+            StockConfig.Peer dest = p.to.isBlank() ? StockConfig.first() : StockConfig.byId(p.to);
             String body = "{\"nbt\":\"" + LinkHttp.jsonEsc(p.nbt)
                     + "\",\"address\":\"" + LinkHttp.jsonEsc(p.address) + "\"}";
-            if (post("/package", body)) {
+            if (postTo(dest, "/package", body)) {
                 LinkQueues.landed();
             } else {
                 LinkQueues.requeueOutbound(p);
@@ -95,21 +104,35 @@ public final class LinkClient {
     }
 
     private static void pullStatus() {
-        long t0 = System.nanoTime();
-        String json = get("/status");
-        long rtt = (System.nanoTime() - t0) / 1_000_000L;
-        if (json == null || !json.contains("\"ok\":true")) {
-            LinkSnapshot.peerFail();
-            return;
+        List<StockConfig.Peer> peers = StockConfig.peers();
+        int up = 0;
+        long lastRtt = -1;
+        String lastId = "";
+        double lastTps = 0;
+        double lastMspt = 0;
+        for (StockConfig.Peer peer : peers) {
+            long t0 = System.nanoTime();
+            String json = getFrom(peer, "/status");
+            long rtt = (System.nanoTime() - t0) / 1_000_000L;
+            if (json == null || !json.contains("\"ok\":true")) {
+                continue;
+            }
+            up++;
+            lastId = LinkHttp.field(json, "self");
+            lastTps = num(LinkHttp.field(json, "tps"), 0);
+            lastMspt = num(LinkHttp.field(json, "mspt"), 0);
+            lastRtt = rtt;
         }
-        String id = LinkHttp.field(json, "self");
-        double tps = num(LinkHttp.field(json, "tps"), 0);
-        double mspt = num(LinkHttp.field(json, "mspt"), 0);
-        LinkSnapshot.peerOk(id, tps, mspt, rtt);
+        if (up > 0) {
+            LinkSnapshot.peersOk(up, peers.size(), lastId, lastTps, lastMspt, lastRtt);
+        } else {
+            LinkSnapshot.peerFail();
+            LinkSnapshot.peersTotal(peers.size());
+        }
     }
 
     private static void pullStock(UUID freq) {
-        String json = get("/stock?freq=" + freq);
+        String json = getFrom(StockConfig.first(), "/stock?freq=" + freq);
         if (json == null || !json.contains("\"ok\":true")) {
             return;
         }
@@ -120,12 +143,31 @@ public final class LinkClient {
         StockCache.put(freq, items, StockCache.Source.PEER);
     }
 
-    private static boolean post(String path, String body) {
-        if (!StockConfig.hasPeer()) {
+    private static void pullNetworks() {
+        String json = getFrom(StockConfig.first(), "/networks");
+        if (json == null || !json.contains("\"ok\":true")) {
+            return;
+        }
+        List<NetworkDirectory.Entry> entries = new ArrayList<>();
+        Matcher matcher = NETWORK.matcher(json);
+        while (matcher.find()) {
+            try {
+                entries.add(new NetworkDirectory.Entry(
+                        UUID.fromString(matcher.group(1)),
+                        matcher.group(2),
+                        Integer.parseInt(matcher.group(3))));
+            } catch (Exception ignored) {
+            }
+        }
+        NetworkDirectory.replacePeer(entries);
+    }
+
+    private static boolean postTo(StockConfig.Peer peer, String path, String body) {
+        if (peer == null) {
             return false;
         }
         try {
-            HttpRequest.Builder b = HttpRequest.newBuilder(uri(path))
+            HttpRequest.Builder b = HttpRequest.newBuilder(uri(peer, path))
                     .timeout(Duration.ofMillis(2500))
                     .header("Content-Type", "application/json; charset=UTF-8")
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
@@ -138,12 +180,12 @@ public final class LinkClient {
         }
     }
 
-    private static String get(String path) {
-        if (!StockConfig.hasPeer()) {
+    private static String getFrom(StockConfig.Peer peer, String path) {
+        if (peer == null) {
             return null;
         }
         try {
-            HttpRequest.Builder b = HttpRequest.newBuilder(uri(path))
+            HttpRequest.Builder b = HttpRequest.newBuilder(uri(peer, path))
                     .timeout(Duration.ofMillis(2500))
                     .GET();
             token(b);
@@ -164,16 +206,15 @@ public final class LinkClient {
         }
     }
 
-    private static URI uri(String path) {
-        String host = StockConfig.PEER_HOST.get().trim();
-        int port = StockConfig.PEER_PORT.get();
-        return URI.create("http://" + host + ":" + port + path);
+    private static URI uri(StockConfig.Peer peer, String path) {
+        return URI.create("http://" + peer.host() + ":" + peer.port() + path);
     }
 
     static String orderJson(LinkQueues.Order order) {
         StringBuilder sb = new StringBuilder("{\"freq\":\"")
                 .append(order.freq).append("\",\"address\":\"")
-                .append(LinkHttp.jsonEsc(order.address)).append("\",\"items\":[");
+                .append(LinkHttp.jsonEsc(order.address)).append("\",\"from\":\"")
+                .append(LinkHttp.jsonEsc(order.from)).append("\",\"items\":[");
         for (int i = 0; i < order.items.size(); i++) {
             if (i > 0) {
                 sb.append(',');

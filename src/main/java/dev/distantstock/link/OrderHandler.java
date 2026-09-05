@@ -32,7 +32,8 @@ final class OrderHandler implements HttpHandler {
                 LinkHttp.reply(ex, 400, "{\"ok\":false,\"err\":\"items\"}");
                 return;
             }
-            if (!LinkQueues.offerInboundOrder(new LinkQueues.Order(freq, address, items))) {
+            String from = LinkHttp.field(body, "from");
+            if (!LinkQueues.offerInboundOrder(new LinkQueues.Order(freq, address, items, from))) {
                 LinkHttp.reply(ex, 503, "{\"ok\":false,\"err\":\"full\"}");
                 return;
             }

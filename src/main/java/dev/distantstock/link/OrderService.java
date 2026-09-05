@@ -30,7 +30,7 @@ public final class OrderService {
             LinkQueues.lastPack(freq, LinkQueues.PackResult.UNLOADED);
             return Result.NO_PEER;
         }
-        boolean ok = LinkQueues.offerOutboundOrder(new LinkQueues.Order(freq, address, lines));
+        boolean ok = LinkQueues.offerOutboundOrder(new LinkQueues.Order(freq, address, lines, StockConfig.selfId()));
         if (ok) {
             LinkClient.wake();
             return Result.QUEUED;
@@ -50,6 +50,7 @@ public final class OrderService {
                 LinkQueues.lastPack(order.freq, LinkQueues.PackResult.UNLOADED);
                 continue;
             }
+            ReturnRoute.remember(order.address, order.from);
             boolean ok = CreateStock.request(order.freq, items, order.address);
             LinkQueues.lastPack(order.freq, ok ? LinkQueues.PackResult.SUCCESS : LinkQueues.PackResult.NO_STOCK);
         }

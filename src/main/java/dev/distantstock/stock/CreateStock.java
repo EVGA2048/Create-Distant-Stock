@@ -14,6 +14,7 @@ import net.minecraft.world.item.Items;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /** 主线程才能碰 Create 物流。 */
@@ -23,6 +24,22 @@ public final class CreateStock {
             return false;
         }
         return Create.LOGISTICS.logisticsNetworks.containsKey(freq);
+    }
+
+    public static List<NetworkDirectory.Entry> openNetworks(String serverId) {
+        if (Create.LOGISTICS == null || Create.LOGISTICS.logisticsNetworks == null) {
+            return List.of();
+        }
+        List<NetworkDirectory.Entry> out = new ArrayList<>();
+        for (Map.Entry<UUID, com.simibubi.create.content.logistics.packagerLink.LogisticsNetwork> row
+                : Create.LOGISTICS.logisticsNetworks.entrySet()) {
+            var network = row.getValue();
+            if (network == null || network.locked || network.loadedLinks == null || network.loadedLinks.isEmpty()) {
+                continue;
+            }
+            out.add(new NetworkDirectory.Entry(row.getKey(), serverId, network.loadedLinks.size()));
+        }
+        return out;
     }
 
     public static List<StockCache.Entry> summary(UUID freq) {

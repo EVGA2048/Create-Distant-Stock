@@ -17,6 +17,8 @@ public final class LinkSnapshot {
     public static volatile int peerFails;
     public static volatile String peerId = "";
     public static volatile long peerSeenMs;
+    public static volatile int peersUp;
+    public static volatile int peersTotal;
 
     private static long prevNano = System.nanoTime();
     private static double ewmaMspt = 50;
@@ -43,8 +45,10 @@ public final class LinkSnapshot {
         inFlight = LinkQueues.inFlight();
     }
 
-    public static void peerOk(String id, double tps, double mspt, long rttMs) {
-        peerUp = true;
+    public static void peersOk(int up, int total, String id, double tps, double mspt, long rttMs) {
+        peerUp = up > 0;
+        peersUp = up;
+        peersTotal = total;
         peerId = id == null ? "" : id;
         peerTps = tps;
         peerMspt = mspt;
@@ -52,11 +56,17 @@ public final class LinkSnapshot {
         peerSeenMs = System.currentTimeMillis();
     }
 
+    public static void peersTotal(int total) {
+        peersTotal = total;
+        peersUp = 0;
+    }
+
     public static void peerFail() {
         peerFails++;
         if (peerSeenMs == 0 || System.currentTimeMillis() - peerSeenMs > 4000) {
             peerUp = false;
             peerRttMs = -1;
+            peersUp = 0;
         }
     }
 
@@ -65,8 +75,7 @@ public final class LinkSnapshot {
     }
 
     public static String linkLabel() {
-        String peer = peerId == null || peerId.isBlank() ? "—" : peerId;
-        return selfId() + " \u2194 " + peer;
+        return view().linkLabel();
     }
 
     public static View view() {
@@ -82,7 +91,9 @@ public final class LinkSnapshot {
                 peerTps,
                 peerMspt,
                 peerRttMs,
-                peerFails
+                peerFails,
+                peersUp,
+                peersTotal
         );
     }
 
@@ -98,9 +109,14 @@ public final class LinkSnapshot {
             double peerTps,
             double peerMspt,
             double peerRttMs,
-            int peerFails
+            int peerFails,
+            int peersUp,
+            int peersTotal
     ) {
         public String linkLabel() {
+            if (peersTotal > 1) {
+                return selfId + " · " + peersUp + "/" + peersTotal;
+            }
             String peer = peerId == null || peerId.isBlank() ? "—" : peerId;
             return selfId + " \u2194 " + peer;
         }
