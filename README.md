@@ -4,15 +4,15 @@
 
 [中文](README.md) · [English](README.en.md)
 
-[![Release](https://img.shields.io/github/v/release/EVGA2048/DistantStock)](https://github.com/EVGA2048/DistantStock/releases)
-[![License](https://img.shields.io/github/license/EVGA2048/DistantStock)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/EVGA2048/Create-Distant-Stock)](https://github.com/EVGA2048/Create-Distant-Stock/releases)
+[![License](https://img.shields.io/github/license/EVGA2048/Create-Distant-Stock)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://adoptium.net/)
 [![NeoForge](https://img.shields.io/badge/NeoForge-1.21.1-blue)](https://neoforged.net/)
 [![Create](https://img.shields.io/badge/Create-6.0.10-yellow)](https://modrinth.com/mod/create)
 
 ---
 
-**Create: Distant Stock**（机械动力：远仓）是面向 NeoForge 1.21.1、依赖 Create 6 的跨服仓管附属。两边各装一份，管理员在配置里指定 `host` / `peer` 与地址；玩家只调谐频率、填写包裹地址，**方块里不填 IP**。版本号以 [`gradle.properties`](gradle.properties) 与 [GitHub Releases](https://github.com/EVGA2048/DistantStock/releases) 为准。
+**Create: Distant Stock**（机械动力：远仓）是面向 NeoForge 1.21.1、依赖 Create 6 的跨服仓管附属。两边各装一份，管理员在配置里指定 `host` / `peer` 与地址；玩家只调谐频率、填写包裹地址，**方块里不填 IP**。版本号以 [`gradle.properties`](gradle.properties) 与 [GitHub Releases](https://github.com/EVGA2048/Create-Distant-Stock/releases) 为准。
 
 模组 id：`distantstock`。HTTP 默认 **18772**，头 `X-DistantStock-Token`。和 EtherLink（18771）、PeerLink（18770）、AllMusic（18765）错开。代码只认配置里的 `self.id`，**不要写死服名**。
 
@@ -182,7 +182,7 @@ JDK 21。编译期 `compileOnly` 本地 Create 6.0.10 jar（见 `build.gradle`�
 
 本模组建议用于你充分信任、能够共同维护端口与 token 的两台服务器。互通一旦建立，库存目录与未拆包裹便会在两端之间流动；不要把 18772 暴露给不可信的网络。
 
-目前仍在测试，功能与配置仍可能调整。缺陷请通过 [Issue](https://github.com/EVGA2048/DistantStock/issues) 反馈；改进亦欢迎 [Pull Request](https://github.com/EVGA2048/DistantStock/pulls)。
+目前仍在测试，功能与配置仍可能调整。缺陷请通过 [Issue](https://github.com/EVGA2048/Create-Distant-Stock/issues) 反馈；改进亦欢迎 [Pull Request](https://github.com/EVGA2048/Create-Distant-Stock/pulls)。
 
 ## 许可证
 

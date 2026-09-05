@@ -4,15 +4,15 @@ Cross-server Create warehouse. Logistics stays on one JVM; the hop is sealed pac
 
 [中文](README.md) · [English](README.en.md)
 
-[![Release](https://img.shields.io/github/v/release/EVGA2048/DistantStock)](https://github.com/EVGA2048/DistantStock/releases)
-[![License](https://img.shields.io/github/license/EVGA2048/DistantStock)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/EVGA2048/Create-Distant-Stock)](https://github.com/EVGA2048/Create-Distant-Stock/releases)
+[![License](https://img.shields.io/github/license/EVGA2048/Create-Distant-Stock)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://adoptium.net/)
 [![NeoForge](https://img.shields.io/badge/NeoForge-1.21.1-blue)](https://neoforged.net/)
 [![Create](https://img.shields.io/badge/Create-6.0.10-yellow)](https://modrinth.com/mod/create)
 
 ---
 
-**Create: Distant Stock** (机械动力：远仓) is a NeoForge 1.21.1 addon for Create 6. Each side loads the same jar. Admins set `host` / `peer` and an address in toml; players only tune a frequency and type a package address. **Blocks never ask for an IP.** Version is [`gradle.properties`](gradle.properties) and [Releases](https://github.com/EVGA2048/DistantStock/releases).
+**Create: Distant Stock** (机械动力：远仓) is a NeoForge 1.21.1 addon for Create 6. Each side loads the same jar. Admins set `host` / `peer` and an address in toml; players only tune a frequency and type a package address. **Blocks never ask for an IP.** Version is [`gradle.properties`](gradle.properties) and [Releases](https://github.com/EVGA2048/Create-Distant-Stock/releases).
 
 Mod id: `distantstock`. HTTP **18772**, header `X-DistantStock-Token`. Code uses `self.id` from config — **do not hardcode server names**.
 
