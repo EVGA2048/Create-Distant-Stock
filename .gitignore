@@ -1,0 +1,10 @@
+.gradle/
+build/
+run/
+run-data/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+*.jar
+!gradle/wrapper/gradle-wrapper.jar

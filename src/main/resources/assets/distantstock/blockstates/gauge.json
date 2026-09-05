@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "distantstock:block/gauge" },
+    "facing=south": { "model": "distantstock:block/gauge", "y": 180 },
+    "facing=west": { "model": "distantstock:block/gauge", "y": 270 },
+    "facing=east": { "model": "distantstock:block/gauge", "y": 90 }
+  }
+}

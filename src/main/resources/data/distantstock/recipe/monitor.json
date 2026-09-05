@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": {
+    "A": { "item": "minecraft:andesite" },
+    "W": { "item": "minecraft:stripped_warped_stem" },
+    "G": { "item": "minecraft:glass_pane" }
+  },
+  "pattern": [
+    "AWA",
+    "WGW",
+    "AWA"
+  ],
+  "result": { "count": 1, "id": "distantstock:monitor" }
+}

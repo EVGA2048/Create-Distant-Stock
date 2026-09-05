@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "top": "minecraft:block/stripped_warped_stem_top",
+    "front": "create:block/brass_casing",
+    "side": "minecraft:block/stripped_warped_stem"
+  }
+}

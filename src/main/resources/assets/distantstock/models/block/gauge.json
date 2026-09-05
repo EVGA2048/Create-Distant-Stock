@@ -1,0 +1,23 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "create:block/andesite_casing",
+    "back": "create:block/andesite_casing",
+    "front": "create:block/brass_casing",
+    "accent": "minecraft:block/stripped_warped_stem"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 14],
+      "to": [16, 16, 16],
+      "faces": {
+        "north": { "uv": [0, 0, 16, 16], "texture": "#front" },
+        "south": { "uv": [0, 0, 16, 16], "texture": "#back" },
+        "east": { "uv": [14, 0, 16, 16], "texture": "#accent" },
+        "west": { "uv": [0, 0, 2, 16], "texture": "#accent" },
+        "up": { "uv": [0, 0, 16, 2], "texture": "#accent" },
+        "down": { "uv": [0, 14, 16, 16], "texture": "#accent" }
+      }
+    }
+  ]
+}
