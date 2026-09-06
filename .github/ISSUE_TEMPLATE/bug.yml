@@ -1,0 +1,12 @@
+name: 缺陷
+description: 出了问题
+title: ""
+labels: [bug]
+type: bug
+body:
+  - type: textarea
+    id: body
+    attributes:
+      label: 说明
+    validations:
+      required: true
