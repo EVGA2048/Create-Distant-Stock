@@ -15,9 +15,9 @@ public final class PackagePump {
             if (pkg.isEmpty() || !PackageItem.isPackage(pkg)) {
                 continue;
             }
-            DockBlockEntity dest = LoadedDocks.importFor(pkg);
+            DockBlockEntity dest = LoadedDocks.importFor(pkg, p.receivingDockGroupId);
             if (dest == null) {
-                LoadedDocks.noMatch(pkg);
+                LoadedDocks.noMatch(pkg, p.receivingDockGroupId);
                 continue;
             }
             if (dest.isFull() || !dest.insert(pkg)) {

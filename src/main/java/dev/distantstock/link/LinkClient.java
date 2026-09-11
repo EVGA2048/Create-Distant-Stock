@@ -93,7 +93,8 @@ public final class LinkClient {
         while ((p = LinkQueues.pollOutboundPackage()) != null) {
             StockConfig.Peer dest = p.to.isBlank() ? StockConfig.first() : StockConfig.byId(p.to);
             String body = "{\"nbt\":\"" + LinkHttp.jsonEsc(p.nbt)
-                    + "\",\"address\":\"" + LinkHttp.jsonEsc(p.address) + "\"}";
+                    + "\",\"address\":\"" + LinkHttp.jsonEsc(p.address)
+                    + "\",\"dockGroup\":\"" + p.receivingDockGroupId + "\"}";
             if (postTo(dest, "/package", body)) {
                 LinkQueues.landed();
             } else {

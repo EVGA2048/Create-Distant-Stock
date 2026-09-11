@@ -18,6 +18,21 @@ public final class ModBlocks {
             BLOCKS.register("gauge", () -> new GaugeBlock(machine().noOcclusion()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, MonitorBlock> MONITOR =
             BLOCKS.register("monitor", () -> new MonitorBlock(panel()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, RemotePackagerBlock> REMOTE_PACKAGER =
+            BLOCKS.register("remote_packager", () -> new RemotePackagerBlock(machine()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, SignalPanelBlock> SIGNAL_PANEL =
+            BLOCKS.register("signal_panel", () -> new SignalPanelBlock(panel()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, IndicatorLampBlock> CYAN_INDICATOR_LAMP = lamp("cyan_indicator_lamp");
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, IndicatorLampBlock> ORANGE_INDICATOR_LAMP = lamp("orange_indicator_lamp");
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, IndicatorLampBlock> RED_INDICATOR_LAMP = lamp("red_indicator_lamp");
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, IndicatorLampBlock> GREEN_INDICATOR_LAMP = lamp("green_indicator_lamp");
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, IndicatorLampBlock> WHITE_INDICATOR_LAMP = lamp("white_indicator_lamp");
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, IndicatorLampBlock> BRASS_INDICATOR_LAMP = lamp("brass_indicator_lamp");
+
+    private static DeferredHolder<net.minecraft.world.level.block.Block, IndicatorLampBlock> lamp(String name) {
+        return BLOCKS.register(name, () -> new IndicatorLampBlock(panel()
+                .lightLevel(state -> state.getValue(IndicatorLampBlock.LIT) ? 10 : 0)));
+    }
 
     private static BlockBehaviour.Properties machine() {
         return BlockBehaviour.Properties.of()
@@ -35,5 +50,9 @@ public final class ModBlocks {
     }
 
     private ModBlocks() {
+    }
+
+    public static net.minecraft.world.level.block.entity.BlockEntityType<SignalPanelBlockEntity> SIGNAL_PANEL_ENTITY_TYPE() {
+        return ModBlockEntities.SIGNAL_PANEL.get();
     }
 }

@@ -14,12 +14,13 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.ArrayList;
 import java.util.List;
+import dev.distantstock.routing.RemoteNetworkId;
 
 public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> networks) implements CustomPacketPayload {
     public record Line(String itemId, int count) {
     }
 
-    public record NetworkLine(java.util.UUID freq, String server, int links) {
+    public record NetworkLine(java.util.UUID freq, String server, int links, RemoteNetworkId networkId) {
     }
 
     public static final Type<StockSyncS2C> TYPE = new Type<>(
@@ -28,11 +29,8 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
             ByteBufCodecs.STRING_UTF8, Line::itemId,
             ByteBufCodecs.VAR_INT, Line::count,
             Line::new);
-    public static final StreamCodec<RegistryFriendlyByteBuf, NetworkLine> NETWORK_CODEC = StreamCodec.composite(
-            net.minecraft.core.UUIDUtil.STREAM_CODEC, NetworkLine::freq,
-            ByteBufCodecs.STRING_UTF8, NetworkLine::server,
-            ByteBufCodecs.VAR_INT, NetworkLine::links,
-            NetworkLine::new);
+    public static final StreamCodec<RegistryFriendlyByteBuf, NetworkLine> NETWORK_CODEC =
+            StreamCodec.of(StockSyncS2C::writeNetwork, StockSyncS2C::readNetwork);
     public static final StreamCodec<RegistryFriendlyByteBuf, StockSyncS2C> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.BOOL, StockSyncS2C::demo,
             ByteBufCodecs.collection(ArrayList::new, LINE_CODEC), StockSyncS2C::items,
@@ -53,7 +51,7 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
         }
         List<NetworkLine> networks = new ArrayList<>();
         for (NetworkDirectory.Entry entry : NetworkDirectory.visible(StockConfig.isHost())) {
-            networks.add(new NetworkLine(entry.freq(), entry.server(), entry.links()));
+            networks.add(new NetworkLine(entry.freq(), entry.server(), entry.links(), entry.networkId()));
         }
         return new StockSyncS2C(demo, lines, networks);
     }
@@ -71,9 +69,28 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
             menu.stock = list;
             List<NetworkDirectory.Entry> networks = new ArrayList<>();
             for (NetworkLine line : msg.networks) {
-                networks.add(new NetworkDirectory.Entry(line.freq, line.server, line.links));
+                networks.add(new NetworkDirectory.Entry(line.freq, line.server, line.links, line.networkId));
             }
             menu.networks = networks;
         });
+    }
+
+    private static void writeNetwork(RegistryFriendlyByteBuf buf, NetworkLine line) {
+        buf.writeUUID(line.freq());
+        buf.writeUtf(line.server(), 64);
+        buf.writeVarInt(line.links());
+        buf.writeBoolean(line.networkId() != null);
+        if (line.networkId() != null) {
+            buf.writeNbt(line.networkId().save());
+        }
+    }
+
+    private static NetworkLine readNetwork(RegistryFriendlyByteBuf buf) {
+        java.util.UUID freq = buf.readUUID();
+        String server = buf.readUtf(64);
+        int links = buf.readVarInt();
+        RemoteNetworkId networkId = buf.readBoolean()
+                ? RemoteNetworkId.read(buf.readNbt()).orElse(null) : null;
+        return new NetworkLine(freq, server, links, networkId);
     }
 }

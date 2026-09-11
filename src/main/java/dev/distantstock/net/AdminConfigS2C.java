@@ -1,10 +1,9 @@
 package dev.distantstock.net;
 
 import dev.distantstock.DistantStock;
-import dev.distantstock.client.AdminScreen;
+import dev.distantstock.client.ClientPayloadHandlers;
 import dev.distantstock.config.StockConfig;
 import dev.distantstock.link.LinkSnapshot;
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -34,7 +33,7 @@ public record AdminConfigS2C(
                 StockConfig.TOKEN.get() == null ? "" : StockConfig.TOKEN.get(),
                 StockConfig.peersText(),
                 LinkSnapshot.linkLabel(),
-                LinkSnapshot.peerUp
+                LinkSnapshot.view().linkUp()
         );
     }
 
@@ -66,6 +65,6 @@ public record AdminConfigS2C(
     }
 
     public static void handle(AdminConfigS2C msg, IPayloadContext ctx) {
-        ctx.enqueueWork(() -> Minecraft.getInstance().setScreen(new AdminScreen(msg)));
+        ctx.enqueueWork(() -> ClientPayloadHandlers.openAdmin(msg));
     }
 }

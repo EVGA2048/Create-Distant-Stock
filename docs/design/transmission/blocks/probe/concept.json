@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "status": "offline_concept_only",
+  "name": {
+    "zh_cn": "远仓探测仪",
+    "en_us": "Distant Probe"
+  },
+  "suggestedRegistryId": "distantstock:probe",
+  "registered": false,
+  "kind": "item",
+  "placement": "handheld_item",
+  "boundsModelPixels": null,
+  "meshFormat": "render_scene face list; not Minecraft block JSON",
+  "states": [
+    "read_only"
+  ],
+  "ports": "handheld / range display",
+  "materialSource": "create_materials / installed Create jar (CREATE_JAR override)",
+  "notes": "Handheld read-only range display showing the enabled chunk footprint."
+}

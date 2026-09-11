@@ -18,9 +18,11 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
 import java.util.UUID;
+import dev.distantstock.routing.RemoteNetworkId;
 
 public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleInformation {
     private UUID freq;
+    private RemoteNetworkId networkId;
     private String address = "";
     private OrderService.Result lastOrder;
     private int catalog;
@@ -41,6 +43,17 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
 
     public void setFreq(UUID freq) {
         this.freq = freq;
+        this.networkId = null;
+        sync();
+    }
+
+    public RemoteNetworkId networkId() {
+        return networkId;
+    }
+
+    public void setNetwork(RemoteNetworkId networkId) {
+        this.networkId = networkId;
+        this.freq = networkId == null ? null : networkId.createFrequency();
         sync();
     }
 
@@ -63,7 +76,10 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
             return;
         }
         StockCache.watch(freq);
-        catalog = StockCache.size(freq);
+        if (networkId != null) {
+            StockCache.watch(networkId);
+        }
+        catalog = networkId == null ? StockCache.size(freq) : StockCache.size(networkId);
         dataLocal = StockCache.isLocal(freq);
         long age = StockCache.ageMs(freq);
         cacheAgeSec = age < 0 ? -1 : (int) (age / 1000);
@@ -124,6 +140,9 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
         if (freq != null) {
             tag.putUUID("Freq", freq);
         }
+        if (networkId != null) {
+            tag.put("RemoteNetwork", networkId.save());
+        }
         tag.putString("Address", address);
         if (lastOrder != null) {
             tag.putString("LastOrder", lastOrder.name());
@@ -137,6 +156,8 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider regs) {
         super.loadAdditional(tag, regs);
         freq = tag.hasUUID("Freq") ? tag.getUUID("Freq") : null;
+        networkId = tag.contains("RemoteNetwork")
+                ? RemoteNetworkId.read(tag.getCompound("RemoteNetwork")).orElse(null) : null;
         address = tag.getString("Address");
         if (tag.contains("LastOrder")) {
             try {

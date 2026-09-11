@@ -1,0 +1,6 @@
+{
+  "parent": "distantstock:block/remote_packager_vertical",
+  "textures": {
+    "5": "distantstock:block/remote_packager_vertical_linked"
+  }
+}

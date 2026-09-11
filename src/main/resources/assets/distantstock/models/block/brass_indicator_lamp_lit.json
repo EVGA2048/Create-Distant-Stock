@@ -1,0 +1,7 @@
+{
+  "parent": "distantstock:block/brass_indicator_lamp",
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "lamp": "distantstock:block/signal_lamp_brass_off"
+  }
+}

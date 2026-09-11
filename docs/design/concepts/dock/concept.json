@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "status": "offline_concept_only",
+  "name": {
+    "zh_cn": "远仓港",
+    "en_us": "Distant Stock Dock"
+  },
+  "suggestedRegistryId": "distantstock:dock",
+  "registered": true,
+  "revision": "dock-berth-v1",
+  "placement": {
+    "independentBlock": true,
+    "cellCount": 1,
+    "boundsModelPixels": [
+      [
+        -8,
+        0,
+        -8
+      ],
+      [
+        8,
+        16,
+        8
+      ]
+    ],
+    "front": "north"
+  },
+  "meshFormat": "render_scene face list; not Minecraft block JSON",
+  "api": {
+    "build": "build(state='idle') -> list[face]",
+    "textures": "textures() -> dict[str, PIL.Image]",
+    "states": [
+      "idle",
+      "online",
+      "loaded"
+    ]
+  },
+  "states": {
+    "idle": {
+      "berth": "empty",
+      "lamp": "blue-gray (off)",
+      "beam": "off"
+    },
+    "online": {
+      "berth": "empty",
+      "lamp": "cyan (ready)",
+      "beam": "on"
+    },
+    "loaded": {
+      "berth": "parcel + cyan envelope",
+      "lamp": "cyan",
+      "beam": "on"
+    }
+  },
+  "stateSemantics": {
+    "beamAndEnvelopeAreEffects": true,
+    "noRoundGauge": true,
+    "noFlatControlPanel": true
+  },
+  "ports": [
+    {
+      "owner": "dock",
+      "kind": "kinetic_input",
+      "face": "east",
+      "center": [
+        8,
+        8,
+        0
+      ]
+    },
+    {
+      "owner": "dock",
+      "kind": "parcel_handoff",
+      "face": "south",
+      "center": [
+        0,
+        8,
+        8
+      ]
+    },
+    {
+      "owner": "dock",
+      "kind": "fluid_input_reserved",
+      "face": "west",
+      "center": [
+        -8,
+        8,
+        0
+      ],
+      "fluid": null
+    }
+  ],
+  "materials": {
+    "andesite": {
+      "source": "andesite_block",
+      "crop": [
+        0,
+        0,
+        16,
+        16
+      ]
+    },
+    "casing": {
+      "source": "andesite_casing",
+      "crop": [
+        0,
+        0,
+        16,
+        16
+      ]
+    },
+    "cast_white": {
+      "source": "palettes/stone_types/polished/andesite_cut_polished",
+      "crop": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "brightness": 1.22
+    },
+    "iron": {
+      "source": "industrial_iron_block",
+      "crop": [
+        0,
+        0,
+        16,
+        16
+      ]
+    },
+    "blue_gray": {
+      "source": "industrial_iron_block",
+      "crop": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "tint": [
+        "#344854",
+        "#B5CCD4"
+      ]
+    },
+    "wood": {
+      "source": "andesite_casing",
+      "crop": [
+        3,
+        3,
+        13,
+        13
+      ]
+    }
+  },
+  "materialSource": "create_materials.material/source; installed Create jar or CREATE_JAR override",
+  "noImplementationClaims": [
+    "parcel teleport",
+    "fluid transfer",
+    "beam physics",
+    "game state logic"
+  ],
+  "fluid": {
+    "name": null,
+    "registered": false
+  }
+}

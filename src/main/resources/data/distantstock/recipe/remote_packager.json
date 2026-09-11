@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": {
+    "P": { "item": "create:packager" },
+    "D": { "item": "minecraft:light_blue_dye" },
+    "A": { "item": "minecraft:amethyst_shard" },
+    "C": { "item": "minecraft:copper_ingot" }
+  },
+  "pattern": [
+    " D ",
+    "APA",
+    " C "
+  ],
+  "result": { "count": 1, "id": "distantstock:remote_packager" }
+}

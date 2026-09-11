@@ -1,0 +1,229 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:translucent",
+  "textures": {
+    "back": "distantstock:block/andesite_block_white_blue",
+    "side": "distantstock:block/monitor_side",
+    "top": "distantstock:block/monitor_top",
+    "face": "distantstock:block/monitor_face_tps",
+    "bulb": "distantstock:block/monitor_bulb",
+    "particle": "create:block/andesite_casing"
+  },
+  "elements": [
+    {
+      "name": "wall_panel",
+      "from": [
+        0,
+        0,
+        13
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
+      "faces": {
+        "north": {
+          "texture": "#face",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "south": {
+          "texture": "#back",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "west": {
+          "texture": "#side",
+          "uv": [
+            3,
+            0,
+            0,
+            16
+          ]
+        },
+        "east": {
+          "texture": "#side",
+          "uv": [
+            0,
+            0,
+            3,
+            16
+          ]
+        },
+        "up": {
+          "texture": "#top",
+          "uv": [
+            0,
+            0,
+            16,
+            3
+          ]
+        },
+        "down": {
+          "texture": "#top",
+          "uv": [
+            0,
+            0,
+            16,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "name": "bulb_tps",
+      "comment": "TPS indicator \u2014 grey=off, green=ok, orange=lag, red=critical",
+      "from": [
+        10,
+        14,
+        11
+      ],
+      "to": [
+        12,
+        16,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#bulb",
+          "uv": [
+            2,
+            0,
+            4,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#bulb",
+          "uv": [
+            2,
+            0,
+            4,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#bulb",
+          "uv": [
+            2,
+            0,
+            4,
+            2
+          ],
+          "rotation": 90
+        },
+        "east": {
+          "texture": "#bulb",
+          "uv": [
+            2,
+            0,
+            4,
+            2
+          ],
+          "rotation": 90
+        },
+        "up": {
+          "texture": "#bulb",
+          "uv": [
+            2,
+            0,
+            4,
+            2
+          ],
+          "rotation": 180
+        },
+        "down": {
+          "texture": "#bulb",
+          "uv": [
+            2,
+            0,
+            4,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "bulb_status",
+      "comment": "Link status \u2014 grey=off, cyan=connected, orange=syncing, red=fault",
+      "from": [
+        13,
+        14,
+        11
+      ],
+      "to": [
+        15,
+        16,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#bulb",
+          "uv": [
+            4,
+            0,
+            6,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#bulb",
+          "uv": [
+            4,
+            0,
+            6,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#bulb",
+          "uv": [
+            4,
+            0,
+            6,
+            2
+          ],
+          "rotation": 90
+        },
+        "east": {
+          "texture": "#bulb",
+          "uv": [
+            4,
+            0,
+            6,
+            2
+          ],
+          "rotation": 90
+        },
+        "up": {
+          "texture": "#bulb",
+          "uv": [
+            4,
+            0,
+            6,
+            2
+          ],
+          "rotation": 180
+        },
+        "down": {
+          "texture": "#bulb",
+          "uv": [
+            4,
+            0,
+            6,
+            2
+          ]
+        }
+      }
+    }
+  ]
+}

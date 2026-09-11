@@ -1,5 +1,7 @@
 package dev.distantstock.link;
 
+import dev.distantstock.routing.DockGroupDirectory;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -11,6 +13,9 @@ public final class LinkQueues {
         public final UUID freq;
         public final String address;
         public final String from;
+        public final UUID receivingDockGroupId;
+        public final UUID correlationId;
+        public final UUID childOrderId;
         public final List<Line> items;
 
         public Order(UUID freq, String address, List<Line> items) {
@@ -18,9 +23,19 @@ public final class LinkQueues {
         }
 
         public Order(UUID freq, String address, List<Line> items, String from) {
+            this(freq, address, items, from, DockGroupDirectory.DEFAULT_GROUP_ID,
+                    UUID.randomUUID(), UUID.randomUUID());
+        }
+
+        public Order(UUID freq, String address, List<Line> items, String from, UUID receivingDockGroupId,
+                     UUID correlationId, UUID childOrderId) {
             this.freq = freq;
             this.address = address == null ? "" : address;
             this.from = from == null ? "" : from;
+            this.receivingDockGroupId = receivingDockGroupId == null
+                    ? DockGroupDirectory.DEFAULT_GROUP_ID : receivingDockGroupId;
+            this.correlationId = correlationId == null ? UUID.randomUUID() : correlationId;
+            this.childOrderId = childOrderId == null ? UUID.randomUUID() : childOrderId;
             this.items = List.copyOf(items);
         }
     }
@@ -32,16 +47,23 @@ public final class LinkQueues {
         public final String nbt;
         public final String address;
         public final String to;
+        public final UUID receivingDockGroupId;
         public int tries;
 
         public Parcel(String nbt, String address) {
-            this(nbt, address, "");
+            this(nbt, address, "", DockGroupDirectory.DEFAULT_GROUP_ID);
         }
 
         public Parcel(String nbt, String address, String to) {
+            this(nbt, address, to, DockGroupDirectory.DEFAULT_GROUP_ID);
+        }
+
+        public Parcel(String nbt, String address, String to, UUID receivingDockGroupId) {
             this.nbt = nbt;
             this.address = address == null ? "" : address;
             this.to = to == null ? "" : to;
+            this.receivingDockGroupId = receivingDockGroupId == null
+                    ? DockGroupDirectory.DEFAULT_GROUP_ID : receivingDockGroupId;
         }
     }
 

@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "status": "offline_concept_only",
+  "name": {
+    "zh_cn": "远仓信号塔控制器",
+    "en_us": "Distant Stock Signal Tower Controller"
+  },
+  "suggestedRegistryId": "distantstock:signal_tower_controller",
+  "registered": false,
+  "placement": {
+    "independentBlock": true,
+    "requiredTowerStructure": false,
+    "cellCount": 1,
+    "boundsModelPixels": [
+      [
+        -8,
+        0,
+        -8
+      ],
+      [
+        8,
+        16,
+        8
+      ]
+    ],
+    "front": "north",
+    "towerStructure": "Complete base + top tower; controller is optional, not a third required component"
+  },
+  "meshFormat": "render_scene face list; not Minecraft block JSON",
+  "api": {
+    "build": "build(state='bound') -> list[face]",
+    "textures": "textures() -> dict[str, PIL.Image]",
+    "materialPrefix": "tower_controller/",
+    "states": [
+      "unbound",
+      "bound",
+      "out_of_range",
+      "fault"
+    ]
+  },
+  "states": {
+    "unbound": {
+      "color": "#85939B",
+      "label": "UNBOUND",
+      "meaning": "No tower identity; controls unavailable"
+    },
+    "bound": {
+      "color": "#63BBD0",
+      "label": "BOUND",
+      "meaning": "Binding valid; not a chunk-loading success lamp"
+    },
+    "out_of_range": {
+      "color": "#D5AD69",
+      "label": "OUT OF RANGE",
+      "meaning": "Binding retained; configuration unavailable"
+    },
+    "fault": {
+      "color": "#CA7065",
+      "label": "FAULT",
+      "meaning": "Identity, structure, permission, load or apply failure"
+    }
+  },
+  "stateSemantics": {
+    "boundDoesNotMeanInterconnectEnabled": true,
+    "boundDoesNotMeanChunkLoadingEnabled": true,
+    "failedApplyMustNotShowSuccess": true,
+    "onlyBindingLampChanges": true
+  },
+  "materials": {
+    "casing": {
+      "source": "andesite_casing",
+      "crop": [
+        0,
+        0,
+        16,
+        16
+      ]
+    },
+    "andesite": {
+      "source": "andesite_block",
+      "crop": [
+        0,
+        0,
+        16,
+        16
+      ]
+    },
+    "cast_white": {
+      "source": "palettes/stone_types/polished/andesite_cut_polished",
+      "crop": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "brightness": 1.22
+    },
+    "blue_gray": {
+      "source": "industrial_iron_block",
+      "crop": [
+        0,
+        0,
+        16,
+        16
+      ],
+      "tint": [
+        "#344854",
+        "#B5CCD4"
+      ]
+    },
+    "iron": {
+      "source": "industrial_iron_block",
+      "crop": [
+        0,
+        0,
+        16,
+        16
+      ]
+    }
+  },
+  "materialSource": "create_materials.material/source; installed Create jar or CREATE_JAR override",
+  "originalAccents": [
+    "small semi-transparent binding lens",
+    "knob pointer"
+  ],
+  "noImplementationClaims": [
+    "server",
+    "game GUI",
+    "chunk tickets",
+    "rate enforcement",
+    "registration"
+  ],
+  "fluid": {
+    "name": null,
+    "registered": false
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "status": "offline_concept_only",
+  "name": {
+    "zh_cn": "互通塔底座",
+    "en_us": "Interconnect Tower Base"
+  },
+  "suggestedRegistryId": "distantstock:tower_base",
+  "registered": false,
+  "kind": "block",
+  "placement": "independentBlock",
+  "boundsModelPixels": [
+    [
+      -8,
+      0,
+      -8
+    ],
+    [
+      8,
+      16,
+      8
+    ]
+  ],
+  "meshFormat": "render_scene face list; not Minecraft block JSON",
+  "states": [
+    "enabled",
+    "off",
+    "fault"
+  ],
+  "ports": "kinetic south / fluid east",
+  "materialSource": "create_materials / installed Create jar (CREATE_JAR override)",
+  "notes": "Large link bulb + factory gauge + small chunk-loading bulb."
+}

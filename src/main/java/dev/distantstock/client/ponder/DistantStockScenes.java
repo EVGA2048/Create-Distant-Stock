@@ -1,6 +1,7 @@
 package dev.distantstock.client.ponder;
 
 import dev.distantstock.block.DockBlock;
+import dev.distantstock.block.DockStatus;
 import net.createmod.ponder.api.PonderPalette;
 import net.createmod.ponder.api.scene.SceneBuilder;
 import net.createmod.ponder.api.scene.SceneBuildingUtil;
@@ -15,7 +16,7 @@ public final class DistantStockScenes {
 
         scene.world().showSection(util.select().fromTo(1, 1, 2, 2, 1, 2), Direction.DOWN);
         scene.overlay().showText(70)
-                .text("The warehouse still packs with a Create packager. Distant Dock does not pack.")
+                .text("The warehouse can use the pale-blue Distant Packager. It keeps Create packing logic and produces Distant Parcels.")
                 .pointAt(util.vector().centerOf(2, 1, 2))
                 .placeNearTarget()
                 .attachKeyFrame();
@@ -36,8 +37,16 @@ public final class DistantStockScenes {
                 .placeNearTarget();
         scene.idle(85);
 
+        scene.overlay().showText(80)
+                .text("Never pipe out of the bottom face: that one is the fallback face for returns and for "
+                        + "items the other server cannot accept.")
+                .pointAt(util.vector().blockSurface(util.grid().at(4, 1, 2), Direction.DOWN))
+                .placeNearTarget()
+                .attachKeyFrame();
+        scene.idle(85);
+
         scene.world().modifyBlock(util.grid().at(4, 1, 2),
-                state -> state.setValue(DockBlock.LOADED, true), false);
+                state -> state.setValue(DockBlock.STATUS, DockStatus.SENDING), false);
         scene.overlay().showText(70)
                 .text("A parcel in the bay means the dock has something queued to send. It is not a shared stock network.")
                 .pointAt(util.vector().centerOf(4, 1, 2))
@@ -63,7 +72,7 @@ public final class DistantStockScenes {
 
         scene.world().showSection(util.select().fromTo(3, 1, 2, 4, 1, 2), Direction.WEST);
         scene.overlay().showText(80)
-                .text("Pull sealed packages out with a hopper or funnel. Unpack them with a Create packager if you need the items.")
+                .text("Pull sealed parcels out with a hopper or funnel. Distant Parcels remain compatible with Create logistics.")
                 .pointAt(util.vector().centerOf(3, 1, 2))
                 .placeNearTarget()
                 .attachKeyFrame();
@@ -123,7 +132,7 @@ public final class DistantStockScenes {
         scene.idle(75);
 
         scene.world().modifyBlock(util.grid().at(4, 1, 2),
-                state -> state.setValue(DockBlock.LIT, true), false);
+                state -> state.setValue(DockBlock.STATUS, DockStatus.STANDBY), false);
         scene.overlay().showText(70)
                 .text("The wall monitor shows local and peer load. Sending a request is not the same as a parcel arriving.")
                 .pointAt(util.vector().blockSurface(util.grid().at(3, 1, 3), Direction.SOUTH))
@@ -135,6 +144,19 @@ public final class DistantStockScenes {
                 .text("If the bay is full, the peer retries. Keep the dock chunk loaded and the address matched.")
                 .independent(32);
         scene.idle(80);
+
+        scene.overlay().showText(90)
+                .text("Lamp: off = not on the network, green = standby, cyan blinking = dispatching, "
+                        + "orange blinking = the fallback face is blocked, red = fault.")
+                .independent(36);
+        scene.idle(90);
+
+        scene.overlay().showText(100)
+                .text("The face underneath is the fallback face. Put a chute there: items the other server "
+                        + "cannot accept come out of it instead of vanishing. Without room below, the dock "
+                        + "blinks orange and holds them.")
+                .independent(36);
+        scene.idle(100);
         scene.markAsFinished();
     }
 

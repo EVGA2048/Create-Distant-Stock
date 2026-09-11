@@ -4,7 +4,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
 
 /**
- * 直接画 Create 仓管贴图（stock_keeper.png），不抄进自己的 jar。
+ * Create 仓管贴图的远仓纸张配色，保留原始 UV 和像素结构。
  * UV 对齐 6.0.10 AllGuiTextures.STOCK_KEEPER_REQUEST_*。
  */
 public enum CreateSheets {
@@ -23,7 +23,7 @@ public enum CreateSheets {
     BANNER_R(75, 228, 8, 16),
     BG(37, 48, 182, 20);
 
-    static final ResourceLocation TEX = ResourceLocation.fromNamespaceAndPath("create", "textures/gui/stock_keeper.png");
+    static final ResourceLocation TEX = ResourceLocation.fromNamespaceAndPath("distantstock", "textures/gui/stock_keeper.png");
 
     final int u;
     final int v;

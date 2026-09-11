@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "status": "offline_concept_only",
+  "name": {
+    "zh_cn": "便携式远仓请求器",
+    "en_us": "Portable Distant Requester"
+  },
+  "suggestedRegistryId": "distantstock:portable",
+  "registered": false,
+  "kind": "item",
+  "placement": "handheld_item",
+  "boundsModelPixels": null,
+  "meshFormat": "render_scene face list; not Minecraft block JSON",
+  "states": [
+    "tuned",
+    "untuned"
+  ],
+  "ports": "handheld",
+  "materialSource": "create_materials / installed Create jar (CREATE_JAR override)",
+  "notes": "Retained Mobile Packages silhouette; original recolor kept."
+}

@@ -19,6 +19,7 @@ import net.minecraft.world.item.ItemStack;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import dev.distantstock.routing.RemoteNetworkId;
 
 public final class RequesterMenu extends AbstractContainerMenu {
     public final InteractionHand hand;
@@ -87,6 +88,14 @@ public final class RequesterMenu extends AbstractContainerMenu {
         return RequesterData.address(device(player));
     }
 
+    public RemoteNetworkId networkId(Player player) {
+        GaugeBlockEntity be = gauge(player);
+        if (be != null) {
+            return be.networkId();
+        }
+        return RequesterData.network(device(player)).orElse(null);
+    }
+
     public void writeAddress(Player player, String address) {
         GaugeBlockEntity be = gauge(player);
         if (be != null) {
@@ -116,8 +125,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
 
     public void refresh(Player player) {
         UUID freq = freq(player);
-        MenuSync.warm(freq);
-        stock = new ArrayList<>(StockCache.get(freq));
+        RemoteNetworkId networkId = networkId(player);
+        MenuSync.warm(networkId, freq);
+        stock = new ArrayList<>(networkId == null ? StockCache.get(freq) : StockCache.get(networkId));
         demo = StockConfig.DEMO_STOCK.get();
     }
 

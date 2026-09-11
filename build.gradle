@@ -55,6 +55,8 @@ tasks.named('jar', Jar).configure {
 
 def createJar = file("${System.getProperty('user.home')}/Documents/minecraft_launcher/.minecraft/versions/ES2_Firmament_1.21.1_9th_9.3.2_SunlightSignal/mods/create-1.21.1-6.0.10.jar")
 def ponderJar = file("libs/ponder-neoforge-1.0.82+mc1.21.1.jar")
+def flywheelJar = file("libs/flywheel-neoforge-1.21.1-1.0.6.jar")
+def transerverJar = file("../Transerver/build/libs/Transerver-0.1.0-SNAPSHOT.jar")
 
 tasks.register('extractPonder') {
     onlyIf { !ponderJar.exists() }
@@ -69,15 +71,56 @@ tasks.register('extractPonder') {
     }
 }
 
+tasks.register('extractFlywheel') {
+    onlyIf { !flywheelJar.exists() }
+    doLast {
+        copy {
+            from zipTree(createJar)
+            include 'META-INF/jarjar/flywheel-neoforge-1.21.1-1.0.6.jar'
+            eachFile { it.path = it.name }
+            into 'libs'
+            includeEmptyDirs = false
+        }
+    }
+}
+
 tasks.named('compileJava').configure {
-    dependsOn 'extractPonder'
+    dependsOn 'extractPonder', 'extractFlywheel'
 }
 
 dependencies {
     compileOnly files(createJar)
+    runtimeOnly files(createJar)
     compileOnly files(ponderJar)
+    compileOnly files(flywheelJar)
+    compileOnly files(transerverJar)
+    runtimeOnly files(transerverJar)
+}
+
+// The protocol and custody checks live in the test source set and need the game classes to build NBT tags.
+configurations.named('testCompileOnly').configure {
+    extendsFrom(configurations.getByName('modDevCompileDependencies'))
+}
+configurations.named('testRuntimeOnly').configure {
+    extendsFrom(configurations.getByName('modDevRuntimeDependencies'))
 }
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+}
+
+tasks.register('verifyWireCodec', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.distantstock.link.PackageDispatchCodecCheck'
+}
+
+tasks.register('verifyParcelOwnership', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.distantstock.link.ParcelOwnershipCheck'
+}
+
+tasks.withType(Test).configureEach {
+    failOnNoDiscoveredTests = false
 }

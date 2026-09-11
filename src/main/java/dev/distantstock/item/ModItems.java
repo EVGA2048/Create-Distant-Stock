@@ -23,6 +23,18 @@ public final class ModItems {
             () -> new BlockItem(ModBlocks.GAUGE.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> MONITOR = ITEMS.register("monitor",
             () -> new BlockItem(ModBlocks.MONITOR.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, BlockItem> REMOTE_PACKAGER = ITEMS.register("remote_packager",
+            () -> new BlockItem(ModBlocks.REMOTE_PACKAGER.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, SignalLampPanelItem> CYAN_INDICATOR_LAMP = lamp("cyan_indicator_lamp", SignalLampPanelItem.Color.CYAN);
+    public static final DeferredHolder<Item, SignalLampPanelItem> ORANGE_INDICATOR_LAMP = lamp("orange_indicator_lamp", SignalLampPanelItem.Color.ORANGE);
+    public static final DeferredHolder<Item, SignalLampPanelItem> RED_INDICATOR_LAMP = lamp("red_indicator_lamp", SignalLampPanelItem.Color.RED);
+    public static final DeferredHolder<Item, SignalLampPanelItem> GREEN_INDICATOR_LAMP = lamp("green_indicator_lamp", SignalLampPanelItem.Color.GREEN);
+    public static final DeferredHolder<Item, SignalLampPanelItem> WHITE_INDICATOR_LAMP = lamp("white_indicator_lamp", SignalLampPanelItem.Color.WHITE);
+    public static final DeferredHolder<Item, SignalLampPanelItem> BRASS_SIGNAL_LAMP = ITEMS.register("brass_signal_lamp",
+            () -> new SignalLampPanelItem(new Item.Properties(), SignalLampPanelItem.Material.BRASS,
+                    SignalLampPanelItem.Color.WHITE));
+    public static final DeferredHolder<Item, RemotePackageItem> REMOTE_PACKAGE = ITEMS.register("remote_package",
+            () -> new RemotePackageItem(new Item.Properties()));
     public static final DeferredHolder<Item, Item> MANUAL = ITEMS.register("manual",
             () -> new ManualItem(new Item.Properties().stacksTo(1)));
 
@@ -34,9 +46,27 @@ public final class ModItems {
                 out.accept(DOCK.get());
                 out.accept(GAUGE.get());
                 out.accept(MONITOR.get());
+                out.accept(REMOTE_PACKAGER.get());
+                out.accept(CYAN_INDICATOR_LAMP.get());
+                out.accept(ORANGE_INDICATOR_LAMP.get());
+                out.accept(RED_INDICATOR_LAMP.get());
+                out.accept(GREEN_INDICATOR_LAMP.get());
+                out.accept(WHITE_INDICATOR_LAMP.get());
+                out.accept(BRASS_SIGNAL_LAMP.get());
+                out.accept(REMOTE_PACKAGE.get());
                 out.accept(MANUAL.get());
             })
             .build());
+
+    private static DeferredHolder<Item, BlockItem> block(String name,
+                                                          DeferredHolder<net.minecraft.world.level.block.Block, ? extends net.minecraft.world.level.block.Block> block) {
+        return ITEMS.register(name, () -> new BlockItem(block.get(), new Item.Properties()));
+    }
+
+    private static DeferredHolder<Item, SignalLampPanelItem> lamp(String name, SignalLampPanelItem.Color color) {
+        return ITEMS.register(name, () -> new SignalLampPanelItem(new Item.Properties(),
+                SignalLampPanelItem.Material.ANDESITE, color));
+    }
 
     private ModItems() {
     }

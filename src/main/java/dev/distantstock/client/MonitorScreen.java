@@ -55,28 +55,28 @@ public final class MonitorScreen extends Screen {
                 Component.translatable("gui.distantstock.peer"),
                 view.peerTps(), view.peerMspt(),
                 view.peerRttMs() < 0 ? "—" : (int) view.peerRttMs() + " ms",
-                view.peerUp());
+                view.linkUp());
 
         drawCounters(g);
         super.render(g, mouseX, mouseY, partial);
     }
 
     private void drawStatus(GuiGraphics g) {
-        Component state = Component.translatable(view.peerUp()
+        Component state = Component.translatable(view.linkUp()
                 ? "gui.distantstock.status.online"
                 : "gui.distantstock.status.offline");
-        int color = view.peerUp() ? 0xB8E4D8 : 0xF0B4A8;
+        int color = view.linkUp() ? 0xB8E4D8 : 0xF0B4A8;
         int x = left + W - 15 - font.width(state);
         g.drawString(font, state, x, top + 13, color, false);
         int lampX = x - 10;
         g.fill(lampX, top + 14, lampX + 5, top + 19, 0xFF533E28);
         g.fill(lampX + 1, top + 15, lampX + 4, top + 18,
-                view.peerUp() ? 0xFF62C8B8 : 0xFF9A5145);
+                view.linkUp() ? 0xFF62C8B8 : 0xFF9A5145);
     }
 
     private void drawRoute(GuiGraphics g) {
         String route = fit(view.linkLabel(), W - 38);
-        int color = view.peerUp() ? AETHER : MUTED;
+        int color = view.linkUp() ? AETHER : MUTED;
         g.drawString(font, route, left + W / 2 - font.width(route) / 2, top + 35, color, false);
     }
 
@@ -134,7 +134,7 @@ public final class MonitorScreen extends Screen {
                 Integer.toString(view.peerFails())
         };
         int[] colors = {
-                view.peerUp() ? GOOD : BAD,
+                view.linkUp() ? GOOD : BAD,
                 view.orderDepth() == 0 ? INK : WARN,
                 view.packageDepth() == 0 ? INK : WARN,
                 view.inFlight() == 0 ? INK : AETHER,

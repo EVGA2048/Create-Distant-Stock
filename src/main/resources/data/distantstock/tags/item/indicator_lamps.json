@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "distantstock:cyan_indicator_lamp",
+    "distantstock:orange_indicator_lamp",
+    "distantstock:red_indicator_lamp",
+    "distantstock:green_indicator_lamp",
+    "distantstock:white_indicator_lamp"
+  ]
+}

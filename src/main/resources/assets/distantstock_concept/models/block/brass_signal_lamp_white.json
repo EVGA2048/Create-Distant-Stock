@@ -1,0 +1,6 @@
+{
+  "parent": "distantstock_concept:block/brass_signal_lamp",
+  "textures": {
+    "lamp": "distantstock:block/indicator_lamp_white_on"
+  }
+}

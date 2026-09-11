@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "redstone",
+  "ingredients": [
+    { "tag": "distantstock:indicator_lamps" },
+    { "item": "minecraft:white_dye" }
+  ],
+  "result": { "count": 1, "id": "distantstock:white_indicator_lamp" }
+}

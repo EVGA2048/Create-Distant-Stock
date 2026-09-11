@@ -39,15 +39,20 @@ public final class MonitorBlockEntity extends BlockEntity implements IHaveGoggle
         LinkSnapshot.View v = LinkSnapshot.view();
         be.localTps = v.localTps();
         be.localMspt = v.localMspt();
-        be.peerUp = v.peerUp();
+        be.peerUp = v.linkUp();
         be.peerTps = v.peerTps();
         be.backlog = v.orderDepth() + v.packageDepth();
         be.rtt = (int) v.peerRttMs();
         be.role = v.selfId();
         be.fails = v.peerFails();
         be.inFlight = v.inFlight();
+        MonitorBlock.Status status = MonitorBlock.Status.fromTps(be.localTps);
+        if (state.getValue(MonitorBlock.STATUS) != status) {
+            level.setBlock(pos, state.setValue(MonitorBlock.STATUS, status), 3);
+        }
         be.setChanged();
-        level.sendBlockUpdated(pos, state, state, 3);
+        BlockState current = be.getBlockState();
+        level.sendBlockUpdated(pos, current, current, 3);
     }
 
     @Override

@@ -1,6 +1,10 @@
 package dev.distantstock.block;
 
+import com.simibubi.create.content.equipment.wrench.IWrenchable;
 import com.mojang.serialization.MapCodec;
+import dev.distantstock.link.TranserverBridge;
+import dev.distantstock.routing.DockGroupDirectory;
+import dev.distantstock.routing.DockMode;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.item.RequesterItem;
 import net.minecraft.core.BlockPos;
@@ -23,17 +27,23 @@ import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
-public final class DockBlock extends BaseEntityBlock {
+public final class DockBlock extends BaseEntityBlock implements IWrenchable {
+
+    /** Rotation would silently move the cabin or the panel slots, so a wrench click only reports state. */
+    @Override
+    public net.minecraft.world.InteractionResult onWrenched(net.minecraft.world.level.block.state.BlockState state,
+                                                            net.minecraft.world.item.context.UseOnContext context) {
+        return net.minecraft.world.InteractionResult.SUCCESS;
+    }
     public static final DirectionProperty FACING = HorizontalDirectionalBlock.FACING;
-    public static final BooleanProperty LOADED = BooleanProperty.create("loaded");
-    public static final BooleanProperty LIT = BooleanProperty.create("lit");
+    public static final EnumProperty<DockStatus> STATUS = EnumProperty.create("status", DockStatus.class);
     public static final MapCodec<DockBlock> CODEC = simpleCodec(DockBlock::new);
     private static final VoxelShape SHAPE = Block.box(0, 0, 0, 16, 16, 16);
 
@@ -41,8 +51,7 @@ public final class DockBlock extends BaseEntityBlock {
         super(props);
         registerDefaultState(stateDefinition.any()
                 .setValue(FACING, Direction.NORTH)
-                .setValue(LOADED, false)
-                .setValue(LIT, false));
+                .setValue(STATUS, DockStatus.INACTIVE));
     }
 
     @Override
@@ -52,7 +61,7 @@ public final class DockBlock extends BaseEntityBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> b) {
-        b.add(FACING, LOADED, LIT);
+        b.add(FACING, STATUS);
     }
 
     @Override
@@ -83,13 +92,22 @@ public final class DockBlock extends BaseEntityBlock {
     @Nullable
     @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        return new DockBlockEntity(pos, state);
+        return new DockBlockEntity(ModBlockEntities.DOCK.get(), pos, state);
     }
 
     @Nullable
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        return level.isClientSide ? null : createTickerHelper(type, ModBlockEntities.DOCK.get(), DockBlockEntity::serverTick);
+        // Runs on both sides: Create only initialises behaviours from SmartBlockEntity.tick().
+        return createTickerHelper(type, ModBlockEntities.DOCK.get(), DockBlockEntity::serverTick);
+    }
+
+    @Override
+    public BlockState playerWillDestroy(Level level, BlockPos pos, BlockState state, Player player) {
+        if (!level.isClientSide && level.getBlockEntity(pos) instanceof DockBlockEntity dock) {
+            dock.spillContents();
+        }
+        return super.playerWillDestroy(level, pos, state, player);
     }
 
     @Override
@@ -101,24 +119,43 @@ public final class DockBlock extends BaseEntityBlock {
         if (stack.getItem() instanceof RequesterItem) {
             if (!level.isClientSide) {
                 if (player.isShiftKeyDown()) {
+                    // Sneak + requester: apply the requester's dock group and address to this dock.
                     be.setImport(RequesterData.address(stack));
+                    RequesterData.receivingGroup(stack).ifPresent(be::setGroupId);
                 } else if (RequesterData.tuned(stack)) {
-                    be.setExport(RequesterData.freq(stack));
+                    be.setMode(DockMode.SEND);
+                    // Copy this dock's group onto the requester for later application.
+                    RequesterData.setReceivingGroup(stack, be.groupId());
+                    RequesterData.network(stack)
+                            .filter(network -> !network.nodeId().equals(TranserverBridge.nodeId()))
+                            .ifPresent(network -> be.setDefaultDestination(network.nodeId(),
+                                    DockGroupDirectory.DEFAULT_GROUP_ID));
                 }
+                be.clearFault();
                 player.displayClientMessage(be.modeMessage(), true);
             }
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
-        if (isWrench(stack) || stack.isEmpty()) {
-            if (!level.isClientSide) {
+        if (isWrench(stack)) {
+            if (!level.isClientSide && !player.isShiftKeyDown()) {
+                be.clearFault();
                 player.displayClientMessage(be.modeMessage(), true);
             }
-            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+            // Never consume the wrench: Create removes blocks with sneak-right-click and opens the value
+            // settings panel by holding it, both of which need this click to fall through.
+            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        }
+        if (stack.isEmpty()) {
+            if (!level.isClientSide) {
+                be.clearFault();
+                player.displayClientMessage(be.modeMessage(), true);
+            }
+            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
         return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
     }
 
-    private static boolean isWrench(ItemStack stack) {
-        return "create:wrench".equals(String.valueOf(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem())));
+    static boolean isWrench(ItemStack stack) {
+        return stack.is(net.neoforged.neoforge.common.Tags.Items.TOOLS_WRENCH);
     }
 }

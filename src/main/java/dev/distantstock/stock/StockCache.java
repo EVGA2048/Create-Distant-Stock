@@ -1,6 +1,7 @@
 package dev.distantstock.stock;
 
 import dev.distantstock.config.StockConfig;
+import dev.distantstock.routing.RemoteNetworkId;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
@@ -42,6 +43,10 @@ public final class StockCache {
     private static final Map<UUID, Long> WATCHED = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> WRITTEN = new ConcurrentHashMap<>();
     private static final Set<UUID> LOCAL = ConcurrentHashMap.newKeySet();
+    private static final Map<RemoteNetworkId, List<Entry>> NETWORK_CACHE = new ConcurrentHashMap<>();
+    private static final Map<RemoteNetworkId, Long> NETWORK_WATCHED = new ConcurrentHashMap<>();
+    private static final Map<RemoteNetworkId, Long> NETWORK_WRITTEN = new ConcurrentHashMap<>();
+    private static final Set<RemoteNetworkId> LOCAL_NETWORKS = ConcurrentHashMap.newKeySet();
 
     public static List<Entry> get(UUID freq) {
         if (freq == null) {
@@ -74,6 +79,63 @@ public final class StockCache {
         } else if (source == Source.PEER) {
             LOCAL.remove(freq);
         }
+    }
+
+    public static List<Entry> get(RemoteNetworkId networkId) {
+        if (networkId == null) {
+            return List.of();
+        }
+        List<Entry> list = NETWORK_CACHE.get(networkId);
+        if (list != null && !list.isEmpty()) {
+            return list;
+        }
+        return StockConfig.DEMO_STOCK.get() ? demo() : List.of();
+    }
+
+    public static void put(RemoteNetworkId networkId, List<Entry> list, Source source) {
+        if (networkId == null) {
+            return;
+        }
+        if (source == Source.PEER && LOCAL_NETWORKS.contains(networkId)) {
+            Long written = NETWORK_WRITTEN.get(networkId);
+            if (written != null && System.currentTimeMillis() - written < 15_000L) {
+                return;
+            }
+        }
+        NETWORK_CACHE.put(networkId, List.copyOf(list));
+        NETWORK_WRITTEN.put(networkId, System.currentTimeMillis());
+        if (source == Source.LOCAL) {
+            LOCAL_NETWORKS.add(networkId);
+        } else if (source == Source.PEER) {
+            LOCAL_NETWORKS.remove(networkId);
+        }
+    }
+
+    public static void watch(RemoteNetworkId networkId) {
+        if (networkId != null) {
+            NETWORK_WATCHED.put(networkId, System.currentTimeMillis());
+        }
+    }
+
+    public static List<RemoteNetworkId> watchedNetworks(long maxAgeMs) {
+        long now = System.currentTimeMillis();
+        List<RemoteNetworkId> out = new ArrayList<>();
+        NETWORK_WATCHED.forEach((id, time) -> {
+            if (now - time <= maxAgeMs) {
+                out.add(id);
+            }
+        });
+        return out;
+    }
+
+    public static long ageMs(RemoteNetworkId networkId) {
+        Long time = networkId == null ? null : NETWORK_WRITTEN.get(networkId);
+        return time == null ? -1 : Math.max(0, System.currentTimeMillis() - time);
+    }
+
+    public static int size(RemoteNetworkId networkId) {
+        List<Entry> list = networkId == null ? null : NETWORK_CACHE.get(networkId);
+        return list == null ? 0 : list.size();
     }
 
     public static void watch(UUID freq) {

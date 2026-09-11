@@ -1,8 +1,16 @@
 {
   "variants": {
-    "facing=north": { "model": "distantstock:block/monitor" },
-    "facing=south": { "model": "distantstock:block/monitor", "y": 180 },
-    "facing=west": { "model": "distantstock:block/monitor", "y": 270 },
-    "facing=east": { "model": "distantstock:block/monitor", "y": 90 }
+    "facing=north,status=green": { "model": "distantstock:block/monitor_green" },
+    "facing=south,status=green": { "model": "distantstock:block/monitor_green", "y": 180 },
+    "facing=west,status=green": { "model": "distantstock:block/monitor_green", "y": 270 },
+    "facing=east,status=green": { "model": "distantstock:block/monitor_green", "y": 90 },
+    "facing=north,status=orange": { "model": "distantstock:block/monitor_orange" },
+    "facing=south,status=orange": { "model": "distantstock:block/monitor_orange", "y": 180 },
+    "facing=west,status=orange": { "model": "distantstock:block/monitor_orange", "y": 270 },
+    "facing=east,status=orange": { "model": "distantstock:block/monitor_orange", "y": 90 },
+    "facing=north,status=red": { "model": "distantstock:block/monitor_red" },
+    "facing=south,status=red": { "model": "distantstock:block/monitor_red", "y": 180 },
+    "facing=west,status=red": { "model": "distantstock:block/monitor_red", "y": 270 },
+    "facing=east,status=red": { "model": "distantstock:block/monitor_red", "y": 90 }
   }
 }

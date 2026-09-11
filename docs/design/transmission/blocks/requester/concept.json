@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "status": "offline_concept_only",
+  "name": {
+    "zh_cn": "远仓请求器",
+    "en_us": "Distant Requester"
+  },
+  "suggestedRegistryId": "distantstock:requester",
+  "registered": false,
+  "kind": "block",
+  "placement": "independentBlock",
+  "boundsModelPixels": [
+    [
+      -8,
+      0,
+      -8
+    ],
+    [
+      8,
+      16,
+      8
+    ]
+  ],
+  "meshFormat": "render_scene face list; not Minecraft block JSON",
+  "states": {
+    "tuned": "lens cyan",
+    "untuned": "lens dull"
+  },
+  "ports": "floor device / tuning lens",
+  "materialSource": "create_materials / installed Create jar (CREATE_JAR override)",
+  "notes": "Floor request device; only the tuning lens changes color."
+}

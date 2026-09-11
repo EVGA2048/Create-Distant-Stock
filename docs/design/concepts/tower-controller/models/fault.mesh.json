@@ -1,0 +1,11424 @@
+{
+  "format": "render_scene",
+  "state": "fault",
+  "faces": [
+    {
+      "points": [
+        [
+          7.6,
+          14.6,
+          -6.3
+        ],
+        [
+          -7.6,
+          14.6,
+          -6.3
+        ],
+        [
+          -7.6,
+          1.4,
+          -6.3
+        ],
+        [
+          7.6,
+          1.4,
+          -6.3
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/casing",
+      "group": "tower_controller/casing",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -7.6,
+          14.6,
+          7.6
+        ],
+        [
+          7.6,
+          14.6,
+          7.6
+        ],
+        [
+          7.6,
+          1.4,
+          7.6
+        ],
+        [
+          -7.6,
+          1.4,
+          7.6
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/casing",
+      "group": "tower_controller/casing",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -7.6,
+          14.6,
+          -6.3
+        ],
+        [
+          -7.6,
+          14.6,
+          7.6
+        ],
+        [
+          -7.6,
+          1.4,
+          7.6
+        ],
+        [
+          -7.6,
+          1.4,
+          -6.3
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/casing",
+      "group": "tower_controller/casing",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          7.6,
+          14.6,
+          7.6
+        ],
+        [
+          7.6,
+          14.6,
+          -6.3
+        ],
+        [
+          7.6,
+          1.4,
+          -6.3
+        ],
+        [
+          7.6,
+          1.4,
+          7.6
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/casing",
+      "group": "tower_controller/casing",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -7.6,
+          14.6,
+          -6.3
+        ],
+        [
+          7.6,
+          14.6,
+          -6.3
+        ],
+        [
+          7.6,
+          14.6,
+          7.6
+        ],
+        [
+          -7.6,
+          14.6,
+          7.6
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/casing",
+      "group": "tower_controller/casing",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -7.6,
+          1.4,
+          7.6
+        ],
+        [
+          7.6,
+          1.4,
+          7.6
+        ],
+        [
+          7.6,
+          1.4,
+          -6.3
+        ],
+        [
+          -7.6,
+          1.4,
+          -6.3
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/casing",
+      "group": "tower_controller/casing",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          8.0,
+          1.4,
+          -8.0
+        ],
+        [
+          -8.0,
+          1.4,
+          -8.0
+        ],
+        [
+          -8.0,
+          0.0,
+          -8.0
+        ],
+        [
+          8.0,
+          0.0,
+          -8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16.0,
+          0
+        ],
+        [
+          16.0,
+          1.4
+        ],
+        [
+          0,
+          1.4
+        ]
+      ],
+      "material": "tower_controller/andesite",
+      "group": "tower_controller/base",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          1.4,
+          8.0
+        ],
+        [
+          8.0,
+          1.4,
+          8.0
+        ],
+        [
+          8.0,
+          0.0,
+          8.0
+        ],
+        [
+          -8.0,
+          0.0,
+          8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16.0,
+          0
+        ],
+        [
+          16.0,
+          1.4
+        ],
+        [
+          0,
+          1.4
+        ]
+      ],
+      "material": "tower_controller/andesite",
+      "group": "tower_controller/base",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          1.4,
+          -8.0
+        ],
+        [
+          -8.0,
+          1.4,
+          8.0
+        ],
+        [
+          -8.0,
+          0.0,
+          8.0
+        ],
+        [
+          -8.0,
+          0.0,
+          -8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16.0,
+          0
+        ],
+        [
+          16.0,
+          1.4
+        ],
+        [
+          0,
+          1.4
+        ]
+      ],
+      "material": "tower_controller/andesite",
+      "group": "tower_controller/base",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          8.0,
+          1.4,
+          8.0
+        ],
+        [
+          8.0,
+          1.4,
+          -8.0
+        ],
+        [
+          8.0,
+          0.0,
+          -8.0
+        ],
+        [
+          8.0,
+          0.0,
+          8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16.0,
+          0
+        ],
+        [
+          16.0,
+          1.4
+        ],
+        [
+          0,
+          1.4
+        ]
+      ],
+      "material": "tower_controller/andesite",
+      "group": "tower_controller/base",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          1.4,
+          -8.0
+        ],
+        [
+          8.0,
+          1.4,
+          -8.0
+        ],
+        [
+          8.0,
+          1.4,
+          8.0
+        ],
+        [
+          -8.0,
+          1.4,
+          8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16.0,
+          0
+        ],
+        [
+          16.0,
+          16.0
+        ],
+        [
+          0,
+          16.0
+        ]
+      ],
+      "material": "tower_controller/andesite",
+      "group": "tower_controller/base",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          0.0,
+          8.0
+        ],
+        [
+          8.0,
+          0.0,
+          8.0
+        ],
+        [
+          8.0,
+          0.0,
+          -8.0
+        ],
+        [
+          -8.0,
+          0.0,
+          -8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16.0,
+          0
+        ],
+        [
+          16.0,
+          16.0
+        ],
+        [
+          0,
+          16.0
+        ]
+      ],
+      "material": "tower_controller/andesite",
+      "group": "tower_controller/base",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          8.0,
+          16.0,
+          -8.0
+        ],
+        [
+          -8.0,
+          16.0,
+          -8.0
+        ],
+        [
+          -8.0,
+          14.6,
+          -8.0
+        ],
+        [
+          8.0,
+          14.6,
+          -8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16.0,
+          0
+        ],
+        [
+          16.0,
+          1.4000000000000004
+        ],
+        [
+          0,
+          1.4000000000000004
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lid",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          16.0,
+          8.0
+        ],
+        [
+          8.0,
+          16.0,
+          8.0
+        ],
+        [
+          8.0,
+          14.6,
+          8.0
+        ],
+        [
+          -8.0,
+          14.6,
+          8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16.0,
+          0
+        ],
+        [
+          16.0,
+          1.4000000000000004
+        ],
+        [
+          0,
+          1.4000000000000004
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lid",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          16.0,
+          -8.0
+        ],
+        [
+          -8.0,
+          16.0,
+          8.0
+        ],
+        [
+          -8.0,
+          14.6,
+          8.0
+        ],
+        [
+          -8.0,
+          14.6,
+          -8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16.0,
+          0
+        ],
+        [
+          16.0,
+          1.4000000000000004
+        ],
+        [
+          0,
+          1.4000000000000004
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lid",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          8.0,
+          16.0,
+          8.0
+        ],
+        [
+          8.0,
+          16.0,
+          -8.0
+        ],
+        [
+          8.0,
+          14.6,
+          -8.0
+        ],
+        [
+          8.0,
+          14.6,
+          8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16.0,
+          0
+        ],
+        [
+          16.0,
+          1.4000000000000004
+        ],
+        [
+          0,
+          1.4000000000000004
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lid",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          16.0,
+          -8.0
+        ],
+        [
+          8.0,
+          16.0,
+          -8.0
+        ],
+        [
+          8.0,
+          16.0,
+          8.0
+        ],
+        [
+          -8.0,
+          16.0,
+          8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16.0,
+          0
+        ],
+        [
+          16.0,
+          16.0
+        ],
+        [
+          0,
+          16.0
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lid",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          14.6,
+          8.0
+        ],
+        [
+          8.0,
+          14.6,
+          8.0
+        ],
+        [
+          8.0,
+          14.6,
+          -8.0
+        ],
+        [
+          -8.0,
+          14.6,
+          -8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16.0,
+          0
+        ],
+        [
+          16.0,
+          16.0
+        ],
+        [
+          0,
+          16.0
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lid",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -6.6,
+          14.6,
+          -7.2
+        ],
+        [
+          -8.0,
+          14.6,
+          -7.2
+        ],
+        [
+          -8.0,
+          1.4,
+          -7.2
+        ],
+        [
+          -6.6,
+          1.4,
+          -7.2
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.4000000000000004,
+          0
+        ],
+        [
+          1.4000000000000004,
+          13.2
+        ],
+        [
+          0,
+          13.2
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/front_jamb",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          14.6,
+          -6.1
+        ],
+        [
+          -6.6,
+          14.6,
+          -6.1
+        ],
+        [
+          -6.6,
+          1.4,
+          -6.1
+        ],
+        [
+          -8.0,
+          1.4,
+          -6.1
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.4000000000000004,
+          0
+        ],
+        [
+          1.4000000000000004,
+          13.2
+        ],
+        [
+          0,
+          13.2
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/front_jamb",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          14.6,
+          -7.2
+        ],
+        [
+          -8.0,
+          14.6,
+          -6.1
+        ],
+        [
+          -8.0,
+          1.4,
+          -6.1
+        ],
+        [
+          -8.0,
+          1.4,
+          -7.2
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.1000000000000005,
+          0
+        ],
+        [
+          1.1000000000000005,
+          13.2
+        ],
+        [
+          0,
+          13.2
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/front_jamb",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -6.6,
+          14.6,
+          -6.1
+        ],
+        [
+          -6.6,
+          14.6,
+          -7.2
+        ],
+        [
+          -6.6,
+          1.4,
+          -7.2
+        ],
+        [
+          -6.6,
+          1.4,
+          -6.1
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.1000000000000005,
+          0
+        ],
+        [
+          1.1000000000000005,
+          13.2
+        ],
+        [
+          0,
+          13.2
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/front_jamb",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          14.6,
+          -7.2
+        ],
+        [
+          -6.6,
+          14.6,
+          -7.2
+        ],
+        [
+          -6.6,
+          14.6,
+          -6.1
+        ],
+        [
+          -8.0,
+          14.6,
+          -6.1
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.4000000000000004,
+          0
+        ],
+        [
+          1.4000000000000004,
+          1.1000000000000005
+        ],
+        [
+          0,
+          1.1000000000000005
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/front_jamb",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          1.4,
+          -6.1
+        ],
+        [
+          -6.6,
+          1.4,
+          -6.1
+        ],
+        [
+          -6.6,
+          1.4,
+          -7.2
+        ],
+        [
+          -8.0,
+          1.4,
+          -7.2
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.4000000000000004,
+          0
+        ],
+        [
+          1.4000000000000004,
+          1.1000000000000005
+        ],
+        [
+          0,
+          1.1000000000000005
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/front_jamb",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          8.0,
+          14.6,
+          -7.2
+        ],
+        [
+          6.6,
+          14.6,
+          -7.2
+        ],
+        [
+          6.6,
+          1.4,
+          -7.2
+        ],
+        [
+          8.0,
+          1.4,
+          -7.2
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.4000000000000004,
+          0
+        ],
+        [
+          1.4000000000000004,
+          13.2
+        ],
+        [
+          0,
+          13.2
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/front_jamb",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          6.6,
+          14.6,
+          -6.1
+        ],
+        [
+          8.0,
+          14.6,
+          -6.1
+        ],
+        [
+          8.0,
+          1.4,
+          -6.1
+        ],
+        [
+          6.6,
+          1.4,
+          -6.1
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.4000000000000004,
+          0
+        ],
+        [
+          1.4000000000000004,
+          13.2
+        ],
+        [
+          0,
+          13.2
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/front_jamb",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          6.6,
+          14.6,
+          -7.2
+        ],
+        [
+          6.6,
+          14.6,
+          -6.1
+        ],
+        [
+          6.6,
+          1.4,
+          -6.1
+        ],
+        [
+          6.6,
+          1.4,
+          -7.2
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.1000000000000005,
+          0
+        ],
+        [
+          1.1000000000000005,
+          13.2
+        ],
+        [
+          0,
+          13.2
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/front_jamb",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          8.0,
+          14.6,
+          -6.1
+        ],
+        [
+          8.0,
+          14.6,
+          -7.2
+        ],
+        [
+          8.0,
+          1.4,
+          -7.2
+        ],
+        [
+          8.0,
+          1.4,
+          -6.1
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.1000000000000005,
+          0
+        ],
+        [
+          1.1000000000000005,
+          13.2
+        ],
+        [
+          0,
+          13.2
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/front_jamb",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          6.6,
+          14.6,
+          -7.2
+        ],
+        [
+          8.0,
+          14.6,
+          -7.2
+        ],
+        [
+          8.0,
+          14.6,
+          -6.1
+        ],
+        [
+          6.6,
+          14.6,
+          -6.1
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.4000000000000004,
+          0
+        ],
+        [
+          1.4000000000000004,
+          1.1000000000000005
+        ],
+        [
+          0,
+          1.1000000000000005
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/front_jamb",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          6.6,
+          1.4,
+          -6.1
+        ],
+        [
+          8.0,
+          1.4,
+          -6.1
+        ],
+        [
+          8.0,
+          1.4,
+          -7.2
+        ],
+        [
+          6.6,
+          1.4,
+          -7.2
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.4000000000000004,
+          0
+        ],
+        [
+          1.4000000000000004,
+          1.1000000000000005
+        ],
+        [
+          0,
+          1.1000000000000005
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/front_jamb",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          6.5,
+          13.3,
+          -6.85
+        ],
+        [
+          -6.5,
+          13.3,
+          -6.85
+        ],
+        [
+          -6.5,
+          3.4,
+          -6.85
+        ],
+        [
+          6.5,
+          3.4,
+          -6.85
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/fascia",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -6.5,
+          13.3,
+          -6.25
+        ],
+        [
+          6.5,
+          13.3,
+          -6.25
+        ],
+        [
+          6.5,
+          3.4,
+          -6.25
+        ],
+        [
+          -6.5,
+          3.4,
+          -6.25
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/fascia",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -6.5,
+          13.3,
+          -6.85
+        ],
+        [
+          -6.5,
+          13.3,
+          -6.25
+        ],
+        [
+          -6.5,
+          3.4,
+          -6.25
+        ],
+        [
+          -6.5,
+          3.4,
+          -6.85
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/fascia",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          6.5,
+          13.3,
+          -6.25
+        ],
+        [
+          6.5,
+          13.3,
+          -6.85
+        ],
+        [
+          6.5,
+          3.4,
+          -6.85
+        ],
+        [
+          6.5,
+          3.4,
+          -6.25
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/fascia",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -6.5,
+          13.3,
+          -6.85
+        ],
+        [
+          6.5,
+          13.3,
+          -6.85
+        ],
+        [
+          6.5,
+          13.3,
+          -6.25
+        ],
+        [
+          -6.5,
+          13.3,
+          -6.25
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/fascia",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -6.5,
+          3.4,
+          -6.25
+        ],
+        [
+          6.5,
+          3.4,
+          -6.25
+        ],
+        [
+          6.5,
+          3.4,
+          -6.85
+        ],
+        [
+          -6.5,
+          3.4,
+          -6.85
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/fascia",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          1.3,
+          12.5,
+          -7.05
+        ],
+        [
+          -5.4,
+          12.5,
+          -7.05
+        ],
+        [
+          -5.4,
+          10.3,
+          -7.05
+        ],
+        [
+          1.3,
+          10.3,
+          -7.05
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          6.7,
+          0
+        ],
+        [
+          6.7,
+          2.1999999999999993
+        ],
+        [
+          0,
+          2.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/short_panel",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.4,
+          12.5,
+          -6.8
+        ],
+        [
+          1.3,
+          12.5,
+          -6.8
+        ],
+        [
+          1.3,
+          10.3,
+          -6.8
+        ],
+        [
+          -5.4,
+          10.3,
+          -6.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          6.7,
+          0
+        ],
+        [
+          6.7,
+          2.1999999999999993
+        ],
+        [
+          0,
+          2.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/short_panel",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.4,
+          12.5,
+          -7.05
+        ],
+        [
+          -5.4,
+          12.5,
+          -6.8
+        ],
+        [
+          -5.4,
+          10.3,
+          -6.8
+        ],
+        [
+          -5.4,
+          10.3,
+          -7.05
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          2.1999999999999993
+        ],
+        [
+          0,
+          2.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/short_panel",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          1.3,
+          12.5,
+          -6.8
+        ],
+        [
+          1.3,
+          12.5,
+          -7.05
+        ],
+        [
+          1.3,
+          10.3,
+          -7.05
+        ],
+        [
+          1.3,
+          10.3,
+          -6.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          2.1999999999999993
+        ],
+        [
+          0,
+          2.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/short_panel",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.4,
+          12.5,
+          -7.05
+        ],
+        [
+          1.3,
+          12.5,
+          -7.05
+        ],
+        [
+          1.3,
+          12.5,
+          -6.8
+        ],
+        [
+          -5.4,
+          12.5,
+          -6.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          6.7,
+          0
+        ],
+        [
+          6.7,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/short_panel",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.4,
+          10.3,
+          -6.8
+        ],
+        [
+          1.3,
+          10.3,
+          -6.8
+        ],
+        [
+          1.3,
+          10.3,
+          -7.05
+        ],
+        [
+          -5.4,
+          10.3,
+          -7.05
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          6.7,
+          0
+        ],
+        [
+          6.7,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/short_panel",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.8000000000000003,
+          11.8,
+          -7.13
+        ],
+        [
+          -4.4,
+          11.8,
+          -7.13
+        ],
+        [
+          -4.4,
+          11.0,
+          -7.13
+        ],
+        [
+          -3.8000000000000003,
+          11.0,
+          -7.13
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.4,
+          11.8,
+          -7.03
+        ],
+        [
+          -3.8000000000000003,
+          11.8,
+          -7.03
+        ],
+        [
+          -3.8000000000000003,
+          11.0,
+          -7.03
+        ],
+        [
+          -4.4,
+          11.0,
+          -7.03
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.4,
+          11.8,
+          -7.13
+        ],
+        [
+          -4.4,
+          11.8,
+          -7.03
+        ],
+        [
+          -4.4,
+          11.0,
+          -7.03
+        ],
+        [
+          -4.4,
+          11.0,
+          -7.13
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.8000000000000003,
+          11.8,
+          -7.03
+        ],
+        [
+          -3.8000000000000003,
+          11.8,
+          -7.13
+        ],
+        [
+          -3.8000000000000003,
+          11.0,
+          -7.13
+        ],
+        [
+          -3.8000000000000003,
+          11.0,
+          -7.03
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.4,
+          11.8,
+          -7.13
+        ],
+        [
+          -3.8000000000000003,
+          11.8,
+          -7.13
+        ],
+        [
+          -3.8000000000000003,
+          11.8,
+          -7.03
+        ],
+        [
+          -4.4,
+          11.8,
+          -7.03
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.4,
+          11.0,
+          -7.03
+        ],
+        [
+          -3.8000000000000003,
+          11.0,
+          -7.03
+        ],
+        [
+          -3.8000000000000003,
+          11.0,
+          -7.13
+        ],
+        [
+          -4.4,
+          11.0,
+          -7.13
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.1,
+          11.8,
+          -7.13
+        ],
+        [
+          -2.7,
+          11.8,
+          -7.13
+        ],
+        [
+          -2.7,
+          11.0,
+          -7.13
+        ],
+        [
+          -2.1,
+          11.0,
+          -7.13
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.7,
+          11.8,
+          -7.03
+        ],
+        [
+          -2.1,
+          11.8,
+          -7.03
+        ],
+        [
+          -2.1,
+          11.0,
+          -7.03
+        ],
+        [
+          -2.7,
+          11.0,
+          -7.03
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.7,
+          11.8,
+          -7.13
+        ],
+        [
+          -2.7,
+          11.8,
+          -7.03
+        ],
+        [
+          -2.7,
+          11.0,
+          -7.03
+        ],
+        [
+          -2.7,
+          11.0,
+          -7.13
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.1,
+          11.8,
+          -7.03
+        ],
+        [
+          -2.1,
+          11.8,
+          -7.13
+        ],
+        [
+          -2.1,
+          11.0,
+          -7.13
+        ],
+        [
+          -2.1,
+          11.0,
+          -7.03
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.7,
+          11.8,
+          -7.13
+        ],
+        [
+          -2.1,
+          11.8,
+          -7.13
+        ],
+        [
+          -2.1,
+          11.8,
+          -7.03
+        ],
+        [
+          -2.7,
+          11.8,
+          -7.03
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.7,
+          11.0,
+          -7.03
+        ],
+        [
+          -2.1,
+          11.0,
+          -7.03
+        ],
+        [
+          -2.1,
+          11.0,
+          -7.13
+        ],
+        [
+          -2.7,
+          11.0,
+          -7.13
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -0.4,
+          11.8,
+          -7.13
+        ],
+        [
+          -1.0,
+          11.8,
+          -7.13
+        ],
+        [
+          -1.0,
+          11.0,
+          -7.13
+        ],
+        [
+          -0.4,
+          11.0,
+          -7.13
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.0,
+          11.8,
+          -7.03
+        ],
+        [
+          -0.4,
+          11.8,
+          -7.03
+        ],
+        [
+          -0.4,
+          11.0,
+          -7.03
+        ],
+        [
+          -1.0,
+          11.0,
+          -7.03
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.0,
+          11.8,
+          -7.13
+        ],
+        [
+          -1.0,
+          11.8,
+          -7.03
+        ],
+        [
+          -1.0,
+          11.0,
+          -7.03
+        ],
+        [
+          -1.0,
+          11.0,
+          -7.13
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -0.4,
+          11.8,
+          -7.03
+        ],
+        [
+          -0.4,
+          11.8,
+          -7.13
+        ],
+        [
+          -0.4,
+          11.0,
+          -7.13
+        ],
+        [
+          -0.4,
+          11.0,
+          -7.03
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.0,
+          11.8,
+          -7.13
+        ],
+        [
+          -0.4,
+          11.8,
+          -7.13
+        ],
+        [
+          -0.4,
+          11.8,
+          -7.03
+        ],
+        [
+          -1.0,
+          11.8,
+          -7.03
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.0,
+          11.0,
+          -7.03
+        ],
+        [
+          -0.4,
+          11.0,
+          -7.03
+        ],
+        [
+          -0.4,
+          11.0,
+          -7.13
+        ],
+        [
+          -1.0,
+          11.0,
+          -7.13
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/dark_iron",
+      "group": "tower_controller/index",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -0.20503267997123764,
+          8.125,
+          -7.8
+        ],
+        [
+          0.1499999999999999,
+          6.8,
+          -7.8
+        ],
+        [
+          -0.55,
+          6.8,
+          -7.8
+        ],
+        [
+          -0.8112504626203445,
+          7.7749999999999995,
+          -7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433601,
+          0
+        ],
+        [
+          1.3717409390433601,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          0.1499999999999999,
+          6.8,
+          -6.6000000000000005
+        ],
+        [
+          -0.20503267997123764,
+          8.125,
+          -6.6000000000000005
+        ],
+        [
+          -0.8112504626203445,
+          7.7749999999999995,
+          -6.6000000000000005
+        ],
+        [
+          -0.55,
+          6.8,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433601,
+          0
+        ],
+        [
+          1.3717409390433601,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          0.1499999999999999,
+          6.8,
+          -7.8
+        ],
+        [
+          -0.20503267997123764,
+          8.125,
+          -7.8
+        ],
+        [
+          -0.20503267997123764,
+          8.125,
+          -6.6000000000000005
+        ],
+        [
+          0.1499999999999999,
+          6.8,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433601,
+          0
+        ],
+        [
+          1.3717409390433601,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -0.8112504626203445,
+          7.7749999999999995,
+          -7.8
+        ],
+        [
+          -0.55,
+          6.8,
+          -7.8
+        ],
+        [
+          -0.55,
+          6.8,
+          -6.6000000000000005
+        ],
+        [
+          -0.8112504626203445,
+          7.7749999999999995,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.0093942758998304,
+          0
+        ],
+        [
+          1.0093942758998304,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.1749999999999998,
+          9.094967320028761,
+          -7.8
+        ],
+        [
+          -0.20503267997123764,
+          8.125,
+          -7.8
+        ],
+        [
+          -0.8112504626203445,
+          7.7749999999999995,
+          -7.8
+        ],
+        [
+          -1.525,
+          8.488749537379656,
+          -7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.371740939043359,
+          0
+        ],
+        [
+          1.371740939043359,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -0.20503267997123764,
+          8.125,
+          -6.6000000000000005
+        ],
+        [
+          -1.1749999999999998,
+          9.094967320028761,
+          -6.6000000000000005
+        ],
+        [
+          -1.525,
+          8.488749537379656,
+          -6.6000000000000005
+        ],
+        [
+          -0.8112504626203445,
+          7.7749999999999995,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.371740939043359,
+          0
+        ],
+        [
+          1.371740939043359,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -0.20503267997123764,
+          8.125,
+          -7.8
+        ],
+        [
+          -1.1749999999999998,
+          9.094967320028761,
+          -7.8
+        ],
+        [
+          -1.1749999999999998,
+          9.094967320028761,
+          -6.6000000000000005
+        ],
+        [
+          -0.20503267997123764,
+          8.125,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.371740939043359,
+          0
+        ],
+        [
+          1.371740939043359,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.525,
+          8.488749537379656,
+          -7.8
+        ],
+        [
+          -0.8112504626203445,
+          7.7749999999999995,
+          -7.8
+        ],
+        [
+          -0.8112504626203445,
+          7.7749999999999995,
+          -6.6000000000000005
+        ],
+        [
+          -1.525,
+          8.488749537379656,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.0093942758998316,
+          0
+        ],
+        [
+          1.0093942758998316,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.5,
+          9.45,
+          -7.8
+        ],
+        [
+          -1.1749999999999998,
+          9.094967320028761,
+          -7.8
+        ],
+        [
+          -1.525,
+          8.488749537379656,
+          -7.8
+        ],
+        [
+          -2.5,
+          8.75,
+          -7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433604,
+          0
+        ],
+        [
+          1.3717409390433604,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.1749999999999998,
+          9.094967320028761,
+          -6.6000000000000005
+        ],
+        [
+          -2.5,
+          9.45,
+          -6.6000000000000005
+        ],
+        [
+          -2.5,
+          8.75,
+          -6.6000000000000005
+        ],
+        [
+          -1.525,
+          8.488749537379656,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433604,
+          0
+        ],
+        [
+          1.3717409390433604,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.1749999999999998,
+          9.094967320028761,
+          -7.8
+        ],
+        [
+          -2.5,
+          9.45,
+          -7.8
+        ],
+        [
+          -2.5,
+          9.45,
+          -6.6000000000000005
+        ],
+        [
+          -1.1749999999999998,
+          9.094967320028761,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433604,
+          0
+        ],
+        [
+          1.3717409390433604,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.5,
+          8.75,
+          -7.8
+        ],
+        [
+          -1.525,
+          8.488749537379656,
+          -7.8
+        ],
+        [
+          -1.525,
+          8.488749537379656,
+          -6.6000000000000005
+        ],
+        [
+          -2.5,
+          8.75,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.0093942758998309,
+          0
+        ],
+        [
+          1.0093942758998309,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.8249999999999993,
+          9.094967320028761,
+          -7.8
+        ],
+        [
+          -2.5,
+          9.45,
+          -7.8
+        ],
+        [
+          -2.5,
+          8.75,
+          -7.8
+        ],
+        [
+          -3.4749999999999996,
+          8.488749537379656,
+          -7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433595,
+          0
+        ],
+        [
+          1.3717409390433595,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.5,
+          9.45,
+          -6.6000000000000005
+        ],
+        [
+          -3.8249999999999993,
+          9.094967320028761,
+          -6.6000000000000005
+        ],
+        [
+          -3.4749999999999996,
+          8.488749537379656,
+          -6.6000000000000005
+        ],
+        [
+          -2.5,
+          8.75,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433595,
+          0
+        ],
+        [
+          1.3717409390433595,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.5,
+          9.45,
+          -7.8
+        ],
+        [
+          -3.8249999999999993,
+          9.094967320028761,
+          -7.8
+        ],
+        [
+          -3.8249999999999993,
+          9.094967320028761,
+          -6.6000000000000005
+        ],
+        [
+          -2.5,
+          9.45,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433595,
+          0
+        ],
+        [
+          1.3717409390433595,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.4749999999999996,
+          8.488749537379656,
+          -7.8
+        ],
+        [
+          -2.5,
+          8.75,
+          -7.8
+        ],
+        [
+          -2.5,
+          8.75,
+          -6.6000000000000005
+        ],
+        [
+          -3.4749999999999996,
+          8.488749537379656,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.0093942758998304,
+          0
+        ],
+        [
+          1.0093942758998304,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.794967320028762,
+          8.125,
+          -7.8
+        ],
+        [
+          -3.8249999999999993,
+          9.094967320028761,
+          -7.8
+        ],
+        [
+          -3.4749999999999996,
+          8.488749537379656,
+          -7.8
+        ],
+        [
+          -4.188749537379655,
+          7.7749999999999995,
+          -7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433597,
+          0
+        ],
+        [
+          1.3717409390433597,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.8249999999999993,
+          9.094967320028761,
+          -6.6000000000000005
+        ],
+        [
+          -4.794967320028762,
+          8.125,
+          -6.6000000000000005
+        ],
+        [
+          -4.188749537379655,
+          7.7749999999999995,
+          -6.6000000000000005
+        ],
+        [
+          -3.4749999999999996,
+          8.488749537379656,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433597,
+          0
+        ],
+        [
+          1.3717409390433597,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.8249999999999993,
+          9.094967320028761,
+          -7.8
+        ],
+        [
+          -4.794967320028762,
+          8.125,
+          -7.8
+        ],
+        [
+          -4.794967320028762,
+          8.125,
+          -6.6000000000000005
+        ],
+        [
+          -3.8249999999999993,
+          9.094967320028761,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433597,
+          0
+        ],
+        [
+          1.3717409390433597,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.188749537379655,
+          7.7749999999999995,
+          -7.8
+        ],
+        [
+          -3.4749999999999996,
+          8.488749537379656,
+          -7.8
+        ],
+        [
+          -3.4749999999999996,
+          8.488749537379656,
+          -6.6000000000000005
+        ],
+        [
+          -4.188749537379655,
+          7.7749999999999995,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.0093942758998316,
+          0
+        ],
+        [
+          1.0093942758998316,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.15,
+          6.8,
+          -7.8
+        ],
+        [
+          -4.794967320028762,
+          8.125,
+          -7.8
+        ],
+        [
+          -4.188749537379655,
+          7.7749999999999995,
+          -7.8
+        ],
+        [
+          -4.45,
+          6.8,
+          -7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433604,
+          0
+        ],
+        [
+          1.3717409390433604,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.794967320028762,
+          8.125,
+          -6.6000000000000005
+        ],
+        [
+          -5.15,
+          6.8,
+          -6.6000000000000005
+        ],
+        [
+          -4.45,
+          6.8,
+          -6.6000000000000005
+        ],
+        [
+          -4.188749537379655,
+          7.7749999999999995,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433604,
+          0
+        ],
+        [
+          1.3717409390433604,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.794967320028762,
+          8.125,
+          -7.8
+        ],
+        [
+          -5.15,
+          6.8,
+          -7.8
+        ],
+        [
+          -5.15,
+          6.8,
+          -6.6000000000000005
+        ],
+        [
+          -4.794967320028762,
+          8.125,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433604,
+          0
+        ],
+        [
+          1.3717409390433604,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.45,
+          6.8,
+          -7.8
+        ],
+        [
+          -4.188749537379655,
+          7.7749999999999995,
+          -7.8
+        ],
+        [
+          -4.188749537379655,
+          7.7749999999999995,
+          -6.6000000000000005
+        ],
+        [
+          -4.45,
+          6.8,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.0093942758998307,
+          0
+        ],
+        [
+          1.0093942758998307,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.794967320028762,
+          5.475,
+          -7.8
+        ],
+        [
+          -5.15,
+          6.8,
+          -7.8
+        ],
+        [
+          -4.45,
+          6.8,
+          -7.8
+        ],
+        [
+          -4.188749537379655,
+          5.824999999999999,
+          -7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433604,
+          0
+        ],
+        [
+          1.3717409390433604,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.15,
+          6.8,
+          -6.6000000000000005
+        ],
+        [
+          -4.794967320028762,
+          5.475,
+          -6.6000000000000005
+        ],
+        [
+          -4.188749537379655,
+          5.824999999999999,
+          -6.6000000000000005
+        ],
+        [
+          -4.45,
+          6.8,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433604,
+          0
+        ],
+        [
+          1.3717409390433604,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.15,
+          6.8,
+          -7.8
+        ],
+        [
+          -4.794967320028762,
+          5.475,
+          -7.8
+        ],
+        [
+          -4.794967320028762,
+          5.475,
+          -6.6000000000000005
+        ],
+        [
+          -5.15,
+          6.8,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433604,
+          0
+        ],
+        [
+          1.3717409390433604,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.188749537379655,
+          5.824999999999999,
+          -7.8
+        ],
+        [
+          -4.45,
+          6.8,
+          -7.8
+        ],
+        [
+          -4.45,
+          6.8,
+          -6.6000000000000005
+        ],
+        [
+          -4.188749537379655,
+          5.824999999999999,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.0093942758998316,
+          0
+        ],
+        [
+          1.0093942758998316,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.825000000000001,
+          4.505032679971238,
+          -7.8
+        ],
+        [
+          -4.794967320028762,
+          5.475,
+          -7.8
+        ],
+        [
+          -4.188749537379655,
+          5.824999999999999,
+          -7.8
+        ],
+        [
+          -3.475000000000001,
+          5.111250462620345,
+          -7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433584,
+          0
+        ],
+        [
+          1.3717409390433584,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.794967320028762,
+          5.475,
+          -6.6000000000000005
+        ],
+        [
+          -3.825000000000001,
+          4.505032679971238,
+          -6.6000000000000005
+        ],
+        [
+          -3.475000000000001,
+          5.111250462620345,
+          -6.6000000000000005
+        ],
+        [
+          -4.188749537379655,
+          5.824999999999999,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433584,
+          0
+        ],
+        [
+          1.3717409390433584,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.794967320028762,
+          5.475,
+          -7.8
+        ],
+        [
+          -3.825000000000001,
+          4.505032679971238,
+          -7.8
+        ],
+        [
+          -3.825000000000001,
+          4.505032679971238,
+          -6.6000000000000005
+        ],
+        [
+          -4.794967320028762,
+          5.475,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433584,
+          0
+        ],
+        [
+          1.3717409390433584,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.475000000000001,
+          5.111250462620345,
+          -7.8
+        ],
+        [
+          -4.188749537379655,
+          5.824999999999999,
+          -7.8
+        ],
+        [
+          -4.188749537379655,
+          5.824999999999999,
+          -6.6000000000000005
+        ],
+        [
+          -3.475000000000001,
+          5.111250462620345,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.0093942758998296,
+          0
+        ],
+        [
+          1.0093942758998296,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.5000000000000004,
+          4.15,
+          -7.8
+        ],
+        [
+          -3.825000000000001,
+          4.505032679971238,
+          -7.8
+        ],
+        [
+          -3.475000000000001,
+          5.111250462620345,
+          -7.8
+        ],
+        [
+          -2.5000000000000004,
+          4.85,
+          -7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433606,
+          0
+        ],
+        [
+          1.3717409390433606,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.825000000000001,
+          4.505032679971238,
+          -6.6000000000000005
+        ],
+        [
+          -2.5000000000000004,
+          4.15,
+          -6.6000000000000005
+        ],
+        [
+          -2.5000000000000004,
+          4.85,
+          -6.6000000000000005
+        ],
+        [
+          -3.475000000000001,
+          5.111250462620345,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433606,
+          0
+        ],
+        [
+          1.3717409390433606,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.825000000000001,
+          4.505032679971238,
+          -7.8
+        ],
+        [
+          -2.5000000000000004,
+          4.15,
+          -7.8
+        ],
+        [
+          -2.5000000000000004,
+          4.15,
+          -6.6000000000000005
+        ],
+        [
+          -3.825000000000001,
+          4.505032679971238,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433606,
+          0
+        ],
+        [
+          1.3717409390433606,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.5000000000000004,
+          4.85,
+          -7.8
+        ],
+        [
+          -3.475000000000001,
+          5.111250462620345,
+          -7.8
+        ],
+        [
+          -3.475000000000001,
+          5.111250462620345,
+          -6.6000000000000005
+        ],
+        [
+          -2.5000000000000004,
+          4.85,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.0093942758998316,
+          0
+        ],
+        [
+          1.0093942758998316,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.1749999999999998,
+          4.5050326799712375,
+          -7.8
+        ],
+        [
+          -2.5000000000000004,
+          4.15,
+          -7.8
+        ],
+        [
+          -2.5000000000000004,
+          4.85,
+          -7.8
+        ],
+        [
+          -1.525,
+          5.111250462620345,
+          -7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433604,
+          0
+        ],
+        [
+          1.3717409390433604,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.5000000000000004,
+          4.15,
+          -6.6000000000000005
+        ],
+        [
+          -1.1749999999999998,
+          4.5050326799712375,
+          -6.6000000000000005
+        ],
+        [
+          -1.525,
+          5.111250462620345,
+          -6.6000000000000005
+        ],
+        [
+          -2.5000000000000004,
+          4.85,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433604,
+          0
+        ],
+        [
+          1.3717409390433604,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.5000000000000004,
+          4.15,
+          -7.8
+        ],
+        [
+          -1.1749999999999998,
+          4.5050326799712375,
+          -7.8
+        ],
+        [
+          -1.1749999999999998,
+          4.5050326799712375,
+          -6.6000000000000005
+        ],
+        [
+          -2.5000000000000004,
+          4.15,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433604,
+          0
+        ],
+        [
+          1.3717409390433604,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.525,
+          5.111250462620345,
+          -7.8
+        ],
+        [
+          -2.5000000000000004,
+          4.85,
+          -7.8
+        ],
+        [
+          -2.5000000000000004,
+          4.85,
+          -6.6000000000000005
+        ],
+        [
+          -1.525,
+          5.111250462620345,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.0093942758998316,
+          0
+        ],
+        [
+          1.0093942758998316,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -0.20503267997123853,
+          5.474999999999999,
+          -7.8
+        ],
+        [
+          -1.1749999999999998,
+          4.5050326799712375,
+          -7.8
+        ],
+        [
+          -1.525,
+          5.111250462620345,
+          -7.8
+        ],
+        [
+          -0.8112504626203452,
+          5.824999999999999,
+          -7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433584,
+          0
+        ],
+        [
+          1.3717409390433584,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.1749999999999998,
+          4.5050326799712375,
+          -6.6000000000000005
+        ],
+        [
+          -0.20503267997123853,
+          5.474999999999999,
+          -6.6000000000000005
+        ],
+        [
+          -0.8112504626203452,
+          5.824999999999999,
+          -6.6000000000000005
+        ],
+        [
+          -1.525,
+          5.111250462620345,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433584,
+          0
+        ],
+        [
+          1.3717409390433584,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.1749999999999998,
+          4.5050326799712375,
+          -7.8
+        ],
+        [
+          -0.20503267997123853,
+          5.474999999999999,
+          -7.8
+        ],
+        [
+          -0.20503267997123853,
+          5.474999999999999,
+          -6.6000000000000005
+        ],
+        [
+          -1.1749999999999998,
+          4.5050326799712375,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433584,
+          0
+        ],
+        [
+          1.3717409390433584,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -0.8112504626203452,
+          5.824999999999999,
+          -7.8
+        ],
+        [
+          -1.525,
+          5.111250462620345,
+          -7.8
+        ],
+        [
+          -1.525,
+          5.111250462620345,
+          -6.6000000000000005
+        ],
+        [
+          -0.8112504626203452,
+          5.824999999999999,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.00939427589983,
+          0
+        ],
+        [
+          1.00939427589983,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          0.1499999999999999,
+          6.799999999999999,
+          -7.8
+        ],
+        [
+          -0.20503267997123853,
+          5.474999999999999,
+          -7.8
+        ],
+        [
+          -0.8112504626203452,
+          5.824999999999999,
+          -7.8
+        ],
+        [
+          -0.55,
+          6.799999999999999,
+          -7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433604,
+          0
+        ],
+        [
+          1.3717409390433604,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -0.20503267997123853,
+          5.474999999999999,
+          -6.6000000000000005
+        ],
+        [
+          0.1499999999999999,
+          6.799999999999999,
+          -6.6000000000000005
+        ],
+        [
+          -0.55,
+          6.799999999999999,
+          -6.6000000000000005
+        ],
+        [
+          -0.8112504626203452,
+          5.824999999999999,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433604,
+          0
+        ],
+        [
+          1.3717409390433604,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -0.20503267997123853,
+          5.474999999999999,
+          -7.8
+        ],
+        [
+          0.1499999999999999,
+          6.799999999999999,
+          -7.8
+        ],
+        [
+          0.1499999999999999,
+          6.799999999999999,
+          -6.6000000000000005
+        ],
+        [
+          -0.20503267997123853,
+          5.474999999999999,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.3717409390433604,
+          0
+        ],
+        [
+          1.3717409390433604,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -0.55,
+          6.799999999999999,
+          -7.8
+        ],
+        [
+          -0.8112504626203452,
+          5.824999999999999,
+          -7.8
+        ],
+        [
+          -0.8112504626203452,
+          5.824999999999999,
+          -6.6000000000000005
+        ],
+        [
+          -0.55,
+          6.799999999999999,
+          -6.6000000000000005
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.0093942758998307,
+          0
+        ],
+        [
+          1.0093942758998307,
+          1.1999999999999993
+        ],
+        [
+          0,
+          1.1999999999999993
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_rim",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.1,
+          8.2,
+          -7.65
+        ],
+        [
+          -3.9,
+          8.2,
+          -7.65
+        ],
+        [
+          -3.9,
+          5.4,
+          -7.65
+        ],
+        [
+          -1.1,
+          5.4,
+          -7.65
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.8,
+          0
+        ],
+        [
+          2.8,
+          2.799999999999999
+        ],
+        [
+          0,
+          2.799999999999999
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/knob_hub",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.9,
+          8.2,
+          -6.95
+        ],
+        [
+          -1.1,
+          8.2,
+          -6.95
+        ],
+        [
+          -1.1,
+          5.4,
+          -6.95
+        ],
+        [
+          -3.9,
+          5.4,
+          -6.95
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.8,
+          0
+        ],
+        [
+          2.8,
+          2.799999999999999
+        ],
+        [
+          0,
+          2.799999999999999
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/knob_hub",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.9,
+          8.2,
+          -7.65
+        ],
+        [
+          -3.9,
+          8.2,
+          -6.95
+        ],
+        [
+          -3.9,
+          5.4,
+          -6.95
+        ],
+        [
+          -3.9,
+          5.4,
+          -7.65
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          2.799999999999999
+        ],
+        [
+          0,
+          2.799999999999999
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/knob_hub",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.1,
+          8.2,
+          -6.95
+        ],
+        [
+          -1.1,
+          8.2,
+          -7.65
+        ],
+        [
+          -1.1,
+          5.4,
+          -7.65
+        ],
+        [
+          -1.1,
+          5.4,
+          -6.95
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          2.799999999999999
+        ],
+        [
+          0,
+          2.799999999999999
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/knob_hub",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.9,
+          8.2,
+          -7.65
+        ],
+        [
+          -1.1,
+          8.2,
+          -7.65
+        ],
+        [
+          -1.1,
+          8.2,
+          -6.95
+        ],
+        [
+          -3.9,
+          8.2,
+          -6.95
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.8,
+          0
+        ],
+        [
+          2.8,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/knob_hub",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.9,
+          5.4,
+          -6.95
+        ],
+        [
+          -1.1,
+          5.4,
+          -6.95
+        ],
+        [
+          -1.1,
+          5.4,
+          -7.65
+        ],
+        [
+          -3.9,
+          5.4,
+          -7.65
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.8,
+          0
+        ],
+        [
+          2.8,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/knob_hub",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -0.75,
+          7.25,
+          -8.0
+        ],
+        [
+          -4.25,
+          7.25,
+          -8.0
+        ],
+        [
+          -4.25,
+          6.35,
+          -8.0
+        ],
+        [
+          -0.75,
+          6.35,
+          -8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          3.5,
+          0
+        ],
+        [
+          3.5,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_grip",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.25,
+          7.25,
+          -7.6
+        ],
+        [
+          -0.75,
+          7.25,
+          -7.6
+        ],
+        [
+          -0.75,
+          6.35,
+          -7.6
+        ],
+        [
+          -4.25,
+          6.35,
+          -7.6
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          3.5,
+          0
+        ],
+        [
+          3.5,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_grip",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.25,
+          7.25,
+          -8.0
+        ],
+        [
+          -4.25,
+          7.25,
+          -7.6
+        ],
+        [
+          -4.25,
+          6.35,
+          -7.6
+        ],
+        [
+          -4.25,
+          6.35,
+          -8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_grip",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -0.75,
+          7.25,
+          -7.6
+        ],
+        [
+          -0.75,
+          7.25,
+          -8.0
+        ],
+        [
+          -0.75,
+          6.35,
+          -8.0
+        ],
+        [
+          -0.75,
+          6.35,
+          -7.6
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_grip",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.25,
+          7.25,
+          -8.0
+        ],
+        [
+          -0.75,
+          7.25,
+          -8.0
+        ],
+        [
+          -0.75,
+          7.25,
+          -7.6
+        ],
+        [
+          -4.25,
+          7.25,
+          -7.6
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          3.5,
+          0
+        ],
+        [
+          3.5,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_grip",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.25,
+          6.35,
+          -7.6
+        ],
+        [
+          -0.75,
+          6.35,
+          -7.6
+        ],
+        [
+          -0.75,
+          6.35,
+          -8.0
+        ],
+        [
+          -4.25,
+          6.35,
+          -8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          3.5,
+          0
+        ],
+        [
+          3.5,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/knob_grip",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.3,
+          8.2,
+          -7.78
+        ],
+        [
+          -2.7,
+          8.2,
+          -7.78
+        ],
+        [
+          -2.7,
+          7.1,
+          -7.78
+        ],
+        [
+          -2.3,
+          7.1,
+          -7.78
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1.0999999999999996
+        ],
+        [
+          0,
+          1.0999999999999996
+        ]
+      ],
+      "material": "tower_controller/pointer",
+      "group": "tower_controller/knob_pointer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.7,
+          8.2,
+          -7.66
+        ],
+        [
+          -2.3,
+          8.2,
+          -7.66
+        ],
+        [
+          -2.3,
+          7.1,
+          -7.66
+        ],
+        [
+          -2.7,
+          7.1,
+          -7.66
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1.0999999999999996
+        ],
+        [
+          0,
+          1.0999999999999996
+        ]
+      ],
+      "material": "tower_controller/pointer",
+      "group": "tower_controller/knob_pointer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.7,
+          8.2,
+          -7.78
+        ],
+        [
+          -2.7,
+          8.2,
+          -7.66
+        ],
+        [
+          -2.7,
+          7.1,
+          -7.66
+        ],
+        [
+          -2.7,
+          7.1,
+          -7.78
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1.0999999999999996
+        ],
+        [
+          0,
+          1.0999999999999996
+        ]
+      ],
+      "material": "tower_controller/pointer",
+      "group": "tower_controller/knob_pointer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.3,
+          8.2,
+          -7.66
+        ],
+        [
+          -2.3,
+          8.2,
+          -7.78
+        ],
+        [
+          -2.3,
+          7.1,
+          -7.78
+        ],
+        [
+          -2.3,
+          7.1,
+          -7.66
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1.0999999999999996
+        ],
+        [
+          0,
+          1.0999999999999996
+        ]
+      ],
+      "material": "tower_controller/pointer",
+      "group": "tower_controller/knob_pointer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.7,
+          8.2,
+          -7.78
+        ],
+        [
+          -2.3,
+          8.2,
+          -7.78
+        ],
+        [
+          -2.3,
+          8.2,
+          -7.66
+        ],
+        [
+          -2.7,
+          8.2,
+          -7.66
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/pointer",
+      "group": "tower_controller/knob_pointer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -2.7,
+          7.1,
+          -7.66
+        ],
+        [
+          -2.3,
+          7.1,
+          -7.66
+        ],
+        [
+          -2.3,
+          7.1,
+          -7.78
+        ],
+        [
+          -2.7,
+          7.1,
+          -7.78
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/pointer",
+      "group": "tower_controller/knob_pointer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.7,
+          13.1,
+          -7.45
+        ],
+        [
+          2.3,
+          13.1,
+          -7.45
+        ],
+        [
+          2.3,
+          9.5,
+          -7.45
+        ],
+        [
+          5.7,
+          9.5,
+          -7.45
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          3.4000000000000004,
+          0
+        ],
+        [
+          3.4000000000000004,
+          3.5999999999999996
+        ],
+        [
+          0,
+          3.5999999999999996
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/lamp_bezel",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          2.3,
+          13.1,
+          -6.85
+        ],
+        [
+          5.7,
+          13.1,
+          -6.85
+        ],
+        [
+          5.7,
+          9.5,
+          -6.85
+        ],
+        [
+          2.3,
+          9.5,
+          -6.85
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          3.4000000000000004,
+          0
+        ],
+        [
+          3.4000000000000004,
+          3.5999999999999996
+        ],
+        [
+          0,
+          3.5999999999999996
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/lamp_bezel",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          2.3,
+          13.1,
+          -7.45
+        ],
+        [
+          2.3,
+          13.1,
+          -6.85
+        ],
+        [
+          2.3,
+          9.5,
+          -6.85
+        ],
+        [
+          2.3,
+          9.5,
+          -7.45
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          3.5999999999999996
+        ],
+        [
+          0,
+          3.5999999999999996
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/lamp_bezel",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.7,
+          13.1,
+          -6.85
+        ],
+        [
+          5.7,
+          13.1,
+          -7.45
+        ],
+        [
+          5.7,
+          9.5,
+          -7.45
+        ],
+        [
+          5.7,
+          9.5,
+          -6.85
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          3.5999999999999996
+        ],
+        [
+          0,
+          3.5999999999999996
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/lamp_bezel",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          2.3,
+          13.1,
+          -7.45
+        ],
+        [
+          5.7,
+          13.1,
+          -7.45
+        ],
+        [
+          5.7,
+          13.1,
+          -6.85
+        ],
+        [
+          2.3,
+          13.1,
+          -6.85
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          3.4000000000000004,
+          0
+        ],
+        [
+          3.4000000000000004,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/lamp_bezel",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          2.3,
+          9.5,
+          -6.85
+        ],
+        [
+          5.7,
+          9.5,
+          -6.85
+        ],
+        [
+          5.7,
+          9.5,
+          -7.45
+        ],
+        [
+          2.3,
+          9.5,
+          -7.45
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          3.4000000000000004,
+          0
+        ],
+        [
+          3.4000000000000004,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/lamp_bezel",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.15,
+          12.6,
+          -7.54
+        ],
+        [
+          2.85,
+          12.6,
+          -7.54
+        ],
+        [
+          2.85,
+          10.0,
+          -7.54
+        ],
+        [
+          5.15,
+          10.0,
+          -7.54
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.3000000000000003,
+          0
+        ],
+        [
+          2.3000000000000003,
+          2.5999999999999996
+        ],
+        [
+          0,
+          2.5999999999999996
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lamp_backing",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          2.85,
+          12.6,
+          -7.44
+        ],
+        [
+          5.15,
+          12.6,
+          -7.44
+        ],
+        [
+          5.15,
+          10.0,
+          -7.44
+        ],
+        [
+          2.85,
+          10.0,
+          -7.44
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.3000000000000003,
+          0
+        ],
+        [
+          2.3000000000000003,
+          2.5999999999999996
+        ],
+        [
+          0,
+          2.5999999999999996
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lamp_backing",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          2.85,
+          12.6,
+          -7.54
+        ],
+        [
+          2.85,
+          12.6,
+          -7.44
+        ],
+        [
+          2.85,
+          10.0,
+          -7.44
+        ],
+        [
+          2.85,
+          10.0,
+          -7.54
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          2.5999999999999996
+        ],
+        [
+          0,
+          2.5999999999999996
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lamp_backing",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.15,
+          12.6,
+          -7.44
+        ],
+        [
+          5.15,
+          12.6,
+          -7.54
+        ],
+        [
+          5.15,
+          10.0,
+          -7.54
+        ],
+        [
+          5.15,
+          10.0,
+          -7.44
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          2.5999999999999996
+        ],
+        [
+          0,
+          2.5999999999999996
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lamp_backing",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          2.85,
+          12.6,
+          -7.54
+        ],
+        [
+          5.15,
+          12.6,
+          -7.54
+        ],
+        [
+          5.15,
+          12.6,
+          -7.44
+        ],
+        [
+          2.85,
+          12.6,
+          -7.44
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.3000000000000003,
+          0
+        ],
+        [
+          2.3000000000000003,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lamp_backing",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          2.85,
+          10.0,
+          -7.44
+        ],
+        [
+          5.15,
+          10.0,
+          -7.44
+        ],
+        [
+          5.15,
+          10.0,
+          -7.54
+        ],
+        [
+          2.85,
+          10.0,
+          -7.54
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.3000000000000003,
+          0
+        ],
+        [
+          2.3000000000000003,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lamp_backing",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.0,
+          12.45,
+          -7.98
+        ],
+        [
+          3.0,
+          12.45,
+          -7.98
+        ],
+        [
+          3.0,
+          10.15,
+          -7.98
+        ],
+        [
+          5.0,
+          10.15,
+          -7.98
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.0,
+          0
+        ],
+        [
+          2.0,
+          2.299999999999999
+        ],
+        [
+          0,
+          2.299999999999999
+        ]
+      ],
+      "material": "tower_controller/lens_fault",
+      "group": "tower_controller/binding_lamp",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          3.0,
+          12.45,
+          -7.55
+        ],
+        [
+          5.0,
+          12.45,
+          -7.55
+        ],
+        [
+          5.0,
+          10.15,
+          -7.55
+        ],
+        [
+          3.0,
+          10.15,
+          -7.55
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.0,
+          0
+        ],
+        [
+          2.0,
+          2.299999999999999
+        ],
+        [
+          0,
+          2.299999999999999
+        ]
+      ],
+      "material": "tower_controller/lens_fault",
+      "group": "tower_controller/binding_lamp",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          3.0,
+          12.45,
+          -7.98
+        ],
+        [
+          3.0,
+          12.45,
+          -7.55
+        ],
+        [
+          3.0,
+          10.15,
+          -7.55
+        ],
+        [
+          3.0,
+          10.15,
+          -7.98
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          2.299999999999999
+        ],
+        [
+          0,
+          2.299999999999999
+        ]
+      ],
+      "material": "tower_controller/lens_fault",
+      "group": "tower_controller/binding_lamp",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.0,
+          12.45,
+          -7.55
+        ],
+        [
+          5.0,
+          12.45,
+          -7.98
+        ],
+        [
+          5.0,
+          10.15,
+          -7.98
+        ],
+        [
+          5.0,
+          10.15,
+          -7.55
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          2.299999999999999
+        ],
+        [
+          0,
+          2.299999999999999
+        ]
+      ],
+      "material": "tower_controller/lens_fault",
+      "group": "tower_controller/binding_lamp",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          3.0,
+          12.45,
+          -7.98
+        ],
+        [
+          5.0,
+          12.45,
+          -7.98
+        ],
+        [
+          5.0,
+          12.45,
+          -7.55
+        ],
+        [
+          3.0,
+          12.45,
+          -7.55
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.0,
+          0
+        ],
+        [
+          2.0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/lens_fault",
+      "group": "tower_controller/binding_lamp",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          3.0,
+          10.15,
+          -7.55
+        ],
+        [
+          5.0,
+          10.15,
+          -7.55
+        ],
+        [
+          5.0,
+          10.15,
+          -7.98
+        ],
+        [
+          3.0,
+          10.15,
+          -7.98
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.0,
+          0
+        ],
+        [
+          2.0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/lens_fault",
+      "group": "tower_controller/binding_lamp",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.0,
+          8.1,
+          -7.2
+        ],
+        [
+          3.0,
+          8.1,
+          -7.2
+        ],
+        [
+          3.0,
+          5.1,
+          -7.2
+        ],
+        [
+          5.0,
+          5.1,
+          -7.2
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.0,
+          0
+        ],
+        [
+          2.0,
+          3.0
+        ],
+        [
+          0,
+          3.0
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/lever_socket",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          3.0,
+          8.1,
+          -6.8
+        ],
+        [
+          5.0,
+          8.1,
+          -6.8
+        ],
+        [
+          5.0,
+          5.1,
+          -6.8
+        ],
+        [
+          3.0,
+          5.1,
+          -6.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.0,
+          0
+        ],
+        [
+          2.0,
+          3.0
+        ],
+        [
+          0,
+          3.0
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/lever_socket",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          3.0,
+          8.1,
+          -7.2
+        ],
+        [
+          3.0,
+          8.1,
+          -6.8
+        ],
+        [
+          3.0,
+          5.1,
+          -6.8
+        ],
+        [
+          3.0,
+          5.1,
+          -7.2
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          3.0
+        ],
+        [
+          0,
+          3.0
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/lever_socket",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.0,
+          8.1,
+          -6.8
+        ],
+        [
+          5.0,
+          8.1,
+          -7.2
+        ],
+        [
+          5.0,
+          5.1,
+          -7.2
+        ],
+        [
+          5.0,
+          5.1,
+          -6.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          3.0
+        ],
+        [
+          0,
+          3.0
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/lever_socket",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          3.0,
+          8.1,
+          -7.2
+        ],
+        [
+          5.0,
+          8.1,
+          -7.2
+        ],
+        [
+          5.0,
+          8.1,
+          -6.8
+        ],
+        [
+          3.0,
+          8.1,
+          -6.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.0,
+          0
+        ],
+        [
+          2.0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/lever_socket",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          3.0,
+          5.1,
+          -6.8
+        ],
+        [
+          5.0,
+          5.1,
+          -6.8
+        ],
+        [
+          5.0,
+          5.1,
+          -7.2
+        ],
+        [
+          3.0,
+          5.1,
+          -7.2
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          2.0,
+          0
+        ],
+        [
+          2.0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/lever_socket",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          4.35,
+          7.6,
+          -8.0
+        ],
+        [
+          3.65,
+          7.6,
+          -8.0
+        ],
+        [
+          3.65,
+          5.6,
+          -8.0
+        ],
+        [
+          4.35,
+          5.6,
+          -8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          2.0
+        ],
+        [
+          0,
+          2.0
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lever",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          3.65,
+          7.6,
+          -7.15
+        ],
+        [
+          4.35,
+          7.6,
+          -7.15
+        ],
+        [
+          4.35,
+          5.6,
+          -7.15
+        ],
+        [
+          3.65,
+          5.6,
+          -7.15
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          2.0
+        ],
+        [
+          0,
+          2.0
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lever",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          3.65,
+          7.6,
+          -8.0
+        ],
+        [
+          3.65,
+          7.6,
+          -7.15
+        ],
+        [
+          3.65,
+          5.6,
+          -7.15
+        ],
+        [
+          3.65,
+          5.6,
+          -8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          2.0
+        ],
+        [
+          0,
+          2.0
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lever",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          4.35,
+          7.6,
+          -7.15
+        ],
+        [
+          4.35,
+          7.6,
+          -8.0
+        ],
+        [
+          4.35,
+          5.6,
+          -8.0
+        ],
+        [
+          4.35,
+          5.6,
+          -7.15
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          2.0
+        ],
+        [
+          0,
+          2.0
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lever",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          3.65,
+          7.6,
+          -8.0
+        ],
+        [
+          4.35,
+          7.6,
+          -8.0
+        ],
+        [
+          4.35,
+          7.6,
+          -7.15
+        ],
+        [
+          3.65,
+          7.6,
+          -7.15
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lever",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          3.65,
+          5.6,
+          -7.15
+        ],
+        [
+          4.35,
+          5.6,
+          -7.15
+        ],
+        [
+          4.35,
+          5.6,
+          -8.0
+        ],
+        [
+          3.65,
+          5.6,
+          -8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/cast_white",
+      "group": "tower_controller/lever",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.2,
+          4.7,
+          -7.05
+        ],
+        [
+          -5.9,
+          4.7,
+          -7.05
+        ],
+        [
+          -5.9,
+          4.0,
+          -7.05
+        ],
+        [
+          -5.2,
+          4.0,
+          -7.05
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.9,
+          4.7,
+          -6.86
+        ],
+        [
+          -5.2,
+          4.7,
+          -6.86
+        ],
+        [
+          -5.2,
+          4.0,
+          -6.86
+        ],
+        [
+          -5.9,
+          4.0,
+          -6.86
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.9,
+          4.7,
+          -7.05
+        ],
+        [
+          -5.9,
+          4.7,
+          -6.86
+        ],
+        [
+          -5.9,
+          4.0,
+          -6.86
+        ],
+        [
+          -5.9,
+          4.0,
+          -7.05
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.2,
+          4.7,
+          -6.86
+        ],
+        [
+          -5.2,
+          4.7,
+          -7.05
+        ],
+        [
+          -5.2,
+          4.0,
+          -7.05
+        ],
+        [
+          -5.2,
+          4.0,
+          -6.86
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.9,
+          4.7,
+          -7.05
+        ],
+        [
+          -5.2,
+          4.7,
+          -7.05
+        ],
+        [
+          -5.2,
+          4.7,
+          -6.86
+        ],
+        [
+          -5.9,
+          4.7,
+          -6.86
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.9,
+          4.0,
+          -6.86
+        ],
+        [
+          -5.2,
+          4.0,
+          -6.86
+        ],
+        [
+          -5.2,
+          4.0,
+          -7.05
+        ],
+        [
+          -5.9,
+          4.0,
+          -7.05
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.2,
+          12.899999999999999,
+          -7.05
+        ],
+        [
+          -5.9,
+          12.899999999999999,
+          -7.05
+        ],
+        [
+          -5.9,
+          12.2,
+          -7.05
+        ],
+        [
+          -5.2,
+          12.2,
+          -7.05
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.9,
+          12.899999999999999,
+          -6.86
+        ],
+        [
+          -5.2,
+          12.899999999999999,
+          -6.86
+        ],
+        [
+          -5.2,
+          12.2,
+          -6.86
+        ],
+        [
+          -5.9,
+          12.2,
+          -6.86
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.9,
+          12.899999999999999,
+          -7.05
+        ],
+        [
+          -5.9,
+          12.899999999999999,
+          -6.86
+        ],
+        [
+          -5.9,
+          12.2,
+          -6.86
+        ],
+        [
+          -5.9,
+          12.2,
+          -7.05
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.2,
+          12.899999999999999,
+          -6.86
+        ],
+        [
+          -5.2,
+          12.899999999999999,
+          -7.05
+        ],
+        [
+          -5.2,
+          12.2,
+          -7.05
+        ],
+        [
+          -5.2,
+          12.2,
+          -6.86
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.9,
+          12.899999999999999,
+          -7.05
+        ],
+        [
+          -5.2,
+          12.899999999999999,
+          -7.05
+        ],
+        [
+          -5.2,
+          12.899999999999999,
+          -6.86
+        ],
+        [
+          -5.9,
+          12.899999999999999,
+          -6.86
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.9,
+          12.2,
+          -6.86
+        ],
+        [
+          -5.2,
+          12.2,
+          -6.86
+        ],
+        [
+          -5.2,
+          12.2,
+          -7.05
+        ],
+        [
+          -5.9,
+          12.2,
+          -7.05
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.8,
+          4.7,
+          -7.05
+        ],
+        [
+          5.1,
+          4.7,
+          -7.05
+        ],
+        [
+          5.1,
+          4.0,
+          -7.05
+        ],
+        [
+          5.8,
+          4.0,
+          -7.05
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.1,
+          4.7,
+          -6.86
+        ],
+        [
+          5.8,
+          4.7,
+          -6.86
+        ],
+        [
+          5.8,
+          4.0,
+          -6.86
+        ],
+        [
+          5.1,
+          4.0,
+          -6.86
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.1,
+          4.7,
+          -7.05
+        ],
+        [
+          5.1,
+          4.7,
+          -6.86
+        ],
+        [
+          5.1,
+          4.0,
+          -6.86
+        ],
+        [
+          5.1,
+          4.0,
+          -7.05
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.8,
+          4.7,
+          -6.86
+        ],
+        [
+          5.8,
+          4.7,
+          -7.05
+        ],
+        [
+          5.8,
+          4.0,
+          -7.05
+        ],
+        [
+          5.8,
+          4.0,
+          -6.86
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.1,
+          4.7,
+          -7.05
+        ],
+        [
+          5.8,
+          4.7,
+          -7.05
+        ],
+        [
+          5.8,
+          4.7,
+          -6.86
+        ],
+        [
+          5.1,
+          4.7,
+          -6.86
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.1,
+          4.0,
+          -6.86
+        ],
+        [
+          5.8,
+          4.0,
+          -6.86
+        ],
+        [
+          5.8,
+          4.0,
+          -7.05
+        ],
+        [
+          5.1,
+          4.0,
+          -7.05
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.8,
+          12.899999999999999,
+          -7.05
+        ],
+        [
+          5.1,
+          12.899999999999999,
+          -7.05
+        ],
+        [
+          5.1,
+          12.2,
+          -7.05
+        ],
+        [
+          5.8,
+          12.2,
+          -7.05
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.1,
+          12.899999999999999,
+          -6.86
+        ],
+        [
+          5.8,
+          12.899999999999999,
+          -6.86
+        ],
+        [
+          5.8,
+          12.2,
+          -6.86
+        ],
+        [
+          5.1,
+          12.2,
+          -6.86
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.1,
+          12.899999999999999,
+          -7.05
+        ],
+        [
+          5.1,
+          12.899999999999999,
+          -6.86
+        ],
+        [
+          5.1,
+          12.2,
+          -6.86
+        ],
+        [
+          5.1,
+          12.2,
+          -7.05
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.8,
+          12.899999999999999,
+          -6.86
+        ],
+        [
+          5.8,
+          12.899999999999999,
+          -7.05
+        ],
+        [
+          5.8,
+          12.2,
+          -7.05
+        ],
+        [
+          5.8,
+          12.2,
+          -6.86
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.1,
+          12.899999999999999,
+          -7.05
+        ],
+        [
+          5.8,
+          12.899999999999999,
+          -7.05
+        ],
+        [
+          5.8,
+          12.899999999999999,
+          -6.86
+        ],
+        [
+          5.1,
+          12.899999999999999,
+          -6.86
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          5.1,
+          12.2,
+          -6.86
+        ],
+        [
+          5.8,
+          12.2,
+          -6.86
+        ],
+        [
+          5.8,
+          12.2,
+          -7.05
+        ],
+        [
+          5.1,
+          12.2,
+          -7.05
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/fasteners",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          4.8,
+          11.8,
+          7.6
+        ],
+        [
+          -4.8,
+          11.8,
+          7.6
+        ],
+        [
+          -4.8,
+          4.0,
+          7.6
+        ],
+        [
+          4.8,
+          4.0,
+          7.6
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/andesite",
+      "group": "tower_controller/rear_cover",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.8,
+          11.8,
+          7.8
+        ],
+        [
+          4.8,
+          11.8,
+          7.8
+        ],
+        [
+          4.8,
+          4.0,
+          7.8
+        ],
+        [
+          -4.8,
+          4.0,
+          7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/andesite",
+      "group": "tower_controller/rear_cover",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.8,
+          11.8,
+          7.6
+        ],
+        [
+          -4.8,
+          11.8,
+          7.8
+        ],
+        [
+          -4.8,
+          4.0,
+          7.8
+        ],
+        [
+          -4.8,
+          4.0,
+          7.6
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/andesite",
+      "group": "tower_controller/rear_cover",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          4.8,
+          11.8,
+          7.8
+        ],
+        [
+          4.8,
+          11.8,
+          7.6
+        ],
+        [
+          4.8,
+          4.0,
+          7.6
+        ],
+        [
+          4.8,
+          4.0,
+          7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/andesite",
+      "group": "tower_controller/rear_cover",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.8,
+          11.8,
+          7.6
+        ],
+        [
+          4.8,
+          11.8,
+          7.6
+        ],
+        [
+          4.8,
+          11.8,
+          7.8
+        ],
+        [
+          -4.8,
+          11.8,
+          7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/andesite",
+      "group": "tower_controller/rear_cover",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -4.8,
+          4.0,
+          7.8
+        ],
+        [
+          4.8,
+          4.0,
+          7.8
+        ],
+        [
+          4.8,
+          4.0,
+          7.6
+        ],
+        [
+          -4.8,
+          4.0,
+          7.6
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          16,
+          0
+        ],
+        [
+          16,
+          16
+        ],
+        [
+          0,
+          16
+        ]
+      ],
+      "material": "tower_controller/andesite",
+      "group": "tower_controller/rear_cover",
+      "clamp": true,
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          1.8,
+          8.7,
+          7.8
+        ],
+        [
+          -1.8,
+          8.7,
+          7.8
+        ],
+        [
+          -1.8,
+          7.2,
+          7.8
+        ],
+        [
+          1.8,
+          7.2,
+          7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          3.6,
+          0
+        ],
+        [
+          3.6,
+          1.4999999999999991
+        ],
+        [
+          0,
+          1.4999999999999991
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/rear_latch",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.8,
+          8.7,
+          8.0
+        ],
+        [
+          1.8,
+          8.7,
+          8.0
+        ],
+        [
+          1.8,
+          7.2,
+          8.0
+        ],
+        [
+          -1.8,
+          7.2,
+          8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          3.6,
+          0
+        ],
+        [
+          3.6,
+          1.4999999999999991
+        ],
+        [
+          0,
+          1.4999999999999991
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/rear_latch",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.8,
+          8.7,
+          7.8
+        ],
+        [
+          -1.8,
+          8.7,
+          8.0
+        ],
+        [
+          -1.8,
+          7.2,
+          8.0
+        ],
+        [
+          -1.8,
+          7.2,
+          7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1.4999999999999991
+        ],
+        [
+          0,
+          1.4999999999999991
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/rear_latch",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          1.8,
+          8.7,
+          8.0
+        ],
+        [
+          1.8,
+          8.7,
+          7.8
+        ],
+        [
+          1.8,
+          7.2,
+          7.8
+        ],
+        [
+          1.8,
+          7.2,
+          8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1.4999999999999991
+        ],
+        [
+          0,
+          1.4999999999999991
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/rear_latch",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.8,
+          8.7,
+          7.8
+        ],
+        [
+          1.8,
+          8.7,
+          7.8
+        ],
+        [
+          1.8,
+          8.7,
+          8.0
+        ],
+        [
+          -1.8,
+          8.7,
+          8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          3.6,
+          0
+        ],
+        [
+          3.6,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/rear_latch",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -1.8,
+          7.2,
+          8.0
+        ],
+        [
+          1.8,
+          7.2,
+          8.0
+        ],
+        [
+          1.8,
+          7.2,
+          7.8
+        ],
+        [
+          -1.8,
+          7.2,
+          7.8
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          3.6,
+          0
+        ],
+        [
+          3.6,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/blue_gray",
+      "group": "tower_controller/rear_latch",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.8,
+          5.8,
+          7.6
+        ],
+        [
+          -5.5,
+          5.8,
+          7.6
+        ],
+        [
+          -5.5,
+          5.0,
+          7.6
+        ],
+        [
+          -3.8,
+          5.0,
+          7.6
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.7000000000000002,
+          0
+        ],
+        [
+          1.7000000000000002,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/rear_hinges",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.5,
+          5.8,
+          8.0
+        ],
+        [
+          -3.8,
+          5.8,
+          8.0
+        ],
+        [
+          -3.8,
+          5.0,
+          8.0
+        ],
+        [
+          -5.5,
+          5.0,
+          8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.7000000000000002,
+          0
+        ],
+        [
+          1.7000000000000002,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/rear_hinges",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.5,
+          5.8,
+          7.6
+        ],
+        [
+          -5.5,
+          5.8,
+          8.0
+        ],
+        [
+          -5.5,
+          5.0,
+          8.0
+        ],
+        [
+          -5.5,
+          5.0,
+          7.6
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/rear_hinges",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.8,
+          5.8,
+          8.0
+        ],
+        [
+          -3.8,
+          5.8,
+          7.6
+        ],
+        [
+          -3.8,
+          5.0,
+          7.6
+        ],
+        [
+          -3.8,
+          5.0,
+          8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/rear_hinges",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.5,
+          5.8,
+          7.6
+        ],
+        [
+          -3.8,
+          5.8,
+          7.6
+        ],
+        [
+          -3.8,
+          5.8,
+          8.0
+        ],
+        [
+          -5.5,
+          5.8,
+          8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.7000000000000002,
+          0
+        ],
+        [
+          1.7000000000000002,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/rear_hinges",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.5,
+          5.0,
+          8.0
+        ],
+        [
+          -3.8,
+          5.0,
+          8.0
+        ],
+        [
+          -3.8,
+          5.0,
+          7.6
+        ],
+        [
+          -5.5,
+          5.0,
+          7.6
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.7000000000000002,
+          0
+        ],
+        [
+          1.7000000000000002,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/rear_hinges",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.8,
+          10.8,
+          7.6
+        ],
+        [
+          -5.5,
+          10.8,
+          7.6
+        ],
+        [
+          -5.5,
+          10.0,
+          7.6
+        ],
+        [
+          -3.8,
+          10.0,
+          7.6
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.7000000000000002,
+          0
+        ],
+        [
+          1.7000000000000002,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/rear_hinges",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.5,
+          10.8,
+          8.0
+        ],
+        [
+          -3.8,
+          10.8,
+          8.0
+        ],
+        [
+          -3.8,
+          10.0,
+          8.0
+        ],
+        [
+          -5.5,
+          10.0,
+          8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.7000000000000002,
+          0
+        ],
+        [
+          1.7000000000000002,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/rear_hinges",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.5,
+          10.8,
+          7.6
+        ],
+        [
+          -5.5,
+          10.8,
+          8.0
+        ],
+        [
+          -5.5,
+          10.0,
+          8.0
+        ],
+        [
+          -5.5,
+          10.0,
+          7.6
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/rear_hinges",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -3.8,
+          10.8,
+          8.0
+        ],
+        [
+          -3.8,
+          10.8,
+          7.6
+        ],
+        [
+          -3.8,
+          10.0,
+          7.6
+        ],
+        [
+          -3.8,
+          10.0,
+          8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/rear_hinges",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.5,
+          10.8,
+          7.6
+        ],
+        [
+          -3.8,
+          10.8,
+          7.6
+        ],
+        [
+          -3.8,
+          10.8,
+          8.0
+        ],
+        [
+          -5.5,
+          10.8,
+          8.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.7000000000000002,
+          0
+        ],
+        [
+          1.7000000000000002,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/rear_hinges",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -5.5,
+          10.0,
+          8.0
+        ],
+        [
+          -3.8,
+          10.0,
+          8.0
+        ],
+        [
+          -3.8,
+          10.0,
+          7.6
+        ],
+        [
+          -5.5,
+          10.0,
+          7.6
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1.7000000000000002,
+          0
+        ],
+        [
+          1.7000000000000002,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/rear_hinges",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -7.6,
+          3.9000000000000004,
+          -2.0
+        ],
+        [
+          -8.0,
+          3.9000000000000004,
+          -2.0
+        ],
+        [
+          -8.0,
+          3.1,
+          -2.0
+        ],
+        [
+          -7.6,
+          3.1,
+          -2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          3.9000000000000004,
+          2.0
+        ],
+        [
+          -7.6,
+          3.9000000000000004,
+          2.0
+        ],
+        [
+          -7.6,
+          3.1,
+          2.0
+        ],
+        [
+          -8.0,
+          3.1,
+          2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          3.9000000000000004,
+          -2.0
+        ],
+        [
+          -8.0,
+          3.9000000000000004,
+          2.0
+        ],
+        [
+          -8.0,
+          3.1,
+          2.0
+        ],
+        [
+          -8.0,
+          3.1,
+          -2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          4.0,
+          0
+        ],
+        [
+          4.0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -7.6,
+          3.9000000000000004,
+          2.0
+        ],
+        [
+          -7.6,
+          3.9000000000000004,
+          -2.0
+        ],
+        [
+          -7.6,
+          3.1,
+          -2.0
+        ],
+        [
+          -7.6,
+          3.1,
+          2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          4.0,
+          0
+        ],
+        [
+          4.0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          3.9000000000000004,
+          -2.0
+        ],
+        [
+          -7.6,
+          3.9000000000000004,
+          -2.0
+        ],
+        [
+          -7.6,
+          3.9000000000000004,
+          2.0
+        ],
+        [
+          -8.0,
+          3.9000000000000004,
+          2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          4.0
+        ],
+        [
+          0,
+          4.0
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          3.1,
+          2.0
+        ],
+        [
+          -7.6,
+          3.1,
+          2.0
+        ],
+        [
+          -7.6,
+          3.1,
+          -2.0
+        ],
+        [
+          -8.0,
+          3.1,
+          -2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          4.0
+        ],
+        [
+          0,
+          4.0
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -7.6,
+          12.9,
+          -2.0
+        ],
+        [
+          -8.0,
+          12.9,
+          -2.0
+        ],
+        [
+          -8.0,
+          12.1,
+          -2.0
+        ],
+        [
+          -7.6,
+          12.1,
+          -2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          12.9,
+          2.0
+        ],
+        [
+          -7.6,
+          12.9,
+          2.0
+        ],
+        [
+          -7.6,
+          12.1,
+          2.0
+        ],
+        [
+          -8.0,
+          12.1,
+          2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          12.9,
+          -2.0
+        ],
+        [
+          -8.0,
+          12.9,
+          2.0
+        ],
+        [
+          -8.0,
+          12.1,
+          2.0
+        ],
+        [
+          -8.0,
+          12.1,
+          -2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          4.0,
+          0
+        ],
+        [
+          4.0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -7.6,
+          12.9,
+          2.0
+        ],
+        [
+          -7.6,
+          12.9,
+          -2.0
+        ],
+        [
+          -7.6,
+          12.1,
+          -2.0
+        ],
+        [
+          -7.6,
+          12.1,
+          2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          4.0,
+          0
+        ],
+        [
+          4.0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          12.9,
+          -2.0
+        ],
+        [
+          -7.6,
+          12.9,
+          -2.0
+        ],
+        [
+          -7.6,
+          12.9,
+          2.0
+        ],
+        [
+          -8.0,
+          12.9,
+          2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          4.0
+        ],
+        [
+          0,
+          4.0
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          -8.0,
+          12.1,
+          2.0
+        ],
+        [
+          -7.6,
+          12.1,
+          2.0
+        ],
+        [
+          -7.6,
+          12.1,
+          -2.0
+        ],
+        [
+          -8.0,
+          12.1,
+          -2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          4.0
+        ],
+        [
+          0,
+          4.0
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          8.0,
+          3.9000000000000004,
+          -2.0
+        ],
+        [
+          7.6,
+          3.9000000000000004,
+          -2.0
+        ],
+        [
+          7.6,
+          3.1,
+          -2.0
+        ],
+        [
+          8.0,
+          3.1,
+          -2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          7.6,
+          3.9000000000000004,
+          2.0
+        ],
+        [
+          8.0,
+          3.9000000000000004,
+          2.0
+        ],
+        [
+          8.0,
+          3.1,
+          2.0
+        ],
+        [
+          7.6,
+          3.1,
+          2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          7.6,
+          3.9000000000000004,
+          -2.0
+        ],
+        [
+          7.6,
+          3.9000000000000004,
+          2.0
+        ],
+        [
+          7.6,
+          3.1,
+          2.0
+        ],
+        [
+          7.6,
+          3.1,
+          -2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          4.0,
+          0
+        ],
+        [
+          4.0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          8.0,
+          3.9000000000000004,
+          2.0
+        ],
+        [
+          8.0,
+          3.9000000000000004,
+          -2.0
+        ],
+        [
+          8.0,
+          3.1,
+          -2.0
+        ],
+        [
+          8.0,
+          3.1,
+          2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          4.0,
+          0
+        ],
+        [
+          4.0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          7.6,
+          3.9000000000000004,
+          -2.0
+        ],
+        [
+          8.0,
+          3.9000000000000004,
+          -2.0
+        ],
+        [
+          8.0,
+          3.9000000000000004,
+          2.0
+        ],
+        [
+          7.6,
+          3.9000000000000004,
+          2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          4.0
+        ],
+        [
+          0,
+          4.0
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          7.6,
+          3.1,
+          2.0
+        ],
+        [
+          8.0,
+          3.1,
+          2.0
+        ],
+        [
+          8.0,
+          3.1,
+          -2.0
+        ],
+        [
+          7.6,
+          3.1,
+          -2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          4.0
+        ],
+        [
+          0,
+          4.0
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          8.0,
+          12.9,
+          -2.0
+        ],
+        [
+          7.6,
+          12.9,
+          -2.0
+        ],
+        [
+          7.6,
+          12.1,
+          -2.0
+        ],
+        [
+          8.0,
+          12.1,
+          -2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          7.6,
+          12.9,
+          2.0
+        ],
+        [
+          8.0,
+          12.9,
+          2.0
+        ],
+        [
+          8.0,
+          12.1,
+          2.0
+        ],
+        [
+          7.6,
+          12.1,
+          2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          7.6,
+          12.9,
+          -2.0
+        ],
+        [
+          7.6,
+          12.9,
+          2.0
+        ],
+        [
+          7.6,
+          12.1,
+          2.0
+        ],
+        [
+          7.6,
+          12.1,
+          -2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          4.0,
+          0
+        ],
+        [
+          4.0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          8.0,
+          12.9,
+          2.0
+        ],
+        [
+          8.0,
+          12.9,
+          -2.0
+        ],
+        [
+          8.0,
+          12.1,
+          -2.0
+        ],
+        [
+          8.0,
+          12.1,
+          2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          4.0,
+          0
+        ],
+        [
+          4.0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          7.6,
+          12.9,
+          -2.0
+        ],
+        [
+          8.0,
+          12.9,
+          -2.0
+        ],
+        [
+          8.0,
+          12.9,
+          2.0
+        ],
+        [
+          7.6,
+          12.9,
+          2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          4.0
+        ],
+        [
+          0,
+          4.0
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "points": [
+        [
+          7.6,
+          12.1,
+          2.0
+        ],
+        [
+          8.0,
+          12.1,
+          2.0
+        ],
+        [
+          8.0,
+          12.1,
+          -2.0
+        ],
+        [
+          7.6,
+          12.1,
+          -2.0
+        ]
+      ],
+      "uv": [
+        [
+          0,
+          0
+        ],
+        [
+          1,
+          0
+        ],
+        [
+          1,
+          4.0
+        ],
+        [
+          0,
+          4.0
+        ]
+      ],
+      "material": "tower_controller/iron",
+      "group": "tower_controller/side_retainer",
+      "kind": "placed_controller_concept",
+      "owner_cell": [
+        0,
+        0,
+        0
+      ]
+    }
+  ]
+}

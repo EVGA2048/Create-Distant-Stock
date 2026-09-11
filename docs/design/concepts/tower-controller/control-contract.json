@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 1,
+  "status": "proposal_not_implemented",
+  "transport": null,
+  "gameGuiImplemented": false,
+  "identity": {
+    "tower": {
+      "uuid": "server-generated stable UUID for this tower lifetime",
+      "dimension": "dimension resource id",
+      "basePos": [
+        "integer x",
+        "integer y",
+        "integer z"
+      ]
+    },
+    "controllerBinding": "Exactly zero or one tower identity; many controllers may bind the same tower",
+    "replacement": "Rebuild at identical coordinates receives a new UUID; explicit rebind required",
+    "device": {
+      "identity": "server-owned device UUID, lifetime-scoped",
+      "pos": [
+        "integer x",
+        "integer y",
+        "integer z"
+      ],
+      "dimension": "dimension resource id",
+      "type": "server-resolved registered device type"
+    },
+    "deviceIdentityImplementation": "Proposed; not claimed to exist in current devices"
+  },
+  "ownership": {
+    "configuration": "tower base, never a controller-local copy",
+    "controllerStores": [
+      "towerIdentity"
+    ],
+    "clientSnapshot": "read-only cache with revision and freshness; never authoritative"
+  },
+  "range": {
+    "sameDimensionOnly": true,
+    "effectiveRangeBlocks": null,
+    "status": "numeric range and metric TBD; server-owned policy, not client-provided",
+    "appliesTo": [
+      "binding",
+      "snapshot",
+      "every update",
+      "every device edit"
+    ]
+  },
+  "loading": {
+    "searchMayLoadChunks": false,
+    "unloadedTarget": "reject as unavailable; do not search-load or trust cached completeness",
+    "loadChecksBeforeWorldReads": true
+  },
+  "operations": {
+    "bind": {
+      "request": [
+        "controllerPos",
+        "candidateTowerIdentity"
+      ],
+      "serverValidation": [
+        "controller_exists_and_actor_can_use",
+        "same_dimension",
+        "tower_identity_matches",
+        "tower_complete",
+        "actor_permission",
+        "controller_within_effective_range",
+        "required_chunks_already_loaded"
+      ],
+      "result": "validated binding or explicit rejection; no implicit coordinate-only adoption"
+    },
+    "snapshot": {
+      "request": [
+        "controllerPos"
+      ],
+      "serverValidation": [
+        "controller_exists_and_actor_can_use",
+        "same_dimension",
+        "tower_identity_matches",
+        "tower_complete",
+        "actor_permission",
+        "controller_within_effective_range",
+        "required_chunks_already_loaded"
+      ],
+      "result": [
+        "towerIdentity",
+        "revision",
+        "effectiveConfig",
+        "deviceTypeCapabilities",
+        "operationStatus"
+      ]
+    },
+    "update": {
+      "request": [
+        "controllerPos",
+        "towerIdentity",
+        "expectedRevision",
+        "patch"
+      ],
+      "serverValidation": [
+        "controller_exists_and_actor_can_use",
+        "same_dimension",
+        "tower_identity_matches",
+        "tower_complete",
+        "actor_permission",
+        "controller_within_effective_range",
+        "required_chunks_already_loaded",
+        "device_identity_membership_range_and_type_capability",
+        "expected_revision_matches",
+        "server_budget_and_tower_capacity"
+      ],
+      "atomic": true,
+      "unknownFields": "reject",
+      "conflict": "reject without overwriting; return fresh revision/snapshot only if still authorized",
+      "success": "increment revision exactly once only after effective apply; acknowledge effective values",
+      "failure": "no revision bump or partial config; no success indication; unwind newly acquired future tickets"
+    },
+    "unbind": {
+      "scope": "this controller only",
+      "permission": "server validates actor and controller access",
+      "doesNotEraseTowerConfig": true
+    }
+  },
+  "config": {
+    "interconnectEnabled": {
+      "type": "boolean",
+      "default": false,
+      "implemented": false
+    },
+    "chunkLoading": {
+      "enabledDefault": false,
+      "implemented": false,
+      "selectionUnit": "chunk",
+      "selection": [
+        {
+          "chunkX": "integer",
+          "chunkZ": "integer"
+        }
+      ],
+      "dimension": "bound tower dimension; cross-dimension selection rejected",
+      "limits": [
+        "deduplicate chunk coordinates",
+        "bounded request payload",
+        "server global/player/tower budgets",
+        "tower capacity",
+        "server-approved area/range"
+      ],
+      "numericLimits": null,
+      "enable": "validate complete selection and atomically reserve future ticket budget before success",
+      "limitFailure": "reject whole request; show fault/reason, never a success light",
+      "disable": "release this tower-owned future tickets",
+      "towerRemovedOrInvalid": "disable and release future tickets; controller removal alone is not tower removal",
+      "restart": "revalidate owner, tower identity/completeness and budget before any future ticket recreation"
+    },
+    "transferRate": {
+      "implemented": false,
+      "value": null,
+      "suggestedUnit": "packages_per_second",
+      "unitStatus": "TBD",
+      "limits": null,
+      "scope": "tower parcel transfer",
+      "notHttpBytes": true,
+      "zeroBurstAndDirectionSemantics": "TBD; no enforcement in this preview"
+    },
+    "devices": {
+      "allowlistDefault": [],
+      "entry": {
+        "device": "identity + pos + dimension + type",
+        "enabled": "boolean",
+        "functions": "subset of server type capability allowlist"
+      },
+      "validation": [
+        "identity must match loaded server device",
+        "belongs to bound tower management set",
+        "same dimension and within effective managed range",
+        "actor authorized for device",
+        "device type resolved by server",
+        "each requested function allowed for that type"
+      ],
+      "clientMayInventCapabilities": false,
+      "staleMovedRebuiltDevice": "reject; never silently retarget coordinates"
+    }
+  },
+  "deviceTypeCapabilityProposal": {
+    "policy": "Only these reviewed per-type candidates may become server capabilities; unknown type/function denied. All gates below are proposals, not existing tower controls.",
+    "dock": {
+      "source": "src/main/java/dev/distantstock/block/DockBlockEntity.java",
+      "observed": "package inventory with import/export mode",
+      "candidateFunctions": [
+        "parcel_import",
+        "parcel_export"
+      ],
+      "mappingStatus": "TBD implementation"
+    },
+    "gauge": {
+      "source": "src/main/java/dev/distantstock/block/GaugeBlockEntity.java",
+      "observed": "frequency/address, stock cache information, last order display",
+      "candidateFunctions": [
+        "stock_status_read"
+      ],
+      "otherFunctions": "TBD after full call-path review"
+    },
+    "monitor": {
+      "source": "src/main/java/dev/distantstock/block/MonitorBlockEntity.java",
+      "observed": "local/peer timing, backlog, round-trip and link status display",
+      "candidateFunctions": [
+        "link_status_read"
+      ],
+      "otherFunctions": "TBD"
+    },
+    "requester": {
+      "source": "src/main/java/dev/distantstock/item/RequesterItem.java",
+      "observed": "handheld item opens requester menu, not a placed block",
+      "candidateFunctions": [],
+      "supportedAsManagedPlacedDevice": false,
+      "mappingStatus": "TBD item identity/holder/current-position validation; do not fabricate blockPos"
+    }
+  },
+  "responses": {
+    "status": [
+      "accepted",
+      "rejected",
+      "unavailable",
+      "conflict"
+    ],
+    "errorCodes": [
+      "UNBOUND",
+      "DIMENSION_MISMATCH",
+      "OUT_OF_RANGE",
+      "TOWER_REPLACED",
+      "TOWER_INCOMPLETE",
+      "PERMISSION_DENIED",
+      "TARGET_UNLOADED",
+      "REVISION_CONFLICT",
+      "BUDGET_EXCEEDED",
+      "DEVICE_NOT_MANAGED",
+      "DEVICE_REPLACED",
+      "CAPABILITY_DENIED",
+      "INVALID_PATCH",
+      "APPLY_FAILED"
+    ],
+    "lamp": "unbound / bound / out_of_range / fault are illustrative binding states; rejected apply never lights success",
+    "chunkLoadingStatusSeparate": true
+  },
+  "fluid": {
+    "name": null,
+    "registerPlaceholder": false
+  },
+  "openDecisions": [
+    "range and metric",
+    "chunk limits and ticket lifetime policy",
+    "rate unit/value/burst/direction",
+    "device capability mapping",
+    "requester managed-item model",
+    "permission integration",
+    "transport/GUI"
+  ]
+}

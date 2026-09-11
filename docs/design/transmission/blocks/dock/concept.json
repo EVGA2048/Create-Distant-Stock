@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "status": "offline_concept_only",
+  "name": {
+    "zh_cn": "远仓港",
+    "en_us": "Distant Dock"
+  },
+  "suggestedRegistryId": "distantstock:dock",
+  "registered": false,
+  "kind": "block",
+  "placement": "independentBlock",
+  "boundsModelPixels": [
+    [
+      -8,
+      0,
+      -8
+    ],
+    [
+      8,
+      16,
+      8
+    ]
+  ],
+  "meshFormat": "render_scene face list; not Minecraft block JSON",
+  "states": {
+    "idle": "berth empty, lamp dull",
+    "online": "berth empty, cyan beam",
+    "loaded": "parcel + cyan envelope"
+  },
+  "ports": "kinetic east / parcel south / fluid reserved west",
+  "materialSource": "create_materials / installed Create jar (CREATE_JAR override)",
+  "notes": "Create andesite-casing parcel berth; beam and envelope are effects."
+}

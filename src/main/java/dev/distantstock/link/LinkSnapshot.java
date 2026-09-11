@@ -19,6 +19,15 @@ public final class LinkSnapshot {
     public static volatile long peerSeenMs;
     public static volatile int peersUp;
     public static volatile int peersTotal;
+    public static volatile boolean transerverAttached;
+    public static volatile boolean transerverUp;
+    public static volatile String transerverNodeId = "";
+    public static volatile String transerverAlias = "";
+    public static volatile String transerverFailure = "";
+    public static volatile int transerverOutbox;
+    public static volatile int transerverInbox;
+    public static volatile int transerverCompleted;
+    public static volatile int transerverDeadLetters;
 
     private static long prevNano = System.nanoTime();
     private static double ewmaMspt = 50;
@@ -41,8 +50,8 @@ public final class LinkSnapshot {
         localMspt = ewmaMspt;
         localTps = ewmaMspt <= 0 ? 20 : Math.min(20.0, 1000.0 / ewmaMspt);
         orderDepth = LinkQueues.orderDepth();
-        packageDepth = LinkQueues.packageDepth();
-        inFlight = LinkQueues.inFlight();
+        packageDepth = LinkQueues.packageDepth() + transerverOutbox + transerverInbox;
+        inFlight = LinkQueues.inFlight() + ParcelEscrow.get(server).size();
     }
 
     public static void peersOk(int up, int total, String id, double tps, double mspt, long rttMs) {
@@ -70,6 +79,31 @@ public final class LinkSnapshot {
         }
     }
 
+    public static void transerver(String nodeId, String alias, boolean transportUp, String failure,
+                                  int outbox, int inbox, int completed, int deadLetters) {
+        transerverAttached = true;
+        transerverUp = transportUp;
+        transerverNodeId = nodeId == null ? "" : nodeId;
+        transerverAlias = alias == null ? transerverNodeId : alias;
+        transerverFailure = failure == null ? "" : failure;
+        transerverOutbox = outbox;
+        transerverInbox = inbox;
+        transerverCompleted = completed;
+        transerverDeadLetters = deadLetters;
+    }
+
+    public static void transerverUnavailable() {
+        transerverAttached = false;
+        transerverUp = false;
+        transerverNodeId = "";
+        transerverAlias = "";
+        transerverFailure = "";
+        transerverOutbox = 0;
+        transerverInbox = 0;
+        transerverCompleted = 0;
+        transerverDeadLetters = 0;
+    }
+
     public static String selfId() {
         return StockConfig.selfId();
     }
@@ -93,7 +127,16 @@ public final class LinkSnapshot {
                 peerRttMs,
                 peerFails,
                 peersUp,
-                peersTotal
+                peersTotal,
+                transerverAttached,
+                transerverUp,
+                transerverNodeId,
+                transerverAlias,
+                transerverFailure,
+                transerverOutbox,
+                transerverInbox,
+                transerverCompleted,
+                transerverDeadLetters
         );
     }
 
@@ -111,9 +154,26 @@ public final class LinkSnapshot {
             double peerRttMs,
             int peerFails,
             int peersUp,
-            int peersTotal
+            int peersTotal,
+            boolean transerverAttached,
+            boolean transerverUp,
+            String transerverNodeId,
+            String transerverAlias,
+            String transerverFailure,
+            int transerverOutbox,
+            int transerverInbox,
+            int transerverCompleted,
+            int transerverDeadLetters
     ) {
+        public boolean linkUp() {
+            return transerverAttached ? transerverUp : peerUp;
+        }
+
         public String linkLabel() {
+            if (transerverAttached) {
+                return (transerverAlias == null || transerverAlias.isBlank()
+                        ? transerverNodeId : transerverAlias) + (transerverUp ? " · online" : " · offline");
+            }
             if (peersTotal > 1) {
                 return selfId + " · " + peersUp + "/" + peersTotal;
             }

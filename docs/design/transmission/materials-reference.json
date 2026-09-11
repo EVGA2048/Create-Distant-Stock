@@ -1,0 +1,88 @@
+{
+  "andesite": "create",
+  "casing": "create",
+  "cast_white": "create",
+  "iron": "create",
+  "blue_gray": "create",
+  "wood": "create",
+  "cyan": [
+    "#63BBD0",
+    "#D9FAFF",
+    "#2585A5"
+  ],
+  "glass": [
+    "#BCDDEB",
+    "#E2F9FF",
+    "#81BFD4"
+  ],
+  "beam_core": [
+    "#DEF9FF",
+    "#F2FDFF",
+    "#C6EDF7"
+  ],
+  "beam_outer": [
+    "#63BBD0",
+    "#63BBD0",
+    "#63BBD0"
+  ],
+  "aether_core": [
+    "#D7ECFB",
+    "#F4FBFF",
+    "#B2D8F4"
+  ],
+  "aether_outer": [
+    "#A5D2EF",
+    "#A5D2EF",
+    "#A5D2EF"
+  ],
+  "lamp_blue": [
+    "#2D75A7",
+    "#A6E6F4",
+    "#1C476D"
+  ],
+  "lamp_cyan": [
+    "#2585A5",
+    "#D9FAFF",
+    "#63BBD0"
+  ],
+  "lamp_off": [
+    "#667277",
+    "#E1E8E5",
+    "#465258"
+  ],
+  "lamp_fault": [
+    "#B85D2D",
+    "#FFE0A3",
+    "#7A2F20"
+  ],
+  "lamp_core_blue": [
+    "#3D9DD0",
+    "#E9FCFF",
+    "#1B5D88"
+  ],
+  "lamp_core_cyan": [
+    "#30C0C2",
+    "#F2FFFF",
+    "#167878"
+  ],
+  "lamp_core_off": [
+    "#CBD5D2",
+    "#FFFFFF",
+    "#7C8987"
+  ],
+  "lamp_core_fault": [
+    "#ED8A38",
+    "#FFF3C4",
+    "#A84621"
+  ],
+  "pointer": [
+    "#CAE9EB",
+    "#E4F7F9",
+    "#9FC9CC"
+  ],
+  "paper": [
+    "#F2EFE3",
+    "#FFFDF1",
+    "#B9C2C6"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": {
+    "B": { "item": "create:brass_ingot" },
+    "G": { "item": "minecraft:white_stained_glass_pane" },
+    "R": { "item": "minecraft:redstone_torch" }
+  },
+  "pattern": [" G ", " B ", " R "],
+  "result": { "count": 1, "id": "distantstock:brass_signal_lamp" }
+}

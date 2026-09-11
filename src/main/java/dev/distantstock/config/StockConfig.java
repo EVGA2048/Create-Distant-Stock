@@ -13,6 +13,8 @@ public final class StockConfig {
     public record Peer(String id, String host, int port) {
     }
 
+    /** Transport mode: "transerver" (default), "legacy" (HTTP only), or "both". */
+    public static final ModConfigSpec.ConfigValue<String> TRANSPORT_MODE;
     public static final ModConfigSpec SPEC;
     public static final ModConfigSpec.ConfigValue<String> ROLE;
     public static final ModConfigSpec.ConfigValue<String> SELF_ID;
@@ -30,6 +32,10 @@ public final class StockConfig {
                 "Distant Stock. Star: host listens, peers list warehouse clients.",
                 "Peer line: id@host:port  e.g. a@10.0.0.2:18772",
                 "Legacy peer.host / peer.port still work as one entry.");
+        TRANSPORT_MODE = b.comment(
+                        "Transport mode. 'transerver' = Transerver only (default).",
+                        "'legacy' = HTTP only (old link). 'both' = start both (migration).")
+                .define("transport.mode", "transerver");
         ROLE = b.comment("host = warehouse. client = outer survival server.")
                 .define("self.role", "host");
         SELF_ID = b.define("self.id", "host");
@@ -44,6 +50,28 @@ public final class StockConfig {
         GIVE_MANUAL = b.comment("Give one manual the first time a player joins this world.")
                 .define("giveManual", true);
         SPEC = b.build();
+    }
+
+    /** Returns "transerver", "legacy", or "both". */
+    public static String transportMode() {
+        String m = TRANSPORT_MODE.get();
+        if (m != null) {
+            String lower = m.trim().toLowerCase(java.util.Locale.ROOT);
+            if ("legacy".equals(lower) || "both".equals(lower)) {
+                return lower;
+            }
+        }
+        return "transerver";
+    }
+
+    public static boolean useTranserver() {
+        String m = transportMode();
+        return "transerver".equals(m) || "both".equals(m);
+    }
+
+    public static boolean useLegacy() {
+        String m = transportMode();
+        return "legacy".equals(m) || "both".equals(m);
     }
 
     public static String role() {

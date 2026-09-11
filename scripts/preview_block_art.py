@@ -120,7 +120,13 @@ def render(name, yaw=30, pitch=25, size=(240,250), scale=9):
                         color = tex.getpixel((tx,ty))
                         if color[3] == 0:
                             continue
-                        pix[x,y] = tuple(round(v*shade) for v in color[:3])+(255,)
+                        if color[3] < 255:
+                            base = pix[x, y]
+                            alpha = color[3] / 255
+                            shaded = tuple(round(v * shade) for v in color[:3])
+                            pix[x, y] = tuple(round(shaded[i] * alpha + base[i] * (1 - alpha)) for i in range(3)) + (255,)
+                        else:
+                            pix[x, y] = tuple(round(v * shade) for v in color[:3]) + (255,)
                         depths[y*size[0]+x] = dep
     return im
 

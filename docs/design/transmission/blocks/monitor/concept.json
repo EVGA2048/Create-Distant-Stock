@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "status": "offline_concept_only",
+  "name": {
+    "zh_cn": "远仓监视器",
+    "en_us": "Distant Monitor"
+  },
+  "suggestedRegistryId": "distantstock:monitor",
+  "registered": false,
+  "kind": "block",
+  "placement": "independentBlock",
+  "boundsModelPixels": [
+    [
+      -8,
+      0,
+      -8
+    ],
+    [
+      8,
+      16,
+      8
+    ]
+  ],
+  "meshFormat": "render_scene face list; not Minecraft block JSON",
+  "states": {
+    "online": "link+pressure lit",
+    "offline": "all dull",
+    "fault": "fault lamp orange"
+  },
+  "ports": "wall placement / read-only",
+  "materialSource": "create_materials / installed Create jar (CREATE_JAR override)",
+  "notes": "Wall lamp cluster; three lamps show link, pressure and fault."
+}

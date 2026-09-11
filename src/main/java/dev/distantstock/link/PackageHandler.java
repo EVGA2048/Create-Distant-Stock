@@ -2,6 +2,9 @@ package dev.distantstock.link;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
+import dev.distantstock.routing.DockGroupDirectory;
+
+import java.util.UUID;
 
 final class PackageHandler implements HttpHandler {
     @Override
@@ -21,13 +24,22 @@ final class PackageHandler implements HttpHandler {
                 return;
             }
             String address = LinkHttp.field(body, "address");
-            if (!LinkQueues.offerInboundPackage(new LinkQueues.Parcel(nbt, address))) {
+            UUID dockGroup = parseGroup(LinkHttp.field(body, "dockGroup"));
+            if (!LinkQueues.offerInboundPackage(new LinkQueues.Parcel(nbt, address, "", dockGroup))) {
                 LinkHttp.reply(ex, 503, "{\"ok\":false,\"err\":\"full\"}");
                 return;
             }
             LinkHttp.reply(ex, 200, "{\"ok\":true}");
         } catch (Exception e) {
             LinkHttp.reply(ex, 500, "{\"ok\":false}");
+        }
+    }
+
+    private static UUID parseGroup(String value) {
+        try {
+            return UUID.fromString(value);
+        } catch (Exception ignored) {
+            return DockGroupDirectory.DEFAULT_GROUP_ID;
         }
     }
 }

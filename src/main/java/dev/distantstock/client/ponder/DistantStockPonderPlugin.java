@@ -17,9 +17,10 @@ public final class DistantStockPonderPlugin implements PonderPlugin {
         ResourceLocation requester = id("requester");
         ResourceLocation gauge = id("gauge");
         ResourceLocation monitor = id("monitor");
+        ResourceLocation remotePackager = id("remote_packager");
         ResourceLocation manual = id("manual");
 
-        helper.forComponents(dock, requester, manual)
+        helper.forComponents(dock, requester, manual, remotePackager)
                 .addStoryBoard("export", DistantStockScenes::export)
                 .addStoryBoard("import", DistantStockScenes::receive);
         helper.forComponents(requester, gauge, dock)

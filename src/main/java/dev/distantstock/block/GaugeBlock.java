@@ -1,5 +1,6 @@
 package dev.distantstock.block;
 
+import com.simibubi.create.content.equipment.wrench.IWrenchable;
 import com.mojang.serialization.MapCodec;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.item.RequesterItem;
@@ -39,7 +40,14 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
-public final class GaugeBlock extends BaseEntityBlock {
+public final class GaugeBlock extends BaseEntityBlock implements IWrenchable {
+
+    /** Rotation would silently move the cabin or the panel slots, so a wrench click only reports state. */
+    @Override
+    public net.minecraft.world.InteractionResult onWrenched(net.minecraft.world.level.block.state.BlockState state,
+                                                            net.minecraft.world.item.context.UseOnContext context) {
+        return net.minecraft.world.InteractionResult.SUCCESS;
+    }
     public static final DirectionProperty FACING = HorizontalDirectionalBlock.FACING;
     public static final BooleanProperty LIT = BooleanProperty.create("lit");
     public static final MapCodec<GaugeBlock> CODEC = simpleCodec(GaugeBlock::new);
@@ -123,6 +131,9 @@ public final class GaugeBlock extends BaseEntityBlock {
     @Override
     protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
                                               Player player, InteractionHand hand, BlockHitResult hit) {
+        if (DockBlock.isWrench(stack)) {
+            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        }
         if (stack.getItem() instanceof RequesterItem && RequesterData.tuned(stack)) {
             if (!level.isClientSide && level.getBlockEntity(pos) instanceof GaugeBlockEntity be) {
                 be.setFreq(RequesterData.freq(stack));

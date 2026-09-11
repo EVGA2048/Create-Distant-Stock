@@ -11,11 +11,23 @@ public final class ModBlockEntities {
             DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, DistantStock.MODID);
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DockBlockEntity>> DOCK =
-            BES.register("dock", () -> BlockEntityType.Builder.of(DockBlockEntity::new, ModBlocks.DOCK.get()).build(null));
+            BES.register("dock", () -> BlockEntityType.Builder.of(ModBlockEntities::dockEntity,
+                    ModBlocks.DOCK.get()).build(null));
+
+    private static DockBlockEntity dockEntity(net.minecraft.core.BlockPos pos,
+                                              net.minecraft.world.level.block.state.BlockState state) {
+        return new DockBlockEntity(DOCK.get(), pos, state);
+    }
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<GaugeBlockEntity>> GAUGE =
             BES.register("gauge", () -> BlockEntityType.Builder.of(GaugeBlockEntity::new, ModBlocks.GAUGE.get()).build(null));
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MonitorBlockEntity>> MONITOR =
             BES.register("monitor", () -> BlockEntityType.Builder.of(MonitorBlockEntity::new, ModBlocks.MONITOR.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RemotePackagerBlockEntity>> REMOTE_PACKAGER =
+            BES.register("remote_packager", () -> BlockEntityType.Builder.of(RemotePackagerBlockEntity::new,
+                    ModBlocks.REMOTE_PACKAGER.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SignalPanelBlockEntity>> SIGNAL_PANEL =
+            BES.register("signal_panel", () -> BlockEntityType.Builder.of(SignalPanelBlockEntity::new,
+                    ModBlocks.SIGNAL_PANEL.get()).build(null));
 
     private ModBlockEntities() {
     }

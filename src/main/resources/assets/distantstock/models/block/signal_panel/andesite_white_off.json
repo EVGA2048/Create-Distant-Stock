@@ -1,0 +1,6 @@
+{
+  "parent": "distantstock:block/signal_panel/andesite_base",
+  "textures": {
+    "lamp": "distantstock:block/indicator_lamp_white_off"
+  }
+}

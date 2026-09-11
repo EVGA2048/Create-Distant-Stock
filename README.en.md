@@ -22,7 +22,7 @@ Mod id: `distantstock`. HTTP **18772**, header `X-DistantStock-Token`. Code uses
 - Clients never speak HTTP. This server’s io thread polls the other side into a cache.
 - Two Stock Link networks stay separate. Only unopened `PackageItem` NBT crosses the wire.
 - It does not use Mobile Packages' drone logic. The Distant Dock only borrows the transport-bee port's industrial bay language; transport remains a cross-server package hop.
-- No remote packager. The warehouse uses a vanilla Create packager.
+- The Distant Packager keeps Create's original rack and logistics behaviour, uses a pale-blue palette, and produces Distant Parcels.
 - The main thread never does HTTP and never joins on a reply.
 
 ## Pieces
@@ -33,6 +33,8 @@ Mod id: `distantstock`. HTTP **18772**, header `X-DistantStock-Token`. Code uses
 | Distant Dock | `dock` | Export = freq (ship packages). Import = address only (restore packages). |
 | Distant Request Desk | `gauge` | Floor ticker; same GUI as the portable item. |
 | Distant Monitor | `monitor` | Wall dashboard: local/peer TPS and link pressure. |
+| Distant Packager | `remote_packager` | Pale-blue Create packager variant that produces Distant Parcels. |
+| Distant Parcel | `remote_package` | Blue sealed package preserving address and contents data. |
 | Distant Stock Manual | `manual` | Creative tab. `giveManual` (default on) gives one on first join. |
 
 All three blocks implement Create goggles. Live data only; the tutorial is the manual. Never show `peer.host`, port, or token.

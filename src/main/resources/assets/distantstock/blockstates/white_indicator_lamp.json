@@ -1,0 +1,98 @@
+{
+  "variants": {
+    "face=floor,facing=north,lit=false": {
+      "model": "distantstock:block/white_indicator_lamp"
+    },
+    "face=floor,facing=north,lit=true": {
+      "model": "distantstock:block/white_indicator_lamp_lit"
+    },
+    "face=floor,facing=east,lit=false": {
+      "model": "distantstock:block/white_indicator_lamp"
+    },
+    "face=floor,facing=east,lit=true": {
+      "model": "distantstock:block/white_indicator_lamp_lit"
+    },
+    "face=floor,facing=south,lit=false": {
+      "model": "distantstock:block/white_indicator_lamp"
+    },
+    "face=floor,facing=south,lit=true": {
+      "model": "distantstock:block/white_indicator_lamp_lit"
+    },
+    "face=floor,facing=west,lit=false": {
+      "model": "distantstock:block/white_indicator_lamp"
+    },
+    "face=floor,facing=west,lit=true": {
+      "model": "distantstock:block/white_indicator_lamp_lit"
+    },
+    "face=ceiling,facing=north,lit=false": {
+      "model": "distantstock:block/white_indicator_lamp",
+      "x": 180
+    },
+    "face=ceiling,facing=north,lit=true": {
+      "model": "distantstock:block/white_indicator_lamp_lit",
+      "x": 180
+    },
+    "face=ceiling,facing=east,lit=false": {
+      "model": "distantstock:block/white_indicator_lamp",
+      "x": 180
+    },
+    "face=ceiling,facing=east,lit=true": {
+      "model": "distantstock:block/white_indicator_lamp_lit",
+      "x": 180
+    },
+    "face=ceiling,facing=south,lit=false": {
+      "model": "distantstock:block/white_indicator_lamp",
+      "x": 180
+    },
+    "face=ceiling,facing=south,lit=true": {
+      "model": "distantstock:block/white_indicator_lamp_lit",
+      "x": 180
+    },
+    "face=ceiling,facing=west,lit=false": {
+      "model": "distantstock:block/white_indicator_lamp",
+      "x": 180
+    },
+    "face=ceiling,facing=west,lit=true": {
+      "model": "distantstock:block/white_indicator_lamp_lit",
+      "x": 180
+    },
+    "face=wall,facing=north,lit=false": {
+      "model": "distantstock:block/white_indicator_lamp",
+      "x": 90
+    },
+    "face=wall,facing=north,lit=true": {
+      "model": "distantstock:block/white_indicator_lamp_lit",
+      "x": 90
+    },
+    "face=wall,facing=east,lit=false": {
+      "model": "distantstock:block/white_indicator_lamp",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=east,lit=true": {
+      "model": "distantstock:block/white_indicator_lamp_lit",
+      "x": 90,
+      "y": 90
+    },
+    "face=wall,facing=south,lit=false": {
+      "model": "distantstock:block/white_indicator_lamp",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=south,lit=true": {
+      "model": "distantstock:block/white_indicator_lamp_lit",
+      "x": 90,
+      "y": 180
+    },
+    "face=wall,facing=west,lit=false": {
+      "model": "distantstock:block/white_indicator_lamp",
+      "x": 90,
+      "y": 270
+    },
+    "face=wall,facing=west,lit=true": {
+      "model": "distantstock:block/white_indicator_lamp_lit",
+      "x": 90,
+      "y": 270
+    }
+  }
+}

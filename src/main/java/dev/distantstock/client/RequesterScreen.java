@@ -45,6 +45,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     private EditBox search;
     private EditBox address;
+    private EditBox localAddress;
+    private EditBox receivingGroup;
     private final List<CartLine> cart = new ArrayList<>();
     private int scroll;
     private int emptyTicks;
@@ -67,6 +69,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
         String keepSearch = search == null ? "" : search.getValue();
         String keepAddr = address == null ? menu.address(minecraft.player) : address.getValue();
+        String keepLocal = localAddress == null ? "" : localAddress.getValue();
 
         search = new EditBox(font, leftPos + 71, topPos + 22, 100, 9,
                 Component.translatable("create.gui.stock_keeper.search_items"));
@@ -85,6 +88,22 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         address.setValue(keepAddr);
         address.setResponder(v -> PacketDistributor.sendToServer(new SetAddressC2S(v)));
         addRenderableWidget(address);
+
+        localAddress = new EditBox(font, leftPos + 82, topPos + imageHeight - 113, 112, 10,
+                Component.translatable("gui.distantstock.route.local"));
+        localAddress.setMaxLength(40);
+        localAddress.setBordered(false);
+        localAddress.setTextColor(INK);
+        localAddress.setValue(keepLocal);
+        addRenderableWidget(localAddress);
+
+        receivingGroup = new EditBox(font, leftPos + 82, topPos + imageHeight - 87, 112, 10,
+                Component.translatable("gui.distantstock.route.group"));
+        receivingGroup.setBordered(false);
+        receivingGroup.setTextColor(INK);
+        receivingGroup.setValue(Component.translatable("gui.distantstock.route.pending").getString());
+        receivingGroup.setEditable(false);
+        addRenderableWidget(receivingGroup);
 
         if (!opened) {
             opened = true;
@@ -146,7 +165,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     }
 
     private int visibleRows() {
-        return Math.max(1, (orderY() - 8 - itemsY()) / CELL);
+        return Math.max(1, (topPos + imageHeight - 132 - itemsY()) / CELL);
     }
 
     private int maxScroll() {
@@ -159,6 +178,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         boolean tuned = menu.tuned(minecraft.player);
         search.setVisible(tuned);
         address.setVisible(tuned);
+        localAddress.setVisible(tuned);
+        receivingGroup.setVisible(tuned);
         renderBackground(g, mouseX, mouseY, partial);
         super.render(g, mouseX, mouseY, partial);
         ItemStack hover = hoveredStock(mouseX, mouseY);
@@ -196,8 +217,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             return;
         }
 
+        renderRouteRow(g, imageHeight - 124, "gui.distantstock.route.local");
+        renderRouteRow(g, imageHeight - 98, "gui.distantstock.route.group");
+
         if (address.getValue().isBlank() && !address.isFocused()) {
-            g.drawString(font, Component.translatable("create.gui.stock_keeper.package_address")
+            g.drawString(font, Component.translatable("gui.distantstock.route.remote")
                     .withStyle(ChatFormatting.ITALIC), address.getX(), address.getY(), HINT, false);
         }
 
@@ -249,7 +273,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         }
 
         int clipTop = y + 17;
-        int clipBot = y + imageHeight - 80;
+        int clipBot = y + imageHeight - 132;
         g.enableScissor(x + 16, clipTop, x + 205, clipBot);
 
         scroll = Mth.clamp(scroll, 0, maxScroll());
@@ -296,7 +320,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
         g.disableScissor();
 
-        int windowH = imageHeight - 92;
+        int windowH = imageHeight - 144;
         int totalH = maxScroll() * CELL + windowH;
         int barSize = Math.max(5, Mth.floor((float) windowH / Math.max(1, totalH) * (windowH - 2)));
         if (maxScroll() > 0 && barSize < windowH - 2) {
@@ -319,6 +343,14 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             return Component.translatable("create.gui.stock_keeper.inventories_empty");
         }
         return Component.translatable("create.gui.stock_keeper.no_search_results");
+    }
+
+    private void renderRouteRow(GuiGraphics g, int offset, String label) {
+        int x = leftPos + 8;
+        int y = topPos + offset;
+        g.blit(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
+                "distantstock", "textures/gui/route_label.png"), x, y, 0, 0, 194, 26, 194, 26);
+        g.drawString(font, Component.translatable(label), x + 24, y + 11, INK, false);
     }
 
     private void renderEntry(GuiGraphics g, ItemStack stack, int count, boolean hot) {
@@ -391,7 +423,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && network >= 0) {
             NetworkDirectory.Entry entry = menu.networks.get(network);
             menu.selectedFreq = entry.freq();
-            PacketDistributor.sendToServer(new JoinNetworkC2S(entry.freq()));
+            PacketDistributor.sendToServer(new JoinNetworkC2S(entry.freq(), entry.networkId()));
             uiSound(SoundEvents.UI_BUTTON_CLICK.value(), 1f, 1.1f);
             return true;
         }
@@ -427,7 +459,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     @Override
     public boolean mouseScrolled(double mx, double my, double sx, double sy) {
-        if (mx >= itemsX() && mx < itemsX() + COLS * CELL && my >= topPos + 16 && my < topPos + imageHeight - 80) {
+        if (mx >= itemsX() && mx < itemsX() + COLS * CELL && my >= topPos + 16 && my < topPos + imageHeight - 132) {
             scroll = Mth.clamp(scroll - (int) Math.signum(sy), 0, maxScroll());
             return true;
         }
@@ -448,6 +480,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     private void request() {
         if (cart.isEmpty()) {
+            return;
+        }
+        // The dual-address transport is not implemented yet: never silently discard an entered route.
+        if (!localAddress.getValue().isBlank()) {
+            minecraft.player.displayClientMessage(Component.translatable("gui.distantstock.route.unavailable"), false);
             return;
         }
         List<PlaceOrderC2S.Line> lines = new ArrayList<>();
@@ -507,7 +544,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     }
 
     private ItemStack hoveredStock(int mx, int my) {
-        if (my < topPos + 16 || my > topPos + imageHeight - 80) {
+        if (my < topPos + 16 || my > topPos + imageHeight - 132) {
             return ItemStack.EMPTY;
         }
         List<StockCache.Entry> list = filtered();

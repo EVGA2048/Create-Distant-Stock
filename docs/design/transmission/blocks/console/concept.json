@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "status": "offline_concept_only",
+  "name": {
+    "zh_cn": "远仓控制台",
+    "en_us": "Distant Console"
+  },
+  "suggestedRegistryId": "distantstock:console",
+  "registered": false,
+  "kind": "block",
+  "placement": "independentBlock",
+  "boundsModelPixels": [
+    [
+      -8,
+      0,
+      -8
+    ],
+    [
+      8,
+      16,
+      8
+    ]
+  ],
+  "meshFormat": "render_scene face list; not Minecraft block JSON",
+  "states": {
+    "bound": "binding lamp cyan",
+    "unbound": "binding lamp dull",
+    "fault": "binding lamp orange"
+  },
+  "ports": "kinetic south / fluid east",
+  "materialSource": "create_materials / installed Create jar (CREATE_JAR override)",
+  "notes": "Sloped control desk with square gauge and a single binding lamp."
+}

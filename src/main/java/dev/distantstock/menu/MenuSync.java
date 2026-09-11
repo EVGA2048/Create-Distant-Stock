@@ -12,6 +12,7 @@ import net.minecraft.world.InteractionHand;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import dev.distantstock.routing.RemoteNetworkId;
 
 public final class MenuSync {
     public static void writeItem(FriendlyByteBuf buf, InteractionHand hand, UUID freq) {
@@ -46,6 +47,10 @@ public final class MenuSync {
             buf.writeUUID(entry.freq());
             buf.writeUtf(entry.server(), 64);
             buf.writeVarInt(entry.links());
+            buf.writeBoolean(entry.networkId() != null);
+            if (entry.networkId() != null) {
+                buf.writeNbt(entry.networkId().save());
+            }
         }
     }
 
@@ -60,18 +65,32 @@ public final class MenuSync {
         int networks = buf.readVarInt();
         List<NetworkDirectory.Entry> directory = new ArrayList<>(networks);
         for (int i = 0; i < networks; i++) {
-            directory.add(new NetworkDirectory.Entry(buf.readUUID(), buf.readUtf(64), buf.readVarInt()));
+            UUID freq = buf.readUUID();
+            String server = buf.readUtf(64);
+            int links = buf.readVarInt();
+            dev.distantstock.routing.RemoteNetworkId networkId = buf.readBoolean()
+                    ? dev.distantstock.routing.RemoteNetworkId.read(buf.readNbt()).orElse(null) : null;
+            directory.add(new NetworkDirectory.Entry(freq, server, links, networkId));
         }
         menu.networks = directory;
     }
 
     public static void warm(UUID freq) {
+        warm(null, freq);
+    }
+
+    public static void warm(RemoteNetworkId networkId, UUID freq) {
         if (freq == null) {
             return;
         }
+        if (networkId != null) {
+            StockCache.watch(networkId);
+        }
         StockCache.watch(freq);
         if (CreateStock.hasNetwork(freq)) {
-            StockCache.put(freq, CreateStock.summary(freq), StockCache.Source.LOCAL);
+            List<StockCache.Entry> summary = CreateStock.summary(freq);
+            StockCache.put(freq, summary, StockCache.Source.LOCAL);
+            StockCache.put(networkId, summary, StockCache.Source.LOCAL);
         }
         LinkClient.wake();
     }

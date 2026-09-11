@@ -1,0 +1,7 @@
+{
+  "parent": "distantstock:block/cyan_indicator_lamp",
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "lamp": "distantstock:block/indicator_lamp_cyan_on"
+  }
+}

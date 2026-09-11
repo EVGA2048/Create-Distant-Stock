@@ -1,0 +1,85 @@
+{
+  "revision": "visual-system-v2",
+  "status": "concept_approved_pending_user_review",
+  "visualLanguage": {
+    "structure": [
+      "create:andesite_casing",
+      "create:industrial_iron",
+      "create:brass_casing",
+      "create:copper_casing"
+    ],
+    "aetherFluid": {
+      "color": "purple",
+      "meaning": "stored/flowing consumable medium"
+    },
+    "networkField": {
+      "color": "cyan",
+      "meaning": "tower coverage, tuning, transfer field"
+    },
+    "tps": {
+      "green": "healthy",
+      "orange": "degraded",
+      "red": "critical"
+    }
+  },
+  "content": {
+    "requester": {
+      "type": "block",
+      "role": "opens Create stock-order UI",
+      "states": [
+        "tuned",
+        "untuned"
+      ]
+    },
+    "portable_requester": {
+      "type": "item",
+      "role": "handheld order UI",
+      "silhouette": "Mobile Packages-inspired current model"
+    },
+    "dock": {
+      "type": "block",
+      "role": "parcel transfer berth",
+      "itemInteraction": "four horizontal sides plus open top",
+      "states": [
+        "offline",
+        "online",
+        "loaded"
+      ]
+    },
+    "monitor": {
+      "type": "wall_block",
+      "role": "remote TPS/link screen",
+      "tpsLamp": [
+        "green",
+        "orange",
+        "red"
+      ]
+    },
+    "tower_base": {
+      "type": "multiblock_component",
+      "inputs": [
+        "kinetic stress",
+        "aetheric condensate"
+      ]
+    },
+    "tower_frame": {
+      "type": "repeatable_multiblock_component",
+      "role": "mast and visible aether conduit"
+    },
+    "aether_resonator": {
+      "type": "multiblock_component",
+      "role": "network field transmitter and tower crown"
+    },
+    "aetheric_condensate": {
+      "type": "fluid",
+      "recipeConcept": "heated mixing of water, amethyst materials, and a conductive ingredient",
+      "costPerParcelMb": 250
+    }
+  },
+  "deferred": [
+    "fluid distant dock",
+    "energy distant dock",
+    "exact coverage radius",
+    "exact fluid recipe counts"
+  ]
+}

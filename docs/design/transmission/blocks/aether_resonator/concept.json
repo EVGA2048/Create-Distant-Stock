@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "status": "offline_concept_only",
+  "name": {
+    "zh_cn": "以太谐振器",
+    "en_us": "Aether Resonator"
+  },
+  "suggestedRegistryId": "distantstock:aether_resonator",
+  "registered": false,
+  "kind": "block",
+  "placement": "independentBlock",
+  "boundsModelPixels": [
+    [
+      -8,
+      0,
+      -8
+    ],
+    [
+      8,
+      16,
+      8
+    ]
+  ],
+  "meshFormat": "render_scene face list; not Minecraft block JSON",
+  "states": [
+    "online",
+    "offline",
+    "fault"
+  ],
+  "ports": "tower top / sky beacon",
+  "materialSource": "create_materials / installed Create jar (CREATE_JAR override)",
+  "notes": "Tower top beacon emitting a light-blue sky beam; beam is an effect."
+}

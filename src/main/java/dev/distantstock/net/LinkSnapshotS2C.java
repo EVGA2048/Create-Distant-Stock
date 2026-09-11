@@ -1,9 +1,8 @@
 package dev.distantstock.net;
 
 import dev.distantstock.DistantStock;
-import dev.distantstock.client.MonitorScreen;
+import dev.distantstock.client.ClientPayloadHandlers;
 import dev.distantstock.link.LinkSnapshot;
-import net.minecraft.client.Minecraft;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -33,6 +32,15 @@ public record LinkSnapshotS2C(LinkSnapshot.View view) implements CustomPacketPay
         buf.writeVarInt(v.peerFails());
         buf.writeVarInt(v.peersUp());
         buf.writeVarInt(v.peersTotal());
+        buf.writeBoolean(v.transerverAttached());
+        buf.writeBoolean(v.transerverUp());
+        buf.writeUtf(v.transerverNodeId());
+        buf.writeUtf(v.transerverAlias());
+        buf.writeUtf(v.transerverFailure());
+        buf.writeVarInt(v.transerverOutbox());
+        buf.writeVarInt(v.transerverInbox());
+        buf.writeVarInt(v.transerverCompleted());
+        buf.writeVarInt(v.transerverDeadLetters());
     }
 
     private static LinkSnapshotS2C read(RegistryFriendlyByteBuf buf) {
@@ -50,6 +58,15 @@ public record LinkSnapshotS2C(LinkSnapshot.View view) implements CustomPacketPay
                 buf.readDouble(),
                 buf.readVarInt(),
                 buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readBoolean(),
+                buf.readBoolean(),
+                buf.readUtf(),
+                buf.readUtf(),
+                buf.readUtf(),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readVarInt(),
                 buf.readVarInt()
         ));
     }
@@ -60,6 +77,6 @@ public record LinkSnapshotS2C(LinkSnapshot.View view) implements CustomPacketPay
     }
 
     public static void handle(LinkSnapshotS2C msg, IPayloadContext ctx) {
-        ctx.enqueueWork(() -> Minecraft.getInstance().setScreen(new MonitorScreen(msg.view())));
+        ctx.enqueueWork(() -> ClientPayloadHandlers.openMonitor(msg));
     }
 }

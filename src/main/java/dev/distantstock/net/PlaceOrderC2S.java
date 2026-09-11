@@ -10,15 +10,17 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.core.UUIDUtil;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-public record PlaceOrderC2S(List<Line> lines) implements CustomPacketPayload {
+public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) implements CustomPacketPayload {
     public record Line(String itemId, int count) {
     }
 
@@ -30,7 +32,12 @@ public record PlaceOrderC2S(List<Line> lines) implements CustomPacketPayload {
             Line::new);
     public static final StreamCodec<RegistryFriendlyByteBuf, PlaceOrderC2S> STREAM_CODEC = StreamCodec.composite(
             ByteBufCodecs.collection(ArrayList::new, LINE_CODEC), PlaceOrderC2S::lines,
+            UUIDUtil.STREAM_CODEC, PlaceOrderC2S::receivingDockGroupId,
             PlaceOrderC2S::new);
+
+    public PlaceOrderC2S(List<Line> lines) {
+        this(lines, dev.distantstock.routing.DockGroupDirectory.DEFAULT_GROUP_ID);
+    }
 
     @Override
     public Type<PlaceOrderC2S> type() {
@@ -59,7 +66,10 @@ public record PlaceOrderC2S(List<Line> lines) implements CustomPacketPayload {
                     items.add(new LinkQueues.Line(line.itemId, line.count));
                 }
             }
-            OrderService.Result result = OrderService.place(freq, address, items);
+            OrderService.Result result = p instanceof ServerPlayer serverPlayer
+                    ? OrderService.place(serverPlayer.getServer(), menu.networkId(p), freq, address,
+                    msg.receivingDockGroupId, items)
+                    : OrderService.Result.FAIL;
             GaugeBlockEntity be = menu.gauge(p);
             if (be != null) {
                 be.lastOrder(result);

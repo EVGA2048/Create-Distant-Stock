@@ -1,0 +1,33 @@
+{
+  "two_placed_blocks_pass": true,
+  "local_cell_bounds_pass": true,
+  "gap_phase_power_cases": 108,
+  "beam_off_pass": true,
+  "phase_loop_pass": true,
+  "images": [
+    {
+      "path": "build/art/concepts/tower-hero.png",
+      "size": [
+        1420,
+        1070
+      ],
+      "png_verified": true
+    },
+    {
+      "path": "build/art/concepts/tower-levels.png",
+      "size": [
+        1550,
+        1180
+      ],
+      "png_verified": true
+    },
+    {
+      "path": "build/art/concepts/tower-details.png",
+      "size": [
+        1560,
+        1160
+      ],
+      "png_verified": true
+    }
+  ]
+}

@@ -1,12 +1,18 @@
 package dev.distantstock.link;
 
 import dev.distantstock.config.StockConfig;
+import dev.distantstock.routing.DockGroupDirectory;
+import dev.distantstock.routing.RemoteRoute;
+import dev.distantstock.routing.RemoteNetworkId;
+import dev.distantstock.routing.RoutingChannels;
 import dev.distantstock.stock.CreateStock;
 import dev.distantstock.stock.StockCache;
+import net.minecraft.server.MinecraftServer;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.io.IOException;
 
 public final class OrderService {
     public enum Result {
@@ -14,6 +20,10 @@ public final class OrderService {
     }
 
     public static Result place(UUID freq, String address, List<LinkQueues.Line> lines) {
+        return place(freq, address, DockGroupDirectory.DEFAULT_GROUP_ID, lines);
+    }
+
+    public static Result place(UUID freq, String address, UUID receivingDockGroupId, List<LinkQueues.Line> lines) {
         if (lines == null || lines.isEmpty()) {
             return Result.EMPTY;
         }
@@ -30,7 +40,8 @@ public final class OrderService {
             LinkQueues.lastPack(freq, LinkQueues.PackResult.UNLOADED);
             return Result.NO_PEER;
         }
-        boolean ok = LinkQueues.offerOutboundOrder(new LinkQueues.Order(freq, address, lines, StockConfig.selfId()));
+        boolean ok = LinkQueues.offerOutboundOrder(new LinkQueues.Order(freq, address, lines, StockConfig.selfId(),
+                receivingDockGroupId, UUID.randomUUID(), UUID.randomUUID()));
         if (ok) {
             LinkClient.wake();
             return Result.QUEUED;
@@ -38,7 +49,32 @@ public final class OrderService {
         return Result.FAIL;
     }
 
-    public static void drainInbound() {
+    public static Result place(MinecraftServer server, RemoteNetworkId networkId, UUID legacyFrequency,
+                               String address, UUID receivingDockGroupId, List<LinkQueues.Line> lines) {
+        if (networkId == null) {
+            return place(legacyFrequency, address, receivingDockGroupId, lines);
+        }
+        if (lines == null || lines.isEmpty()) {
+            return Result.EMPTY;
+        }
+        UUID localNode = TranserverBridge.nodeId();
+        if (networkId.nodeId().equals(localNode)) {
+            return place(networkId.createFrequency(), address, receivingDockGroupId, lines);
+        }
+        UUID correlationId = UUID.randomUUID();
+        UUID childOrderId = UUID.randomUUID();
+        try {
+            OrderRequestCodec.Request request = new OrderRequestCodec.Request(networkId, receivingDockGroupId,
+                    correlationId, childOrderId, address == null ? "" : address, lines);
+            UUID messageId = TranserverBridge.send(networkId.nodeId().toString(), RoutingChannels.ORDER_REQUEST,
+                    OrderRequestCodec.encode(request), correlationId.toString());
+            return messageId == null ? Result.NO_PEER : Result.QUEUED;
+        } catch (IOException | RuntimeException exception) {
+            return Result.FAIL;
+        }
+    }
+
+    public static void drainInbound(MinecraftServer server) {
         LinkQueues.Order order;
         int n = 0;
         while (n++ < 8 && (order = LinkQueues.pollInboundOrder()) != null) {
@@ -50,9 +86,20 @@ public final class OrderService {
                 LinkQueues.lastPack(order.freq, LinkQueues.PackResult.UNLOADED);
                 continue;
             }
-            ReturnRoute.remember(order.address, order.from);
-            boolean ok = CreateStock.request(order.freq, items, order.address);
+            // An order without a usable source node keeps a null route: the parcel then relies on the
+            // sending dock's explicit default destination instead of an address-keyed guess.
+            RemoteRoute route = routeFor(order);
+            boolean ok = CreateStock.request(order.freq, items, order.address, server, route);
             LinkQueues.lastPack(order.freq, ok ? LinkQueues.PackResult.SUCCESS : LinkQueues.PackResult.NO_STOCK);
+        }
+    }
+
+    private static RemoteRoute routeFor(LinkQueues.Order order) {
+        try {
+            return new RemoteRoute(RemoteRoute.CURRENT_SCHEMA, UUID.fromString(order.from),
+                    order.receivingDockGroupId, order.correlationId, order.childOrderId);
+        } catch (IllegalArgumentException ignored) {
+            return null;
         }
     }
 

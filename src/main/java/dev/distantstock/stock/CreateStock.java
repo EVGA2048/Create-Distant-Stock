@@ -3,11 +3,19 @@ package dev.distantstock.stock;
 import com.simibubi.create.Create;
 import com.simibubi.create.content.logistics.BigItemStack;
 import com.simibubi.create.content.logistics.packager.InventorySummary;
+import com.simibubi.create.content.logistics.packager.PackagerBlockEntity;
 import com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour;
 import com.simibubi.create.content.logistics.packagerLink.LogisticsManager;
 import com.simibubi.create.content.logistics.stockTicker.PackageOrderWithCrafts;
+import dev.distantstock.routing.OrderRouteDirectory;
+import dev.distantstock.routing.RemoteRoute;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.server.level.ServerLevel;
+import dev.distantstock.routing.RemoteNetworkId;
+import dev.distantstock.routing.WorldIdentity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -26,7 +34,7 @@ public final class CreateStock {
         return Create.LOGISTICS.logisticsNetworks.containsKey(freq);
     }
 
-    public static List<NetworkDirectory.Entry> openNetworks(String serverId) {
+    public static List<NetworkDirectory.Entry> openNetworks(MinecraftServer server, String serverId, UUID nodeId) {
         if (Create.LOGISTICS == null || Create.LOGISTICS.logisticsNetworks == null) {
             return List.of();
         }
@@ -37,7 +45,16 @@ public final class CreateStock {
             if (network == null || network.locked || network.loadedLinks == null || network.loadedLinks.isEmpty()) {
                 continue;
             }
-            out.add(new NetworkDirectory.Entry(row.getKey(), serverId, network.loadedLinks.size()));
+            RemoteNetworkId networkId = null;
+            if (server != null && nodeId != null) {
+                GlobalPos link = network.loadedLinks.iterator().next();
+                ServerLevel level = server.getLevel(link.dimension());
+                if (level != null) {
+                    networkId = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, nodeId,
+                            WorldIdentity.get(level), link.dimension().location().toString(), row.getKey());
+                }
+            }
+            out.add(new NetworkDirectory.Entry(row.getKey(), serverId, network.loadedLinks.size(), networkId));
         }
         return out;
     }
@@ -62,6 +79,11 @@ public final class CreateStock {
     }
 
     public static boolean request(UUID freq, List<StockCache.Entry> items, String address) {
+        return request(freq, items, address, null, null);
+    }
+
+    public static boolean request(UUID freq, List<StockCache.Entry> items, String address,
+                                  MinecraftServer server, RemoteRoute route) {
         if (!hasNetwork(freq) || items == null || items.isEmpty()) {
             return false;
         }
@@ -77,12 +99,26 @@ public final class CreateStock {
             return false;
         }
         String dest = address == null ? "" : address;
-        return LogisticsManager.broadcastPackageRequest(
-                freq,
-                LogisticallyLinkedBehaviour.RequestType.PLAYER,
-                PackageOrderWithCrafts.simple(stacks),
-                null,
-                dest);
+        PackageOrderWithCrafts order = PackageOrderWithCrafts.simple(stacks);
+        if (route == null) {
+            return LogisticsManager.broadcastPackageRequest(
+                    freq, LogisticallyLinkedBehaviour.RequestType.PLAYER, order, null, dest);
+        }
+        if (server == null) {
+            throw new IllegalArgumentException("A server is required for routed package requests");
+        }
+        var requests = LogisticsManager.findPackagersForRequest(freq, order, null, dest);
+        if (requests.isEmpty()) {
+            return false;
+        }
+        for (PackagerBlockEntity packager : requests.keySet()) {
+            if (packager.isTooBusyFor(LogisticallyLinkedBehaviour.RequestType.PLAYER)) {
+                return false;
+            }
+        }
+        OrderRouteDirectory.get(server).remember(requests.values(), route);
+        LogisticsManager.performPackageRequests(requests);
+        return true;
     }
 
     private CreateStock() {
