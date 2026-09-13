@@ -386,3 +386,99 @@ Transerver: ./gradlew clean build --no-daemon
 ### 13.5 下一步
 
 按审计文档 P1 继续：最小双节点竖切测试。需要 Minecraft 测试环境启动后验证。
+
+## 14. 2026-09-12 客户端崩溃修复记录
+
+### 14.1 证据边界
+
+用户提供的 `minecraft-exported-crash-info-2026-09-12T14-08-03.zip` 内，实际崩溃报告时间为 `12:49:50`，调用链是 Create `FilteringRenderer` / `ValueSettingsClient.render` 向 `Font.width` 传入空文本。该报告早于后续构建和安装，不能用于判断新包是否仍崩溃。日志还包含大量旧世界区块 DataFixer `Pair cannot be cast to Dynamic` 错误，应与信号灯客户端崩溃分开处理。
+
+### 14.2 独立信号灯根因与修复
+
+`SignalLampPanelItem.placeStandalone` 使用的 `BlockPlaceContext.getClickedPos()` 已经是实际放置位置，旧代码又沿点击面 `relative(...)` 一次，导致目标落在支撑面外一格。独立灯无法存活后，旧代码调用 `super.place(context)`，实际放置了该物品继承绑定的 `SIGNAL_PANEL`，因此出现整块紫黑模型并进入 Create 工厂面板的 Filtering / Value Settings 路径。
+
+现已改为：
+
+- 独立灯直接使用 `context.getClickedPos()` 和原放置上下文；
+- 无法放置时明确返回 `FAIL`，绝不回退为信号面板；
+- 信号面板灯格在数据同步前及确认是灯格后，始终返回非空 `Component.empty()` 提示并绕过 Value Settings；
+- 独立灯和四分格面板灯的模型、贴图与所有 24 个附着/朝向/亮灭 blockstate 组合由 `verifyClientAssets` 自动检查。
+
+### 14.3 监视器重开修复
+
+监视器的“显式打开”和“每秒刷新”已拆成两个不同的网络包：
+
+- `OpenMonitorS2C` 只能由玩家右键触发并打开界面；
+- `LinkSnapshotS2C` 只能更新已经打开、且来源方块坐标一致的 `MonitorScreen`；
+- 周期刷新包不再具备打开界面的代码路径，关闭界面后不会被刷新包重新拉起。
+
+### 14.4 资源检查与构建
+
+新增 `scripts/verify_client_assets.py` 和 Gradle 任务 `verifyClientAssets`，并接入 `check`。检查首次发现远仓港八个状态模型引用了不存在的 `distantstock:block/lamp_socket`，已改为现有的 Create 工业铁块纹理。安山青色独立灯、面板灯和远仓港均已离线渲染成功。
+
+2026-09-12 18:11 完整通过：
+
+```text
+Transerver: ./gradlew clean build --no-daemon
+DistantStock: ./gradlew clean build verifyWireCodec verifyParcelOwnership verifyClientAssets --no-daemon
+结果：BUILD SUCCESSFUL
+```
+
+当前安装包：
+
+```text
+DistantStock SHA-256: 767b97a1867dc6d9757beb895427c297057562bbeee80c8ffeb527186239563f
+Transerver SHA-256:    7b18605ca28311cb56c1a9797859895b7629796187b49d3d9d6506ae5548b504
+```
+
+两个构建产物与 HMCL 测试实例 `mods` 内文件哈希一致。测试服务器已关闭。下一步必须用这个哈希的新包在干净测试世界做一次实际放置回归；双服 Transerver 请求、打包、发送、接收和 `APPLIED` 销账仍未被真实游戏测试证明。
+
+## 15. 2026-09-12 Codex 重新接盘记录
+
+### 15.1 用户补充的人工验收事实
+
+用户确认 Cursor 开发阶段完成了两类实际工作：
+
+- 制作并替换了一轮新的方块贴图；当前工作树中远仓港八种状态模型均有后续调整，客户端资源检查覆盖 11 个方块、74 个模型。
+- 实际测试过两个服务端之间的通信，正常双服通信已经成功。
+
+这两项属于用户提供的人工验收结果。当前本机可查的 `latest.log` 只记录到 Transerver 节点被禁用的单机运行，不能独立复现双服成功过程；后续测试应保留两端日志作为回归证据。
+
+### 15.2 当前工作树重新验证
+
+本轮以 Cursor 留下的未提交版本重新执行：
+
+```text
+Transerver: ./gradlew clean build --no-daemon
+DistantStock: ./gradlew clean build verifyWireCodec verifyParcelOwnership verifyClientAssets --no-daemon
+结果：全部 BUILD SUCCESSFUL
+客户端资源检查：PASSED（11 blocks, 74 models）
+```
+
+Cursor 的主要未提交工作经静态审查可确认包括：
+
+- `DockItem`：远仓港物品可先从已有 Create 物流链接复制稳定网络身份，放置后自动成为发送港；潜行空手可解除港绑定。
+- 远仓港空手交互可取走完整到货包裹，先检查玩家背包是否能容纳，避免取出后掉失。
+- 信号灯独立放置不再错误回退成整块 `signal_panel`。
+- 监视器显式打开包与周期刷新包分离，关闭界面后不会被刷新包强制重开。
+- 新的 `verifyClientAssets` 已挂入 Gradle `check`。
+
+### 15.3 本轮新增的跨服可诊断性
+
+为订单和包裹主链补充统一日志，关键状态现在会带稳定标识：
+
+- 订单：`messageId`、`correlationId`、`childOrderId`、目标节点、Create 网络频率、收货港组、物品行数；
+- 包裹：`parcelId`、`messageId`、目标/来源节点、收货港组、剔除次数、最终 `APPLIED` / `REJECTED`；
+- 目标端：重复包裹、不兼容注册表、无法解码、无已加载港、港满、插入拒绝与最终落港位置；
+- 隔离：记录来源保管区、原因和明细。
+
+日志前缀固定为 `[DistantStock/Order]` 与 `[DistantStock/Parcel]`。正常状态用 INFO，暂时性等待用 DEBUG，拒收/不兼容用 WARN，进入隔离库用 ERROR。
+
+### 15.4 新增故障恢复自动测试
+
+`TranserverNodeIntegrationTest` 新增并通过两个场景：
+
+1. 目标第一次返回 `RETRY`：消息继续由来源队列持有；目标恢复后返回 `APPLIED`；继续 pump 不会再次应用。
+2. 目标节点离线且来源节点重启：来源重启后消息仍在；目标上线后只应用一次；来源收到最终 `APPLIED` 并清空待发队列。
+
+这证明 Transerver 底层对“港暂时不可用”和“目标离线 + 来源重启”具备可靠恢复行为。它仍不能代替 Minecraft 层的实测：下一步应在游戏中验证远仓港满/不存在时，`TranserverPackageService` 是否按预期持续返回 `RETRY`，腾出空间后是否只生成一个包裹。

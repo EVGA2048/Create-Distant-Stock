@@ -3,48 +3,58 @@ package dev.distantstock.net;
 import dev.distantstock.DistantStock;
 import dev.distantstock.client.ClientPayloadHandlers;
 import dev.distantstock.link.LinkSnapshot;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-public record LinkSnapshotS2C(LinkSnapshot.View view) implements CustomPacketPayload {
+/** Periodic data for an already-open monitor screen. This payload can never open a screen. */
+public record LinkSnapshotS2C(BlockPos source, LinkSnapshot.View view) implements CustomPacketPayload {
     public static final Type<LinkSnapshotS2C> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "link_snapshot"));
 
     public static final StreamCodec<RegistryFriendlyByteBuf, LinkSnapshotS2C> STREAM_CODEC =
             StreamCodec.of(LinkSnapshotS2C::write, LinkSnapshotS2C::read);
 
-    private static void write(RegistryFriendlyByteBuf buf, LinkSnapshotS2C m) {
-        LinkSnapshot.View v = m.view;
-        buf.writeUtf(v.selfId());
-        buf.writeUtf(v.peerId());
-        buf.writeDouble(v.localTps());
-        buf.writeDouble(v.localMspt());
-        buf.writeVarInt(v.orderDepth());
-        buf.writeVarInt(v.packageDepth());
-        buf.writeVarInt(v.inFlight());
-        buf.writeBoolean(v.peerUp());
-        buf.writeDouble(v.peerTps());
-        buf.writeDouble(v.peerMspt());
-        buf.writeDouble(v.peerRttMs());
-        buf.writeVarInt(v.peerFails());
-        buf.writeVarInt(v.peersUp());
-        buf.writeVarInt(v.peersTotal());
-        buf.writeBoolean(v.transerverAttached());
-        buf.writeBoolean(v.transerverUp());
-        buf.writeUtf(v.transerverNodeId());
-        buf.writeUtf(v.transerverAlias());
-        buf.writeUtf(v.transerverFailure());
-        buf.writeVarInt(v.transerverOutbox());
-        buf.writeVarInt(v.transerverInbox());
-        buf.writeVarInt(v.transerverCompleted());
-        buf.writeVarInt(v.transerverDeadLetters());
+    private static void write(RegistryFriendlyByteBuf buf, LinkSnapshotS2C message) {
+        buf.writeBlockPos(message.source);
+        writeView(buf, message.view);
     }
 
     private static LinkSnapshotS2C read(RegistryFriendlyByteBuf buf) {
-        return new LinkSnapshotS2C(new LinkSnapshot.View(
+        return new LinkSnapshotS2C(buf.readBlockPos(), readView(buf));
+    }
+
+    static void writeView(RegistryFriendlyByteBuf buf, LinkSnapshot.View view) {
+        buf.writeUtf(view.selfId());
+        buf.writeUtf(view.peerId());
+        buf.writeDouble(view.localTps());
+        buf.writeDouble(view.localMspt());
+        buf.writeVarInt(view.orderDepth());
+        buf.writeVarInt(view.packageDepth());
+        buf.writeVarInt(view.inFlight());
+        buf.writeBoolean(view.peerUp());
+        buf.writeDouble(view.peerTps());
+        buf.writeDouble(view.peerMspt());
+        buf.writeDouble(view.peerRttMs());
+        buf.writeVarInt(view.peerFails());
+        buf.writeVarInt(view.peersUp());
+        buf.writeVarInt(view.peersTotal());
+        buf.writeBoolean(view.transerverAttached());
+        buf.writeBoolean(view.transerverUp());
+        buf.writeUtf(view.transerverNodeId());
+        buf.writeUtf(view.transerverAlias());
+        buf.writeUtf(view.transerverFailure());
+        buf.writeVarInt(view.transerverOutbox());
+        buf.writeVarInt(view.transerverInbox());
+        buf.writeVarInt(view.transerverCompleted());
+        buf.writeVarInt(view.transerverDeadLetters());
+    }
+
+    static LinkSnapshot.View readView(RegistryFriendlyByteBuf buf) {
+        return new LinkSnapshot.View(
                 buf.readUtf(),
                 buf.readUtf(),
                 buf.readDouble(),
@@ -68,7 +78,7 @@ public record LinkSnapshotS2C(LinkSnapshot.View view) implements CustomPacketPay
                 buf.readVarInt(),
                 buf.readVarInt(),
                 buf.readVarInt()
-        ));
+        );
     }
 
     @Override
@@ -76,7 +86,7 @@ public record LinkSnapshotS2C(LinkSnapshot.View view) implements CustomPacketPay
         return TYPE;
     }
 
-    public static void handle(LinkSnapshotS2C msg, IPayloadContext ctx) {
-        ctx.enqueueWork(() -> ClientPayloadHandlers.openMonitor(msg));
+    public static void handle(LinkSnapshotS2C message, IPayloadContext context) {
+        context.enqueueWork(() -> ClientPayloadHandlers.updateMonitor(message));
     }
 }

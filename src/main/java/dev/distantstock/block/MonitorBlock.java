@@ -3,9 +3,12 @@ package dev.distantstock.block;
 import com.simibubi.create.content.equipment.wrench.IWrenchable;
 import com.mojang.serialization.MapCodec;
 import dev.distantstock.link.LinkSnapshot;
+import dev.distantstock.item.RequesterData;
+import dev.distantstock.item.RequesterItem;
 import dev.distantstock.net.AdminConfigS2C;
-import dev.distantstock.net.LinkSnapshotS2C;
+import dev.distantstock.net.OpenMonitorS2C;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.InteractionHand;
@@ -93,25 +96,33 @@ public final class MonitorBlock extends WallPanelBlock implements IWrenchable {
     @Override
     protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
                                               Player player, InteractionHand hand, BlockHitResult hit) {
-        if (DockBlock.isWrench(stack)) {
-            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        if (stack.isEmpty()) {
+            open(level, pos, player);
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
-        open(level, player);
-        return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        if (stack.getItem() instanceof RequesterItem && RequesterData.tuned(stack)) {
+            if (!level.isClientSide && level.getBlockEntity(pos) instanceof MonitorBlockEntity be) {
+                RequesterData.network(stack).ifPresentOrElse(be::setNetwork,
+                        () -> be.setFrequency(RequesterData.freq(stack)));
+                player.displayClientMessage(Component.translatable("gui.distantstock.tuned"), true);
+            }
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        }
+        return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
     }
 
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
-        open(level, player);
+        open(level, pos, player);
         return InteractionResult.sidedSuccess(level.isClientSide);
     }
 
-    private static void open(Level level, Player player) {
+    private static void open(Level level, BlockPos pos, Player player) {
         if (!level.isClientSide && player instanceof ServerPlayer sp) {
             if (player.isShiftKeyDown() && player.hasPermissions(2)) {
                 PacketDistributor.sendToPlayer(sp, AdminConfigS2C.fromConfig());
             } else {
-                PacketDistributor.sendToPlayer(sp, new LinkSnapshotS2C(LinkSnapshot.view()));
+                PacketDistributor.sendToPlayer(sp, new OpenMonitorS2C(pos, LinkSnapshot.view()));
             }
         }
     }

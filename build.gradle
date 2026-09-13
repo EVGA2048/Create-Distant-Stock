@@ -121,6 +121,37 @@ tasks.register('verifyParcelOwnership', JavaExec) {
     mainClass = 'dev.distantstock.link.ParcelOwnershipCheck'
 }
 
+tasks.register('verifyClientAssets', Exec) {
+    group = 'verification'
+    description = 'Checks local block models, textures, and signal lamp variants.'
+    commandLine 'python3', 'scripts/verify_client_assets.py'
+}
+
+tasks.named('check').configure {
+    dependsOn 'verifyClientAssets'
+    dependsOn 'verifyPackagerParity'
+    dependsOn 'verifyDockMotion'
+    dependsOn 'verifyRequesterUnbind'
+}
+
+tasks.register('verifyRequesterUnbind', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.distantstock.item.RequesterUnbindCheck'
+}
+
+tasks.register('verifyDockMotion', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.distantstock.client.DockParcelMotionCheck'
+}
+
+tasks.register('verifyPackagerParity', Exec) {
+    group = 'verification'
+    description = 'Checks packager model and tray compatibility against the installed Create jar.'
+    commandLine 'python3', 'scripts/verify_packager_parity.py'
+}
+
 tasks.withType(Test).configureEach {
     failOnNoDiscoveredTests = false
 }

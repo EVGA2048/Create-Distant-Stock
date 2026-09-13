@@ -17,9 +17,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /** Durable remote-order intake and conservative main-thread application. */
 public final class TranserverOrderService {
+    private static final Logger LOG = LogManager.getLogger();
+
     public static void register() {
         TranserverBridge.handler(RoutingChannels.ORDER_REQUEST, TranserverOrderService::receive);
     }
@@ -46,9 +50,17 @@ public final class TranserverOrderService {
                         record.request().address(), server, route);
                 inbox.state(record.childOrderId(), applied ? InboundOrderInbox.State.APPLIED
                         : InboundOrderInbox.State.RECEIVED, applied ? "" : "network busy or stock unavailable");
+                if (applied) {
+                    LOG.info("[DistantStock/Order] applied correlation={} child={} source={} network={} group={} lines={}",
+                            record.request().correlationId(), record.childOrderId(), record.sourceNodeId(),
+                            record.request().networkId().createFrequency(),
+                            record.request().receivingDockGroupId(), record.request().lines().size());
+                }
             } catch (RuntimeException exception) {
                 inbox.state(record.childOrderId(), InboundOrderInbox.State.PROCESSING,
                         "ambiguous after exception: " + exception.getClass().getSimpleName());
+                LOG.error("[DistantStock/Order] ambiguous failure correlation={} child={} source={}",
+                        record.request().correlationId(), record.childOrderId(), record.sourceNodeId(), exception);
             }
             inbox.flush(server);
         }
@@ -94,7 +106,14 @@ public final class TranserverOrderService {
         InboundOrderInbox inbox = InboundOrderInbox.get(server);
         InboundOrderInbox.Record record = inbox.receive(sourceNode, request);
         if (record == null) {
+            LOG.warn("[DistantStock/Order] rejected identity conflict correlation={} child={} source={}",
+                    request.correlationId(), request.childOrderId(), sourceNode);
             return DeliveryResult.REJECTED;
+        }
+        if (record.state() == InboundOrderInbox.State.RECEIVED) {
+            LOG.debug("[DistantStock/Order] accepted correlation={} child={} source={} network={} group={}",
+                    request.correlationId(), request.childOrderId(), sourceNode,
+                    request.networkId().createFrequency(), request.receivingDockGroupId());
         }
         return switch (record.state()) {
             case APPLIED -> DeliveryResult.APPLIED;

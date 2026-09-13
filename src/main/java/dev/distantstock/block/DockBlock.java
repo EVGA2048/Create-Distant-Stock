@@ -7,6 +7,8 @@ import dev.distantstock.routing.DockGroupDirectory;
 import dev.distantstock.routing.DockMode;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.item.RequesterItem;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
@@ -67,6 +69,17 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext ctx) {
         return defaultBlockState().setValue(FACING, ctx.getHorizontalDirection().getOpposite());
+    }
+
+    @Override
+    public void setPlacedBy(Level level, BlockPos pos, BlockState state, LivingEntity placer, ItemStack stack) {
+        super.setPlacedBy(level, pos, state, placer, stack);
+        if (!level.isClientSide && level.getBlockEntity(pos) instanceof DockBlockEntity dock) {
+            RequesterData.network(stack).ifPresentOrElse(network -> dock.setNetwork(network),
+                    () -> {
+                        if (RequesterData.tuned(stack)) dock.setExport(RequesterData.freq(stack));
+                    });
+        }
     }
 
     @Override
@@ -146,9 +159,13 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
         if (stack.isEmpty()) {
-            if (!level.isClientSide) {
-                be.clearFault();
-                player.displayClientMessage(be.modeMessage(), true);
+            if (!level.isClientSide && player.isShiftKeyDown()) {
+                be.clearNetwork();
+                player.displayClientMessage(Component.translatable("gui.distantstock.dock_unbound"), true);
+                return ItemInteractionResult.sidedSuccess(false);
+            }
+            if (!level.isClientSide && !player.isShiftKeyDown() && be.takeReceived(player)) {
+                return ItemInteractionResult.sidedSuccess(false);
             }
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }

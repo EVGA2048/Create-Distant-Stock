@@ -59,6 +59,17 @@ public final class CreateStock {
         return out;
     }
 
+    public static int deviceCount(UUID freq) {
+        if (freq == null || Create.LOGISTICS == null || Create.LOGISTICS.logisticsNetworks == null) {
+            return 0;
+        }
+        var network = Create.LOGISTICS.logisticsNetworks.get(freq);
+        if (network == null) {
+            return 0;
+        }
+        return network.loadedLinks == null ? 0 : network.loadedLinks.size();
+    }
+
     public static List<StockCache.Entry> summary(UUID freq) {
         if (!hasNetwork(freq)) {
             return List.of();

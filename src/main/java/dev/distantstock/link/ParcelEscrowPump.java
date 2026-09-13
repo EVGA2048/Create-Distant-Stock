@@ -75,6 +75,9 @@ public final class ParcelEscrowPump {
                         PackageDispatchCodec.encode(dispatch), record.parcelId().toString());
                 if (messageId != null) {
                     escrow.submitted(record.parcelId(), messageId);
+                    LOG.info("[DistantStock/Parcel] submitted parcel={} message={} target={} group={} strips={}",
+                            record.parcelId(), messageId, record.destinationNode(),
+                            record.receivingDockGroupId(), record.strips());
                     sent++;
                 }
             } catch (RuntimeException ignored) {
@@ -99,8 +102,12 @@ public final class ParcelEscrowPump {
                 // the message currently in flight may change its state.
                 if (record != null && completed.messageId().equals(record.messageId())) {
                     if (completed.state() == DeliveryState.APPLIED) {
+                        LOG.info("[DistantStock/Parcel] completed parcel={} message={} result=APPLIED",
+                                parcelId, completed.messageId());
                         escrow.remove(parcelId);
                     } else if (completed.state() == DeliveryState.REJECTED) {
+                        LOG.warn("[DistantStock/Parcel] completed parcel={} message={} result=REJECTED detail={}",
+                                parcelId, completed.messageId(), completed.detail());
                         escrow.rejected(parcelId, completed.detail());
                     }
                 }
@@ -264,6 +271,8 @@ public final class ParcelEscrowPump {
                                          String reason, String detail) {
         try {
             quarantine.transfer(escrow, record, reason, detail, () -> quarantine.flush(server));
+            LOG.error("[DistantStock/Parcel] quarantined parcel={} source=escrow reason={} detail={}",
+                    record.parcelId(), reason, detail);
         } catch (IllegalStateException full) {
             // Quarantine is full: the escrow record stays authoritative instead of being discarded.
         }
@@ -274,6 +283,8 @@ public final class ParcelEscrowPump {
                                          String reason, String detail) {
         try {
             quarantine.transfer(returns, record, reason, detail, () -> quarantine.flush(server));
+            LOG.error("[DistantStock/Parcel] quarantined parcel={} source=return_inbox reason={} detail={}",
+                    record.parcelId(), reason, detail);
         } catch (IllegalStateException full) {
             // Quarantine is full: the return inbox record stays authoritative instead of being discarded.
         }

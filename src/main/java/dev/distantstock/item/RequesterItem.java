@@ -25,6 +25,14 @@ public final class RequesterItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
+        if (player.isShiftKeyDown()) {
+            if (!level.isClientSide) {
+                RequesterData.clearBinding(stack);
+                player.displayClientMessage(Component.translatable("item.distantstock.requester.unbound"), true);
+                player.getInventory().setChanged();
+            }
+            return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
+        }
         if (!level.isClientSide && player instanceof ServerPlayer sp) {
             sp.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> new RequesterMenu(id, inv, hand),
@@ -37,6 +45,7 @@ public final class RequesterItem extends Item {
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext ctx, List<Component> tip, TooltipFlag flag) {
         tip.add(Component.translatable("item.distantstock.requester.desc").withStyle(ChatFormatting.AQUA));
+        tip.add(Component.translatable("item.distantstock.requester.unbind_hint").withStyle(ChatFormatting.GRAY));
         UUID freq = RequesterData.freq(stack);
         if (freq == null) {
             tip.add(Component.translatable("gui.distantstock.untuned").withStyle(ChatFormatting.GRAY));

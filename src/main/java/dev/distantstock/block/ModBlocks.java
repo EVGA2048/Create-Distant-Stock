@@ -16,10 +16,15 @@ public final class ModBlocks {
             BLOCKS.register("dock", () -> new DockBlock(machine()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, GaugeBlock> GAUGE =
             BLOCKS.register("gauge", () -> new GaugeBlock(machine().noOcclusion()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, RemoteGaugeBlock> REMOTE_GAUGE =
+            BLOCKS.register("remote_gauge", () -> new RemoteGaugeBlock(panel()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, MonitorBlock> MONITOR =
             BLOCKS.register("monitor", () -> new MonitorBlock(panel()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, RemotePackagerBlock> REMOTE_PACKAGER =
-            BLOCKS.register("remote_packager", () -> new RemotePackagerBlock(machine()));
+            BLOCKS.register("remote_packager", () -> new RemotePackagerBlock(
+                    BlockBehaviour.Properties.ofFullCopy(net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
+                            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", "packager")))
+                            .noOcclusion()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, SignalPanelBlock> SIGNAL_PANEL =
             BLOCKS.register("signal_panel", () -> new SignalPanelBlock(panel()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, IndicatorLampBlock> CYAN_INDICATOR_LAMP = lamp("cyan_indicator_lamp");

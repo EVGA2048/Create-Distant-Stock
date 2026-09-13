@@ -61,6 +61,9 @@ public final class SignalPanelRenderer extends SmartBlockEntityRenderer<SignalPa
             SignalLampPanelItem lamp = SignalLampPanelItem.from(lampStack);
             if (lamp != null) {
                 renderLamp(state, entry.getKey(), lamp, be.lampSignal(entry.getKey()), ms, buffer, light, overlay);
+                for (FactoryPanelConnection connection : behaviour.targetedBy.values()) {
+                    FactoryPanelRenderer.renderPath(behaviour, connection, partialTicks, ms, buffer, light, overlay);
+                }
                 continue;
             }
             renderPartial(AllPartialModels.FACTORY_PANEL_WITH_BULB, state, entry.getKey(), ms,

@@ -11,7 +11,7 @@
     "portal": "distantstock:block/ether_portal",
     "cap": "distantstock:block/andesite_block_white_blue",
     "edge": "distantstock:block/andesite_block_white_blue",
-    "socket": "distantstock:block/lamp_socket",
+    "socket": "create:block/industrial_iron_block",
     "lamp": "distantstock:block/gauge_bulb_green",
     "iris": "create:block/packager_iris_closed",
     "details": "create:block/packager_details"

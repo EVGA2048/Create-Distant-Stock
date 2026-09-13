@@ -112,12 +112,12 @@ DistantStock 不应直接访问 Transerver 内部 `core` 包，只通过 `dev.tr
 定义位置：`routing/RoutingChannels.java`
 
 ```text
-distantstock:v1/network.announce
-distantstock:v1/stock.query
-distantstock:v1/stock.result
-distantstock:v1/order.request
-distantstock:v1/order.result
-distantstock:v1/package.dispatch
+distantstock:v1.network.announce
+distantstock:v1.stock.query
+distantstock:v1.stock.result
+distantstock:v1.order.request
+distantstock:v1.order.result
+distantstock:v1.package.dispatch
 ```
 
 频道名仍为 `v1`，但 `package.dispatch` 的内部二进制信封已升级为 V2；V1 仍可解码。不要仅因内部字段升级就随意更换频道名，否则会割裂持久消息和滚动升级。
@@ -179,7 +179,7 @@ distantstock:v1/package.dispatch
 
 退回与剔除的完整链路（本轮新增，细节见 `docs/design/RETURN-FACE.zh-CN.md`）：
 
-- 目标拒收时先算出自身缺失的注册表条目，通过 `distantstock:v1/package.strip` 把 `parcelId + 缺失清单` 发回来源；
+- 目标拒收时先算出自身缺失的注册表条目，通过 `distantstock:v1.package.strip` 把 `parcelId + 缺失清单` 发回来源；
 - 来源把缺失清单挂到托管记录（`ParcelEscrow.attachStrip` 并落盘），由 `ParcelEscrowPump` 在原港已加载时整件剔除命中条目；
 - 剔除物进港的回退缓冲并从底面推出，剩余内容写回 `create:package_contents`、重算清单与哈希、记一次 `strips` 后重新提交；
 - 未命中任何条目或 `strips` 达到 3 次时不允许重发，整包从底面退出并置故障灯；
@@ -233,7 +233,8 @@ distantstock:v1/package.dispatch
 - 橙色（堵塞）只代表"真的有东西出不去"：回退缓冲非空且推不动、回退面交付被拒、发送缓存里有无法解析目的地的包裹。空机永远是绿灯。
 - 机壳贴图必须保留 Create 打包机的**镂空**（`remote_packager_*` 的 alpha 与 Create 原版逐像素一致，可用 alpha 通道从 create jar 直接还原，别去补实）。镂空后面要靠**发光机芯**兜住：远仓港由 `DockRenderer.renderInnerCore` 在内部画一个全亮核心，打包机靠 Create 自己的 `PackagerRenderer`。删掉机芯会立刻看穿到虚空。
 - 信号灯的物品名必须由 `SignalLampPanelItem.getDescriptionId()` 指定：它继承 `BlockItem`，不覆盖就会显示方块名（信号面板）。
-- 灯格不要覆盖 `isActive()`（Create 用它判断槽位占用，覆盖会让灯格渲染成空仪表）；要屏蔽的是 Create 客户端的提示：覆盖 `getAmountTip()` 返回 null（否则 `FilteringRenderer` 会画"单击并按住以改变目标数量"），再配 `acceptsValueSettings=false` + `bypassesInput=true`。
+- 灯格不要覆盖 `isActive()`（Create 用它判断槽位占用，覆盖会让灯格渲染成空仪表）；要屏蔽的是 Create 客户端提示：`getAmountTip()` 必须返回非空的 `Component.empty()`，绝不能返回 `null`，否则 `FilteringRenderer` 会把 null 放进提示列表并在 `Font.width` 崩溃；同时配 `acceptsValueSettings=false` + `bypassesInput=true`。
+- `SignalLampPanelItem.placeStandalone()` 的 `BlockPlaceContext.getClickedPos()` 已经是实际放置坐标，绝不能再沿点击面 `relative()`；独立灯放置失败时必须返回 `FAIL`，不能 `super.place()`，因为该物品继承绑定的是 `SIGNAL_PANEL`，回退会悄悄生成工厂面板并重新进入 Filtering/Value Settings 路径。
 - 舱口（Create 打包机的螺旋舱门）是**模型元素**，不是靠渲染器：`remote_dock_*` 里叫 `bottom_hatch`、`remote_packager*` 用作者原始坐标（Create 的"关闭"状态就是原位）。
 - 打包机的舱口与托盘**不要写进模型**，也不要指望 `PackagerRenderer`：它在 `VisualizationManager.supportsVisualization()` 为真时直接跳过这两样，交给按方块实体类型注册的 Flywheel visual（Create 只给自己的类型注册了 `PackagerVisual`）。我们的类型必须在客户端 `FMLClientSetupEvent` 里自行注册：`SimpleBlockEntityVisualizer.builder(REMOTE_PACKAGER).factory((ctx,be,t) -> new PackagerVisual<>(ctx,be,t)).neverSkipVanillaRender().apply()`。`neverSkipVanillaRender` 不能省——Create 的 BER 还要在 Flywheel 检查之外画包裹。
 - 往模型里再塞一个静态舱口会变成"两个舱口、其中一个在中间"，`SuperByteBuffer.translate` 的单位是**方块**（0.5 = 半格），不是模型单位（曾把舱口丢到 6 格之外）。
@@ -282,7 +283,7 @@ distantstock:v1/package.dispatch
 
 - 请求器 UI 已向 Create 仓储界面靠拢，使用淡蓝灰背景，并增加来源网络、本地地址、接收港组等路由字段。
 - 请求器数据已支持稳定 `networkId`，同时保留旧频率迁移。
-- 远仓监视器用于 TPS、链路和队列概览，不等同于远仓仪表。
+- 远仓监视器用于 TPS、链路和队列概览，不等同于远仓仪表。显式打开只走 `OpenMonitorS2C`；每秒刷新只走 `LinkSnapshotS2C`，后者只能更新来源坐标一致且已经打开的 `MonitorScreen`，不能打开界面。禁止再把打开标志塞回周期刷新包。
 - 远仓仪表对应 Create 工厂仪表，用于跨服请求生产；相关右侧模型方向曾修正 180°。
 - 这些部分仍需要真实多人、多服流程验证，不能仅凭界面可打开认定完成。
 

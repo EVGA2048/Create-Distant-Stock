@@ -47,8 +47,10 @@ public final class ClientSetup {
 
         @SubscribeEvent
         public static void renderers(EntityRenderersEvent.RegisterRenderers e) {
+            e.registerBlockEntityRenderer(ModBlockEntities.REMOTE_GAUGE.get(),
+                    com.simibubi.create.content.logistics.factoryBoard.FactoryPanelRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.REMOTE_PACKAGER.get(), PackagerRenderer::new);
-            e.registerBlockEntityRenderer(ModBlockEntities.DOCK.get(), DockRenderer::new);
+            e.registerBlockEntityRenderer(ModBlockEntities.DOCK.get(), DockParcelRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.SIGNAL_PANEL.get(), SignalPanelRenderer::new);
         }
 
@@ -69,6 +71,20 @@ public final class ClientSetup {
 
     @EventBusSubscriber(modid = DistantStock.MODID, value = Dist.CLIENT)
     public static final class Manual {
+        @SubscribeEvent
+        public static void lampConnection(PlayerInteractEvent.RightClickBlock e) {
+            if (!(e.getLevel().getBlockEntity(e.getPos()) instanceof dev.distantstock.block.SignalPanelBlockEntity be)) return;
+            var slot = com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock.getTargetedSlot(
+                    e.getPos(), be.getBlockState(), e.getHitVec().getLocation());
+            if (!be.isLamp(slot) || !e.getItemStack().isEmpty()) return;
+            // Lamps intentionally bypass value settings, so route connection clicks explicitly.
+            if (com.simibubi.create.content.logistics.factoryBoard.FactoryPanelConnectionHandler.panelClicked(
+                    e.getLevel(), e.getEntity(), be.panels.get(slot))) {
+                e.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);
+                e.setCanceled(true);
+            }
+        }
+
         @SubscribeEvent
         public static void use(PlayerInteractEvent.RightClickItem e) {
             if (!e.getLevel().isClientSide) {

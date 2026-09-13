@@ -57,7 +57,11 @@ def load_model(name: str) -> dict:
             print(f"WARN: model not found: {fp}", file=sys.stderr)
             return {}
         data = json.loads(fp.read_text())
-    parent = load_model(data["parent"]) if "parent" in data else {}
+    parent_name = data.get("parent")
+    if parent_name and ":" not in parent_name:
+        # ResourceLocation defaults an omitted namespace to minecraft (Create uses "block/block").
+        parent_name = f"minecraft:{parent_name}"
+    parent = load_model(parent_name) if parent_name else {}
     merged = {**parent, **data}
     merged["textures"] = {**parent.get("textures", {}), **data.get("textures", {})}
     return merged
@@ -329,15 +333,15 @@ def render(
             norm_len = np.linalg.norm(normal)
             if norm_len > 1e-8:
                 normal /= norm_len
-            # Light from upper-right-front
-            light_dir = np.array([0.3, 0.8, 0.5])
-            light_dir /= np.linalg.norm(light_dir)
-            ndotl = max(0.0, float(np.dot(normal, light_dir)))
-            # Blend between ambient and directional
-            shade = 0.45 + 0.55 * ndotl
-            # Also apply MC-style face-based shading
-            shade *= FACE_SHADE.get(face_name, 0.8)
-            shade = min(1.0, shade)
+            # Use one diffuse shading term, not MC shading multiplied by a
+            # second directional light (which made pale source textures dark).
+            if not elem_rot and not bs_x and not bs_y:
+                shade = FACE_SHADE.get(face_name, 0.8)
+            else:
+                shade = float(normal[0] ** 2 * 0.6 + normal[2] ** 2 * 0.8
+                              + normal[1] ** 2 * FACE_SHADE.get(face_name, 1.0))
+            if obj.get("shade") is False or e.get("shade") is False:
+                shade = 1.0
 
             avg_depth = float(dps.mean())
             try:
@@ -432,6 +436,7 @@ def main():
     sub.add_parser("lamps", help="Render all indicator lamps sheet")
     # All blocks
     sub.add_parser("all", help="Render machines + lamps sheets")
+    sub.add_parser("remote", help="Render the shipped remote packager and parcel assets")
 
     args = parser.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
@@ -467,6 +472,23 @@ def main():
             cells.append((f"{c.upper()} LIT", f"{c}_indicator_lamp_lit", 30, 55))
         sheet = render_sheet(cells, "DISTANT STOCK 0.3.7 — INDICATOR LAMPS (OFFLINE RENDER)", cols=6)
         path = OUT / "lamps-0.3.7.png"
+        sheet.save(path)
+        print(path)
+
+    if args.cmd == "remote":
+        cells = [
+            ("REMOTE PACKAGER / IDLE", "distantstock:block/remote_packager", 30, 25),
+            ("REMOTE DOCK / SAME FRAME", "distantstock:block/remote_dock_off", 30, 25),
+            ("REMOTE PARCEL / RESTORED", "distantstock:item/remote_package_12x12", 30, 25),
+        ]
+        sheet = Image.new("RGBA", (840, 340), "#e8e5dc")
+        draw = ImageDraw.Draw(sheet)
+        for i, (label, model, yaw, pitch) in enumerate(cells):
+            preview = render(model, yaw=yaw, pitch=pitch, size=(280, 300), scale=12)
+            sheet.paste(preview, (i * 280, 25), preview)
+            draw.text((i * 280 + 10, 8), label, fill="#3c5459")
+        draw.text((10, 322), "ACTUAL SHIPPED JSON + PNG / NEAREST-PIXEL OFFLINE RENDER", fill="#68777a")
+        path = OUT / "remote-packager-and-parcel.png"
         sheet.save(path)
         print(path)
 

@@ -1,7 +1,11 @@
 package dev.distantstock.block;
 
 import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
+import dev.distantstock.item.RequesterData;
 import dev.distantstock.link.LinkSnapshot;
+import dev.distantstock.net.LinkSnapshotS2C;
+import dev.distantstock.routing.RemoteNetworkId;
+import dev.distantstock.stock.CreateStock;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -10,6 +14,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -27,9 +33,34 @@ public final class MonitorBlockEntity extends BlockEntity implements IHaveGoggle
     private String role = "host";
     private int fails;
     private int inFlight;
+    private java.util.UUID freq;
+    private RemoteNetworkId networkId;
+    private int deviceCount;
 
     public MonitorBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.MONITOR.get(), pos, state);
+    }
+
+    public RemoteNetworkId networkId() {
+        return networkId;
+    }
+
+    public void setNetwork(RemoteNetworkId networkId) {
+        this.networkId = networkId;
+        this.freq = networkId == null ? null : networkId.createFrequency();
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    public void setFrequency(java.util.UUID freq) {
+        this.freq = freq;
+        this.networkId = null;
+        setChanged();
+        if (level != null) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, MonitorBlockEntity be) {
@@ -46,6 +77,7 @@ public final class MonitorBlockEntity extends BlockEntity implements IHaveGoggle
         be.role = v.selfId();
         be.fails = v.peerFails();
         be.inFlight = v.inFlight();
+        be.deviceCount = be.freq == null ? 0 : CreateStock.deviceCount(be.freq);
         MonitorBlock.Status status = MonitorBlock.Status.fromTps(be.localTps);
         if (state.getValue(MonitorBlock.STATUS) != status) {
             level.setBlock(pos, state.setValue(MonitorBlock.STATUS, status), 3);
@@ -53,11 +85,22 @@ public final class MonitorBlockEntity extends BlockEntity implements IHaveGoggle
         be.setChanged();
         BlockState current = be.getBlockState();
         level.sendBlockUpdated(pos, current, current, 3);
+        LinkSnapshotS2C update = new LinkSnapshotS2C(pos, v);
+        for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
+            if (player.level() == level && player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) <= 32 * 32) {
+                PacketDistributor.sendToPlayer(player, update);
+            }
+        }
     }
 
     @Override
     public boolean addToGoggleTooltip(List<Component> tip, boolean sneaking) {
         GoggleText.title(tip, "block.distantstock.monitor");
+        if (networkId == null && freq == null) {
+            GoggleText.line(tip, "goggle.distantstock.untuned");
+        } else {
+            GoggleText.line(tip, "goggle.distantstock.freq", RequesterData.shortFreq(freq));
+        }
         GoggleText.line(tip, "goggle.distantstock.local_tps", fmt(localTps), fmt(localMspt));
         if (peerUp) {
             GoggleText.line(tip, "goggle.distantstock.peer_tps", fmt(peerTps));
@@ -65,6 +108,7 @@ public final class MonitorBlockEntity extends BlockEntity implements IHaveGoggle
             GoggleText.value(tip, "goggle.distantstock.peer_down", ChatFormatting.RED);
         }
         GoggleText.line(tip, "goggle.distantstock.pressure", backlog, rtt < 0 ? "—" : rtt);
+        GoggleText.line(tip, "goggle.distantstock.devices", deviceCount);
         return true;
     }
 
@@ -84,6 +128,13 @@ public final class MonitorBlockEntity extends BlockEntity implements IHaveGoggle
         tag.putString("Role", role);
         tag.putInt("Fails", fails);
         tag.putInt("InFlight", inFlight);
+        tag.putInt("DeviceCount", deviceCount);
+        if (freq != null) {
+            tag.putUUID("Freq", freq);
+        }
+        if (networkId != null) {
+            tag.put("RemoteNetwork", networkId.save());
+        }
     }
 
     @Override
@@ -98,6 +149,10 @@ public final class MonitorBlockEntity extends BlockEntity implements IHaveGoggle
         role = tag.getString("Role");
         fails = tag.getInt("Fails");
         inFlight = tag.getInt("InFlight");
+        deviceCount = tag.getInt("DeviceCount");
+        freq = tag.hasUUID("Freq") ? tag.getUUID("Freq") : null;
+        networkId = tag.contains("RemoteNetwork")
+                ? RemoteNetworkId.read(tag.getCompound("RemoteNetwork")).orElse(null) : null;
     }
 
     @Override

@@ -1,0 +1,9 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.distantstock.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": ["LampConnectionMixin"],
+  "client": ["client.PackagerRendererMixin", "client.LampConnectionHandlerMixin"],
+  "injectors": { "defaultRequire": 1 }
+}

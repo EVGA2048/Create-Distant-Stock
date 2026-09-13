@@ -68,8 +68,8 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
         }
         boolean connectedGaugeIsOn = level != null && behaviour.targetedBy.values().stream()
                 .map(connection -> FactoryPanelBehaviour.at(level, connection))
-                .anyMatch(source -> source != null && source.satisfied);
-        return connectedGaugeIsOn ? 15 : lampSignal;
+                .anyMatch(source -> source != null && (source.satisfied || source.redstonePowered));
+        return connectedGaugeIsOn ? 15 : 0;
     }
 
     public ItemStack lampStack(FactoryPanelBlock.PanelSlot slot) {
@@ -91,7 +91,7 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
      * active panel must not be rendered as a factory gauge.
      */
     public boolean panelDataReady() {
-        return panelDataReady;
+        return level != null && (!level.isClientSide || panelDataReady);
     }
 
     @Override
@@ -123,16 +123,16 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
         return found;
     }
 
-    /** True when every occupied slot holds a lamp, so the block reads as a lamp rather than a panel. */
+    /** True when every occupied slot holds a lamp; an empty panel is not a lamp panel. */
     private boolean onlyLamps() {
         boolean any = false;
         for (FactoryPanelBlock.PanelSlot slot : FactoryPanelBlock.PanelSlot.values()) {
-            ItemStack lamp = lampStack(slot);
-            if (lamp.isEmpty()) {
+            FactoryPanelBehaviour behaviour = panels.get(slot);
+            if (behaviour == null || !behaviour.isActive()) {
                 continue;
             }
             any = true;
-            if (SignalLampPanelItem.from(lamp) == null) {
+            if (SignalLampPanelItem.from(behaviour.getFilter()) == null) {
                 return false;
             }
         }
@@ -152,11 +152,11 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
             if (behaviour == null || !behaviour.isActive()) {
                 continue;
             }
-            ItemStack lamp = lampStack(slot);
-            ItemStack drop = lamp.isEmpty()
-                    ? new ItemStack(BuiltInRegistries.BLOCK.get(
-                            ResourceLocation.fromNamespaceAndPath("create", "factory_gauge")))
-                    : lamp.copyWithCount(1);
+            ItemStack filter = behaviour.getFilter();
+            ItemStack drop = SignalLampPanelItem.from(filter) != null
+                    ? filter.copyWithCount(1)
+                    : new ItemStack(BuiltInRegistries.BLOCK.get(
+                            ResourceLocation.fromNamespaceAndPath("create", "factory_gauge")));
             drops.add(drop);
             behaviour.disable();
         }
@@ -183,12 +183,19 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
     }
 
     private static final class SignalLampAwarePanelBehaviour extends FactoryPanelBehaviour {
+        private final SignalPanelBlockEntity owner;
+
         private SignalLampAwarePanelBehaviour(SignalPanelBlockEntity be, FactoryPanelBlock.PanelSlot slot) {
             super(be, slot);
+            owner = be;
         }
 
         private boolean isLampSlot() {
             return SignalLampPanelItem.from(getFilter()) != null;
+        }
+
+        private boolean isLampInputBlocked() {
+            return !owner.panelDataReady() || isLampSlot();
         }
 
         /**
@@ -197,30 +204,30 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
          */
         @Override
         public boolean acceptsValueSettings() {
-            return !isLampSlot();
+            return owner.panelDataReady() && !isLampSlot();
         }
 
         /** Create's renderer draws "hold to set the amount" over the slot; a lamp has no amount. */
         @Override
         public net.minecraft.network.chat.MutableComponent getAmountTip() {
-            return isLampSlot() ? net.minecraft.network.chat.Component.empty() : super.getAmountTip();
+            return isLampInputBlocked() ? net.minecraft.network.chat.Component.empty() : super.getAmountTip();
         }
 
         @Override
         public boolean bypassesInput(net.minecraft.world.item.ItemStack stack) {
-            return isLampSlot() || super.bypassesInput(stack);
+            return isLampInputBlocked() || super.bypassesInput(stack);
         }
 
         @Override
         public void tick() {
-            if (!isLampSlot()) {
+            if (!isLampInputBlocked()) {
                 super.tick();
             }
         }
 
         @Override
         public void lazyTick() {
-            if (!isLampSlot()) {
+            if (!isLampInputBlocked()) {
                 super.lazyTick();
             }
         }

@@ -4,6 +4,7 @@ import dev.distantstock.link.LinkSnapshot;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 
 import java.util.Locale;
@@ -12,26 +13,49 @@ import java.util.Locale;
 public final class MonitorScreen extends Screen {
     private static final int W = 272;
     private static final int H = 190;
-    private static final int INK = 0x49352B;
-    private static final int MUTED = 0x806B55;
-    private static final int HEADER = 0xF3E6C8;
-    private static final int BRASS = 0x8A672F;
-    private static final int AETHER = 0x357D7B;
-    private static final int GOOD = 0x4B8054;
-    private static final int WARN = 0xB0833F;
-    private static final int BAD = 0xA05040;
+    private static final int INK = 0x263B43;
+    private static final int MUTED = 0x68828A;
+    private static final int HEADER = 0xF4FBF8;
+    private static final int BRASS = 0x718B8B;
+    private static final int AETHER = 0x3A9DB0;
+    private static final int GOOD = 0x4C9B7A;
+    private static final int WARN = 0xC18A4A;
+    private static final int BAD = 0xB65E57;
     private static final ResourceLocation PANEL =
             ResourceLocation.fromNamespaceAndPath("distantstock", "textures/gui/monitor.png");
 
-    private final LinkSnapshot.View view;
+    private final BlockPos source;
+    private LinkSnapshot.View view;
+    private int flipTicks;
+    private int previousTps;
+    private int previousMspt;
     private int left;
     private int top;
 
-    public MonitorScreen(LinkSnapshot.View view) {
+    public MonitorScreen(BlockPos source, LinkSnapshot.View view) {
         super(Component.translatable("gui.distantstock.monitor"));
+        this.source = source.immutable();
         this.view = view;
     }
 
+    public boolean isSource(BlockPos source) {
+        return this.source.equals(source);
+    }
+
+    public void update(LinkSnapshot.View next) {
+        previousTps = (int) Math.round(view.localTps() * 10);
+        previousMspt = (int) Math.round(view.localMspt() * 10);
+        view = next;
+        flipTicks = 8;
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        if (flipTicks > 0) {
+            flipTicks--;
+        }
+    }
     @Override
     protected void init() {
         left = (width - W) / 2;
@@ -40,7 +64,8 @@ public final class MonitorScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
-        renderBackground(g, mouseX, mouseY, partial);
+        // A machinery panel should remain part of the world, not open Minecraft's blurred menu backdrop.
+        g.fill(0, 0, width, height, 0x4208171B);
         g.blit(PANEL, left, top, 0, 0, W, H, W, H);
 
         Component title = Component.translatable("gui.distantstock.monitor");
@@ -89,15 +114,36 @@ public final class MonitorScreen extends Screen {
             return;
         }
 
-        String tpsText = n(tps) + " TPS";
-        g.drawString(font, tpsText, x + 59 - font.width(tpsText) / 2, y + 25, INK, false);
+        String tpsText = flipValue(n(tps), previousTps, tps, "");
+        drawFlipReadout(g, tpsText, "TPS", x + 59, y + 23, online ? AETHER : MUTED);
         meter(g, x + 10, y + 42, 98, tps);
 
-        String msptText = n(mspt) + " MSPT";
-        g.drawString(font, msptText, x + 10, y + 55, MUTED, false);
+        String msptText = flipValue(n(mspt), previousMspt, mspt, "");
+        drawFlipReadout(g, msptText, "MSPT", x + 43, y + 53, MUTED);
         if (rtt != null) {
             g.drawString(font, rtt, x + 108 - font.width(rtt), y + 55, MUTED, false);
         }
+    }
+
+    /** Pixel flip-board cells inspired by Create's display boards; values remain readable at GUI scale 1. */
+    private void drawFlipReadout(GuiGraphics g, String value, String unit, int centreX, int y, int color) {
+        int cellW = 7;
+        int gap = 1;
+        int cellsW = value.length() * (cellW + gap) - gap;
+        int unitW = font.width(unit);
+        int total = cellsW + 4 + unitW;
+        int x = centreX - total / 2;
+        for (int i = 0; i < value.length(); i++) {
+            int cx = x + i * (cellW + gap);
+            g.fill(cx, y, cx + cellW, y + 11, 0xFF43575D);
+            g.fill(cx + 1, y + 1, cx + cellW - 1, y + 5, 0xFF71888E);
+            g.fill(cx + 1, y + 6, cx + cellW - 1, y + 10, 0xFF52676D);
+            g.fill(cx, y + 5, cx + cellW, y + 6, 0xFF2E4147);
+            String glyph = value.substring(i, i + 1);
+            g.drawString(font, glyph, cx + (cellW - font.width(glyph)) / 2, y + 2,
+                    0xFFE8F4F2, false);
+        }
+        g.drawString(font, unit, x + cellsW + 4, y + 2, color, false);
     }
 
     private void meter(GuiGraphics g, int x, int y, int w, double tps) {
@@ -176,6 +222,17 @@ public final class MonitorScreen extends Screen {
     @Override
     public boolean mouseDragged(double x, double y, int button, double dx, double dy) {
         return inside(x, y) || super.mouseDragged(x, y, button, dx, dy);
+    }
+
+    private String flipValue(String current, int previousTenths, double value, String suffix) {
+        if (flipTicks == 0 || previousTenths == 0) {
+            return current;
+        }
+        double progress = (8 - flipTicks) / 8.0;
+        if (progress < 0.5) {
+            return n(previousTenths / 10.0) + suffix;
+        }
+        return current;
     }
 
     private static String n(double value) {

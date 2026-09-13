@@ -12,9 +12,13 @@ import net.minecraft.world.item.ItemStack;
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /** Target-side parcel validation, de-duplication and insertion. */
 public final class TranserverPackageService {
+    private static final Logger LOG = LogManager.getLogger();
+
     public static void register() {
         TranserverBridge.handler(RoutingChannels.PACKAGE_DISPATCH, TranserverPackageService::receive);
     }
@@ -40,27 +44,41 @@ public final class TranserverPackageService {
                                         String sourceNode) {
         ParcelLedger ledger = ParcelLedger.get(server);
         if (ledger.contains(dispatch.parcelId())) {
+            LOG.info("[DistantStock/Parcel] duplicate already applied parcel={} source={} group={}",
+                    dispatch.parcelId(), sourceNode, dispatch.receivingDockGroupId());
             return DeliveryResult.APPLIED;
         }
         // Tell the source exactly what this server lacks. Only the source owns those mods, so it is the only
         // node that can take the offending items out of the parcel and hand them back to its own logistics.
         List<String> missing = dispatch.manifest().missingRegistryEntries();
         if (!missing.isEmpty()) {
+            LOG.warn("[DistantStock/Parcel] rejected incompatible parcel={} source={} group={} missing={}",
+                    dispatch.parcelId(), sourceNode, dispatch.receivingDockGroupId(), missing);
             requestStrip(sourceNode, dispatch.parcelId(), missing);
             return DeliveryResult.REJECTED;
         }
         ItemStack parcel = PackageCodec.decode(dispatch.encodedPackage(), server.registryAccess());
         if (parcel.isEmpty() || !PackageItem.isPackage(parcel)) {
+            LOG.warn("[DistantStock/Parcel] rejected unreadable parcel={} source={} group={}",
+                    dispatch.parcelId(), sourceNode, dispatch.receivingDockGroupId());
             return DeliveryResult.REJECTED;
         }
         DockBlockEntity dock = LoadedDocks.importFor(parcel, dispatch.receivingDockGroupId());
         if (dock == null || dock.isFull()) {
+            LOG.debug("[DistantStock/Parcel] waiting parcel={} source={} group={} reason={}",
+                    dispatch.parcelId(), sourceNode, dispatch.receivingDockGroupId(),
+                    dock == null ? "no_loaded_dock" : "dock_full");
             return DeliveryResult.RETRY;
         }
         if (!dock.insert(parcel)) {
+            LOG.debug("[DistantStock/Parcel] waiting parcel={} source={} group={} reason=insert_refused",
+                    dispatch.parcelId(), sourceNode, dispatch.receivingDockGroupId());
             return DeliveryResult.RETRY;
         }
         ledger.markApplied(dispatch.parcelId());
+        LOG.info("[DistantStock/Parcel] applied parcel={} source={} group={} dock={} dimension={}",
+                dispatch.parcelId(), sourceNode, dispatch.receivingDockGroupId(), dock.getBlockPos(),
+                dock.getLevel() == null ? "unknown" : dock.getLevel().dimension().location());
         return DeliveryResult.APPLIED;
     }
 

@@ -32,7 +32,21 @@ public final class RequesterData {
     }
 
     public static void setFreq(ItemStack stack, UUID freq) {
-        update(stack, tag -> tag.putUUID(FREQ, freq));
+        update(stack, tag -> {
+            tag.remove(NETWORK);
+            tag.putUUID(FREQ, freq);
+        });
+    }
+
+    /** Clear only network-dependent fields; preserve the user's address and other item data. */
+    public static void clearBinding(ItemStack stack) {
+        update(stack, RequesterData::clearBindingTag);
+    }
+
+    static void clearBindingTag(CompoundTag tag) {
+        tag.remove(FREQ);
+        tag.remove(NETWORK);
+        tag.remove(RECEIVING_GROUP);
     }
 
     public static void setAddress(ItemStack stack, String address) {

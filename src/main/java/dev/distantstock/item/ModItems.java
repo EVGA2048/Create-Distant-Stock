@@ -17,10 +17,12 @@ public final class ModItems {
 
     public static final DeferredHolder<Item, Item> REQUESTER = ITEMS.register("requester",
             () -> new RequesterItem(new Item.Properties().stacksTo(1)));
-    public static final DeferredHolder<Item, BlockItem> DOCK = ITEMS.register("dock",
-            () -> new BlockItem(ModBlocks.DOCK.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, DockItem> DOCK = ITEMS.register("dock",
+            () -> new DockItem(ModBlocks.DOCK.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> GAUGE = ITEMS.register("gauge",
             () -> new BlockItem(ModBlocks.GAUGE.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockItem> REMOTE_GAUGE = ITEMS.register("remote_gauge",
+            () -> new com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockItem(ModBlocks.REMOTE_GAUGE.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> MONITOR = ITEMS.register("monitor",
             () -> new BlockItem(ModBlocks.MONITOR.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> REMOTE_PACKAGER = ITEMS.register("remote_packager",
@@ -31,7 +33,8 @@ public final class ModItems {
     public static final DeferredHolder<Item, SignalLampPanelItem> GREEN_INDICATOR_LAMP = lamp("green_indicator_lamp", SignalLampPanelItem.Color.GREEN);
     public static final DeferredHolder<Item, SignalLampPanelItem> WHITE_INDICATOR_LAMP = lamp("white_indicator_lamp", SignalLampPanelItem.Color.WHITE);
     public static final DeferredHolder<Item, SignalLampPanelItem> BRASS_SIGNAL_LAMP = ITEMS.register("brass_signal_lamp",
-            () -> new SignalLampPanelItem(new Item.Properties(), SignalLampPanelItem.Material.BRASS,
+            () -> new SignalLampPanelItem(ModBlocks.BRASS_INDICATOR_LAMP.get(), new Item.Properties(),
+                    SignalLampPanelItem.Material.BRASS,
                     SignalLampPanelItem.Color.WHITE));
     public static final DeferredHolder<Item, RemotePackageItem> REMOTE_PACKAGE = ITEMS.register("remote_package",
             () -> new RemotePackageItem(new Item.Properties()));
@@ -45,6 +48,7 @@ public final class ModItems {
                 out.accept(REQUESTER.get());
                 out.accept(DOCK.get());
                 out.accept(GAUGE.get());
+                out.accept(REMOTE_GAUGE.get());
                 out.accept(MONITOR.get());
                 out.accept(REMOTE_PACKAGER.get());
                 out.accept(CYAN_INDICATOR_LAMP.get());
@@ -64,7 +68,13 @@ public final class ModItems {
     }
 
     private static DeferredHolder<Item, SignalLampPanelItem> lamp(String name, SignalLampPanelItem.Color color) {
-        return ITEMS.register(name, () -> new SignalLampPanelItem(new Item.Properties(),
+        return ITEMS.register(name, () -> new SignalLampPanelItem(switch (color) {
+                    case CYAN -> ModBlocks.CYAN_INDICATOR_LAMP.get();
+                    case ORANGE -> ModBlocks.ORANGE_INDICATOR_LAMP.get();
+                    case RED -> ModBlocks.RED_INDICATOR_LAMP.get();
+                    case GREEN -> ModBlocks.GREEN_INDICATOR_LAMP.get();
+                    case WHITE -> ModBlocks.WHITE_INDICATOR_LAMP.get();
+                }, new Item.Properties(),
                 SignalLampPanelItem.Material.ANDESITE, color));
     }
 

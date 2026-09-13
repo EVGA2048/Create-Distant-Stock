@@ -13,8 +13,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.io.IOException;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public final class OrderService {
+    private static final Logger LOG = LogManager.getLogger();
+
     public enum Result {
         QUEUED, FAIL, EMPTY, NO_PEER
     }
@@ -68,8 +72,19 @@ public final class OrderService {
                     correlationId, childOrderId, address == null ? "" : address, lines);
             UUID messageId = TranserverBridge.send(networkId.nodeId().toString(), RoutingChannels.ORDER_REQUEST,
                     OrderRequestCodec.encode(request), correlationId.toString());
+            if (messageId != null) {
+                LOG.info("[DistantStock/Order] queued message={} correlation={} child={} target={} network={} group={} lines={}",
+                        messageId, correlationId, childOrderId, networkId.nodeId(),
+                        networkId.createFrequency(), receivingDockGroupId, lines.size());
+            } else {
+                LOG.warn("[DistantStock/Order] transport unavailable correlation={} child={} target={} network={} group={}",
+                        correlationId, childOrderId, networkId.nodeId(),
+                        networkId.createFrequency(), receivingDockGroupId);
+            }
             return messageId == null ? Result.NO_PEER : Result.QUEUED;
         } catch (IOException | RuntimeException exception) {
+            LOG.warn("[DistantStock/Order] encode/send failed target={} network={} group={}",
+                    networkId.nodeId(), networkId.createFrequency(), receivingDockGroupId, exception);
             return Result.FAIL;
         }
     }

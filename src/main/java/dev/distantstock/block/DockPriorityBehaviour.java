@@ -60,7 +60,7 @@ final class DockPriorityBehaviour extends BlockEntityBehaviour implements ValueS
 
     @Override
     public ValueSettingsBoard createBoard(Player player, BlockHitResult hit) {
-        return new ValueSettingsBoard(Component.translatable("goggle.distantstock.priority"),
+        return new ValueSettingsBoard(Component.translatable("value.distantstock.priority"),
                 DockBlockEntity.MAX_PRIORITY, 1, List.of(Component.translatable("value.distantstock.priority")),
                 new ValueSettingsFormatter(settings -> Component.literal("P" + settings.value())));
     }

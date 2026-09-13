@@ -49,7 +49,7 @@
 
 1. **目标服知道自己缺什么**：`PayloadManifest.missingRegistryEntries()` 在反序列化前就用自身注册表算出缺失的 `item:` / `component:` 条目。
 2. **目标服拿不出实物**：缺模组的物品在目标服无法实例化（`PackageCodec.decode` 直接失败），所以"从港下面清理出来"只能发生在**有那个模组的服务器**，也就是来源服。
-3. **Transerver 不传递原因**：`MessageHandler` 只能返回 `APPLIED` / `RETRY` / `REJECTED`，回执里的 `detail` 由 Transerver 自己填写。因此缺失清单走 DistantStock 自己的反向频道 `distantstock:v1/package.strip`（不改 Transerver 公共 API）。
+3. **Transerver 不传递原因**：`MessageHandler` 只能返回 `APPLIED` / `RETRY` / `REJECTED`，回执里的 `detail` 由 Transerver 自己填写。因此缺失清单走 DistantStock 自己的反向频道 `distantstock:v1.package.strip`（不改 Transerver 公共 API）。
 
 流程：
 

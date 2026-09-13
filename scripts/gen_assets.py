@@ -288,31 +288,41 @@ def monitor_panel():
     width, height = 272, 190
     im = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(im)
-    wood_d, wood, wood_l = (66, 43, 27, 255), (102, 66, 39, 255), (137, 91, 51, 255)
-    brass_d, brass, brass_l = (102, 75, 35, 255), (177, 139, 66, 255), (225, 194, 109, 255)
-    paper, paper_2, rule = (241, 229, 199, 255), (235, 219, 184, 255), (190, 163, 120, 255)
-    draw.rectangle((0, 0, width - 5, height - 5), fill=wood_d)
-    draw.rectangle((2, 2, width - 7, height - 7), fill=wood)
+    edge, metal_d, metal, metal_l = ((55, 75, 81, 255), (102, 125, 130, 255),
+                                     (171, 191, 193, 255), (224, 236, 234, 255))
+    aether_d, aether, aether_l = (49, 112, 127, 255), (96, 181, 201, 255), (187, 229, 234, 255)
+    brass_d, brass_l = (126, 105, 59, 255), (211, 190, 126, 255)
+    paper, paper_2, rule = (239, 246, 243, 255), (218, 232, 230, 255), (145, 169, 172, 255)
+    draw.rectangle((0, 0, width - 5, height - 5), fill=edge)
+    draw.rectangle((2, 2, width - 7, height - 7), fill=metal)
     p = im.load()
     for y in range(3, height - 7):
         for x in range(3, width - 7):
-            if (x * 3 + y * 7) % 37 == 0:
-                p[x, y] = wood_l
-    draw.rectangle((5, 5, width - 10, height - 10), fill=brass_d)
+            noise = (x * 3 + y * 7) % 41
+            if noise == 0:
+                p[x, y] = metal_l
+            elif noise == 1:
+                p[x, y] = metal_d
+    draw.rectangle((5, 5, width - 10, height - 10), fill=metal_d)
     draw.rectangle((7, 7, width - 12, height - 12), fill=paper)
-    draw.rectangle((7, 7, width - 12, 27), fill=wood_d)
-    draw.rectangle((7, 27, width - 12, 29), fill=brass)
+    draw.rectangle((7, 7, width - 12, 27), fill=edge)
+    for x in range(9, width - 14, 11):
+        draw.point((x, 9), fill=aether_d if (x // 11) % 2 else metal)
+    draw.rectangle((7, 27, width - 12, 29), fill=aether_d)
     draw.line((8, 27, width - 13, 27), fill=brass_l)
     draw.rectangle((12, 33, width - 17, 45), fill=paper_2)
-    draw.line((12, 32, width - 17, 32), fill=rule)
-    draw.line((12, 45, width - 17, 45), fill=rule)
+    draw.line((12, 32, width - 17, 32), fill=aether)
+    draw.line((12, 45, width - 17, 45), fill=aether_d)
+    for x, y in ((4, 4), (width - 10, 4), (4, height - 10), (width - 10, height - 10)):
+        draw.rectangle((x, y, x + 2, y + 2), fill=brass_d)
+        draw.point((x + 1, y), fill=brass_l)
 
     def card(box):
         x0, y0, x1, y1 = box
         draw.rectangle(box, fill=paper_2)
-        draw.rectangle(box, outline=brass_d)
-        draw.line((x0 + 1, y0 + 1, x1 - 1, y0 + 1), fill=brass_l)
-        draw.rectangle((x0 + 1, y0 + 2, x1 - 1, y0 + 16), fill=(226, 207, 168, 255))
+        draw.rectangle(box, outline=metal_d)
+        draw.line((x0 + 1, y0 + 1, x1 - 1, y0 + 1), fill=metal_l)
+        draw.rectangle((x0 + 1, y0 + 2, x1 - 1, y0 + 16), fill=(196, 216, 216, 255))
         draw.line((x0 + 1, y0 + 17, x1 - 1, y0 + 17), fill=rule)
 
     card((12, 51, 130, 120))
@@ -321,6 +331,91 @@ def monitor_panel():
     for x in (61, 110, 159, 208):
         draw.line((x, 147, x, 175), fill=rule)
     return im
+
+
+def recolor_remote_package():
+    """Quantise the package to the same low-saturation white/blue casing family."""
+    palette = ((72, 88, 93), (104, 125, 130), (139, 160, 164),
+               (180, 199, 201), (215, 229, 228), (240, 247, 245))
+    accents = ((91, 119, 125), (214, 229, 229), (241, 248, 246))
+    final_colors = set(palette + accents)
+    previous_colors = {
+        (64, 126, 140): accents[0],
+        (103, 181, 198): accents[1],
+        (185, 226, 231): accents[2],
+        (91, 111, 116): palette[2],
+    }
+
+    def recolor(path):
+        im = Image.open(path).convert("RGBA")
+        out = Image.new("RGBA", im.size)
+        source = im.load()
+        target = out.load()
+        for y in range(im.height):
+            for x in range(im.width):
+                r, g, b, a = source[x, y]
+                if a == 0:
+                    continue
+                if (r, g, b) in final_colors:
+                    target[x, y] = (r, g, b, a)
+                    continue
+                if (r, g, b) in previous_colors:
+                    target[x, y] = (*previous_colors[(r, g, b)], a)
+                    continue
+                lum = (r * 3 + g * 6 + b) // 10
+                index = min(len(palette) - 1, max(0, lum * len(palette) // 256))
+                nr, ng, nb = palette[index]
+                # Keep saturated cyan markings as restrained aether accents.
+                if b > r * 1.18 and g > r * 1.10 and lum > 75:
+                    nr, ng, nb = accents[min(2, max(0, (lum - 76) // 60))]
+                target[x, y] = (nr, ng, nb, a)
+        out.save(path)
+
+    recolor(ITEM / "remote_package.png")
+    particle = ITEM / "remote_package_particle.png"
+    if particle.exists():
+        recolor(particle)
+
+
+def recolor_remote_packager():
+    """Rebuild pale packager sheets from Create's originals, preserving every alpha/UV pixel."""
+    names = (
+        "packager_frame", "packager_particle",
+        "packager_horizontal_unpowered", "packager_horizontal_linked", "packager_horizontal_powered",
+        "packager_vertical_unpowered", "packager_vertical_linked", "packager_vertical_powered",
+    )
+    if not CREATE.exists():
+        raise FileNotFoundError(f"Create jar not found: {CREATE}")
+    with zipfile.ZipFile(CREATE) as archive:
+        for name in names:
+            source = Image.open(io.BytesIO(
+                archive.read(f"assets/create/textures/block/{name}.png"))).convert("RGBA")
+            output = Image.new("RGBA", source.size)
+            src = source.load()
+            dst = output.load()
+            for y in range(source.height):
+                for x in range(source.width):
+                    r, g, b, a = src[x, y]
+                    if a == 0:
+                        continue
+                    lum = (r * 3 + g * 6 + b) // 10
+                    if r > g * 1.35 and r > b * 1.35:
+                        # Keep Create's powered/link telltales, but soften their saturation.
+                        dst[x, y] = (min(220, 100 + lum), 62 + lum // 3, 58 + lum // 4, a)
+                    else:
+                        # The model is an open rack, so side-face lighting darkens it heavily in game.
+                        # Start from a genuinely pale casing value to read white-blue after shading.
+                        value = min(250, max(174, 184 + lum // 4))
+                        dst[x, y] = (max(0, value - 10), value, min(255, value + 4), a)
+            suffix = name.removeprefix("packager_")
+            output.save(BLOCK / f"remote_packager_{suffix}_pale.png")
+
+
+def finish_assets():
+    GUI.mkdir(parents=True, exist_ok=True)
+    monitor_panel().save(GUI / "monitor.png")
+    # Accepted dock/packager and parcel textures are hand-tuned source assets.
+    # Do not quantise or overwrite them when rebuilding unrelated GUI artwork.
 
 
 class NbtWriter:
@@ -519,4 +614,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--finish-assets" in sys.argv:
+        finish_assets()
+        print("generated white-blue monitor UI and remote package")
+    else:
+        main()

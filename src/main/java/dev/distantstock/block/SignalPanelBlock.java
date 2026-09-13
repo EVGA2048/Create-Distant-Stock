@@ -75,7 +75,7 @@ public final class SignalPanelBlock extends FactoryPanelBlock implements IWrench
                 }
                 return ItemInteractionResult.SUCCESS;
             }
-            return ItemInteractionResult.SUCCESS;
+            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
         return super.useItemOn(stack, state, level, pos, player, hand, hit);
     }

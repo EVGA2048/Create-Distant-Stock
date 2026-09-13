@@ -1,6 +1,5 @@
 package dev.distantstock.item;
 
-import com.simibubi.create.AllBlocks;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBehaviour;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockEntity;
@@ -13,8 +12,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -40,8 +38,11 @@ public final class SignalLampPanelItem extends BlockItem {
     private final Material material;
     private final Color color;
 
-    public SignalLampPanelItem(Properties properties, Material material, Color color) {
-        super(ModBlocks.SIGNAL_PANEL.get(), properties);
+    public SignalLampPanelItem(Block standaloneBlock, Properties properties, Material material, Color color) {
+        // The BlockItem must be associated with the real standalone lamp. Binding every lamp item
+        // to SIGNAL_PANEL overwrites BlockItem.BY_BLOCK and lets normal placement create a factory
+        // panel instead of a lamp (as well as leaving the lamp blocks without their own items).
+        super(standaloneBlock, properties);
         this.material = material;
         this.color = color;
     }
@@ -67,12 +68,15 @@ public final class SignalLampPanelItem extends BlockItem {
     }
 
     @Override
-    public InteractionResult place(BlockPlaceContext context) {
+    public InteractionResult useOn(UseOnContext context) {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos();
         BlockState state = level.getBlockState(pos);
 
         if (state.getBlock() instanceof FactoryPanelBlock) {
+            var targeted = FactoryPanelBlock.getTargetedSlot(pos, state, context.getClickLocation());
+            if (level.getBlockEntity(pos) instanceof FactoryPanelBlockEntity old
+                    && old.panels.get(targeted).isActive()) return InteractionResult.FAIL;
             if (level.isClientSide) {
                 return InteractionResult.SUCCESS;
             }
@@ -84,63 +88,19 @@ public final class SignalLampPanelItem extends BlockItem {
             }
             FactoryPanelBlock.PanelSlot slot = FactoryPanelBlock.getTargetedSlot(pos, be.getBlockState(),
                     context.getClickLocation());
-            return install(context, be, slot);
+            return install(new BlockPlaceContext(context), be, slot);
         }
 
-        return placeStandalone(context);
-    }
+        if (context.getPlayer() != null && context.getPlayer().isShiftKeyDown()
+                && context.getClickedFace().getAxis().isHorizontal()) {
+            // Use vanilla placement validation without changing this registered item's block mapping.
+            return new BlockItem(ModBlocks.SIGNAL_PANEL.get(), new net.minecraft.world.item.Item.Properties())
+                    .place(new BlockPlaceContext(context));
+        }
 
-    /**
-     * Lamps are standalone wall lights by default; a factory panel is only used when the click targets one.
-     * Without this the item would place an empty signal panel showing four gauge slots.
-     */
-    private InteractionResult placeStandalone(BlockPlaceContext context) {
-        Level level = context.getLevel();
-        Block lamp = standaloneBlock();
-        if (lamp == null) {
-            return super.place(context);
-        }
-        BlockPos target = context.getClickedPos().relative(context.getClickedFace());
-        BlockPlaceContext at = BlockPlaceContext.at(context, target, context.getClickedFace());
-        if (!level.getBlockState(target).canBeReplaced(at)) {
-            return super.place(context);
-        }
-        BlockState state = lamp.getStateForPlacement(at);
-        if (state == null) {
-            // Face-attached placement can refuse the clicked face; a floor lamp always fits a solid top.
-            state = lamp.defaultBlockState()
-                    .setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties
-                            .ATTACH_FACE,
-                            net.minecraft.world.level.block.state.properties.AttachFace.FLOOR)
-                    .setValue(net.minecraft.world.level.block.state.properties.BlockStateProperties
-                            .HORIZONTAL_FACING, context.getHorizontalDirection().getOpposite());
-        }
-        if (!state.canSurvive(level, target)) {
-            return super.place(context);
-        }
-        if (level.isClientSide) {
-            return InteractionResult.SUCCESS;
-        }
-        level.setBlock(target, state, 11);
-        level.playSound(null, target, state.getSoundType().getPlaceSound(), SoundSource.BLOCKS, 1f, 0.9f);
-        Player player = context.getPlayer();
-        if (player == null || !player.isCreative()) {
-            context.getItemInHand().shrink(1);
-        }
-        return InteractionResult.SUCCESS;
-    }
-
-    private Block standaloneBlock() {
-        return switch (material) {
-            case BRASS -> ModBlocks.BRASS_INDICATOR_LAMP.get();
-            case ANDESITE -> switch (color) {
-                case CYAN -> ModBlocks.CYAN_INDICATOR_LAMP.get();
-                case ORANGE -> ModBlocks.ORANGE_INDICATOR_LAMP.get();
-                case RED -> ModBlocks.RED_INDICATOR_LAMP.get();
-                case GREEN -> ModBlocks.GREEN_INDICATOR_LAMP.get();
-                case WHITE -> ModBlocks.WHITE_INDICATOR_LAMP.get();
-            };
-        };
+        // For every ordinary surface use vanilla BlockItem placement. Since this item is now
+        // registered against the correct IndicatorLampBlock, no fallback can create SIGNAL_PANEL.
+        return super.useOn(context);
     }
 
     public static void finishPlacement(SignalPanelBlockEntity be, FactoryPanelBlock.PanelSlot slot, ItemStack held) {
@@ -155,6 +115,15 @@ public final class SignalLampPanelItem extends BlockItem {
         behaviour.count = 0;
         be.redraw = true;
         be.sendData();
+    }
+
+    @Override
+    public void appendHoverText(ItemStack stack, TooltipContext context,
+                                java.util.List<net.minecraft.network.chat.Component> tooltip,
+                                net.minecraft.world.item.TooltipFlag flag) {
+        super.appendHoverText(stack, context, tooltip, flag);
+        tooltip.add(net.minecraft.network.chat.Component.translatable("item.distantstock.lamp.placement")
+                .withStyle(net.minecraft.ChatFormatting.GRAY));
     }
 
     private InteractionResult install(BlockPlaceContext context, SignalPanelBlockEntity be,
@@ -190,6 +159,13 @@ public final class SignalLampPanelItem extends BlockItem {
                 .setValue(BlockStateProperties.HORIZONTAL_FACING, oldState.getValue(BlockStateProperties.HORIZONTAL_FACING))
                 .setValue(BlockStateProperties.WATERLOGGED, oldState.getValue(BlockStateProperties.WATERLOGGED))
                 .setValue(FactoryPanelBlock.POWERED, oldState.getValue(FactoryPanelBlock.POWERED));
+        // Avoid FactoryPanelBlockEntity.destroy dropping extra gauges during an in-place conversion.
+        // Existing connected boards need a transactional migration; leave them untouched for now.
+        if (oldBe.panels.values().stream().anyMatch(panel -> !panel.targetedBy.isEmpty()
+                || !panel.targetedByLinks.isEmpty() || !panel.targeting.isEmpty())) return null;
+        for (var panel : oldBe.panels.values()) {
+            if (panel.isActive()) panel.disable();
+        }
         level.setBlock(pos, replacement, 3);
 
         if (!(level.getBlockEntity(pos) instanceof SignalPanelBlockEntity newBe)) {

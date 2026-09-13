@@ -9,13 +9,13 @@ import dev.distantstock.item.RequesterData;
 import dev.distantstock.link.LinkQueues;
 import dev.distantstock.link.LinkSnapshot;
 import dev.distantstock.link.PackageCodec;
+import dev.distantstock.routing.RemoteRouteData;
 import dev.distantstock.link.ParcelEscrow;
 import dev.distantstock.routing.DockGroupDirectory;
 import dev.distantstock.routing.DockMode;
 import dev.distantstock.routing.OrderRouteDirectory;
 import dev.distantstock.routing.RemoteRoute;
-import dev.distantstock.routing.RemoteRoute;
-import dev.distantstock.routing.RemoteRouteData;
+import dev.distantstock.routing.RemoteNetworkId;
 import dev.distantstock.routing.RouteResolution;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -38,7 +38,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 public final class DockBlockEntity extends SmartBlockEntity implements IHaveGoggleInformation {
-    public static final int SLOTS = 9;
+    public static final int SLOTS = 1;
     public static final int MAX_PRIORITY = 5;
     public static final int TRANSMIT_TICKS = 30;
     /** How long a blocked fallback face keeps reporting itself after the last refused release. */
@@ -51,29 +51,29 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     /** Items and parcels the dock cannot handle, waiting for room below the fallback face. */
     private final ItemStackHandler fallbackInv = fallbackInventory(this::contentsChanged);
 
-    /** First nine slots extract received parcels; last nine insert outbound parcels. */
+    /** Two directional views of one physical capacity. Legacy slots are exposed only to drain them. */
     final IItemHandler automation = new IItemHandler() {
         @Override
         public int getSlots() {
-            return SLOTS * 2;
+            return receivedInv.getSlots() + outboundInv.getSlots();
         }
 
         @Override
         public ItemStack getStackInSlot(int slot) {
-            return slot < SLOTS ? receivedInv.getStackInSlot(slot) : outboundInv.getStackInSlot(slot - SLOTS);
+            return slot < receivedInv.getSlots() ? receivedInv.getStackInSlot(slot) : outboundInv.getStackInSlot(slot - receivedInv.getSlots());
         }
 
         @Override
         public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
-            if (slot < SLOTS || !PackageItem.isPackage(stack) || !canSend()) {
+            if (slot < receivedInv.getSlots() || !PackageItem.isPackage(stack) || !canSend() || occupied()) {
                 return stack;
             }
-            return outboundInv.insertItem(slot - SLOTS, stack, simulate);
+            return outboundInv.insertItem(slot - receivedInv.getSlots(), stack, simulate);
         }
 
         @Override
         public ItemStack extractItem(int slot, int amount, boolean simulate) {
-            if (slot >= SLOTS || !canReceive()) {
+            if (slot >= receivedInv.getSlots() || !canReceive() || receiving()) {
                 return ItemStack.EMPTY;
             }
             return receivedInv.extractItem(slot, amount, simulate);
@@ -86,7 +86,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
 
         @Override
         public boolean isItemValid(int slot, ItemStack stack) {
-            return slot >= SLOTS && canSend() && PackageItem.isPackage(stack);
+            return slot >= receivedInv.getSlots() && canSend() && PackageItem.isPackage(stack);
         }
     };
 
@@ -97,28 +97,22 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     final IItemHandler bottomFace = new IItemHandler() {
         @Override
         public int getSlots() {
-            return SLOTS * 2;
+            return automation.getSlots();
         }
 
         @Override
         public ItemStack getStackInSlot(int slot) {
-            return slot < SLOTS ? receivedInv.getStackInSlot(slot) : outboundInv.getStackInSlot(slot - SLOTS);
+            return automation.getStackInSlot(slot);
         }
 
         @Override
         public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
-            if (slot < SLOTS || !PackageItem.isPackage(stack) || !canSend()) {
-                return stack;
-            }
-            return outboundInv.insertItem(slot - SLOTS, stack, simulate);
+            return automation.insertItem(slot, stack, simulate);
         }
 
         @Override
         public ItemStack extractItem(int slot, int amount, boolean simulate) {
-            if (slot >= SLOTS || !canReceive()) {
-                return ItemStack.EMPTY;
-            }
-            return receivedInv.extractItem(slot, amount, simulate);
+            return automation.extractItem(slot, amount, simulate);
         }
 
         @Override
@@ -128,11 +122,12 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
 
         @Override
         public boolean isItemValid(int slot, ItemStack stack) {
-            return slot >= SLOTS && canSend() && PackageItem.isPackage(stack);
+            return automation.isItemValid(slot, stack);
         }
     };
 
     private UUID freq;
+    private RemoteNetworkId networkId;
     private String address = "";
     private DockMode mode = DockMode.RECEIVE;
     private UUID groupId = DockGroupDirectory.DEFAULT_GROUP_ID;
@@ -140,6 +135,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     private int backlogOrders;
     private int inFlight;
     private long transmitStartedAt = -1;
+    private long receiveStartedAt = -1;
     private String faultNote = "";
     private String fallbackNote = "";
     private UUID defaultDestinationNode;
@@ -243,11 +239,34 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     }
 
     public boolean isFull() {
-        return full(receivedInv);
+        return occupied();
     }
 
     public boolean isOutboundFull() {
-        return full(outboundInv);
+        return occupied();
+    }
+
+    private boolean occupied() {
+        return used(receivedInv) + used(outboundInv) + used(fallbackInv) > 0;
+    }
+
+    public boolean receiving() {
+        return level != null && receiveStartedAt >= 0
+                && level.getGameTime() - receiveStartedAt < TRANSMIT_TICKS;
+    }
+
+    public float receiveProgress(float partialTicks) {
+        return receiveStartedAt < 0 || level == null ? -1
+                : Math.min(1, Math.max(0, (level.getGameTime() + partialTicks - receiveStartedAt) / TRANSMIT_TICKS));
+    }
+
+    public ItemStack displayedStack() {
+        for (ItemStackHandler inv : List.of(receivedInv, outboundInv, fallbackInv)) {
+            for (int slot = 0; slot < inv.getSlots(); slot++) {
+                if (PackageItem.isPackage(inv.getStackInSlot(slot))) return inv.getStackInSlot(slot).copyWithCount(1);
+            }
+        }
+        return ItemStack.EMPTY;
     }
 
     public int usedSlots() {
@@ -276,13 +295,68 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                 (level.getGameTime() + partialTicks - transmitStartedAt) / TRANSMIT_TICKS));
     }
 
+    public void setNetwork(RemoteNetworkId network) {
+        this.networkId = network;
+        this.freq = network == null ? null : network.createFrequency();
+        mode = network == null ? DockMode.RECEIVE : DockMode.SEND;
+        sendError = "";
+        sync();
+    }
+
+    /** Removes the Create network binding without discarding the dock's address or group. */
+    public void clearNetwork() {
+        networkId = null;
+        freq = null;
+        if (mode == DockMode.SEND) {
+            mode = DockMode.RECEIVE;
+        } else if (mode == DockMode.BIDIRECTIONAL) {
+            mode = DockMode.RECEIVE;
+        }
+        sendError = "";
+        clearFault();
+        sync();
+    }
+
+    /** Transfers one received parcel only after the player's inventory can accept it whole. */
+    public boolean takeReceived(net.minecraft.world.entity.player.Player player) {
+        if (player == null || !canReceive() || receiving()) return false;
+        for (int slot = 0; slot < receivedInv.getSlots(); slot++) {
+            ItemStack parcel = receivedInv.getStackInSlot(slot);
+            if (parcel.isEmpty() || !canFit(player, parcel)) continue;
+            ItemStack taken = receivedInv.extractItem(slot, 1, false);
+            if (taken.isEmpty()) return false;
+            if (player.getInventory().add(taken)) {
+                sync();
+                return true;
+            }
+            receivedInv.setStackInSlot(slot, taken);
+            return false;
+        }
+        return false;
+    }
+
+    private static boolean canFit(net.minecraft.world.entity.player.Player player, ItemStack stack) {
+        int remaining = stack.getCount();
+        for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {
+            ItemStack existing = player.getInventory().getItem(slot);
+            if (existing.isEmpty()) remaining -= stack.getMaxStackSize();
+            else if (ItemStack.isSameItemSameComponents(existing, stack)) {
+                remaining -= Math.max(0, existing.getMaxStackSize() - existing.getCount());
+            }
+            if (remaining <= 0) return true;
+        }
+        return false;
+    }
+
     public void setExport(UUID freq) {
+        this.networkId = null;
         this.freq = freq;
         mode = DockMode.SEND;
         sync();
     }
 
     public void setImport(String address) {
+        networkId = null;
         freq = null;
         this.address = address == null ? "" : address;
         mode = DockMode.RECEIVE;
@@ -290,6 +364,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     }
 
     public void setBidirectional(UUID freq, String address) {
+        this.networkId = null;
         this.freq = freq;
         this.address = address == null ? "" : address;
         mode = DockMode.BIDIRECTIONAL;
@@ -310,11 +385,14 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     }
 
     public boolean insert(ItemStack pkg) {
-        return canReceive() && insertInto(receivedInv, pkg);
+        if (!canReceive() || occupied() || pkg.getCount() != 1 || !insertInto(receivedInv, pkg)) return false;
+        receiveStartedAt = level == null ? -1 : level.getGameTime();
+        sync();
+        return true;
     }
 
     private boolean insertOutbound(ItemStack pkg) {
-        return canSend() && insertInto(outboundInv, pkg);
+        return canSend() && !occupied() && pkg.getCount() == 1 && insertInto(outboundInv, pkg);
     }
 
     /** Hands an item or parcel to the fallback face. False when the buffer is already full. */
@@ -322,6 +400,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         if (stack.isEmpty()) {
             return true;
         }
+        if (occupied() || (PackageItem.isPackage(stack) && stack.getCount() > 1)) return false;
         ItemStack remaining = stack.copy();
         for (int slot = 0; slot < fallbackInv.getSlots() && !remaining.isEmpty(); slot++) {
             remaining = fallbackInv.insertItem(slot, remaining, false);
@@ -336,13 +415,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     }
 
     public boolean hasFallbackRoom(int stacks) {
-        int free = 0;
-        for (int slot = 0; slot < fallbackInv.getSlots(); slot++) {
-            if (fallbackInv.getStackInSlot(slot).isEmpty()) {
-                free++;
-            }
-        }
-        return free >= stacks;
+        return stacks == 0 || (stacks == 1 && !occupied());
     }
 
     public int fallbackSlots() {
@@ -415,6 +488,10 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         if (level.isClientSide) {
             return;
         }
+        if (be.receiveStartedAt >= 0 && !be.receiving()) {
+            be.receiveStartedAt = -1;
+            be.sync();
+        }
         if (level.getGameTime() % 10 == 0) {
             LinkSnapshot.View snapshot = LinkSnapshot.view();
             be.linkUp = snapshot.linkUp() || (!snapshot.transerverAttached()
@@ -429,7 +506,8 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             be.setChanged();
         }
 
-        if (!be.canSend() || !be.linkUp || !be.sendError.isBlank() || be.transmittingStack().isEmpty()) {
+        if (!be.canSend() || !be.linkUp || !be.sendError.isBlank() || be.transmittingStack().isEmpty()
+                || used(be.receivedInv) > 0 || !be.fallbackEmpty()) {
             if (be.transmitStartedAt >= 0) {
                 be.transmitStartedAt = -1;
                 be.sync();
@@ -696,6 +774,9 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         if (freq != null) {
             tag.putUUID("Freq", freq);
         }
+        if (networkId != null) {
+            tag.put("RemoteNetwork", networkId.save());
+        }
         tag.putString("Address", address);
         tag.putString("Mode", mode.name().toLowerCase(Locale.ROOT));
         tag.putUUID("DockGroup", groupId);
@@ -704,6 +785,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         tag.put("FallbackInv", fallbackInv.serializeNBT(registries));
         tag.putBoolean("LinkUp", linkUp);
         tag.putLong("TransmitStartedAt", transmitStartedAt);
+        tag.putLong("ReceiveStartedAt", receiveStartedAt);
         tag.putString("FaultNote", faultNote);
         tag.putString("FallbackNote", fallbackNote);
         if (defaultDestinationNode != null) {
@@ -718,10 +800,17 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     protected void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.read(tag, registries, clientPacket);
         freq = tag.hasUUID("Freq") ? tag.getUUID("Freq") : null;
+        networkId = tag.contains("RemoteNetwork")
+                ? RemoteNetworkId.read(tag.getCompound("RemoteNetwork")).orElse(null) : null;
+        if (networkId != null) {
+            freq = networkId.createFrequency();
+        }
         address = tag.getString("Address");
         mode = readMode(tag.getString("Mode"), freq != null ? DockMode.SEND : DockMode.RECEIVE);
         groupId = tag.hasUUID("DockGroup") ? tag.getUUID("DockGroup") : DockGroupDirectory.DEFAULT_GROUP_ID;
         if (tag.contains("ReceivedInv")) {
+            // ItemStackHandler restores the saved Size. Keep legacy extra slots intact;
+            // occupied() blocks all new input until those parcels have been drained.
             receivedInv.deserializeNBT(registries, tag.getCompound("ReceivedInv"));
         }
         if (tag.contains("OutboundInv")) {
@@ -736,6 +825,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         }
         linkUp = tag.getBoolean("LinkUp");
         transmitStartedAt = tag.contains("TransmitStartedAt") ? tag.getLong("TransmitStartedAt") : -1;
+        receiveStartedAt = tag.contains("ReceiveStartedAt") ? tag.getLong("ReceiveStartedAt") : -1;
         faultNote = tag.getString("FaultNote");
         fallbackNote = tag.getString("FallbackNote");
         defaultDestinationNode = tag.hasUUID("DefaultDestination") ? tag.getUUID("DefaultDestination") : null;
@@ -788,8 +878,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
 
     private void contentsChanged() {
         sendError = "";
-        setChanged();
-        updateVisual();
+        if (level == null || !level.isClientSide) sync();
     }
 
     private boolean fallbackEmpty() {
