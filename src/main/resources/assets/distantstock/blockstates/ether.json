@@ -1,0 +1,52 @@
+{
+  "variants": {
+    "level=0": {
+      "model": "distantstock:block/ether"
+    },
+    "level=1": {
+      "model": "distantstock:block/ether"
+    },
+    "level=2": {
+      "model": "distantstock:block/ether"
+    },
+    "level=3": {
+      "model": "distantstock:block/ether"
+    },
+    "level=4": {
+      "model": "distantstock:block/ether"
+    },
+    "level=5": {
+      "model": "distantstock:block/ether"
+    },
+    "level=6": {
+      "model": "distantstock:block/ether"
+    },
+    "level=7": {
+      "model": "distantstock:block/ether"
+    },
+    "level=8": {
+      "model": "distantstock:block/ether"
+    },
+    "level=9": {
+      "model": "distantstock:block/ether"
+    },
+    "level=10": {
+      "model": "distantstock:block/ether"
+    },
+    "level=11": {
+      "model": "distantstock:block/ether"
+    },
+    "level=12": {
+      "model": "distantstock:block/ether"
+    },
+    "level=13": {
+      "model": "distantstock:block/ether"
+    },
+    "level=14": {
+      "model": "distantstock:block/ether"
+    },
+    "level=15": {
+      "model": "distantstock:block/ether"
+    }
+  }
+}

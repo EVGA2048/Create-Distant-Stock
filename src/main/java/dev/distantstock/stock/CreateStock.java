@@ -13,6 +13,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.core.GlobalPos;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import dev.distantstock.routing.RemoteNetworkId;
 import dev.distantstock.routing.WorldIdentity;
@@ -23,6 +24,7 @@ import net.minecraft.world.item.Items;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /** 主线程才能碰 Create 物流。 */
@@ -57,6 +59,68 @@ public final class CreateStock {
             out.add(new NetworkDirectory.Entry(row.getKey(), serverId, network.loadedLinks.size(), networkId));
         }
         return out;
+    }
+
+    /**
+     * Cheap snapshot of a network's health for the signal lamps. Only touches set sizes and the
+     * promise queue's emptiness, so it is safe to call on a timer.
+     *
+     * @param maxMissing how many offline link positions to carry along for the goggle readout
+     */
+    public static NetworkHealth health(UUID freq, int maxMissing) {
+        if (!hasNetwork(freq)) {
+            return NetworkHealth.UNKNOWN;
+        }
+        var network = Create.LOGISTICS.logisticsNetworks.get(freq);
+        if (network == null) {
+            return NetworkHealth.UNKNOWN;
+        }
+        Set<GlobalPos> loaded = network.loadedLinks == null ? Set.of() : network.loadedLinks;
+        Set<GlobalPos> total = network.totalLinks == null ? Set.of() : network.totalLinks;
+        List<BlockPos> missing = new ArrayList<>();
+        for (GlobalPos link : total) {
+            if (missing.size() >= maxMissing) {
+                break;
+            }
+            if (!loaded.contains(link)) {
+                missing.add(link.pos());
+            }
+        }
+        // totalLinks is a hash set, so sort to keep two identical samples equal.
+        missing.sort(java.util.Comparator.comparingInt((BlockPos p) -> p.getX())
+                .thenComparingInt(p -> p.getY()).thenComparingInt(p -> p.getZ()));
+        boolean idle = network.panelPromises == null || network.panelPromises.isEmpty();
+        return new NetworkHealth(true, loaded.size(), total.size(), idle, network.locked, List.copyOf(missing));
+    }
+
+    /**
+     * How much of one item a network holds, and how much of it is already promised to arrive.
+     * Both numbers come straight from Create, so a monitor shows the same figures a stock ticker
+     * would without keeping its own copy of anything.
+     *
+     * @return {@code {stock, promised}}
+     */
+    public static int[] itemStock(UUID freq, ItemStack item) {
+        if (!hasNetwork(freq) || item.isEmpty()) {
+            return new int[]{0, 0};
+        }
+        var network = Create.LOGISTICS.logisticsNetworks.get(freq);
+        if (network == null) {
+            return new int[]{0, 0};
+        }
+        InventorySummary sum = LogisticsManager.getSummaryOfNetwork(freq, true);
+        int stock = sum == null ? 0 : sum.getCountOf(item);
+        int promised = 0;
+        if (network.panelPromises != null) {
+            for (var promise : network.panelPromises.flatten(false)) {
+                var ordered = promise.promisedStack;
+                if (ordered != null && !ordered.stack.isEmpty()
+                        && ItemStack.isSameItemSameComponents(ordered.stack, item)) {
+                    promised += ordered.count;
+                }
+            }
+        }
+        return new int[]{stock, promised};
     }
 
     public static int deviceCount(UUID freq) {

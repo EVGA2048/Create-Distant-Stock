@@ -152,9 +152,12 @@ for path in sorted(TEXTURES.rglob("*.png")):
         if dimensions != (16, 16):
             errors.append(f"lamp texture must be 16x16: {path.relative_to(ROOT)} -> {dimensions}")
 
-mod_blocks = (ROOT / "src/main/java/dev/distantstock/block/ModBlocks.java").read_text(encoding="utf-8")
-registered = set(re.findall(r'BLOCKS\.register\("([a-z0-9_]+)"', mod_blocks))
-registered.update(re.findall(r'lamp\("([a-z0-9_]+)"\)', mod_blocks))
+# Any source file may register blocks; the fluid blocks live with their fluids, for instance.
+registered = set()
+for source in (ROOT / "src/main/java").rglob("*.java"):
+    text = source.read_text(encoding="utf-8")
+    registered.update(re.findall(r'BLOCKS\.register\("([a-z0-9_]+)"', text))
+    registered.update(re.findall(r'lamp\("([a-z0-9_]+)"\)', text))
 for name in sorted(registered):
     path = BLOCKSTATES / f"{name}.json"
     if not path.is_file():

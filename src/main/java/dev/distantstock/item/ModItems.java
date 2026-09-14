@@ -5,9 +5,11 @@ import dev.distantstock.block.ModBlocks;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -41,6 +43,32 @@ public final class ModItems {
     public static final DeferredHolder<Item, Item> MANUAL = ITEMS.register("manual",
             () -> new ManualItem(new Item.Properties().stacksTo(1)));
 
+    /** Ground ender pearl, the second ingredient of raw ether quartz. */
+    public static final DeferredHolder<Item, Item> ENDER_DUST = ITEMS.register("ender_dust",
+            () -> new Item(new Item.Properties()));
+    /** Base ether material; polished stock is what the casings and higher-tier parts are made from. */
+    public static final DeferredHolder<Item, Item> ETHER_QUARTZ = ITEMS.register("ether_quartz",
+            () -> new Item(new Item.Properties()));
+    public static final DeferredHolder<Item, Item> POLISHED_ETHER_QUARTZ = ITEMS.register("polished_ether_quartz",
+            () -> new Item(new Item.Properties()));
+    public static final DeferredHolder<Item, BucketItem> ETHER_BUCKET = ITEMS.register("ether_bucket",
+            () -> new BucketItem(dev.distantstock.fluid.ModFluids.ETHER.get(),
+                    new Item.Properties().craftRemainder(Items.BUCKET).stacksTo(1)));
+    public static final DeferredHolder<Item, BucketItem> MOLTEN_AMETHYST_BUCKET = ITEMS.register("molten_amethyst_bucket",
+            () -> new BucketItem(dev.distantstock.fluid.ModFluids.MOLTEN_AMETHYST.get(),
+                    new Item.Properties().craftRemainder(Items.BUCKET).stacksTo(1)));
+    /**
+     * Bottled forms. A bottle is a quarter bucket, so it uses {@link FluidBottleItem} rather than
+     * {@link BucketItem}, which would pour a whole source block. Filling is handled by
+     * {@link BottleFillingEvents} because a bottle has no {@code Fluid#getBucket} hook.
+     */
+    public static final DeferredHolder<Item, FluidBottleItem> ETHER_BOTTLE = ITEMS.register("ether_bottle",
+            () -> new FluidBottleItem(dev.distantstock.fluid.ModFluids.ETHER.get(),
+                    new Item.Properties().stacksTo(1)));
+    public static final DeferredHolder<Item, FluidBottleItem> MOLTEN_AMETHYST_BOTTLE = ITEMS.register("molten_amethyst_bottle",
+            () -> new FluidBottleItem(dev.distantstock.fluid.ModFluids.MOLTEN_AMETHYST.get(),
+                    new Item.Properties().stacksTo(1)));
+
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB = TABS.register("main", () -> CreativeModeTab.builder()
             .title(Component.translatable("itemGroup.distantstock"))
             .icon(() -> new ItemStack(REQUESTER.get()))
@@ -58,6 +86,13 @@ public final class ModItems {
                 out.accept(WHITE_INDICATOR_LAMP.get());
                 out.accept(BRASS_SIGNAL_LAMP.get());
                 out.accept(REMOTE_PACKAGE.get());
+                out.accept(ENDER_DUST.get());
+                out.accept(ETHER_QUARTZ.get());
+                out.accept(POLISHED_ETHER_QUARTZ.get());
+                out.accept(ETHER_BUCKET.get());
+                out.accept(MOLTEN_AMETHYST_BUCKET.get());
+                out.accept(ETHER_BOTTLE.get());
+                out.accept(MOLTEN_AMETHYST_BOTTLE.get());
                 out.accept(MANUAL.get());
             })
             .build());

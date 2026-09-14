@@ -1,0 +1,77 @@
+{
+  "parent": "minecraft:block/block",
+  "ambientocclusion": false,
+  "textures": {
+    "deck": "distantstock:block/dock_cap",
+    "edge": "distantstock:block/dock_cap_edge",
+    "under": "distantstock:block/dock_inside",
+    "particle": "distantstock:block/dock_cap"
+  },
+  "elements": [
+    {
+      "name": "deck",
+      "from": [2, 0, 2],
+      "to": [14, 1, 14],
+      "faces": {
+        "north": { "texture": "#edge", "uv": [2, 0, 14, 1] },
+        "south": { "texture": "#edge", "uv": [2, 0, 14, 1] },
+        "west": { "texture": "#edge", "uv": [2, 0, 14, 1] },
+        "east": { "texture": "#edge", "uv": [2, 0, 14, 1] },
+        "up": { "texture": "#deck", "uv": [2, 2, 14, 14] },
+        "down": { "texture": "#under", "uv": [2, 2, 14, 14] }
+      }
+    },
+    {
+      "name": "lip_north",
+      "from": [2, 1, 2],
+      "to": [14, 2, 3],
+      "faces": {
+        "north": { "texture": "#edge", "uv": [2, 0, 14, 1] },
+        "south": { "texture": "#edge", "uv": [2, 0, 14, 1] },
+        "west": { "texture": "#edge", "uv": [0, 0, 1, 1] },
+        "east": { "texture": "#edge", "uv": [0, 0, 1, 1] },
+        "up": { "texture": "#deck", "uv": [2, 2, 14, 3] },
+        "down": { "texture": "#under", "uv": [2, 2, 14, 3] }
+      }
+    },
+    {
+      "name": "lip_south",
+      "from": [2, 1, 13],
+      "to": [14, 2, 14],
+      "faces": {
+        "north": { "texture": "#edge", "uv": [2, 0, 14, 1] },
+        "south": { "texture": "#edge", "uv": [2, 0, 14, 1] },
+        "west": { "texture": "#edge", "uv": [0, 0, 1, 1] },
+        "east": { "texture": "#edge", "uv": [0, 0, 1, 1] },
+        "up": { "texture": "#deck", "uv": [2, 13, 14, 14] },
+        "down": { "texture": "#under", "uv": [2, 13, 14, 14] }
+      }
+    },
+    {
+      "name": "lip_west",
+      "from": [2, 1, 3],
+      "to": [3, 2, 13],
+      "faces": {
+        "north": { "texture": "#edge", "uv": [0, 0, 1, 1] },
+        "south": { "texture": "#edge", "uv": [0, 0, 1, 1] },
+        "west": { "texture": "#edge", "uv": [3, 0, 13, 1] },
+        "east": { "texture": "#edge", "uv": [3, 0, 13, 1] },
+        "up": { "texture": "#deck", "uv": [2, 3, 3, 13] },
+        "down": { "texture": "#under", "uv": [2, 3, 3, 13] }
+      }
+    },
+    {
+      "name": "lip_east",
+      "from": [13, 1, 3],
+      "to": [14, 2, 13],
+      "faces": {
+        "north": { "texture": "#edge", "uv": [0, 0, 1, 1] },
+        "south": { "texture": "#edge", "uv": [0, 0, 1, 1] },
+        "west": { "texture": "#edge", "uv": [3, 0, 13, 1] },
+        "east": { "texture": "#edge", "uv": [3, 0, 13, 1] },
+        "up": { "texture": "#deck", "uv": [13, 3, 14, 13] },
+        "down": { "texture": "#under", "uv": [13, 3, 14, 13] }
+      }
+    }
+  ]
+}

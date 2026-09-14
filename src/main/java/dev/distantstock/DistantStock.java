@@ -3,6 +3,7 @@ package dev.distantstock;
 import dev.distantstock.block.ModBlockEntities;
 import dev.distantstock.block.ModBlocks;
 import dev.distantstock.config.StockConfig;
+import dev.distantstock.fluid.ModFluids;
 import dev.distantstock.item.ModItems;
 import dev.distantstock.menu.ModMenus;
 import net.neoforged.bus.api.IEventBus;
@@ -16,6 +17,8 @@ public final class DistantStock {
 
     public DistantStock(IEventBus bus, ModContainer container) {
         container.registerConfig(ModConfig.Type.COMMON, StockConfig.SPEC);
+        ModFluids.FLUID_TYPES.register(bus);
+        ModFluids.FLUIDS.register(bus);
         ModBlocks.BLOCKS.register(bus);
         ModBlockEntities.BES.register(bus);
         ModItems.ITEMS.register(bus);

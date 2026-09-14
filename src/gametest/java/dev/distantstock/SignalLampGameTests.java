@@ -1,12 +1,16 @@
 package dev.distantstock;
 
+import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBehaviour;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockEntity;
+import com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem;
 import dev.distantstock.block.*;
 import dev.distantstock.item.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.component.CustomData;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -19,6 +23,11 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.HopperBlock;
+import net.minecraft.world.level.block.entity.HopperBlockEntity;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
@@ -116,5 +125,471 @@ public final class SignalLampGameTests {
         h.assertTrue(target.targetedBy.size() == 1, "duplicate connection");
         target.disconnectAll();
         h.assertTrue(!source.targeting.contains(target.getPanelPosition()), "disconnection leaves source attached");
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void mixedPanelSlots(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos.south(), Blocks.STONE.defaultBlockState(), 3);
+        var state = ModBlocks.REMOTE_GAUGE.get().defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH);
+        level.setBlock(pos, state, 3);
+        var original = (FactoryPanelBlockEntity) level.getBlockEntity(pos);
+        var first = FactoryPanelBlock.PanelSlot.BOTTOM_LEFT;
+        original.addPanel(first, UUID.randomUUID());
+        ItemStack createGauge = new ItemStack(BuiltInRegistries.BLOCK.get(ResourceLocation.parse("create:factory_gauge")), 3);
+        CompoundTag data = new CompoundTag();
+        data.putUUID("Freq", UUID.randomUUID());
+        createGauge.set(DataComponents.BLOCK_ENTITY_DATA, CustomData.of(data));
+        h.assertTrue(LogisticallyLinkedBlockItem.isTuned(createGauge), "factory gauge not tuned");
+        player.setItemInHand(InteractionHand.MAIN_HAND, createGauge);
+        Vec3 hit = Vec3.atLowerCornerOf(pos).add(.25, .75, 0);
+        var event = new PlayerInteractEvent.RightClickBlock(player, InteractionHand.MAIN_HAND, pos,
+                new BlockHitResult(hit, Direction.NORTH, pos, false));
+        GaugePlacementEvents.install(event);
+        var mixed = (SignalPanelBlockEntity) level.getBlockEntity(pos);
+        var second = FactoryPanelBlock.getTargetedSlot(pos, state, hit);
+        h.assertTrue(mixed != null && mixed.activePanels() == 2, "mixed gauge board not formed");
+        h.assertTrue(mixed.isRemoteGauge(first) && !mixed.isRemoteGauge(second), "gauge kinds lost");
+        h.assertTrue(mixed.getBlockState().getValue(FactoryPanelBlock.FACING) == Direction.NORTH, "panel facing changed");
+        h.assertTrue(createGauge.getCount() == 2, "factory gauge consumed incorrectly");
+        h.succeed();
+    }
+
+    /** A hit position on the north face that Create's own slot math resolves to {@code want}. */
+    private static Vec3 hitForSlot(BlockPos pos, BlockState state, FactoryPanelBlock.PanelSlot want) {
+        for (int ix = 0; ix <= 4; ix++) {
+            for (int iy = 0; iy <= 4; iy++) {
+                Vec3 hit = Vec3.atLowerCornerOf(pos).add(ix * .25, iy * .25, 0);
+                if (FactoryPanelBlock.getTargetedSlot(pos, state, hit) == want) return hit;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Aiming a factory gauge straight at the slot that already holds a remote gauge must not
+     * remove the remote gauge: the occupied slot is refused and nothing is consumed.
+     */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void factoryGaugeOnOccupiedSlotKeepsRemoteGauge(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos.south(), Blocks.STONE.defaultBlockState(), 3);
+        var state = ModBlocks.REMOTE_GAUGE.get().defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH);
+        level.setBlock(pos, state, 3);
+        var original = (FactoryPanelBlockEntity) level.getBlockEntity(pos);
+        Vec3 hit = Vec3.atLowerCornerOf(pos).add(.25, .75, 0);
+        var slot = FactoryPanelBlock.getTargetedSlot(pos, state, hit);
+        original.addPanel(slot, UUID.randomUUID());
+        h.assertTrue(original.activePanels() == 1, "setup did not place the remote gauge");
+
+        ItemStack createGauge = new ItemStack(BuiltInRegistries.BLOCK.get(ResourceLocation.parse("create:factory_gauge")), 3);
+        CompoundTag data = new CompoundTag();
+        data.putUUID("Freq", UUID.randomUUID());
+        createGauge.set(DataComponents.BLOCK_ENTITY_DATA, CustomData.of(data));
+        player.setItemInHand(InteractionHand.MAIN_HAND, createGauge);
+        var event = new PlayerInteractEvent.RightClickBlock(player, InteractionHand.MAIN_HAND, pos,
+                new BlockHitResult(hit, Direction.NORTH, pos, false));
+        GaugePlacementEvents.install(event);
+
+        var after = level.getBlockEntity(pos);
+        h.assertTrue(after instanceof FactoryPanelBlockEntity, "panel block entity lost");
+        var panel = (FactoryPanelBlockEntity) after;
+        h.assertTrue(panel.activePanels() == 1,
+                "occupied slot changed panel count to " + panel.activePanels());
+        h.assertTrue(createGauge.getCount() == 3, "factory gauge was consumed by a refused placement");
+        h.succeed();
+    }
+
+    /** A signal lamp has to be able to take a free slot on a board that already carries gauges. */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void lampJoinsPanelWithGauges(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos.south(), Blocks.STONE.defaultBlockState(), 3);
+        var state = ModBlocks.SIGNAL_PANEL.get().defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH);
+        level.setBlock(pos, state, 3);
+        var board = (SignalPanelBlockEntity) level.getBlockEntity(pos);
+        var gaugeSlot = FactoryPanelBlock.PanelSlot.BOTTOM_LEFT;
+        board.addPanel(gaugeSlot, UUID.randomUUID());
+        board.panels.get(gaugeSlot).setFilter(new ItemStack(Items.IRON_INGOT));
+
+        var freeSlot = FactoryPanelBlock.PanelSlot.TOP_LEFT;
+        Vec3 hit = hitForSlot(pos, state, freeSlot);
+        h.assertTrue(hit != null, "no hit position maps to a free slot");
+        var lamp = new ItemStack(ModItems.CYAN_INDICATOR_LAMP.get(), 2);
+        player.setItemInHand(InteractionHand.MAIN_HAND, lamp);
+        h.assertTrue(lamp.getItem().useOn(new UseOnContext(player, InteractionHand.MAIN_HAND,
+                new BlockHitResult(hit, Direction.NORTH, pos, false))).consumesAction(),
+                "lamp could not join a board that carries a gauge");
+        h.assertTrue(board.isLamp(freeSlot), "lamp did not take the free slot");
+        h.assertTrue(board.panels.get(gaugeSlot).isActive(), "existing gauge was disturbed");
+        h.assertTrue(lamp.getCount() == 1, "lamp placement consumed the wrong amount");
+        h.succeed();
+    }
+
+    /** Create lets a board fill all four slots; ours has to do the same. */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void fourRemoteGaugesFillOnePanel(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos.south(), Blocks.STONE.defaultBlockState(), 3);
+        level.setBlock(pos, ModBlocks.REMOTE_GAUGE.get().defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH), 3);
+
+        int placed = 0;
+        for (var want : FactoryPanelBlock.PanelSlot.values()) {
+            var current = level.getBlockState(pos);
+            Vec3 hit = hitForSlot(pos, current, want);
+            h.assertTrue(hit != null, "no hit position maps to slot " + want);
+            ItemStack gauge = new ItemStack(ModItems.REMOTE_GAUGE.get(), 2);
+            CompoundTag data = new CompoundTag();
+            data.putUUID("Freq", UUID.randomUUID());
+            gauge.set(DataComponents.BLOCK_ENTITY_DATA, CustomData.of(data));
+            player.setItemInHand(InteractionHand.MAIN_HAND, gauge);
+            GaugePlacementEvents.install(new PlayerInteractEvent.RightClickBlock(player,
+                    InteractionHand.MAIN_HAND, pos, new BlockHitResult(hit, Direction.NORTH, pos, false)));
+            if (gauge.getCount() == 1) placed++;
+        }
+        var be = (FactoryPanelBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(placed == 4, "only " + placed + " of 4 remote gauges were accepted");
+        h.assertTrue(be.activePanels() == 4, "expected 4 panels, got " + be.activePanels());
+        h.succeed();
+    }
+
+    /** The same for lamps: four slots, four lamps. */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void fourLampsFillOnePanel(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos.south(), Blocks.STONE.defaultBlockState(), 3);
+        level.setBlock(pos, ModBlocks.SIGNAL_PANEL.get().defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH), 3);
+
+        int placed = 0;
+        for (var want : FactoryPanelBlock.PanelSlot.values()) {
+            var current = level.getBlockState(pos);
+            Vec3 hit = hitForSlot(pos, current, want);
+            h.assertTrue(hit != null, "no hit position maps to slot " + want);
+            var lamp = new ItemStack(ModItems.CYAN_INDICATOR_LAMP.get(), 2);
+            player.setItemInHand(InteractionHand.MAIN_HAND, lamp);
+            if (lamp.getItem().useOn(new UseOnContext(player, InteractionHand.MAIN_HAND,
+                    new BlockHitResult(hit, Direction.NORTH, pos, false))).consumesAction()
+                    && lamp.getCount() == 1) {
+                placed++;
+            }
+        }
+        var be = (SignalPanelBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(placed == 4, "only " + placed + " of 4 lamps were accepted");
+        h.assertTrue(be.activePanels() == 4, "expected 4 panels, got " + be.activePanels());
+        h.succeed();
+    }
+
+    /**
+     * A free slot has no hitbox, so the crosshair passes through the panel and the click is reported
+     * on the wall behind it. The panel has to be resolved from that, exactly like Create's own
+     * BlockPlaceContext relative position.
+     */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void clickThroughEmptySlotReachesPanel(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos wall = pos.south();
+        level.setBlock(wall, Blocks.STONE.defaultBlockState(), 3);
+        level.setBlock(pos, ModBlocks.SIGNAL_PANEL.get().defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH), 3);
+        var board = (SignalPanelBlockEntity) level.getBlockEntity(pos);
+        var taken = FactoryPanelBlock.PanelSlot.BOTTOM_LEFT;
+        board.addPanel(taken, UUID.randomUUID());
+        board.panels.get(taken).setFilter(new ItemStack(Items.IRON_INGOT));
+
+        var free = FactoryPanelBlock.PanelSlot.TOP_LEFT;
+        Vec3 local = hitForSlot(pos, level.getBlockState(pos), free);
+        h.assertTrue(local != null, "no hit position maps to the free slot");
+        // Same point, but reported on the wall behind the panel: that is what the client sends.
+        var hit = new BlockHitResult(new Vec3(local.x, local.y, wall.getZ()),
+                Direction.NORTH, wall, false);
+        var lamp = new ItemStack(ModItems.CYAN_INDICATOR_LAMP.get(), 2);
+        player.setItemInHand(InteractionHand.MAIN_HAND, lamp);
+        LampPlacementEvents.install(new PlayerInteractEvent.RightClickBlock(player,
+                InteractionHand.MAIN_HAND, wall, hit));
+        h.assertTrue(board.isLamp(free), "lamp could not be placed through the empty slot");
+        h.assertTrue(board.panels.get(taken).isActive(), "existing panel was disturbed");
+        h.succeed();
+    }
+
+    /**
+     * The same click shape with a factory gauge must add a slot, not replace the whole board.
+     * Create's canBeReplaced accepts the held item on a free slot, which would rebuild the block.
+     */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void factoryGaugeThroughEmptySlotAddsInsteadOfReplacing(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos wall = pos.south();
+        level.setBlock(wall, Blocks.STONE.defaultBlockState(), 3);
+        level.setBlock(pos, ModBlocks.SIGNAL_PANEL.get().defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH), 3);
+        var board = (SignalPanelBlockEntity) level.getBlockEntity(pos);
+        var remote = FactoryPanelBlock.PanelSlot.BOTTOM_LEFT;
+        board.addPanel(remote, UUID.randomUUID());
+        board.setRemoteGauge(remote, true);
+
+        var free = FactoryPanelBlock.PanelSlot.TOP_LEFT;
+        Vec3 local = hitForSlot(pos, level.getBlockState(pos), free);
+        h.assertTrue(local != null, "no hit position maps to the free slot");
+        ItemStack createGauge = new ItemStack(
+                BuiltInRegistries.BLOCK.get(ResourceLocation.parse("create:factory_gauge")), 2);
+        CompoundTag data = new CompoundTag();
+        data.putUUID("Freq", UUID.randomUUID());
+        createGauge.set(DataComponents.BLOCK_ENTITY_DATA, CustomData.of(data));
+        player.setItemInHand(InteractionHand.MAIN_HAND, createGauge);
+        var hit = new BlockHitResult(new Vec3(local.x, local.y, wall.getZ()),
+                Direction.NORTH, wall, false);
+        GaugePlacementEvents.install(new PlayerInteractEvent.RightClickBlock(player,
+                InteractionHand.MAIN_HAND, wall, hit));
+
+        var after = level.getBlockEntity(pos);
+        h.assertTrue(after instanceof SignalPanelBlockEntity, "the board block was replaced");
+        var stillBoard = (SignalPanelBlockEntity) after;
+        h.assertTrue(stillBoard.isRemoteGauge(remote), "the remote gauge was lost");
+        h.assertTrue(stillBoard.panels.get(free).isActive(), "the factory gauge was not added");
+        h.assertTrue(stillBoard.activePanels() == 2,
+                "expected 2 panels, got " + stillBoard.activePanels());
+        h.succeed();
+    }
+
+    /** Clicking an existing factory gauge with a lamp must not turn that slot into a lamp. */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void lampOnOccupiedGaugeSlotIsRefused(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos wall = pos.south();
+        level.setBlock(wall, Blocks.STONE.defaultBlockState(), 3);
+        level.setBlock(pos, BuiltInRegistries.BLOCK.get(ResourceLocation.parse("create:factory_gauge"))
+                .defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH), 3);
+        var board = (FactoryPanelBlockEntity) level.getBlockEntity(pos);
+        var gaugeSlot = FactoryPanelBlock.PanelSlot.BOTTOM_LEFT;
+        board.addPanel(gaugeSlot, UUID.randomUUID());
+        board.panels.get(gaugeSlot).setFilter(new ItemStack(Items.IRON_INGOT));
+
+        Vec3 local = hitForSlot(pos, level.getBlockState(pos), gaugeSlot);
+        h.assertTrue(local != null, "no hit position maps to the gauge slot");
+        var lamp = new ItemStack(ModItems.CYAN_INDICATOR_LAMP.get(), 2);
+        player.setItemInHand(InteractionHand.MAIN_HAND, lamp);
+        LampPlacementEvents.install(new PlayerInteractEvent.RightClickBlock(player,
+                InteractionHand.MAIN_HAND, wall, new BlockHitResult(
+                        new Vec3(local.x, local.y, wall.getZ()), Direction.NORTH, wall, false)));
+
+        var after = level.getBlockEntity(pos);
+        h.assertTrue(after instanceof FactoryPanelBlockEntity, "the board block was replaced");
+        var still = (FactoryPanelBlockEntity) after;
+        h.assertTrue(still.activePanels() == 1, "expected 1 panel, got " + still.activePanels());
+        h.assertTrue(still.panels.get(gaugeSlot).getFilter().is(Items.IRON_INGOT),
+                "the factory gauge filter was replaced by the lamp");
+        h.assertTrue(lamp.getCount() == 2, "the lamp was consumed by a refused placement");
+        h.succeed();
+    }
+
+    /**
+     * The conversion path: a plain Create board with a gauge, plus a lamp aimed at a free slot.
+     * The block is rebuilt, so the existing gauge has to survive the migration intact.
+     */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void lampJoinsPlainCreateBoardKeepingGauge(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos wall = pos.south();
+        level.setBlock(wall, Blocks.STONE.defaultBlockState(), 3);
+        level.setBlock(pos, BuiltInRegistries.BLOCK.get(ResourceLocation.parse("create:factory_gauge"))
+                .defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH), 3);
+        var board = (FactoryPanelBlockEntity) level.getBlockEntity(pos);
+        var gaugeSlot = FactoryPanelBlock.PanelSlot.BOTTOM_LEFT;
+        board.addPanel(gaugeSlot, UUID.randomUUID());
+        board.panels.get(gaugeSlot).setFilter(new ItemStack(Items.IRON_INGOT));
+        board.panels.get(gaugeSlot).count = 7;
+
+        var free = FactoryPanelBlock.PanelSlot.TOP_LEFT;
+        Vec3 local = hitForSlot(pos, level.getBlockState(pos), free);
+        h.assertTrue(local != null, "no hit position maps to the free slot");
+        var lamp = new ItemStack(ModItems.CYAN_INDICATOR_LAMP.get(), 2);
+        player.setItemInHand(InteractionHand.MAIN_HAND, lamp);
+        LampPlacementEvents.install(new PlayerInteractEvent.RightClickBlock(player,
+                InteractionHand.MAIN_HAND, wall, new BlockHitResult(
+                        new Vec3(local.x, local.y, wall.getZ()), Direction.NORTH, wall, false)));
+
+        var after = level.getBlockEntity(pos);
+        h.assertTrue(after instanceof SignalPanelBlockEntity, "the board was not converted");
+        var converted = (SignalPanelBlockEntity) after;
+        h.assertTrue(converted.activePanels() == 2,
+                "expected gauge + lamp, got " + converted.activePanels());
+        h.assertTrue(converted.panels.get(gaugeSlot).isActive(), "the factory gauge slot was lost");
+        h.assertTrue(converted.panels.get(gaugeSlot).getFilter().is(Items.IRON_INGOT),
+                "the factory gauge filter was replaced");
+        h.assertTrue(converted.panels.get(gaugeSlot).count == 7,
+                "the factory gauge amount was lost");
+        h.assertTrue(converted.isLamp(free), "the lamp did not take the free slot");
+        h.succeed();
+    }
+
+    /** Builds a gauge wired into a signal lamp and returns both panels. */
+    private static FactoryPanelBehaviour[] gaugeInto(GameTestHelper h, BlockPos gaugePos, BlockPos lampPos) {
+        var level = h.getLevel();
+        level.setBlock(gaugePos.south(), Blocks.STONE.defaultBlockState(), 3);
+        level.setBlock(lampPos.south(), Blocks.STONE.defaultBlockState(), 3);
+        level.setBlock(gaugePos, ModBlocks.REMOTE_GAUGE.get().defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH), 3);
+        level.setBlock(lampPos, ModBlocks.SIGNAL_PANEL.get().defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH), 3);
+        var gauge = (FactoryPanelBlockEntity) level.getBlockEntity(gaugePos);
+        var board = (SignalPanelBlockEntity) level.getBlockEntity(lampPos);
+        var slot = FactoryPanelBlock.PanelSlot.values()[0];
+        gauge.addPanel(slot, UUID.randomUUID());
+        SignalLampPanelItem.finishPlacement(board, slot, new ItemStack(ModItems.CYAN_INDICATOR_LAMP.get()));
+        var source = gauge.panels.get(slot);
+        var lamp = board.panels.get(slot);
+        source.setFilter(new ItemStack(Items.IRON_INGOT));
+        source.addConnection(lamp.getPanelPosition());
+        return new FactoryPanelBehaviour[]{source, lamp};
+    }
+
+    /** The brass lamp is an andon light: the worst connected gauge decides its colour. */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void brassLampReportsWorstInput(GameTestHelper h) {
+        BlockPos gaugePos = h.absolutePos(new BlockPos(1, 2, 2));
+        BlockPos lampPos = gaugePos.east();
+        var panels = gaugeInto(h, gaugePos, lampPos);
+        var source = panels[0];
+        var board = (SignalPanelBlockEntity) h.getLevel().getBlockEntity(lampPos);
+        var slot = source.getPanelPosition().slot();
+
+        source.satisfied = false;
+        source.promisedSatisfied = false;
+        source.redstonePowered = false;
+        source.waitingForNetwork = false;
+        h.assertTrue(board.lampState(slot) == LampState.WARN,
+                "short stock should be WARN, got " + board.lampState(slot));
+        source.waitingForNetwork = true;
+        h.assertTrue(board.lampState(slot) == LampState.WARN_URGENT,
+                "a silent network should be WARN_URGENT, got " + board.lampState(slot));
+        source.waitingForNetwork = false;
+        source.promisedSatisfied = true;
+        h.assertTrue(board.lampState(slot) == LampState.ACT,
+                "promised stock should be ACT, got " + board.lampState(slot));
+        source.satisfied = true;
+        // Nothing is on order in a test world, so a stocked gauge reports standby.
+        h.assertTrue(board.lampState(slot) == LampState.IDLE,
+                "a stocked idle gauge should be IDLE, got " + board.lampState(slot));
+        source.redstonePowered = true;
+        h.assertTrue(board.lampState(slot) == LampState.FATAL,
+                "a forced gauge should be FATAL, got " + board.lampState(slot));
+        h.assertTrue(LampState.FATAL.blink() == LampState.Blink.FAST
+                && LampState.WARN_URGENT.blink() == LampState.Blink.FAST
+                && LampState.IDLE.blink() == LampState.Blink.SLOW
+                && LampState.ALL_GOOD.blink() == LampState.Blink.NONE, "blink mapping is wrong");
+        h.assertTrue(LampState.worst(LampState.ALL_GOOD, LampState.WARN) == LampState.WARN
+                && LampState.worst(LampState.IDLE, LampState.ALL_GOOD) == LampState.ALL_GOOD
+                && LampState.worst(null, LampState.ACT) == LampState.ACT, "worst() ordering is wrong");
+        h.succeed();
+    }
+
+    /** An inverted lamp is a shortage alarm: it lights exactly while a source is attached and short. */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void invertedLampIsAShortageAlarm(GameTestHelper h) {
+        BlockPos gaugePos = h.absolutePos(new BlockPos(1, 4, 2));
+        BlockPos lampPos = gaugePos.east();
+        var panels = gaugeInto(h, gaugePos, lampPos);
+        var source = panels[0];
+        var lamp = panels[1];
+        var board = (SignalPanelBlockEntity) h.getLevel().getBlockEntity(lampPos);
+        var slot = source.getPanelPosition().slot();
+
+        source.satisfied = false;
+        h.assertTrue(board.lampSignal(slot) == 0, "a normal lamp lights without stock");
+        lamp.count = 1;
+        h.assertTrue(board.lampInverted(slot), "the lamp mode was not read back");
+        h.assertTrue(board.lampSignal(slot) == 15, "an inverted lamp stays dark while short");
+        source.satisfied = true;
+        h.assertTrue(board.lampSignal(slot) == 0, "an inverted lamp lights while stocked");
+        lamp.count = 0;
+        h.assertTrue(board.lampSignal(slot) == 15, "switching back to normal did not take effect");
+        h.succeed();
+    }
+
+    /** A lamp bound to a frequency reads the network itself; an unknown frequency is a fault. */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void boundLampReadsTheNetwork(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos.south(), Blocks.STONE.defaultBlockState(), 3);
+        level.setBlock(pos, ModBlocks.SIGNAL_PANEL.get().defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH), 3);
+        var board = (SignalPanelBlockEntity) level.getBlockEntity(pos);
+        var slot = FactoryPanelBlock.PanelSlot.BOTTOM_LEFT;
+        SignalLampPanelItem.finishPlacement(board, slot, new ItemStack(ModItems.BRASS_SIGNAL_LAMP.get()));
+
+        h.assertTrue(board.lampNetwork(slot) == null, "a fresh lamp should not be bound");
+        h.assertTrue(board.lampHealth(slot) == null, "an unbound lamp must not claim a network reading");
+        h.assertTrue(board.lampState(slot) == null, "an unbound lamp with no inputs has no state");
+
+        UUID freq = UUID.randomUUID();
+        board.setLampNetwork(slot, freq);
+        h.assertTrue(freq.equals(board.lampNetwork(slot)), "the binding was not stored");
+        h.assertTrue(board.lampHealth(slot) != null, "a bound lamp has no sampled reading");
+        // No Create network exists under this frequency, so the lamp has to report a fault.
+        h.assertTrue(board.lampState(slot) == LampState.FATAL,
+                "an unknown network should be FATAL, got " + board.lampState(slot));
+
+        board.setLampNetwork(slot, null);
+        h.assertTrue(board.lampNetwork(slot) == null && board.lampHealth(slot) == null,
+                "unbinding did not clear the reading");
+        h.assertTrue(board.lampState(slot) == null, "unbinding did not return the lamp to gauge mode");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 50)
+    public static void hopperFeedsVisibleDockParcel(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        BlockPos hopperPos = pos.east();
+        level.setBlock(hopperPos, Blocks.HOPPER.defaultBlockState().setValue(HopperBlock.FACING, Direction.WEST), 3);
+        var hopper = (HopperBlockEntity) level.getBlockEntity(hopperPos);
+        hopper.setItem(0, new ItemStack(ModItems.REMOTE_PACKAGE.get()));
+        h.runAfterDelay(25, () -> {
+            var dock = (DockBlockEntity) level.getBlockEntity(pos);
+            var handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, Direction.EAST);
+            h.assertTrue(handler != null && handler.getSlots() == 1, "dock has no single-slot item capability");
+            h.assertTrue(dock != null && dock.displayedStack().is(ModItems.REMOTE_PACKAGE.get()), "hopper parcel not visible in dock");
+            h.assertTrue(hopper.getItem(0).isEmpty(), "hopper did not transfer parcel");
+            h.succeed();
+        });
     }
 }

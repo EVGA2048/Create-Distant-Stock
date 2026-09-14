@@ -530,47 +530,9 @@ def floor(width, depth, extra, palette_extra, nbt_extra=None):
     write_structure(PONDER / nbt_extra, [width, 4, depth], palette, blocks)
 
 
-def ponder_scenes():
-    PONDER.mkdir(parents=True, exist_ok=True)
-    floor(7, 6, [
-        {"pos": [1, 1, 2], "state": 2, "nbt": {"id": "minecraft:chest"}},
-        {"pos": [2, 1, 2], "state": 3},
-        {"pos": [3, 1, 2], "state": 4},
-        {"pos": [4, 1, 2], "state": 5},
-    ], [
-        {"Name": "minecraft:chest", "Properties": {"facing": "east", "type": "single", "waterlogged": "false"}},
-        {"Name": "create:packager", "Properties": {"facing": "east", "powered": "false", "linked": "false"}},
-        {"Name": "minecraft:hopper", "Properties": {"facing": "east", "enabled": "true"}},
-        {"Name": "distantstock:dock", "Properties": {"facing": "south", "loaded": "false", "lit": "true"}},
-    ], "export.nbt")
-
-    floor(7, 6, [
-        {"pos": [2, 1, 2], "state": 2},
-        {"pos": [3, 1, 2], "state": 3},
-        {"pos": [4, 1, 2], "state": 4, "nbt": {"id": "minecraft:chest"}},
-    ], [
-        {"Name": "distantstock:dock", "Properties": {"facing": "south", "loaded": "true", "lit": "true"}},
-        {"Name": "minecraft:hopper", "Properties": {"facing": "east", "enabled": "true"}},
-        {"Name": "minecraft:chest", "Properties": {"facing": "west", "type": "single", "waterlogged": "false"}},
-    ], "import.nbt")
-
-    floor(6, 6, [
-        {"pos": [1, 1, 3], "state": 2},
-        {"pos": [2, 1, 2], "state": 3},
-    ], [
-        {"Name": "distantstock:dock", "Properties": {"facing": "south", "loaded": "false", "lit": "true"}},
-        {"Name": "distantstock:gauge", "Properties": {"facing": "south", "lit": "true"}},
-    ], "tune.nbt")
-
-    floor(6, 6, [
-        {"pos": [1, 1, 3], "state": 2},
-        {"pos": [3, 1, 3], "state": 3},
-        {"pos": [4, 1, 2], "state": 4},
-    ], [
-        {"Name": "minecraft:stone", "Properties": {}},
-        {"Name": "distantstock:monitor", "Properties": {"facing": "south"}},
-        {"Name": "distantstock:dock", "Properties": {"facing": "south", "loaded": "false", "lit": "false"}},
-    ], "status.nbt")
+# The ponder structures live in gen_ponder_structures.py. They were once written here as
+# well, from a palette that named block properties the blocks no longer have, and the
+# mismatch read back as air; one file owns them now.
 
 
 def textures():
@@ -609,8 +571,7 @@ def main():
     from gen_item_art import main as items
     blocks()
     items()
-    ponder_scenes()
-    print("generated current block/item art and ponder nbt")
+    print("generated current block/item art (ponder structures: gen_ponder_structures.py)")
 
 
 if __name__ == "__main__":

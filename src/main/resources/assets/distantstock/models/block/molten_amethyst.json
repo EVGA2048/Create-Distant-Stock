@@ -1,0 +1,7 @@
+{
+  "textures": {
+    "particle": "distantstock:fluid/molten_amethyst_still",
+    "still": "distantstock:fluid/molten_amethyst_still",
+    "flow": "distantstock:fluid/molten_amethyst_flow"
+  }
+}

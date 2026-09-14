@@ -1,0 +1,15 @@
+{
+  "type": "create:mixing",
+  "heat_requirement": "superheated",
+  "ingredients": [
+    {
+      "item": "distantstock:ether_quartz"
+    }
+  ],
+  "results": [
+    {
+      "amount": 250,
+      "id": "distantstock:ether"
+    }
+  ]
+}

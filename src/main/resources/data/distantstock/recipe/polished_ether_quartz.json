@@ -1,0 +1,13 @@
+{
+  "type": "create:sandpaper_polishing",
+  "ingredients": [
+    {
+      "item": "distantstock:ether_quartz"
+    }
+  ],
+  "results": [
+    {
+      "id": "distantstock:polished_ether_quartz"
+    }
+  ]
+}

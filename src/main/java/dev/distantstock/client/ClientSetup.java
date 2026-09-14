@@ -2,6 +2,7 @@ package dev.distantstock.client;
 
 import dev.distantstock.DistantStock;
 import dev.distantstock.block.ModBlockEntities;
+import dev.distantstock.fluid.ModFluids;
 import dev.distantstock.client.ponder.DistantStockPonderPlugin;
 import dev.distantstock.item.ManualItem;
 import dev.distantstock.item.ModItems;
@@ -20,6 +21,8 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
+import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
+import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
@@ -29,6 +32,7 @@ public final class ClientSetup {
         @SubscribeEvent
         public static void screens(RegisterMenuScreensEvent e) {
             e.register(ModMenus.REQUESTER.get(), RequesterScreen::new);
+            e.register(ModMenus.LAMP_MONITOR.get(), LampMonitorScreen::new);
         }
 
         /**
@@ -36,15 +40,63 @@ public final class ClientSetup {
          * whenever Flywheel visualization is available. Our block entity type has no visual by default, so
          * the hatch never appeared; register Create's own visual for our type to get both back.
          */
+        /**
+         * Both fluids keep the palette they were authored with. The default water tint would
+         * multiply the still texture by the biome colour and darken it.
+         */
+        @SubscribeEvent
+        public static void fluidTextures(RegisterClientExtensionsEvent e) {
+            e.registerFluidType(fluid("ether"), ModFluids.ETHER_TYPE.get());
+            e.registerFluidType(fluid("molten_amethyst"), ModFluids.MOLTEN_AMETHYST_TYPE.get());
+        }
+
+        private static IClientFluidTypeExtensions fluid(String name) {
+            return new IClientFluidTypeExtensions() {
+                @Override
+                public net.minecraft.resources.ResourceLocation getStillTexture() {
+                    return ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "fluid/" + name + "_still");
+                }
+
+                @Override
+                public net.minecraft.resources.ResourceLocation getFlowingTexture() {
+                    return ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "fluid/" + name + "_flow");
+                }
+
+                @Override
+                public int getTintColor() {
+                    return 0xFFFFFFFF;
+                }
+            };
+        }
+
+        /**
+         * Ether renders translucent; the melt stays solid.
+         *
+         * Vanilla decides a fluid's render layer from a table that only lists water, and everything
+         * else falls through to {@code RenderType.solid()}, which ignores the texture's alpha. That
+         * is why ether came out opaque on the ground no matter what the texture said. NeoForge adds
+         * a setter for it. Lava is not in that table either, and solid is exactly what a melt wants,
+         * so molten amethyst is deliberately left alone.
+         */
+        @SubscribeEvent
+        public static void fluidRenderLayers(FMLClientSetupEvent e) {
+            net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
+                    ModFluids.ETHER.get(), net.minecraft.client.renderer.RenderType.translucent());
+            net.minecraft.client.renderer.ItemBlockRenderTypes.setRenderLayer(
+                    ModFluids.ETHER_FLOW.get(), net.minecraft.client.renderer.RenderType.translucent());
+        }
+
         @SubscribeEvent
         public static void visualizers(FMLClientSetupEvent e) {
             SignalPanelRenderer.registerModels();
+            RemoteGaugeRenderer.registerModels();
             SimpleBlockEntityVisualizer.builder(ModBlockEntities.REMOTE_PACKAGER.get())
                     .factory((context, be, partialTick) -> new PackagerVisual<>(context, be, partialTick))
                     // The renderer still draws the packaged box outside the Flywheel check.
                     .neverSkipVanillaRender()
                     .apply();
         }
+
 
         @SubscribeEvent
         public static void renderers(EntityRenderersEvent.RegisterRenderers e) {

@@ -13,6 +13,10 @@ public final class ModMenus {
     public static final DeferredHolder<MenuType<?>, MenuType<RequesterMenu>> REQUESTER = MENUS.register("requester",
             () -> IMenuTypeExtension.create(RequesterMenu::fromNetwork));
 
+    /** The brass lamp's watch list. Named apart from the monitor block's own screen. */
+    public static final DeferredHolder<MenuType<?>, MenuType<MonitorMenu>> LAMP_MONITOR = MENUS.register("lamp_monitor",
+            () -> IMenuTypeExtension.create(MonitorMenu::fromNetwork));
+
     private ModMenus() {
     }
 }

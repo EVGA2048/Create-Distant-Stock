@@ -51,12 +51,19 @@ public final class GaugeBlock extends BaseEntityBlock implements IWrenchable {
     public static final DirectionProperty FACING = HorizontalDirectionalBlock.FACING;
     public static final BooleanProperty LIT = BooleanProperty.create("lit");
     public static final MapCodec<GaugeBlock> CODEC = simpleCodec(GaugeBlock::new);
+    /**
+     * The console is floor-standing furniture, so its whole silhouette is solid.
+     *
+     * The head is a single box rather than a staircase following its -22.5 degree tilt: an
+     * AABB union cannot express the tilt, and a cheaper approximation would let players walk
+     * through the board. The head's real extent is y 9.02..16.99 by z 0.23..15.77, clipped
+     * here to the block. The antenna reaches y=25 and is deliberately left out, the same way
+     * the previous mast was.
+     */
     private static final VoxelShape NORTH = Shapes.or(
-            Block.box(0, 0, 0, 16, 3, 16),
-            Block.box(2, 3, 3, 14, 8, 14),
-            Block.box(1, 7, 2, 15, 10, 6),
-            Block.box(1, 7, 6, 15, 11, 10),
-            Block.box(1, 8, 10, 15, 13, 14));
+            Block.box(1, 0, 2, 15, 2, 15),
+            Block.box(3, 2, 6, 13, 12, 14),
+            Block.box(0, 9, 0, 16, 16, 16));
     private static final VoxelShape EAST = quarterTurn(NORTH);
     private static final VoxelShape SOUTH = quarterTurn(EAST);
     private static final VoxelShape WEST = quarterTurn(SOUTH);

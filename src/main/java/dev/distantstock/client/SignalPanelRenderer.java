@@ -8,6 +8,7 @@ import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelConnection
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelRenderer;
 import com.simibubi.create.foundation.blockEntity.renderer.SmartBlockEntityRenderer;
 import dev.distantstock.DistantStock;
+import dev.distantstock.block.LampState;
 import dev.distantstock.block.SignalPanelBlockEntity;
 import dev.distantstock.item.SignalLampPanelItem;
 import dev.engine_room.flywheel.lib.model.baked.PartialModel;
@@ -63,16 +64,25 @@ public final class SignalPanelRenderer extends SmartBlockEntityRenderer<SignalPa
             ItemStack lampStack = be.lampStack(entry.getKey());
             SignalLampPanelItem lamp = SignalLampPanelItem.from(lampStack);
             if (lamp != null) {
-                renderLamp(state, entry.getKey(), lamp, be.lampSignal(entry.getKey()), ms, buffer, light, overlay);
+                renderLamp(be, entry.getKey(), lamp, partialTicks, ms, buffer, light, overlay);
                 for (FactoryPanelConnection connection : behaviour.targetedBy.values()) {
                     FactoryPanelRenderer.renderPath(behaviour, connection, partialTicks, ms, buffer, light, overlay);
                 }
                 continue;
             }
-            renderPartial(AllPartialModels.FACTORY_PANEL_WITH_BULB, state, entry.getKey(), ms,
-                    buffer, light, overlay, RenderType.cutout());
+            // A remote gauge keeps its own panel art even when it shares a board with Create gauges.
+            boolean remote = be.isRemoteGauge(entry.getKey());
+            renderPartial(remote
+                            ? RemoteGaugeRenderer.panelModel(be.restocker, behaviour.count != 0)
+                            : (behaviour.count == 0 ? AllPartialModels.FACTORY_PANEL
+                                    : AllPartialModels.FACTORY_PANEL_WITH_BULB),
+                    state, entry.getKey(), ms, buffer, light, overlay, RenderType.cutout());
             if (behaviour.getAmount() > 0) {
-                FactoryPanelRenderer.renderBulb(behaviour, partialTicks, ms, buffer, light, overlay);
+                if (remote) {
+                    RemoteGaugeRenderer.renderRemoteBulb(behaviour, partialTicks, ms, buffer, light, overlay);
+                } else {
+                    FactoryPanelRenderer.renderBulb(behaviour, partialTicks, ms, buffer, light, overlay);
+                }
             }
             for (FactoryPanelConnection connection : behaviour.targetedBy.values()) {
                 FactoryPanelRenderer.renderPath(behaviour, connection, partialTicks, ms, buffer, light, overlay);
@@ -83,22 +93,43 @@ public final class SignalPanelRenderer extends SmartBlockEntityRenderer<SignalPa
         }
     }
 
-    private static void renderLamp(BlockState state, FactoryPanelBlock.PanelSlot slot,
-                                   SignalLampPanelItem lamp, int strength, PoseStack ms,
+    /** Blink phases, roughly a stack light's slow "standby" and fast "emergency" rates. */
+    private static final int SLOW_BLINK_TICKS = 20;
+    private static final int FAST_BLINK_TICKS = 8;
+
+    private static void renderLamp(SignalPanelBlockEntity be, FactoryPanelBlock.PanelSlot slot,
+                                   SignalLampPanelItem lamp, float partialTicks, PoseStack ms,
                                    MultiBufferSource buffer, int light, int overlay) {
-        boolean lit = strength > 0;
+        boolean lit = be.lampSignal(slot) > 0;
         SignalLampPanelItem.Color color = lamp.color();
-        if (lamp.material() == SignalLampPanelItem.Material.BRASS && lit) {
-            color = strength <= 5 ? SignalLampPanelItem.Color.RED
-                    : strength <= 10 ? SignalLampPanelItem.Color.ORANGE
-                    : strength < 15 ? SignalLampPanelItem.Color.GREEN
-                    : SignalLampPanelItem.Color.CYAN;
+        if (lamp.material() == SignalLampPanelItem.Material.BRASS) {
+            // The brass lamp is an andon light: its colour reports the worst connected gauge.
+            LampState level = be.lampState(slot);
+            if (level == null) {
+                lit = false;
+            } else {
+                color = switch (level) {
+                    case IDLE, ALL_GOOD -> SignalLampPanelItem.Color.GREEN;
+                    case ACT -> SignalLampPanelItem.Color.CYAN;
+                    case WARN, WARN_URGENT -> SignalLampPanelItem.Color.ORANGE;
+                    case FATAL -> SignalLampPanelItem.Color.RED;
+                };
+                lit = blinkOn(be, partialTicks, level.blink());
+            }
         }
         String key = lamp.material().name().toLowerCase() + "_" + color.name().toLowerCase()
                 + "_" + (lit ? "on" : "off");
         PartialModel model = LAMPS.get(key);
-        renderPartial(model, state, slot, ms, buffer, lit ? 0xF000F0 : light, overlay,
+        renderPartial(model, be.getBlockState(), slot, ms, buffer, lit ? 0xF000F0 : light, overlay,
                 lit ? RenderType.cutout() : RenderType.translucent());
+    }
+
+    private static boolean blinkOn(SignalPanelBlockEntity be, float partialTicks, LampState.Blink blink) {
+        if (blink == LampState.Blink.NONE || be.getLevel() == null) {
+            return true;
+        }
+        long period = blink == LampState.Blink.FAST ? FAST_BLINK_TICKS : SLOW_BLINK_TICKS;
+        return ((be.getLevel().getGameTime() + (long) partialTicks) / period) % 2 == 0;
     }
 
     static void renderPartial(PartialModel model, BlockState state,

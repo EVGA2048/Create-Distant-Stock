@@ -4,10 +4,17 @@ import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
 import com.simibubi.create.foundation.advancement.AdvancementBehaviour;
 import com.simibubi.create.foundation.advancement.AllAdvancements;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
+import com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsBoard;
+import com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsBehaviour.ValueSettings;
+import com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsFormatter;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBehaviour;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockEntity;
+import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelConnection;
 import dev.distantstock.item.SignalLampPanelItem;
+import dev.distantstock.item.ModItems;
+import dev.distantstock.stock.CreateStock;
+import dev.distantstock.stock.NetworkHealth;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -16,17 +23,25 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.ContainerHelper;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implements IHaveGoggleInformation {
     private int lampSignal;
     private boolean panelDataReady;
+    private final EnumSet<FactoryPanelBlock.PanelSlot> remoteGauges = EnumSet.noneOf(FactoryPanelBlock.PanelSlot.class);
 
     public SignalPanelBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.SIGNAL_PANEL.get(), pos, state);
@@ -51,6 +66,9 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
         if (level == null) {
             return;
         }
+        if (!level.isClientSide) {
+            sampleLampNetworks();
+        }
         int next = level.getBestNeighborSignal(worldPosition);
         if (next == lampSignal) {
             return;
@@ -61,15 +79,204 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
         }
     }
 
+    /** How many offline link positions a bound lamp carries for the goggle readout. */
+    public static final int REPORTED_MISSING_LINKS = 3;
+    /** Create's logistics live on the server thread, so bound lamps resample once a second. */
+    private static final int SAMPLE_INTERVAL_TICKS = 20;
+
+    /** How many items one lamp can watch at once. */
+    public static final int MONITOR_SLOTS = 8;
+
+    private final Map<FactoryPanelBlock.PanelSlot, UUID> lampNetworks =
+            new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
+    private final Map<FactoryPanelBlock.PanelSlot, NetworkHealth> lampHealth =
+            new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
+    private final Map<FactoryPanelBlock.PanelSlot, SimpleContainer> monitors =
+            new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
+    private final Map<FactoryPanelBlock.PanelSlot, List<LampState>> monitorStates =
+            new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
+
+    /**
+     * The items a lamp watches. A plain container rather than a list, so the monitor screen can
+     * expose these as ordinary slots and get JEI dragging and shift-clicking for free.
+     */
+    public SimpleContainer monitor(FactoryPanelBlock.PanelSlot slot) {
+        return monitors.computeIfAbsent(slot, key -> new SimpleContainer(MONITOR_SLOTS) {
+            @Override
+            public void setChanged() {
+                super.setChanged();
+                SignalPanelBlockEntity.this.sync();
+            }
+        });
+    }
+
+    /** One state per watched item, in slot order. Empty when the lamp watches nothing. */
+    public List<LampState> monitorStates(FactoryPanelBlock.PanelSlot slot) {
+        return monitorStates.getOrDefault(slot, List.of());
+    }
+
+    /** Points a lamp slot at a logistics frequency, or clears it with null. */
+    public void setLampNetwork(FactoryPanelBlock.PanelSlot slot, UUID freq) {
+        if (freq == null) {
+            lampNetworks.remove(slot);
+            lampHealth.remove(slot);
+        } else {
+            lampNetworks.put(slot, freq);
+            lampHealth.put(slot, CreateStock.health(freq, REPORTED_MISSING_LINKS));
+        }
+        sync();
+    }
+
+    public UUID lampNetwork(FactoryPanelBlock.PanelSlot slot) {
+        return lampNetworks.get(slot);
+    }
+
+    private void sampleLampNetworks() {
+        if (lampNetworks.isEmpty() || level.getGameTime() % SAMPLE_INTERVAL_TICKS != 0) {
+            return;
+        }
+        boolean changed = false;
+        for (var entry : lampNetworks.entrySet()) {
+            NetworkHealth next = CreateStock.health(entry.getValue(), REPORTED_MISSING_LINKS);
+            NetworkHealth previous = lampHealth.put(entry.getKey(), next);
+            if (!next.equals(previous)) {
+                changed = true;
+            }
+            if (sampleMonitor(entry.getKey(), entry.getValue())) {
+                changed = true;
+            }
+        }
+        if (changed) {
+            sync();
+        }
+    }
+
+    /** Re-reads every watched item's stock and promise count. True when something moved. */
+    private boolean sampleMonitor(FactoryPanelBlock.PanelSlot slot, UUID freq) {
+        SimpleContainer container = monitor(slot);
+        List<LampState> next = new ArrayList<>(MONITOR_SLOTS);
+        for (int i = 0; i < MONITOR_SLOTS; i++) {
+            ItemStack item = container.getItem(i);
+            next.add(item.isEmpty() ? null : itemLevel(freq, item));
+        }
+        return !next.equals(monitorStates.put(slot, next));
+    }
+
+    /** Stock on hand means good; an outstanding promise means it is coming; otherwise it is short. */
+    private static LampState itemLevel(UUID freq, ItemStack item) {
+        int[] counts = CreateStock.itemStock(freq, item);
+        if (counts[0] > 0) {
+            return LampState.ALL_GOOD;
+        }
+        return counts[1] > 0 ? LampState.ACT : LampState.WARN;
+    }
+
+    /** The most urgent state among the watched items, or null when none is configured. */
+    private LampState worstMonitored(FactoryPanelBlock.PanelSlot slot) {
+        LampState worst = null;
+        for (LampState state : monitorStates(slot)) {
+            worst = LampState.worst(worst, state);
+        }
+        return worst;
+    }
+
+    private void sync() {
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     public int lampSignal(FactoryPanelBlock.PanelSlot slot) {
         FactoryPanelBehaviour behaviour = panels.get(slot);
-        if (behaviour == null || !behaviour.isActive()) {
+        if (behaviour == null || !behaviour.isActive() || level == null) {
             return 0;
         }
-        boolean connectedGaugeIsOn = level != null && behaviour.targetedBy.values().stream()
-                .map(connection -> FactoryPanelBehaviour.at(level, connection))
-                .anyMatch(source -> source != null && (source.satisfied || source.redstonePowered));
-        return connectedGaugeIsOn ? 15 : 0;
+        boolean connected = false;
+        boolean satisfied = false;
+        for (FactoryPanelConnection connection : behaviour.targetedBy.values()) {
+            FactoryPanelBehaviour source = FactoryPanelBehaviour.at(level, connection);
+            if (source == null) {
+                continue;
+            }
+            connected = true;
+            if (source.satisfied || source.redstonePowered) {
+                satisfied = true;
+            }
+        }
+        if (lampInverted(slot)) {
+            // An inverted lamp is a shortage alarm: attached and short is exactly when it lights.
+            return connected && !satisfied ? 15 : 0;
+        }
+        return satisfied ? 15 : 0;
+    }
+
+    /** How urgent one connected source gauge looks, using the fields Create syncs to the client. */
+    private static LampState sourceLevel(FactoryPanelBehaviour gauge) {
+        if (gauge.isMissingAddress() || gauge.redstonePowered) {
+            return LampState.FATAL;
+        }
+        if (gauge.satisfied) {
+            // Nothing on order means the line is ready but idle, not busy.
+            return gauge.getPromised() > 0 ? LampState.ALL_GOOD : LampState.IDLE;
+        }
+        if (gauge.promisedSatisfied) {
+            return LampState.ACT;
+        }
+        return gauge.waitingForNetwork ? LampState.WARN_URGENT : LampState.WARN;
+    }
+
+    /**
+     * Andon state of a brass lamp slot: the most urgent connected gauge wins. Null means no source
+     * gauge is attached, which keeps the lamp dark instead of claiming everything is fine.
+     */
+    public LampState lampState(FactoryPanelBlock.PanelSlot slot) {
+        FactoryPanelBehaviour behaviour = panels.get(slot);
+        if (behaviour == null || !behaviour.isActive() || level == null) {
+            return null;
+        }
+        if (lampNetworks.containsKey(slot)) {
+            // Bound to a frequency, so the network itself is the sensor: no gauges, no wiring.
+            NetworkHealth net = lampHealth.get(slot);
+            LampState overall = networkLevel(net == null ? NetworkHealth.UNKNOWN : net);
+            if (overall == LampState.FATAL) {
+                // Without a reachable network every per-item reading is just "no stock", which
+                // would masquerade as a shortage. The missing network is the real problem.
+                return overall;
+            }
+            LampState watched = worstMonitored(slot);
+            return watched != null ? watched : overall;
+        }
+        LampState worst = null;
+        for (FactoryPanelConnection connection : behaviour.targetedBy.values()) {
+            FactoryPanelBehaviour source = FactoryPanelBehaviour.at(level, connection);
+            if (source != null) {
+                worst = LampState.worst(worst, sourceLevel(source));
+            }
+        }
+        return worst;
+    }
+
+    /** A bound network reports through the same andon ladder as wired gauges. */
+    private static LampState networkLevel(NetworkHealth net) {
+        if (!net.known() || net.locked() || net.loadedLinks() == 0) {
+            return LampState.FATAL;
+        }
+        if (net.loadedLinks() < net.totalLinks()) {
+            return LampState.ACT;
+        }
+        return net.idle() ? LampState.IDLE : LampState.ALL_GOOD;
+    }
+
+    /** The sampled health of a bound lamp, or null when the slot reads gauges instead. */
+    public NetworkHealth lampHealth(FactoryPanelBlock.PanelSlot slot) {
+        return lampNetworks.containsKey(slot) ? lampHealth.get(slot) : null;
+    }
+
+    /** Lamp slots carry no amount, so their value setting stores the andesite lamp's mode instead. */
+    public boolean lampInverted(FactoryPanelBlock.PanelSlot slot) {
+        FactoryPanelBehaviour behaviour = panels.get(slot);
+        return behaviour != null && behaviour.isActive() && behaviour.count != 0;
     }
 
     public ItemStack lampStack(FactoryPanelBlock.PanelSlot slot) {
@@ -83,6 +290,31 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
 
     public boolean isLamp(FactoryPanelBlock.PanelSlot slot) {
         return !lampStack(slot).isEmpty();
+    }
+
+    public boolean isRemoteGauge(FactoryPanelBlock.PanelSlot slot) {
+        return remoteGauges.contains(slot) && panels.get(slot).isActive();
+    }
+
+    public void setRemoteGauge(FactoryPanelBlock.PanelSlot slot, boolean remote) {
+        if (remote) remoteGauges.add(slot);
+        else remoteGauges.remove(slot);
+        redraw = true;
+        sendData();
+    }
+
+    public ItemStack panelItem(FactoryPanelBlock.PanelSlot slot) {
+        if (isLamp(slot)) return lampStack(slot).copyWithCount(1);
+        return isRemoteGauge(slot) ? new ItemStack(ModItems.REMOTE_GAUGE.get())
+                : new ItemStack(BuiltInRegistries.BLOCK.get(
+                        ResourceLocation.fromNamespaceAndPath("create", "factory_gauge")));
+    }
+
+    @Override
+    public boolean removePanel(FactoryPanelBlock.PanelSlot slot) {
+        boolean removed = super.removePanel(slot);
+        if (removed) remoteGauges.remove(slot);
+        return removed;
     }
 
     /**
@@ -119,8 +351,80 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
                             Component.translatable("goggle.distantstock.signal_lamp.color."
                                     + item.color().name().toLowerCase()), strength)
                     .withStyle(strength > 0 ? ChatFormatting.GREEN : ChatFormatting.DARK_GRAY));
+            if (item.material() == SignalLampPanelItem.Material.BRASS) {
+                appendAndonReadout(tip, slot);
+            }
         }
         return found;
+    }
+
+    /**
+     * The andon readout: which state the brass lamp is showing, and why. This is the whole point of
+     * the goggles here — a colour on the wall says something is wrong, this says what.
+     */
+    private void appendAndonReadout(List<Component> tip, FactoryPanelBlock.PanelSlot slot) {
+        LampState level = lampState(slot);
+        tip.add(Component.translatable("goggle.distantstock.lamp.state."
+                        + (level == null ? "none" : level.name().toLowerCase()))
+                .withStyle(stateStyle(level)));
+        NetworkHealth net = lampHealth(slot);
+        if (net == null) {
+            return;
+        }
+        if (!net.known()) {
+            tip.add(Component.translatable("goggle.distantstock.lamp.net.unknown")
+                    .withStyle(ChatFormatting.RED));
+            return;
+        }
+        tip.add(Component.translatable("goggle.distantstock.lamp.net.links",
+                        net.loadedLinks(), net.totalLinks())
+                .withStyle(net.offline() > 0 ? ChatFormatting.GOLD : ChatFormatting.DARK_GRAY));
+        if (net.locked()) {
+            tip.add(Component.translatable("goggle.distantstock.lamp.net.locked")
+                    .withStyle(ChatFormatting.RED));
+        }
+        for (BlockPos missing : net.missing()) {
+            tip.add(Component.literal("    " + missing.getX() + ", " + missing.getY() + ", "
+                    + missing.getZ()).withStyle(ChatFormatting.DARK_RED));
+        }
+        if (net.offline() > net.missing().size()) {
+            tip.add(Component.translatable("goggle.distantstock.lamp.net.more",
+                    net.offline() - net.missing().size()).withStyle(ChatFormatting.DARK_RED));
+        }
+        appendWatchedItems(tip, slot);
+    }
+
+    /**
+     * The per-item breakdown. This is the monitor's detail view without opening its screen, which
+     * is why the lamp is useful before anyone configures a list at all.
+     */
+    private void appendWatchedItems(List<Component> tip, FactoryPanelBlock.PanelSlot slot) {
+        SimpleContainer container = monitor(slot);
+        List<LampState> states = monitorStates(slot);
+        for (int i = 0; i < MONITOR_SLOTS; i++) {
+            ItemStack item = container.getItem(i);
+            if (item.isEmpty()) {
+                continue;
+            }
+            LampState level = i < states.size() ? states.get(i) : null;
+            tip.add(Component.literal("  ").append(item.getHoverName())
+                    .append("  ")
+                    .append(Component.translatable("goggle.distantstock.lamp.short."
+                            + (level == null ? "none" : level.name().toLowerCase())))
+                    .withStyle(stateStyle(level)));
+        }
+    }
+
+    private static ChatFormatting stateStyle(LampState level) {
+        if (level == null) {
+            return ChatFormatting.DARK_GRAY;
+        }
+        return switch (level) {
+            case IDLE, ALL_GOOD -> ChatFormatting.GREEN;
+            case ACT -> ChatFormatting.AQUA;
+            case WARN -> ChatFormatting.GOLD;
+            case WARN_URGENT, FATAL -> ChatFormatting.RED;
+        };
     }
 
     /** True when every occupied slot holds a lamp; an empty panel is not a lamp panel. */
@@ -153,10 +457,7 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
                 continue;
             }
             ItemStack filter = behaviour.getFilter();
-            ItemStack drop = SignalLampPanelItem.from(filter) != null
-                    ? filter.copyWithCount(1)
-                    : new ItemStack(BuiltInRegistries.BLOCK.get(
-                            ResourceLocation.fromNamespaceAndPath("create", "factory_gauge")));
+            ItemStack drop = panelItem(slot);
             drops.add(drop);
             behaviour.disable();
         }
@@ -173,12 +474,100 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
     protected void write(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.write(tag, registries, clientPacket);
         tag.putInt("LampSignal", lampSignal);
+        CompoundTag kinds = new CompoundTag();
+        for (var slot : remoteGauges) kinds.putBoolean(slot.name(), true);
+        tag.put("RemoteGaugeSlots", kinds);
+        CompoundTag networks = new CompoundTag();
+        for (var entry : lampNetworks.entrySet()) {
+            networks.putUUID(entry.getKey().name(), entry.getValue());
+        }
+        tag.put("LampNetworks", networks);
+        // The sampled health is derived, but recomputing it needs Create's logistics, which only
+        // exist on the server, so the reading travels with the block update instead.
+        CompoundTag health = new CompoundTag();
+        for (var entry : lampHealth.entrySet()) {
+            NetworkHealth net = entry.getValue();
+            CompoundTag row = new CompoundTag();
+            row.putBoolean("Known", net.known());
+            row.putInt("Loaded", net.loadedLinks());
+            row.putInt("Total", net.totalLinks());
+            row.putBoolean("Idle", net.idle());
+            row.putBoolean("Locked", net.locked());
+            int[] positions = new int[net.missing().size() * 3];
+            for (int i = 0; i < net.missing().size(); i++) {
+                positions[i * 3] = net.missing().get(i).getX();
+                positions[i * 3 + 1] = net.missing().get(i).getY();
+                positions[i * 3 + 2] = net.missing().get(i).getZ();
+            }
+            row.putIntArray("Missing", positions);
+            health.put(entry.getKey().name(), row);
+        }
+        tag.put("LampHealth", health);
+        CompoundTag watches = new CompoundTag();
+        for (var entry : monitors.entrySet()) {
+            CompoundTag row = new CompoundTag();
+            ContainerHelper.saveAllItems(row, entry.getValue().getItems(), registries);
+            List<LampState> states = monitorStates.get(entry.getKey());
+            int[] ordinals = new int[states == null ? 0 : states.size()];
+            for (int i = 0; i < ordinals.length; i++) {
+                // -1 keeps the "empty slot" holes so the states stay aligned with the item slots.
+                ordinals[i] = states.get(i) == null ? -1 : states.get(i).ordinal();
+            }
+            row.putIntArray("States", ordinals);
+            watches.put(entry.getKey().name(), row);
+        }
+        tag.put("LampWatches", watches);
     }
 
     @Override
     protected void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.read(tag, registries, clientPacket);
         lampSignal = tag.getInt("LampSignal");
+        remoteGauges.clear();
+        CompoundTag kinds = tag.getCompound("RemoteGaugeSlots");
+        for (var slot : FactoryPanelBlock.PanelSlot.values()) {
+            if (kinds.getBoolean(slot.name())) remoteGauges.add(slot);
+        }
+        lampNetworks.clear();
+        CompoundTag networks = tag.getCompound("LampNetworks");
+        for (var slot : FactoryPanelBlock.PanelSlot.values()) {
+            if (networks.hasUUID(slot.name())) {
+                lampNetworks.put(slot, networks.getUUID(slot.name()));
+            }
+        }
+        lampHealth.clear();
+        CompoundTag health = tag.getCompound("LampHealth");
+        for (var slot : FactoryPanelBlock.PanelSlot.values()) {
+            if (!health.contains(slot.name())) {
+                continue;
+            }
+            CompoundTag row = health.getCompound(slot.name());
+            int[] positions = row.getIntArray("Missing");
+            List<BlockPos> missing = new ArrayList<>();
+            for (int i = 0; i + 2 < positions.length; i += 3) {
+                missing.add(new BlockPos(positions[i], positions[i + 1], positions[i + 2]));
+            }
+            lampHealth.put(slot, new NetworkHealth(row.getBoolean("Known"), row.getInt("Loaded"),
+                    row.getInt("Total"), row.getBoolean("Idle"), row.getBoolean("Locked"), List.copyOf(missing)));
+        }
+        monitors.clear();
+        monitorStates.clear();
+        CompoundTag watches = tag.getCompound("LampWatches");
+        for (var slot : FactoryPanelBlock.PanelSlot.values()) {
+            if (!watches.contains(slot.name())) {
+                continue;
+            }
+            CompoundTag row = watches.getCompound(slot.name());
+            SimpleContainer container = monitor(slot);
+            ContainerHelper.loadAllItems(row, container.getItems(), registries);
+            int[] ordinals = row.getIntArray("States");
+            List<LampState> states = new ArrayList<>(ordinals.length);
+            for (int ordinal : ordinals) {
+                states.add(ordinal < 0 || ordinal >= LampState.values().length
+                        ? null : LampState.values()[ordinal]);
+            }
+            monitorStates.put(slot, states);
+        }
         panelDataReady = true;
     }
 
@@ -199,23 +588,91 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
         }
 
         /**
-         * A lamp is not a factory gauge: holding right-click on it must not open Create's count setting,
-         * and the block's own interaction (name tag, wrench) has to stay reachable.
+         * A lamp has no amount, but the andesite one still owns a value panel: the same board
+         * picks its mode. The mode lives in {@code count}, which is otherwise unused on a lamp
+         * slot and already persisted and synced by Create.
          */
         @Override
-        public boolean acceptsValueSettings() {
-            return owner.panelDataReady() && !isLampSlot();
+        public ValueSettingsBoard createBoard(Player player, BlockHitResult hitResult) {
+            if (!isLampSlot()) {
+                return super.createBoard(player, hitResult);
+            }
+            return new ValueSettingsBoard(
+                    Component.translatable("gui.distantstock.lamp.mode"),
+                    1, 1,
+                    List.of(Component.translatable("gui.distantstock.lamp.mode.row")),
+                    new ValueSettingsFormatter(settings -> Component.translatable(
+                            settings.value() == 0 ? "gui.distantstock.lamp.mode.normal"
+                                    : "gui.distantstock.lamp.mode.inverted")));
         }
 
-        /** Create's renderer draws "hold to set the amount" over the slot; a lamp has no amount. */
+        @Override
+        public ValueSettings getValueSettings() {
+            return isLampSlot() ? new ValueSettings(0, lampInverted() ? 1 : 0) : super.getValueSettings();
+        }
+
+        @Override
+        public void setValueSettings(Player player, ValueSettings settings, boolean ctrlDown) {
+            if (!isLampSlot()) {
+                super.setValueSettings(player, settings, ctrlDown);
+                return;
+            }
+            count = Math.clamp(settings.value(), 0, 1);
+            owner.sendData();
+        }
+
+        @Override
+        public boolean isCountVisible() {
+            return isLampSlot() || super.isCountVisible();
+        }
+
+        /**
+         * Create's gauge label reports "no target amount set" while count is zero, which on a lamp
+         * just means the normal mode. A lamp names itself instead.
+         */
+        @Override
+        public net.minecraft.network.chat.MutableComponent getLabel() {
+            return isLampSlot() ? getFilter().getHoverName().copy() : super.getLabel();
+        }
+
+        /** The box shows the mode name where a gauge would show its amount. */
+        @Override
+        public net.minecraft.network.chat.MutableComponent getCountLabelForValueBox() {
+            return isLampSlot()
+                    ? Component.translatable(lampInverted() ? "gui.distantstock.lamp.mode.inverted"
+                            : "gui.distantstock.lamp.mode.normal")
+                    : super.getCountLabelForValueBox();
+        }
+
         @Override
         public net.minecraft.network.chat.MutableComponent getAmountTip() {
-            return isLampInputBlocked() ? net.minecraft.network.chat.Component.empty() : super.getAmountTip();
+            return isLampSlot() ? Component.translatable("gui.distantstock.lamp.mode.tip")
+                    : super.getAmountTip();
+        }
+
+        /**
+         * A brass lamp reads the network and its gauges and has no mode to set, so its value
+         * panel is meaningless and must not open at all. The andesite lamp keeps its board:
+         * that is where the normal/inverted toggle lives.
+         */
+        private boolean isBrassLampSlot() {
+            SignalLampPanelItem lamp = SignalLampPanelItem.from(getFilter());
+            return lamp != null && lamp.material() == SignalLampPanelItem.Material.BRASS;
         }
 
         @Override
+        public boolean acceptsValueSettings() {
+            return owner.panelDataReady() && !isBrassLampSlot();
+        }
+
+        /** A lamp slot owns its value panel now, so it only swallows input until the data arrives. */
+        @Override
         public boolean bypassesInput(net.minecraft.world.item.ItemStack stack) {
-            return isLampInputBlocked() || super.bypassesInput(stack);
+            return !owner.panelDataReady() || isBrassLampSlot() || super.bypassesInput(stack);
+        }
+
+        private boolean lampInverted() {
+            return count != 0;
         }
 
         @Override

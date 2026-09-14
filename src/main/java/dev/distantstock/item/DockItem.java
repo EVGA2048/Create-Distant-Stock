@@ -43,7 +43,15 @@ public final class DockItem extends BlockItem {
         }
         if (behaviour != null && LogisticallyLinkedBehaviour.isValidLink(behaviour)) {
             UUID node = TranserverBridge.nodeId();
-            if (!(level instanceof ServerLevel serverLevel) || node == null
+            if (node == null) {
+                // A distant binding records which server the network lives on, and that identity is
+                // the Transerver node id. With no node configured there is nothing to write into the
+                // item, so say that instead of blaming the stock link.
+                player.displayClientMessage(
+                        Component.translatable("gui.distantstock.dock_bind_no_node"), true);
+                return InteractionResult.FAIL;
+            }
+            if (!(level instanceof ServerLevel serverLevel)
                     || Create.LOGISTICS == null || Create.LOGISTICS.logisticsNetworks == null) {
                 player.displayClientMessage(Component.translatable("gui.distantstock.dock_bind_failed"), true);
                 return InteractionResult.FAIL;

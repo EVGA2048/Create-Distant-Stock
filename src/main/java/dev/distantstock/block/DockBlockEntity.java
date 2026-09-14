@@ -24,6 +24,8 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.WorldlyContainer;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -37,7 +39,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
-public final class DockBlockEntity extends SmartBlockEntity implements IHaveGoggleInformation {
+public final class DockBlockEntity extends SmartBlockEntity implements IHaveGoggleInformation, WorldlyContainer {
     public static final int SLOTS = 1;
     public static final int MAX_PRIORITY = 5;
     public static final int TRANSMIT_TICKS = 30;
@@ -51,32 +53,33 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     /** Items and parcels the dock cannot handle, waiting for room below the fallback face. */
     private final ItemStackHandler fallbackInv = fallbackInventory(this::contentsChanged);
 
-    /** Two directional views of one physical capacity. Legacy slots are exposed only to drain them. */
+    /** One exposed package slot; received parcels may be extracted, outgoing parcels inserted. */
     final IItemHandler automation = new IItemHandler() {
         @Override
         public int getSlots() {
-            return receivedInv.getSlots() + outboundInv.getSlots();
+            return 1;
         }
 
         @Override
         public ItemStack getStackInSlot(int slot) {
-            return slot < receivedInv.getSlots() ? receivedInv.getStackInSlot(slot) : outboundInv.getStackInSlot(slot - receivedInv.getSlots());
+            return slot == 0 ? (receivedInv.getStackInSlot(0).isEmpty()
+                    ? outboundInv.getStackInSlot(0) : receivedInv.getStackInSlot(0)) : ItemStack.EMPTY;
         }
 
         @Override
         public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
-            if (slot < receivedInv.getSlots() || !PackageItem.isPackage(stack) || !canSend() || occupied()) {
+            if (slot != 0 || !PackageItem.isPackage(stack) || occupied()) {
                 return stack;
             }
-            return outboundInv.insertItem(slot - receivedInv.getSlots(), stack, simulate);
+            return outboundInv.insertItem(0, stack, simulate);
         }
 
         @Override
         public ItemStack extractItem(int slot, int amount, boolean simulate) {
-            if (slot >= receivedInv.getSlots() || !canReceive() || receiving()) {
+            if (slot != 0 || !canReceive() || receiving()) {
                 return ItemStack.EMPTY;
             }
-            return receivedInv.extractItem(slot, amount, simulate);
+            return receivedInv.extractItem(0, amount, simulate);
         }
 
         @Override
@@ -86,7 +89,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
 
         @Override
         public boolean isItemValid(int slot, ItemStack stack) {
-            return slot >= receivedInv.getSlots() && canSend() && PackageItem.isPackage(stack);
+            return slot == 0 && PackageItem.isPackage(stack);
         }
     };
 
@@ -125,6 +128,32 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             return automation.isItemValid(slot, stack);
         }
     };
+
+    @Override public int getContainerSize() { return 1; }
+    @Override public boolean isEmpty() { return !occupied(); }
+    @Override public ItemStack getItem(int slot) { return automation.getStackInSlot(slot); }
+    @Override public ItemStack removeItem(int slot, int amount) { return automation.extractItem(slot, amount, false); }
+    @Override public ItemStack removeItemNoUpdate(int slot) { return automation.extractItem(slot, 1, false); }
+    @Override public void setItem(int slot, ItemStack stack) {
+        if (slot == 0 && !stack.isEmpty()) automation.insertItem(0, stack, false);
+    }
+    @Override public boolean stillValid(Player player) {
+        return level != null && level.getBlockEntity(worldPosition) == this
+                && player.distanceToSqr(worldPosition.getCenter()) <= 64;
+    }
+    @Override public void clearContent() {
+        receivedInv.setStackInSlot(0, ItemStack.EMPTY);
+        outboundInv.setStackInSlot(0, ItemStack.EMPTY);
+        fallbackInv.setStackInSlot(0, ItemStack.EMPTY);
+    }
+    @Override public int[] getSlotsForFace(Direction side) { return new int[]{0}; }
+    @Override public boolean canPlaceItem(int slot, ItemStack stack) { return automation.isItemValid(slot, stack); }
+    @Override public boolean canPlaceItemThroughFace(int slot, ItemStack stack, Direction side) {
+        return canPlaceItem(slot, stack);
+    }
+    @Override public boolean canTakeItemThroughFace(int slot, ItemStack stack, Direction side) {
+        return slot == 0 && canReceive() && !receiving() && !receivedInv.getStackInSlot(0).isEmpty();
+    }
 
     private UUID freq;
     private RemoteNetworkId networkId;
@@ -609,8 +638,10 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             }
             Optional<RemoteRoute> route = RouteResolution.resolve(packageRoute, orderRoute, defaultRoute());
             if (route.isEmpty()) {
-                if (dev.distantstock.link.TranserverBridge.attachedApi() == null) {
-                    // Legacy peers without Transerver still resolve the other side by address themselves.
+                // Legacy peers without Transerver resolve the other side by address themselves, but
+                // only when the parcel actually carries one. Handing a parcel with neither route nor
+                // address to the queue would drop it, so it has to stay here and report instead.
+                if (dev.distantstock.link.TranserverBridge.attachedApi() == null && !destinationAddress.isBlank()) {
                     if (LinkQueues.offerOutboundPackage(new LinkQueues.Parcel(
                             nbt, destinationAddress, "", DockGroupDirectory.DEFAULT_GROUP_ID))) {
                         outboundInv.extractItem(slot, 1, false);

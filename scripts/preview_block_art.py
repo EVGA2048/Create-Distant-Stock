@@ -20,6 +20,10 @@ CREATE = Path.home() / 'Documents/minecraft_launcher/.minecraft/versions/ES2_Fir
 
 @lru_cache(None)
 def model(name):
+    # A reference with no namespace means minecraft:, the same as it does in game. Create's
+    # own models rely on that, so the blockstate sweep used to die partway through the jar.
+    if ':' not in name:
+        name = 'minecraft:' + name
     namespace, path = name.split(':')
     if namespace == 'minecraft':
         return {}
@@ -43,13 +47,17 @@ def texture(name):
     return im
 
 
-def resolve(ref, textures):
+def resolve_name(ref, textures):
     seen = set()
     while ref.startswith('#'):
         assert ref not in seen, 'Texture cycle'
         seen.add(ref)
         ref = textures[ref[1:]]
-    return texture(ref)
+    return ref
+
+
+def resolve(ref, textures):
+    return texture(resolve_name(ref, textures))
 
 
 def rotate(point, rotation):
@@ -64,12 +72,14 @@ def rotate(point, rotation):
     return tuple(p[i]+origin[i] for i in range(3))
 
 
-def render(name, yaw=30, pitch=25, size=(240,250), scale=9):
+def render(name, yaw=30, pitch=25, size=(240,250), scale=9, center=(8,8,8)):
+    """center is worth moving for models taller than one block; the console's antenna
+    reaches y=25, and pivoting about y=8 pushes it off the top of the frame."""
     obj = model(name)
     sy,cy = math.sin(math.radians(yaw)),math.cos(math.radians(yaw))
     sp,cp = math.sin(math.radians(pitch)),math.cos(math.radians(pitch))
     def project(p):
-        x,y,z = p[0]-8,p[1]-8,p[2]-8
+        x,y,z = p[0]-center[0],p[1]-center[1],p[2]-center[2]
         xr,zr = cy*x+sy*z,-sy*x+cy*z
         yr,depth = cp*y+sp*zr,-sp*y+cp*zr
         return (size[0]/2+xr*scale,size[1]/2-yr*scale),depth
@@ -131,21 +141,74 @@ def render(name, yaw=30, pitch=25, size=(240,250), scale=9):
     return im
 
 
+# Models whose geometry deliberately leaves the block. Both are the requester console:
+# its antenna is the portable requester's mast stood upright, which reaches y=25. It is
+# floor-standing furniture and nothing is meant to sit on top of it.
+BEYOND_BLOCK = {'gauge', 'gauge_lit'}
+
+# Cuboids carrying only the faces they need. The console's Dish and AntennaTop are
+# zero- and thin-plate parts lifted straight from the portable item model, where the
+# unseen faces were already dropped.
+OPEN_CUBOIDS = {'gauge', 'gauge_lit'}
+
+# Textures the console is allowed to sample with alpha below 255.
+#
+#   glass   - the lamp cover is meant to be see-through, which is also why the console
+#             renders as a whole-model translucent.
+#   requester - the antenna reuses the portable requester's item texture, whose alpha
+#             layout leaves most of its faces redundant. Rendering the finished model
+#             through the handoff's own renderer reproduces both approved previews
+#             pixel-for-pixel, so the holes those faces would leave are all covered.
+#   bulb    - the monitor's bulb, alpha 0..206 on an already-translucent model.
+PARTIAL_ALPHA_OK = {
+    'distantstock:block/requester_console/glass',
+    'distantstock:block/requester_console/glass_lit',
+    'distantstock:item/requester',
+    'distantstock:block/monitor_bulb',
+}
+
+
+def sampled_region(texture, uv):
+    """The pixels a face actually reads, so opacity is judged on the sample and not the file.
+
+    The console's girder textures carry a transparent attachment column that its UVs
+    deliberately avoid; checking the whole file would flag a texture that is used correctly.
+    """
+    u0, v0, u1, v1 = uv
+    left, right = sorted((u0, u1))
+    top, bottom = sorted((v0, v1))
+    x0 = math.floor(left / 16 * texture.width)
+    x1 = math.ceil(right / 16 * texture.width)
+    y0 = math.floor(top / 16 * texture.height)
+    y1 = math.ceil(bottom / 16 * texture.height)
+    return texture.crop((x0, y0, max(x0 + 1, x1), max(y0 + 1, y1)))
+
+
 def validate():
     for name in ('dock','dock_lit','dock_loaded','dock_loaded_lit','gauge','gauge_lit','monitor'):
         m = model('distantstock:block/'+name)
         for e in m['elements']:
-            assert set(e['faces']) == {'north','south','east','west','up','down'}
+            if name not in OPEN_CUBOIDS:
+                assert set(e['faces']) == {'north','south','east','west','up','down'}
             for face in e['faces'].values():
                 assert all(0 <= v <= 16 for v in face['uv']), (name,face)
-                assert resolve(face['texture'],m['textures']).getchannel('A').getextrema() == (255,255)
+                ref = resolve_name(face['texture'],m['textures'])
+                if ref not in PARTIAL_ALPHA_OK:
+                    assert sampled_region(texture(ref),face['uv']).getchannel('A').getextrema() == (255,255), (name,ref)
             for x in (e['from'][0],e['to'][0]):
                 for y in (e['from'][1],e['to'][1]):
                     for z in (e['from'][2],e['to'][2]):
-                        assert all(-.001 <= p <= 16.001 for p in rotate((x,y,z),e.get('rotation'))), (name,e['name'])
-        if name.startswith('dock'):
+                        corners = rotate((x,y,z),e.get('rotation'))
+                        if name in BEYOND_BLOCK:
+                            # Still bounded, just by a taller box: the antenna stops at y=25.
+                            assert all(-.001 <= p <= 25.001 for p in corners), (name,e.get('name'))
+                        else:
+                            assert all(-.001 <= p <= 16.001 for p in corners), (name,e.get('name'))
+        # The sealed dock casing is one full cube, so it is named explicitly rather than
+        # prefix-matched against the open-topped packager shells.
+        if name in ('dock', 'dock_lit', 'dock_loaded', 'dock_loaded_lit'):
             assert len(m['elements']) == 1 and m['elements'][0]['from'] == [0,0,0] and m['elements'][0]['to'] == [16,16,16]
-        print(f'PASS {name}: {len(m["elements"])} cuboids, {sum(len(e["faces"]) for e in m["elements"])} faces, opaque UVs, within one block')
+        print(f'PASS {name}: {len(m["elements"])} cuboids, {sum(len(e["faces"]) for e in m["elements"])} faces, opaque samples, within block')
     for path in (ASSETS/'distantstock/blockstates').glob('*.json'):
         for entry in json.loads(path.read_text()).get('variants',{}).values():
             for v in entry if isinstance(entry,list) else [entry]:
@@ -156,15 +219,16 @@ def validate():
 def main():
     validate()
     OUT.mkdir(parents=True,exist_ok=True)
-    cells = [('DOCK / IDLE','dock',30,25),('DOCK / LINK','dock_lit',30,25),
-             ('DOCK / PARCEL','dock_loaded_lit',30,25),('DOCK / BACK','dock',210,25),
-             ('DOCK / FRONT','dock_lit',0,0),('REQUEST DESK','gauge_lit',30,35),
-             ('DESK / SIDE','gauge',90,20),('WALL INSTRUMENT','monitor',30,20)]
+    # The console is framed smaller and about a higher pivot so its y=25 antenna fits.
+    cells = [('DOCK / IDLE','dock',30,25,9,(8,8,8)),('DOCK / LINK','dock_lit',30,25,9,(8,8,8)),
+             ('DOCK / PARCEL','dock_loaded_lit',30,25,9,(8,8,8)),('DOCK / BACK','dock',210,25,9,(8,8,8)),
+             ('DOCK / FRONT','dock_lit',0,0,9,(8,8,8)),('REQUEST DESK','gauge_lit',30,35,6,(8,12,8)),
+             ('DESK / SIDE','gauge',90,20,6,(8,12,8)),('WALL INSTRUMENT','monitor',30,20,9,(8,8,8))]
     sheet = Image.new('RGBA',(960,580),'#e8e5dc')
     d = ImageDraw.Draw(sheet)
-    for i,(label,name,yaw,pitch) in enumerate(cells):
+    for i,(label,name,yaw,pitch,scale,center) in enumerate(cells):
         x,y = (i%4)*240,(i//4)*280
-        sheet.paste(render('distantstock:block/'+name,yaw,pitch),(x,y+30))
+        sheet.paste(render('distantstock:block/'+name,yaw,pitch,scale=scale,center=center),(x,y+30))
         d.text((x+12,y+12),label,fill='#3c423c')
     d.text((12,565),'0.3.7 ACTUAL JSON + TEXTURES / OFFLINE PREVIEW, NOT A GAME SCREENSHOT',fill='#62685f')
     sheet.save(OUT/'machines-0.3.7.png')

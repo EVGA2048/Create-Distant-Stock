@@ -1,0 +1,22 @@
+{
+  "type": "create:mixing",
+  "heat_requirement": "heated",
+  "ingredients": [
+    {
+      "tag": "c:gems/quartz"
+    },
+    {
+      "item": "distantstock:ender_dust"
+    },
+    {
+      "type": "neoforge:single",
+      "amount": 250,
+      "fluid": "distantstock:molten_amethyst"
+    }
+  ],
+  "results": [
+    {
+      "id": "distantstock:ether_quartz"
+    }
+  ]
+}

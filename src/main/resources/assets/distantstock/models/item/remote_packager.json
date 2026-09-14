@@ -2,10 +2,10 @@
   "render_type": "minecraft:cutout",
   "parent": "create:block/packager/item",
   "textures": {
-    "0": "distantstock:block/remote_packager_frame",
+    "0": "distantstock:block/remote_packager_frame_pale",
     "1": "create:block/packager_details",
-    "2": "distantstock:block/remote_packager_horizontal_unpowered",
+    "2": "distantstock:block/remote_packager_horizontal_unpowered_pale",
     "3": "create:block/packager_iris_closed",
-    "particle": "distantstock:block/remote_packager_particle"
+    "particle": "distantstock:block/remote_packager_particle_pale"
   }
 }

@@ -1,0 +1,24 @@
+{
+  "sources": [
+    {
+      "type": "minecraft:single",
+      "resource": "distantstock:block/dock_cap"
+    },
+    {
+      "type": "minecraft:single",
+      "resource": "distantstock:fluid/ether_still"
+    },
+    {
+      "type": "minecraft:single",
+      "resource": "distantstock:fluid/ether_flow"
+    },
+    {
+      "type": "minecraft:single",
+      "resource": "distantstock:fluid/molten_amethyst_still"
+    },
+    {
+      "type": "minecraft:single",
+      "resource": "distantstock:fluid/molten_amethyst_flow"
+    }
+  ]
+}

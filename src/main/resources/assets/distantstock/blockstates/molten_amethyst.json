@@ -1,0 +1,52 @@
+{
+  "variants": {
+    "level=0": {
+      "model": "distantstock:block/molten_amethyst"
+    },
+    "level=1": {
+      "model": "distantstock:block/molten_amethyst"
+    },
+    "level=2": {
+      "model": "distantstock:block/molten_amethyst"
+    },
+    "level=3": {
+      "model": "distantstock:block/molten_amethyst"
+    },
+    "level=4": {
+      "model": "distantstock:block/molten_amethyst"
+    },
+    "level=5": {
+      "model": "distantstock:block/molten_amethyst"
+    },
+    "level=6": {
+      "model": "distantstock:block/molten_amethyst"
+    },
+    "level=7": {
+      "model": "distantstock:block/molten_amethyst"
+    },
+    "level=8": {
+      "model": "distantstock:block/molten_amethyst"
+    },
+    "level=9": {
+      "model": "distantstock:block/molten_amethyst"
+    },
+    "level=10": {
+      "model": "distantstock:block/molten_amethyst"
+    },
+    "level=11": {
+      "model": "distantstock:block/molten_amethyst"
+    },
+    "level=12": {
+      "model": "distantstock:block/molten_amethyst"
+    },
+    "level=13": {
+      "model": "distantstock:block/molten_amethyst"
+    },
+    "level=14": {
+      "model": "distantstock:block/molten_amethyst"
+    },
+    "level=15": {
+      "model": "distantstock:block/molten_amethyst"
+    }
+  }
+}

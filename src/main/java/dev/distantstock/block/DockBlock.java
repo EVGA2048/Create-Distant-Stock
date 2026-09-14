@@ -14,7 +14,9 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import com.simibubi.create.content.logistics.box.PackageItem;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
@@ -158,6 +160,25 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
             // settings panel by holding it, both of which need this click to fall through.
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
+        if (PackageItem.isPackage(stack)) {
+            if (!level.isClientSide) {
+                // The dock holds one parcel at a time, so a refusal here is normal and it used to be
+                // silent: the click reported success and the parcel stayed in hand with no hint why.
+                boolean accepted = be.automation.insertItem(0, stack.copyWithCount(1), false).isEmpty();
+                if (accepted && !player.isCreative()) {
+                    stack.shrink(1);
+                }
+                if (accepted) {
+                    player.displayClientMessage(
+                            Component.translatable("gui.distantstock.dock.accepted"), true);
+                } else {
+                    // To chat, not the action bar. Wearing goggles and looking at a dock puts the
+                    // readout over the action bar, which is exactly when this needs to be read.
+                    player.sendSystemMessage(Component.translatable("gui.distantstock.dock.busy"));
+                }
+            }
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        }
         if (stack.isEmpty()) {
             if (!level.isClientSide && player.isShiftKeyDown()) {
                 be.clearNetwork();
@@ -168,6 +189,14 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                 return ItemInteractionResult.sidedSuccess(false);
             }
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        }
+        // Holding something the dock has no use for is worth saying out loud. It is also the only
+        // way to tell "the dock looked at this item and shrugged" apart from "the dock never saw
+        // the click", which is what a sneaking player gets: vanilla skips the block entirely when a
+        // held item does not bypass sneak-use, so nothing below this line ever runs for them.
+        if (!level.isClientSide && !stack.isEmpty() && !(stack.getItem() instanceof BlockItem)) {
+            player.sendSystemMessage(Component.translatable("gui.distantstock.dock.unhandled",
+                    stack.getHoverName()));
         }
         return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
     }

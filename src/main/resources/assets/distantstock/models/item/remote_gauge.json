@@ -1,1 +1,7 @@
-{"parent":"create:block/factory_gauge/item"}
+{
+  "parent": "create:block/factory_gauge/item",
+  "textures": {
+    "0": "distantstock:block/remote_factory_panel",
+    "particle": "distantstock:block/remote_factory_panel"
+  }
+}

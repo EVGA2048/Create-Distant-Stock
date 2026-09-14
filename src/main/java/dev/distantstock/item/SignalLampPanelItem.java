@@ -3,10 +3,13 @@ package dev.distantstock.item;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBehaviour;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockEntity;
+import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelConnection;
+import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelPosition;
 import dev.distantstock.block.ModBlocks;
 import dev.distantstock.block.SignalPanelBlock;
 import dev.distantstock.block.SignalPanelBlockEntity;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.BlockItem;
@@ -20,6 +23,8 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 
 import java.util.EnumMap;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 public final class SignalLampPanelItem extends BlockItem {
     public enum Material {
@@ -127,6 +132,11 @@ public final class SignalLampPanelItem extends BlockItem {
         super.appendHoverText(stack, context, tooltip, flag);
         tooltip.add(net.minecraft.network.chat.Component.translatable("item.distantstock.lamp.placement")
                 .withStyle(net.minecraft.ChatFormatting.GRAY));
+        if (material == Material.BRASS) {
+            // The watch list is the brass lamp's whole point and nothing on screen advertises it.
+            tooltip.add(net.minecraft.network.chat.Component.translatable("item.distantstock.brass_signal_lamp.usage")
+                    .withStyle(net.minecraft.ChatFormatting.DARK_GRAY));
+        }
     }
 
     private InteractionResult install(BlockPlaceContext context, SignalPanelBlockEntity be,
@@ -141,12 +151,28 @@ public final class SignalLampPanelItem extends BlockItem {
         return InteractionResult.SUCCESS;
     }
 
-    private static SignalPanelBlockEntity convertFactoryPanel(Level level, BlockPos pos, BlockState oldState) {
+    /**
+     * The panel a click really targets. A panel only carries a hitbox for the slots that are already
+     * occupied, so aiming at a free slot makes the crosshair pass straight through and land on the
+     * wall behind it. Create's own placement resolves that through {@code BlockPlaceContext}'s
+     * relative position; the event based paths have to do the same or they never see the panel.
+     */
+    public static BlockPos panelUnder(Level level, BlockPos hitPos, Direction hitFace) {
+        if (level.getBlockState(hitPos).getBlock() instanceof FactoryPanelBlock) {
+            return hitPos;
+        }
+        BlockPos mounted = hitPos.relative(hitFace);
+        return level.getBlockState(mounted).getBlock() instanceof FactoryPanelBlock ? mounted : null;
+    }
+
+    public static SignalPanelBlockEntity convertFactoryPanel(Level level, BlockPos pos, BlockState oldState) {
         if (!(level.getBlockEntity(pos) instanceof FactoryPanelBlockEntity oldBe)) {
             return null;
         }
 
         EnumMap<FactoryPanelBlock.PanelSlot, CompoundTag> saved =
+                new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
+        EnumMap<FactoryPanelBlock.PanelSlot, Map<FactoryPanelPosition, FactoryPanelConnection>> outputs =
                 new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
         for (var entry : oldBe.panels.entrySet()) {
             if (!entry.getValue().isActive()) {
@@ -155,6 +181,15 @@ public final class SignalLampPanelItem extends BlockItem {
             CompoundTag tag = new CompoundTag();
             entry.getValue().write(tag, level.registryAccess(), false);
             saved.put(entry.getKey(), tag);
+            Map<FactoryPanelPosition, FactoryPanelConnection> peers = new HashMap<>();
+            for (var targetPos : entry.getValue().targeting) {
+                FactoryPanelBehaviour target = FactoryPanelBehaviour.at(level, targetPos);
+                if (target != null) {
+                    FactoryPanelConnection connection = target.targetedBy.get(entry.getValue().getPanelPosition());
+                    if (connection != null) peers.put(targetPos, connection);
+                }
+            }
+            outputs.put(entry.getKey(), peers);
         }
 
         BlockState replacement = ModBlocks.SIGNAL_PANEL.get().defaultBlockState()
@@ -162,10 +197,8 @@ public final class SignalLampPanelItem extends BlockItem {
                 .setValue(BlockStateProperties.HORIZONTAL_FACING, oldState.getValue(BlockStateProperties.HORIZONTAL_FACING))
                 .setValue(BlockStateProperties.WATERLOGGED, oldState.getValue(BlockStateProperties.WATERLOGGED))
                 .setValue(FactoryPanelBlock.POWERED, oldState.getValue(FactoryPanelBlock.POWERED));
-        // Avoid FactoryPanelBlockEntity.destroy dropping extra gauges during an in-place conversion.
-        // Existing connected boards need a transactional migration; leave them untouched for now.
-        if (oldBe.panels.values().stream().anyMatch(panel -> !panel.targetedBy.isEmpty()
-                || !panel.targetedByLinks.isEmpty() || !panel.targeting.isEmpty())) return null;
+        // Disable the old entity after taking a complete snapshot; this detaches live peers,
+        // which reconnectCopiedPanels reattaches from the snapshot below.
         for (var panel : oldBe.panels.values()) {
             if (panel.isActive()) panel.disable();
         }
@@ -174,33 +207,46 @@ public final class SignalLampPanelItem extends BlockItem {
         if (!(level.getBlockEntity(pos) instanceof SignalPanelBlockEntity newBe)) {
             return null;
         }
+        newBe.restocker = oldBe.restocker;
         for (var entry : saved.entrySet()) {
             newBe.addPanel(entry.getKey(), null);
             newBe.panels.get(entry.getKey()).read(entry.getValue(), level.registryAccess(), false);
+            if (oldState.is(ModBlocks.REMOTE_GAUGE.get())) newBe.setRemoteGauge(entry.getKey(), true);
         }
-        reconnectCopiedPanels(level, newBe);
+        reconnectCopiedPanels(level, newBe, outputs);
         newBe.redraw = true;
         newBe.sendData();
         return newBe;
     }
 
-    private static void reconnectCopiedPanels(Level level, SignalPanelBlockEntity be) {
+    private static void reconnectCopiedPanels(Level level, SignalPanelBlockEntity be,
+            EnumMap<FactoryPanelBlock.PanelSlot, Map<FactoryPanelPosition, FactoryPanelConnection>> outputs) {
         for (FactoryPanelBehaviour panel : be.panels.values()) {
             if (!panel.isActive()) {
                 continue;
             }
-            // Replacing the original block disconnects both ends. The copied NBT
-            // restores this side; replaying the relationships restores the peers.
+            // Replacing the original block detaches both ends. The copied NBT restores this
+            // side; the peers are reattached from the pre-conversion snapshot so their
+            // per-connection settings survive instead of being rebuilt from scratch.
             for (var connection : new ArrayList<>(panel.targetedBy.values())) {
-                panel.addConnection(connection.from);
+                FactoryPanelBehaviour source = FactoryPanelBehaviour.at(level, connection.from);
+                if (source != null) {
+                    source.targeting.add(panel.getPanelPosition());
+                    source.blockEntity.sendData();
+                }
             }
             for (var connection : new ArrayList<>(panel.targetedByLinks.values())) {
-                panel.addConnection(connection.from);
+                var link = FactoryPanelBehaviour.linkAt(level, connection);
+                if (link != null) link.connect(panel);
             }
             for (var targetPosition : new ArrayList<>(panel.targeting)) {
                 FactoryPanelBehaviour target = FactoryPanelBehaviour.at(level, targetPosition);
                 if (target != null) {
-                    target.addConnection(panel.getPanelPosition());
+                    FactoryPanelConnection snapshot = outputs.getOrDefault(panel.slot, Map.of()).get(targetPosition);
+                    if (snapshot != null) {
+                        target.targetedBy.put(panel.getPanelPosition(), snapshot);
+                        target.blockEntity.sendData();
+                    }
                 }
             }
         }

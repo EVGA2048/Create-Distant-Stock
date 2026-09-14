@@ -1,0 +1,7 @@
+{
+  "textures": {
+    "particle": "distantstock:fluid/ether_still",
+    "still": "distantstock:fluid/ether_still",
+    "flow": "distantstock:fluid/ether_flow"
+  }
+}
