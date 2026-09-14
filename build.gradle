@@ -12,6 +12,12 @@ base {
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
+// Opt-in integration tests run in a separate world and are excluded from release jars.
+if (providers.gradleProperty('withGameTests').isPresent()) {
+    sourceSets.main.java.srcDir('src/gametest/java')
+    sourceSets.main.resources.srcDir('src/gametest/resources')
+}
+
 neoForge {
     version = neo_version
     runs {
@@ -21,10 +27,35 @@ neoForge {
         server {
             server()
         }
+        if (providers.gradleProperty('withGameTests').isPresent()) {
+            clientSmoke {
+                client()
+                gameDirectory = layout.buildDirectory.dir('client-smoke-run')
+                systemProperty 'distantstock.clientSmoke', 'true'
+            }
+            gameTestServer {
+                type = 'gameTestServer'
+                gameDirectory = layout.buildDirectory.dir('gametest-run')
+                systemProperty 'neoforge.enabledGameTestNamespaces', 'distantstock'
+                programArgument '--nogui'
+            }
+        }
     }
     mods {
         "${mod_id}" {
             sourceSet(sourceSets.main)
+        }
+    }
+}
+
+if (providers.gradleProperty('withGameTests').isPresent()) {
+    tasks.named('runClientSmoke').configure {
+        doLast {
+            def report = layout.buildDirectory.file('client-smoke-run/logs/latest.log').get().asFile
+            if (!report.exists() || !report.text.contains('DISTANTSTOCK_CLIENT_SMOKE_PASSED')
+                    || report.text.contains('DISTANTSTOCK_CLIENT_SMOKE_FAILED')) {
+                throw new GradleException('Client smoke test failed; inspect build/client-smoke-run/logs/latest.log')
+            }
         }
     }
 }

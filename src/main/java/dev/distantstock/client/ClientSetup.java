@@ -38,6 +38,7 @@ public final class ClientSetup {
          */
         @SubscribeEvent
         public static void visualizers(FMLClientSetupEvent e) {
+            SignalPanelRenderer.registerModels();
             SimpleBlockEntityVisualizer.builder(ModBlockEntities.REMOTE_PACKAGER.get())
                     .factory((context, be, partialTick) -> new PackagerVisual<>(context, be, partialTick))
                     // The renderer still draws the packaged box outside the Flywheel check.
@@ -48,7 +49,7 @@ public final class ClientSetup {
         @SubscribeEvent
         public static void renderers(EntityRenderersEvent.RegisterRenderers e) {
             e.registerBlockEntityRenderer(ModBlockEntities.REMOTE_GAUGE.get(),
-                    com.simibubi.create.content.logistics.factoryBoard.FactoryPanelRenderer::new);
+                    RemoteGaugeRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.REMOTE_PACKAGER.get(), PackagerRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.DOCK.get(), DockParcelRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.SIGNAL_PANEL.get(), SignalPanelRenderer::new);
@@ -73,6 +74,7 @@ public final class ClientSetup {
     public static final class Manual {
         @SubscribeEvent
         public static void lampConnection(PlayerInteractEvent.RightClickBlock e) {
+            if (!e.getLevel().isClientSide) return;
             if (!(e.getLevel().getBlockEntity(e.getPos()) instanceof dev.distantstock.block.SignalPanelBlockEntity be)) return;
             var slot = com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock.getTargetedSlot(
                     e.getPos(), be.getBlockState(), e.getHitVec().getLocation());

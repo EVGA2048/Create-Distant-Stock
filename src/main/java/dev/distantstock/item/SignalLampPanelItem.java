@@ -91,16 +91,19 @@ public final class SignalLampPanelItem extends BlockItem {
             return install(new BlockPlaceContext(context), be, slot);
         }
 
-        if (context.getPlayer() != null && context.getPlayer().isShiftKeyDown()
-                && context.getClickedFace().getAxis().isHorizontal()) {
-            // Use vanilla placement validation without changing this registered item's block mapping.
-            return new BlockItem(ModBlocks.SIGNAL_PANEL.get(), new net.minecraft.world.item.Item.Properties())
-                    .place(new BlockPlaceContext(context));
-        }
-
         // For every ordinary surface use vanilla BlockItem placement. Since this item is now
         // registered against the correct IndicatorLampBlock, no fallback can create SIGNAL_PANEL.
         return super.useOn(context);
+    }
+
+    @Override
+    protected BlockState getPlacementState(BlockPlaceContext context) {
+        if (context.getPlayer() != null && context.getPlayer().isShiftKeyDown()
+                && context.getClickedFace().getAxis().isHorizontal()) {
+            BlockState state = ModBlocks.SIGNAL_PANEL.get().getStateForPlacement(context);
+            return state != null && canPlace(context, state) ? state : null;
+        }
+        return super.getPlacementState(context);
     }
 
     public static void finishPlacement(SignalPanelBlockEntity be, FactoryPanelBlock.PanelSlot slot, ItemStack held) {

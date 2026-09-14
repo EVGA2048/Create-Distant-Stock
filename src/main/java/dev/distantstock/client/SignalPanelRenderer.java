@@ -44,6 +44,9 @@ public final class SignalPanelRenderer extends SmartBlockEntityRenderer<SignalPa
         super(context);
     }
 
+    /** Force partial registration before the first model bake, not on renderer construction. */
+    public static void registerModels() {}
+
     @Override
     protected void renderSafe(SignalPanelBlockEntity be, float partialTicks, PoseStack ms,
                               MultiBufferSource buffer, int light, int overlay) {
@@ -98,7 +101,7 @@ public final class SignalPanelRenderer extends SmartBlockEntityRenderer<SignalPa
                 lit ? RenderType.cutout() : RenderType.translucent());
     }
 
-    private static void renderPartial(PartialModel model, BlockState state,
+    static void renderPartial(PartialModel model, BlockState state,
                                       FactoryPanelBlock.PanelSlot slot, PoseStack ms,
                                       MultiBufferSource buffer, int light, int overlay,
                                       RenderType renderType) {
