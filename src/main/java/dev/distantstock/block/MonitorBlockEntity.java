@@ -96,6 +96,11 @@ public final class MonitorBlockEntity extends BlockEntity implements IHaveGoggle
     @Override
     public boolean addToGoggleTooltip(List<Component> tip, boolean sneaking) {
         GoggleText.title(tip, "block.distantstock.monitor");
+        // The tower carries this device or it does not; either way that is the first thing to say,
+        // because everything under it reads as a fault when the answer is no.
+        if (!dev.distantstock.routing.TowerActivation.active(level, worldPosition)) {
+            GoggleText.value(tip, "goggle.distantstock.tower.inactive", net.minecraft.ChatFormatting.RED);
+        }
         if (networkId == null && freq == null) {
             GoggleText.line(tip, "goggle.distantstock.untuned");
         } else {

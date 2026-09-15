@@ -793,6 +793,13 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     @Override
     public boolean addToGoggleTooltip(List<Component> tip, boolean sneaking) {
         GoggleText.title(tip, "block.distantstock.dock");
+        // First, before every number that only means something when the dock is on. A dock outside
+        // every tower's reach reports zero throughput, an empty backlog and a target it never
+        // reaches, and an operator reading that list top to bottom would go looking at the network
+        // before they thought to look at the tower.
+        if (!TowerActivation.active(level, worldPosition)) {
+            GoggleText.value(tip, "goggle.distantstock.tower.inactive", net.minecraft.ChatFormatting.RED);
+        }
         GoggleText.line(tip, switch (mode) {
             case SEND -> "goggle.distantstock.mode.export";
             case RECEIVE -> "goggle.distantstock.mode.import";

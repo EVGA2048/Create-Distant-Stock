@@ -30,8 +30,10 @@ import java.util.Map;
  *
  * <p>The members come from {@link TowerActivation}'s snapshot, which is already the answer to "which
  * towers are one system and what do they carry"; only the tier and the rotation are read from the
- * block entities, because those are not part of that snapshot. Nothing here is computed per frame or
- * per tick: a readout is built once a second, on the same beat the monitor's other numbers move.
+ * block entities, because those are not part of that snapshot, and the switches, the radius and the
+ * tank come from {@link TowerDirectory}, which is the only place that holds them. Nothing here is
+ * computed per frame or per tick: a readout is built once a second, on the same beat the monitor's
+ * other numbers move.
  *
  * <p>{@code stress} and {@code speed} describe the system, not one tower: the merged system's draw
  * is the sum of its members' impacts, and it turns no faster than its slowest member — a system with
@@ -56,16 +58,43 @@ public record TowerReadout(
         members = List.copyOf(members);
     }
 
-    /** One member tower as the readout shows it. {@code tier} is empty for a tower that went away. */
-    public record Member(long pos, String tier, int radius, int devices, boolean running, float speed) {
+    /**
+     * One member tower as the readout shows it. {@code tier} is empty for a tower that went away.
+     *
+     * <p>The last six fields are per tower rather than per system, which is why they are read here
+     * instead of being summed at the top: the ether in a tower's tank belongs to that base, the
+     * capacity is whatever shaft happens to turn it, and the two switches and the chunk radius are
+     * exactly the dials the monitor's screen edits — one tower at a time.
+     *
+     * @param ether      millibuckets in this tower's tank; zero when the block entity is gone
+     * @param capacity   what this tower's own rotation network can supply, in stress units; zero
+     *                   when it has no network under it
+     * @param overstressed whether that network is over its capacity. A stalled tower and an
+     *                   overstressed one both report a speed of zero, and only this tells them
+     *                   apart — see {@link #speed}
+     * @param chunkRadius the radius the loader actually uses for this tower: the stored setting
+     *                   clamped to the tier, so a tower that lost its mast reads as what it loads
+     *                   today rather than as what it once asked for
+     * @param loading    this tower's chunk-loading switch, as the file holds it
+     * @param carrying   this tower's device switch, as the file holds it
+     */
+    public record Member(long pos, String tier, int radius, int devices, boolean running, float speed,
+                         int ether, float capacity, boolean overstressed,
+                         int chunkRadius, boolean loading, boolean carrying) {
     }
 
     /**
      * One loaded tower, as the world half found it: where it stands, how tall it is, how fast it
      * turns. A tower whose block entity is gone keeps its place in the list with a null tier —
      * dropping it would silently shrink a system the snapshot still believes in.
+     *
+     * <p>The settings travel in the fact rather than being looked up later because they live in a
+     * file, not in the world: an unloaded tower still has a radius the operator chose, and a
+     * readout that could not see it would show a tower's dials as untouched while they are set.
      */
-    public record Fact(BlockPos base, TowerTier tier, boolean running, float speed) {
+    public record Fact(BlockPos base, TowerTier tier, boolean running, float speed,
+                       int ether, float capacity, boolean overstressed,
+                       TowerDirectory.Settings settings) {
     }
 
     /**
@@ -91,7 +120,14 @@ public record TowerReadout(
             TowerTier tier = fact.tier();
             members.add(new Member(fact.base().asLong(), tier == null ? "" : tier.name(),
                     tier == null ? 0 : tier.radius(), tier == null ? 0 : tier.devices(),
-                    fact.running(), fact.speed()));
+                    fact.running(), fact.speed(),
+                    fact.ether(), fact.capacity(), fact.overstressed(),
+                    // Clamped to the tier on the way out, by the same call the loader makes. The
+                    // screen edits the number it is shown, so the number it is shown has to be the
+                    // one in force; a stored three over a tier that pays for one would otherwise
+                    // come back as a three the buttons could not step down from.
+                    fact.settings().radiusFor(tier),
+                    fact.settings().loading(), fact.settings().carrying()));
             if (tier != null) {
                 stress += tier.stress();
                 devices += tier.devices();
@@ -123,6 +159,11 @@ public record TowerReadout(
         if (carrier == null) {
             return NONE;
         }
+        MinecraftServer server = level.getServer();
+        if (server == null) {
+            return NONE;
+        }
+        TowerDirectory directory = TowerDirectory.get(server);
         List<TowerSystem.Member> members = TowerActivation.snapshot().systemMembers(carrier);
         Map<TowerSystem.TowerId, TowerCoreBlockEntity> loaded = loadedTowers();
         List<Fact> facts = new ArrayList<>();
@@ -134,11 +175,11 @@ public record TowerReadout(
             if (own == null) {
                 return NONE;
             }
-            facts.add(factOf(own, BlockPos.of(carrier.packedPos())));
+            facts.add(factOf(own, BlockPos.of(carrier.packedPos()), directory.settings(carrier)));
             return describe(carrier, facts, TowerActivation.usage(carrier), selectedSide(level, carrier));
         }
         for (TowerSystem.Member member : members) {
-            facts.add(factOf(loaded.get(member.id()), member.base()));
+            facts.add(factOf(loaded.get(member.id()), member.base(), directory.settings(member.id())));
         }
         return describe(carrier, facts, TowerActivation.usage(carrier), selectedSide(level, carrier));
     }
@@ -195,11 +236,12 @@ public record TowerReadout(
         return TowerTier.sideForRadius(settings.radiusFor(tower == null ? null : tower.tier()));
     }
 
-    private static Fact factOf(TowerCoreBlockEntity tower, BlockPos base) {
+    private static Fact factOf(TowerCoreBlockEntity tower, BlockPos base, TowerDirectory.Settings settings) {
         if (tower == null) {
-            return new Fact(base, null, false, 0);
+            return new Fact(base, null, false, 0, 0, 0, false, settings);
         }
-        return new Fact(base, tower.tier(), tower.isRunning(), tower.getSpeed());
+        return new Fact(base, tower.tier(), tower.isRunning(), tower.getSpeed(),
+                tower.ether(), tower.networkCapacity(), tower.overstressed(), settings);
     }
 
     private static Map<TowerSystem.TowerId, TowerCoreBlockEntity> loadedTowers() {

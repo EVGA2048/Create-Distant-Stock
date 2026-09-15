@@ -254,5 +254,15 @@
   "goggle.distantstock.tower.ether": "Ether %s / %s mB — %s mB per parcel",
   "goggle.distantstock.tower.ether.off": "Ether: not billed (tower.chargeParcels is off)",
   "goggle.distantstock.send.no_ether": "Held: the tower cannot pay for this parcel",
-  "gui.distantstock.uncharged": "No tower carries this desk — it can be read, not ordered from"
+  "gui.distantstock.uncharged": "No tower carries this desk — it can be read, not ordered from",
+  "distantstock.ponder.distant_tower.header": "Raising an interlink tower",
+  "distantstock.ponder.distant_tower.text_1": "A tower is driven from below: one vertical shaft, set directly under the base. The underside is the only face that takes rotation, so a shaft run in from the side meets nothing. Speed is not the price — a medium network will do; what a tower spends is stress.",
+  "distantstock.ponder.distant_tower.text_2": "Above the shaft goes the Interlink Tower Base — the one part of a tower that turns, and the one that keeps the count. Close the base off with a 3x3 ring of Distant Casing: the casing has no say in whether a tower stands, but it is the base's face.",
+  "distantstock.ponder.distant_tower.text_3": "Stack Interlink Tower Couplers upward, and keep the mast unbroken from the base: one gap, or one segment of another block, and there is no tower at all. Five segments is the first tier.",
+  "distantstock.ponder.distant_tower.text_4": "Cap the mast with an Ether Resonator and the tower is up. The column over the cap is its state lamp: grey while the tower is unfinished or standing still, cyan while it works, and a deeper, self-lit blue while a parcel crosses it.",
+  "distantstock.ponder.distant_tower.text_5": "Height is rank: five couplers is tier I, two more takes the next step, and seventeen couplers is the last of them, tier VII.",
+  "distantstock.ponder.distant_tower.text_6": "A tier decides three things: how many distant devices the tower carries (8 at tier I, 128 at VII), how far from the base they may stand (32 blocks out to 144), and how large a square of chunks it keeps loaded (1x1 up to 7x7).",
+  "distantstock.ponder.distant_tower.text_7": "The shaft below feeds the tower rotation, and taller towers draw more of it: 256 at tier I, roughly doubling a step to 16384 at VII. Fall below a medium speed, or overstress the network, and the light goes out.",
+  "distantstock.ponder.distant_tower.text_8": "Pull the lever and the casing it lights turns its centre into a see-through window, spreading along the casings it touches. It is decoration only — the tower works exactly the same.",
+  "goggle.distantstock.tower.inactive": "未激活：不在任何运转中的互通塔范围内"
 }

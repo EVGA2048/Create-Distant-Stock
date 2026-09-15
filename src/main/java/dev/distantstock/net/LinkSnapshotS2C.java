@@ -58,10 +58,14 @@ public record LinkSnapshotS2C(BlockPos source, LinkSnapshot.View view) implement
     /**
      * The tower readout, written as one block at the very end of the view.
      *
-     * <p>Kept in its own pair of methods so the twelve values it holds are read in the same order
-     * they were written without the reader having to scan a hundred lines of the link half to check.
-     * Every field is written unconditionally, attached or not: a branch would be one more thing the
-     * two sides could disagree about, and the unattached case is a handful of bytes.
+     * <p>Kept in its own pair of methods so the values it holds are read in the same order they were
+     * written without the reader having to scan a hundred lines of the link half to check. Every
+     * field is written unconditionally, attached or not: a branch would be one more thing the two
+     * sides could disagree about, and the unattached case is a handful of bytes.
+     *
+     * <p>Both halves of a member are positional, and the per-tower block comes last in each: a
+     * field added in the middle of it shifts every value behind it, and the failure is a screen
+     * full of plausible numbers rather than an error.
      */
     /**
      * The most members a system may report.
@@ -90,6 +94,12 @@ public record LinkSnapshotS2C(BlockPos source, LinkSnapshot.View view) implement
             buf.writeVarInt(member.devices());
             buf.writeBoolean(member.running());
             buf.writeFloat(member.speed());
+            buf.writeVarInt(member.ether());
+            buf.writeFloat(member.capacity());
+            buf.writeBoolean(member.overstressed());
+            buf.writeVarInt(member.chunkRadius());
+            buf.writeBoolean(member.loading());
+            buf.writeBoolean(member.carrying());
         }
     }
 
@@ -111,8 +121,11 @@ public record LinkSnapshotS2C(BlockPos source, LinkSnapshot.View view) implement
         }
         java.util.List<TowerReadout.Member> members = new java.util.ArrayList<>(memberCount);
         for (int i = 0; i < memberCount; i++) {
+            // The same order writeTower uses, field for field.
             members.add(new TowerReadout.Member(buf.readLong(), buf.readUtf(), buf.readVarInt(),
-                    buf.readVarInt(), buf.readBoolean(), buf.readFloat()));
+                    buf.readVarInt(), buf.readBoolean(), buf.readFloat(),
+                    buf.readVarInt(), buf.readFloat(), buf.readBoolean(),
+                    buf.readVarInt(), buf.readBoolean(), buf.readBoolean()));
         }
         return new TowerReadout(attached, carrierPos, dimension, carried, limit, stress, speed,
                 maxSide, selectedSide, members);

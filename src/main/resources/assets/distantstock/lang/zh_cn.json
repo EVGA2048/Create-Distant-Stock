@@ -254,5 +254,15 @@
   "goggle.distantstock.tower.ether": "以太 %s / %s mB —— 每个邮包 %s mB",
   "goggle.distantstock.tower.ether.off": "以太：未启用（tower.chargeParcels 为关）",
   "goggle.distantstock.send.no_ether": "已滞留：塔付不起这个邮包",
-  "gui.distantstock.uncharged": "没有塔带载这台请求台 —— 可以看，不能下单"
+  "gui.distantstock.uncharged": "没有塔带载这台请求台 —— 可以看，不能下单",
+  "distantstock.ponder.distant_tower.header": "建造互通塔",
+  "distantstock.ponder.distant_tower.text_1": "一座塔的动力从脚下送上来：在底座正下方接一根竖直的传动轴。底面是底座唯一接受旋转的接面，从侧面接过来的轴它认不到。转速不必快，中速（30 转/分）即可——真正吃紧的是应力。",
+  "distantstock.ponder.distant_tower.text_2": "在轴的正上方放一块互通塔底座——整座塔只有它会转，等级与带载也都记在它身上。四周再用远仓机壳围出 3×3 的裙板收口：成塔判定只认底座、耦合器与谐振器，裙板不参与其中，但它是塔基的门面。",
+  "distantstock.ponder.distant_tower.text_3": "往上堆互通塔耦合器，桅杆要从底座一路连续长上去：中间断一格，或者夹进别的方块，塔就不成立。五段是 I 级的门槛。",
+  "distantstock.ponder.distant_tower.text_4": "顶上盖一台以太谐振器，塔就立起来了。塔顶的光柱就是它的状态灯：还没成塔、或塔没在转时是暗灰，工作时是青色，有包裹经过时会变成更深的蓝色并自己发亮——从塔底抬头就能看清。",
+  "distantstock.ponder.distant_tower.text_5": "塔越高，等级越高：耦合器堆到 5 段是 I 级，此后每多两段升一级，17 段封顶 VII 级。",
+  "distantstock.ponder.distant_tower.text_6": "等级决定三件事：能带载多少台远仓设备（I 级 8 台，VII 级 128 台）、能照顾到多远的设备（32 格到 144 格）、能常驻加载多大的区块范围（1×1 到 7×7）。",
+  "distantstock.ponder.distant_tower.text_7": "塔从下方那根轴吃旋转动力，等级越高吃得越多：I 级 256，此后逐级约翻倍，VII 级 16384。转速掉到中速以下，或者网络应力过载，塔顶的光柱都会暗下去。",
+  "distantstock.ponder.distant_tower.text_8": "把拉杆按下去：被红石点亮的机壳，中间会变成透明的观察窗，并顺着相连的机壳一路传开。这只是外观，塔照常工作。",
+  "goggle.distantstock.tower.inactive": "Not activated — outside every running interlink tower"
 }
