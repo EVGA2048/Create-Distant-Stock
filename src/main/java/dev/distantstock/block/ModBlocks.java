@@ -38,13 +38,9 @@ public final class ModBlocks {
             BLOCKS.register("tower_casing", () -> new TowerCasingBlock(tower()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, TowerCouplerBlock> TOWER_COUPLER =
             BLOCKS.register("tower_coupler", () -> new TowerCouplerBlock(tower().noOcclusion()));
-    /**
-     * The core is a plain block until the tower assembly lands, when it becomes a kinetic block
-     * taking rotation from the shaft below it. Its model is the 3x3 base's centre, so it keeps the
-     * tower's own material and sound rather than the generic machine ones.
-     */
-    public static final DeferredHolder<net.minecraft.world.level.block.Block, net.minecraft.world.level.block.Block> TOWER_CORE =
-            BLOCKS.register("tower_core", () -> new net.minecraft.world.level.block.Block(tower().noOcclusion()));
+    /** The 3x3 base's centre: the one part of a tower that takes rotation, from the shaft below. */
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, TowerCoreBlock> TOWER_CORE =
+            BLOCKS.register("tower_core", () -> new TowerCoreBlock(tower().noOcclusion()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, ResonatorBlock> ETHER_RESONATOR =
             BLOCKS.register("ether_resonator", () -> new ResonatorBlock(tower().noOcclusion()));
 

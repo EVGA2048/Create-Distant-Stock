@@ -38,6 +38,14 @@ public final class ModBlockEntities {
                     ModBlocks.SIGNAL_PANEL.get()).build(null));
 
     /**
+     * The core is a kinetic block entity because it is the tower's only rotating part, and the tier
+     * lives here too: the table a tower has reached follows from the mast above it, which this walks.
+     */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TowerCoreBlockEntity>> TOWER_CORE =
+            BES.register("tower_core", () -> BlockEntityType.Builder.of(TowerCoreBlockEntity::new,
+                    ModBlocks.TOWER_CORE.get()).build(null));
+
+    /**
      * The resonator's arms turn about the block's centre and sweep past its sides, so they are drawn
      * by a renderer rather than baked into the model. Nothing else about the tower needs a block
      * entity yet — the casing, core and couplers are all stateless.
