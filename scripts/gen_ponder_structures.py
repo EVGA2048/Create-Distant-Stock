@@ -424,10 +424,36 @@ def verify(scene, name):
                 f"got {sorted(props)}")
 
 
+def replenish_scene():
+    """A gauge board on a wall, a requester beside it, and the dock their orders come out of.
+
+    The two devices sit together because they answer the same question — where do my goods come from
+    — and the scene is about the binding gesture rather than about either machine. The board hangs on
+    the wall the way the monitor does: a wall panel is mounted on the face it was placed against and
+    looks the other way, so the wall stands to its south.
+
+    No panel is written into the board's block entity. Create's panel data is a versioned structure
+    this script has no business inventing, and a scene that showed a filter it had guessed at would
+    teach the wrong shape; the text says what to put on the panel instead.
+    """
+    scene = Scene(8, 6)
+    for x in range(2, 7):
+        for y in (1, 2):
+            scene.place((x, y, 4), "create:cardboard_block", {"axis": "x"})
+    scene.place((3, 1, 3), "distantstock:remote_gauge")
+    scene.place((5, 1, 3), "distantstock:remote_redstone_requester",
+                {"axis": "x", "powered": "false"})
+    scene.place((2, 1, 2), "minecraft:hopper", {"facing": "east", "enabled": "true"},
+                {"id": "minecraft:hopper", "TransferCooldown": -1, "Enabled": 1})
+    chest((6, 1, 2), scene, facing="west")
+    dock((2, 2, 2), scene, facing="south", status="standby")
+    return scene
+
+
 def main():
     for name, build in (("export", export_scene), ("import", import_scene),
                         ("tune", tune_scene), ("status", status_scene),
-                        ("tower", tower_scene)):
+                        ("tower", tower_scene), ("replenish", replenish_scene)):
         scene = build()
         verify(scene, name)
         scene.save(f"{name}.nbt")

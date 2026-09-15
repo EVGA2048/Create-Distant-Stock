@@ -168,6 +168,73 @@ public final class DistantStockScenes {
         scene.markAsFinished();
     }
 
+    /**
+     * replenish.nbt: cardboard wall x2..6 / y1..2 / z4, remote gauge(3,1,3), distant redstone
+     * requester(5,1,3), hopper(2,1,2), dock(2,2,2), chest(6,1,2).
+     *
+     * <p>Two machines and the door their goods come through. The scene is about the gesture that
+     * points them at a warehouse, so the panels are not written into the structure: what a board
+     * looks like with a filter on it is Create's business, and the text says what to put there.
+     */
+    public static void replenish(SceneBuilder scene, SceneBuildingUtil util) {
+        scene.title("distant_replenish", "Ordering from another server");
+        scene.configureBasePlate(0, 0, 8);
+        scene.showBasePlate();
+        scene.idle(8);
+
+        scene.world().showSection(util.select().position(3, 1, 3), Direction.DOWN);
+        scene.overlay().showText(95)
+                .text("A Distant Gauge is a factory gauge that orders for itself. Put a panel on the "
+                        + "board, set its item and the amount you want to keep, and that panel will "
+                        + "watch the number for you.")
+                .pointAt(util.vector().centerOf(3, 1, 3))
+                .placeNearTarget()
+                .attachKeyFrame();
+        scene.idle(100);
+
+        scene.overlay().showText(95)
+                .text("Right-click that panel with a tuned Requester to bind it to that requester's "
+                        + "warehouse and receiving group; sneak-click to unbind. Each of the four "
+                        + "panels is bound on its own, so one board can draw from four places.")
+                .pointAt(util.vector().centerOf(3, 1, 3))
+                .placeNearTarget()
+                .attachKeyFrame();
+        scene.idle(100);
+
+        scene.overlay().showText(95)
+                .text("When the amount falls short of the target it orders the difference. One order "
+                        + "at a time: the next one waits until the stock arrives or the first is "
+                        + "written off, and a single order never asks for more than a stack.")
+                .independent(30);
+        scene.idle(100);
+
+        scene.world().showSection(util.select().position(5, 1, 3), Direction.DOWN);
+        scene.overlay().showText(95)
+                .text("The Distant Redstone Requester is the same idea on a pulse. Give it its nine "
+                        + "items and an address in its own screen, bind it the same way, and one "
+                        + "rising edge sends one order.")
+                .pointAt(util.vector().centerOf(5, 1, 3))
+                .placeNearTarget()
+                .attachKeyFrame();
+        scene.idle(100);
+
+        scene.world().showSection(util.select().fromTo(2, 1, 2, 2, 2, 2), Direction.DOWN);
+        scene.overlay().showText(95)
+                .text("Both order into a receiving group, the same way an order from the desk does, "
+                        + "so the goods arrive at a dock on this side. An unbound Requester is just a "
+                        + "redstone requester, and an unbound gauge is just a gauge.")
+                .pointAt(util.vector().centerOf(2, 2, 2))
+                .placeNearTarget();
+        scene.idle(100);
+
+        scene.overlay().showText(80)
+                .text("Neither one spends anything without a tower carrying it, so build the tower "
+                        + "first.")
+                .independent(30);
+        scene.idle(85);
+        scene.markAsFinished();
+    }
+
     /** status.nbt: stone wall x3..6 / y1..2 / z4, monitor(4,1,3) facing north, dock(4,1,2). */
     public static void status(SceneBuilder scene, SceneBuildingUtil util) {
         scene.title("distant_status", "Reading the link");

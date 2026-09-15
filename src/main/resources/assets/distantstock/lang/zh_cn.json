@@ -298,10 +298,19 @@
   "gui.distantstock.group.default": "默认收货港组",
   "gui.distantstock.route.group.hint": "输入系统名；不存在就新建一个",
   "gui.distantstock.group.closed": "那个系统不对你开放",
-  "gui.distantstock.manual.h6": "A tower is what makes distant devices work. Where one is turning, every distant device in that dimension that no tower reaches stops, and its goggles say so in red. Build the base with a ring of Distant Casing around the central Tower Base, with a vertical shaft underneath — its underside is the only face that takes rotation. Stack at least five Couplers, then cap them with an Ether Resonator. Height is rank: five couplers is tier I, seventeen is tier VII, and each step carries more devices, reaches further, and keeps a wider square of chunks loaded. A tower draws stress from the shaft below it, more at every tier. The column over the cap is its state: grey while it is not turning, cyan while it works, and a deeper, self-lit blue while a parcel crosses it.",
+  "gui.distantstock.manual.h6": "互通塔",
   "gui.distantstock.manual.p6": "塔是远仓设备工作的前提。有塔在转的维度里，没被任何塔罩住的远仓设备会停，护目镜上会红字写明。建法：用远仓机壳在中央的互通塔底座周围围出 3×3 裙板，底座正下方接一根竖直传动轴——底面是它唯一接受旋转的接面。往上堆至少五段耦合器，顶上盖一台以太谐振器。高度就是等级：五段是 I 级，十七段是 VII 级，每升一级都能带载更多设备、够到更远、常驻加载更大的区块范围。塔从下方那根轴吃应力，等级越高吃得越多。塔顶的光柱就是它的状态：没在转是暗灰，在转是青色，有包裹经过时变成更深的蓝色并自己发亮。",
-  "gui.distantstock.manual.h7": "A dock group is one system: it decides which docks a parcel comes out of. On the requester, open the Receiving Group field to see the systems you may use, or type a name nobody has taken to make a new one. Sneak-click a dock to make it belong to the carried system; plain click to make it send there. A system you make is yours and starts closed — only you can add docks to it or send into it. The lock at the right of your own system in the list opens it to everyone, and closes it again. A monitor on a tower shows every tower in its system and lets you set each one on its own: how far it keeps chunks loaded, and whether it loads chunks and carries devices at all.",
+  "gui.distantstock.manual.h7": "港组与锁定",
   "gui.distantstock.manual.p7": "一个港组就是一套系统：它决定包裹从哪些港出来。在请求器上点开「收货港组」那一栏，会列出你可以用的系统；打一个没人用过的名字就会新建一个。潜行右键一个港，它属于当前选中的系统；直接右键，它就发往那个系统。你自己建的系统归你，而且默认关闭——只有你能往里加港、也只有你能往里发货。列表里你自己那个系统右边有个锁，点它开放给别人，再点一次收回。塔上的远仓监视器会列出所属系统里的每一座塔，并且允许你逐座单独设置：常驻加载多远、要不要加载区块、要不要带载设备。",
   "gui.distantstock.group.rename": "改名",
-  "goggle.distantstock.group": "系统：%s"
+  "goggle.distantstock.group": "系统：%s",
+  "gui.distantstock.manual.h8": "跨服下单",
+  "gui.distantstock.manual.p8": "远仓仪表是会自动下单的工厂仪表：每个格子绑一个远端仓库，面板读数低于数值面板上的目标，它就补差额，一次一单、最多一组，库存到目标或超过两分钟才算这一单结束。手持已调谐的请求器右键格子绑定，潜行右键解绑；四个格子可以是四个仓库。远仓红石请求器是红石请求器的跨服版：上升沿发一单，九个格子一次发出去。没绑定的红石请求器就是普通红石请求器。两者都要有塔带载，没塔带载时照常显示、不下单。",
+  "distantstock.ponder.distant_replenish.header": "跨服下单",
+  "distantstock.ponder.distant_replenish.text_1": "远仓仪表是会自动下单的工厂仪表。给它装上面板，设好过滤物品和你想保有的数量，这一个格子就会替你盯着这个数。",
+  "distantstock.ponder.distant_replenish.text_2": "手持已调谐的远仓请求器右键这个格子，它就会绑到那台请求器的货源网络和收货港组上；潜行右键解绑。四个格子各绑各的，一块板子可以同时对着四处要货。",
+  "distantstock.ponder.distant_replenish.text_3": "数量少于目标时，它会补上差额。同一时刻只有一单在途：下一单要等库存到货、或者这一单被判超时；单次最多一组，免得一次把远端仓库整仓拉走。",
+  "distantstock.ponder.distant_replenish.text_4": "远仓红石请求器是同一件事的脉冲版。在它自己的界面里填好九个物品和到货地址，用同样的手势绑定，一个上升沿发出一单。",
+  "distantstock.ponder.distant_replenish.text_5": "两者都下到收货港组里，和请求台下的单一样，所以货物会从本侧的远仓港出来。没绑定的请求器就是普通红石请求器，没绑定的仪表就是普通仪表。",
+  "distantstock.ponder.distant_replenish.text_6": "没有塔带载时它们什么都不发——先把塔立起来。"
 }

@@ -29,6 +29,7 @@ public final class SignalLampClientSmoke {
         var mc = Minecraft.getInstance();
         if (mc.getOverlay() != null || mc.screen == null || mc.getModelManager().getMissingModel() == null) return;
         done = true;
+        int scenes = 0;
         try {
             if (Arrays.stream(FactoryPanelConnectionHandler.class.getDeclaredMethods())
                     .noneMatch(m -> m.getName().contains("distantstock$lampOutput"))) {
@@ -99,6 +100,37 @@ public final class SignalLampClientSmoke {
                 sprites++;
             }
             LogUtils.getLogger().info("DISTANTSTOCK_ATLAS_SPRITES_OK: {} sprites stitched", sprites);
+            // A Ponder scene is three things that have to agree and none of which the game checks
+            // together: a structure file, a storyboard registered under that name, and one text key
+            // per line the scene shows. Get any of them wrong and the scene either never opens or
+            // opens with blank captions, and the only place that shows up is in front of a player.
+            var language = net.minecraft.locale.Language.getInstance();
+            for (var entry : java.util.Map.of(
+                    "export", 5, "import", 3, "tune", 3, "status", 5, "tower", 8, "replenish", 6)
+                    .entrySet()) {
+                String scene = entry.getKey();
+                var id = ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "ponder/" + scene + ".nbt");
+                var resource = mc.getResourceManager().getResource(id).orElseThrow(
+                        () -> new AssertionError("Ponder structure is missing: " + id));
+                try (var stream = resource.open()) {
+                    net.minecraft.nbt.NbtIo.readCompressed(stream,
+                            net.minecraft.nbt.NbtAccounter.unlimitedHeap());
+                } catch (Exception broken) {
+                    throw new AssertionError("Ponder structure does not parse: " + id, broken);
+                }
+                String header = "distantstock.ponder.distant_" + scene + ".header";
+                if (!language.has(header)) {
+                    throw new AssertionError("Ponder scene has no title: " + header);
+                }
+                for (int line = 1; line <= entry.getValue(); line++) {
+                    String key = "distantstock.ponder.distant_" + scene + ".text_" + line;
+                    if (!language.has(key)) {
+                        throw new AssertionError("Ponder scene is missing a line of text: " + key);
+                    }
+                }
+                scenes++;
+            }
+            LogUtils.getLogger().info("DISTANTSTOCK_PONDER_OK: {} scenes have a structure and their text", scenes);
             LogUtils.getLogger().info("DISTANTSTOCK_CLIENT_SMOKE_PASSED: {} block states, {} quarter-lamp models, {} remote gauge models, factory panel, client mixin",
                     states, partials.size(), gaugePartials.size());
         } catch (Throwable failure) {

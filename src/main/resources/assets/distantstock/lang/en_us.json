@@ -300,8 +300,17 @@
   "gui.distantstock.group.closed": "That system is closed to you",
   "gui.distantstock.manual.h6": "Interlink towers",
   "gui.distantstock.manual.p6": "互通塔",
-  "gui.distantstock.manual.h7": "Systems, and keeping one to yourself",
+  "gui.distantstock.manual.h7": "Groups and locks",
   "gui.distantstock.manual.p7": "系统，以及怎么把系统留给自己",
   "gui.distantstock.group.rename": "Rename",
-  "goggle.distantstock.group": "System: %s"
+  "goggle.distantstock.group": "System: %s",
+  "gui.distantstock.manual.h8": "Ordering across servers",
+  "gui.distantstock.manual.p8": "A Distant Gauge is a factory gauge that orders for itself: each panel is bound to one warehouse on another server, and when the number the panel reads falls short of the target in its value box it orders the difference — one order at a time, a stack at most, settled when the stock reaches the target or written off after two minutes. Bind a panel by right-clicking it with a tuned requester, sneak-click to unbind; the four panels can be four different warehouses. The Distant Redstone Requester is the same idea on a pulse: one edge, one order carrying all nine of its slots. An unbound one is simply a redstone requester. Both need a tower that carries them: without one they still read, and they do not order.",
+  "distantstock.ponder.distant_replenish.header": "Ordering across servers",
+  "distantstock.ponder.distant_replenish.text_1": "A Distant Gauge is a factory gauge that orders for itself. Put a panel on the board, set its item and the amount you want to keep, and that panel will watch the number for you.",
+  "distantstock.ponder.distant_replenish.text_2": "Right-click that panel with a tuned Requester to bind it to that requester's warehouse and receiving group; sneak-click to unbind. Each of the four panels is bound on its own, so one board can draw from four places.",
+  "distantstock.ponder.distant_replenish.text_3": "When the amount falls short of the target it orders the difference. One order at a time: the next one waits until the stock arrives or the first is written off, and a single order never asks for more than a stack.",
+  "distantstock.ponder.distant_replenish.text_4": "The Distant Redstone Requester is the same idea on a pulse. Give it its nine items and an address in its own screen, bind it the same way, and one rising edge sends one order.",
+  "distantstock.ponder.distant_replenish.text_5": "Both order into a receiving group, the same way an order from the desk does, so the goods arrive at a dock on this side. An unbound Requester is just a redstone requester, and an unbound gauge is just a gauge.",
+  "distantstock.ponder.distant_replenish.text_6": "Neither one spends anything without a tower carrying it, so build the tower first."
 }

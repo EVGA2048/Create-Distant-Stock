@@ -23,6 +23,8 @@ public final class DistantStockPonderPlugin implements PonderPlugin {
         ResourceLocation towerCoupler = id("tower_coupler");
         ResourceLocation etherResonator = id("ether_resonator");
         ResourceLocation towerCasing = id("tower_casing");
+        ResourceLocation remoteGauge = id("remote_gauge");
+        ResourceLocation remoteRedstoneRequester = id("remote_redstone_requester");
 
         helper.forComponents(dock, requester, manual, remotePackager)
                 .addStoryBoard("export", DistantStockScenes::export)
@@ -34,6 +36,8 @@ public final class DistantStockPonderPlugin implements PonderPlugin {
         // 塔的四个方块都挂同一场戏：玩家手上拿着哪一块，想学的都是同一座塔怎么立起来。
         helper.forComponents(towerCore, towerCoupler, etherResonator, towerCasing)
                 .addStoryBoard("tower", DistantStockScenes::tower);
+        helper.forComponents(remoteGauge, remoteRedstoneRequester, requester, manual)
+                .addStoryBoard("replenish", DistantStockScenes::replenish);
     }
 
     private static ResourceLocation id(String path) {
