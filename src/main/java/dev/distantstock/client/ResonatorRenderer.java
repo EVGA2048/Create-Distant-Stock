@@ -31,8 +31,13 @@ public final class ResonatorRenderer extends SmartBlockEntityRenderer<ResonatorB
             DistantStock.MODID, "block/tower/ether_resonator_rotor"));
     private static final PartialModel BEAM = PartialModel.of(ResourceLocation.fromNamespaceAndPath(
             DistantStock.MODID, "block/tower/ether_resonator_beam"));
-    /** Degrees per tick. Slow enough to read as idle machinery rather than a fan. */
-    private static final float SPEED = 1.5f;
+    /**
+     * Degrees per tick. Slow enough to read as idle machinery rather than a fan.
+     *
+     * <p>Was 1.5, which is a full turn every twelve seconds — fast enough that a player watching it
+     * reads a fan or a warning beacon rather than a machine idling under load. Reported from play.
+     */
+    private static final float SPEED = 0.35f;
 
     /**
      * What each state does to the light column, as a multiplier over the authored texture.

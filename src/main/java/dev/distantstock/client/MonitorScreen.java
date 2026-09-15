@@ -25,8 +25,6 @@ public final class MonitorScreen extends Screen {
     private static final int BAD = 0xB65E57;
     /** Row pitch on the tower page: three lines of text and the button strip between them. */
     private static final int ROW_H = 36;
-    /** Where the member rows start, below the summary, the stress reading and the selection. */
-    private static final int TOWER_ROW_TOP = 68;
     /** What a member tower's own tier allows it to load, as a square. */
     private static int memberCeiling(TowerReadout.Member member) {
         try {
@@ -266,28 +264,35 @@ public final class MonitorScreen extends Screen {
 
         Component summary = Component.translatable("gui.distantstock.tower.summary",
                 tower.members().size(), tower.carried(), tower.limit());
-        g.drawString(font, summary, left + 14, top + 42, BRASS, false);
+        g.drawString(font, summary, left + 14, top + 44, BRASS, false);
         Component stress = Component.translatable("gui.distantstock.tower.stress",
                 (int) tower.stress(), (int) tower.speed());
-        g.drawString(font, stress, left + W - 14 - font.width(stress), top + 42,
+        g.drawString(font, stress, left + W - 14 - font.width(stress), top + 44,
                 tower.speed() <= 0 ? BAD : MUTED, false);
 
         // The square the system actually keeps loaded, against the largest one any of its members
-        // pays for. Both were already on the wire and neither was drawn, so the buttons below were
-        // the only sign a ceiling existed at all — and they stopped at it without saying why.
+        // pays for. Both were already on the wire and neither was drawn, so the buttons further up
+        // were the only sign a ceiling existed at all — and they stopped at it without saying why.
+        //
+        // Along the bottom, under the rows rather than above them: the panel's furniture is drawn
+        // at fixed heights and the row area starts where the artwork expects it to, so a line
+        // pushed in above the rows lands on the frame and pushes everything below it out of place.
         Component selection = tower.selectedSide() <= 0
-                ? Component.translatable("gui.distantstock.tower.selection.none", tower.maxSide())
+                ? Component.translatable("gui.distantstock.tower.selection.none",
+                tower.maxSide(), tower.maxSide())
                 : Component.translatable("gui.distantstock.tower.selection",
-                tower.selectedSide(), tower.maxSide());
-        g.drawString(font, selection, left + 14, top + 54,
+                tower.selectedSide(), tower.selectedSide(), tower.maxSide(), tower.maxSide());
+        g.drawString(font, selection, left + 14, top + H - 15,
                 tower.selectedSide() <= 0 ? MUTED : AETHER, false);
 
-        int y = TOWER_ROW_TOP;
+        int y = top + 58;
         for (TowerReadout.Member member : tower.members()) {
             if (y + ROW_H > top + H - 4) {
                 Component more = Component.translatable("gui.distantstock.tower.more",
-                        tower.members().size() - (y - top - TOWER_ROW_TOP) / ROW_H);
-                g.drawString(font, more, left + 14, y, MUTED, false);
+                        tower.members().size() - (y - top - 58) / ROW_H);
+                // Right-aligned: the selection line sits along the bottom too, and two strings
+                // starting at the same x on consecutive lines read as one broken sentence.
+                g.drawString(font, more, left + W - 14 - font.width(more), y, MUTED, false);
                 return;
             }
             drawTowerRow(g, member, y);

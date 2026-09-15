@@ -1,16 +1,34 @@
 {
   "variants": {
-    "port=false,powered=false": {
+    "port=none,powered=false": {
       "model": "distantstock:block/tower/tower_casing"
     },
-    "port=false,powered=true": {
+    "port=north,powered=false": {
+      "model": "distantstock:block/tower/tower_casing_port_north"
+    },
+    "port=east,powered=false": {
+      "model": "distantstock:block/tower/tower_casing_port_east"
+    },
+    "port=south,powered=false": {
+      "model": "distantstock:block/tower/tower_casing_port_south"
+    },
+    "port=west,powered=false": {
+      "model": "distantstock:block/tower/tower_casing_port_west"
+    },
+    "port=none,powered=true": {
       "model": "distantstock:block/tower/tower_casing_active"
     },
-    "port=true,powered=false": {
-      "model": "distantstock:block/tower/tower_casing_port"
+    "port=north,powered=true": {
+      "model": "distantstock:block/tower/tower_casing_port_north"
     },
-    "port=true,powered=true": {
-      "model": "distantstock:block/tower/tower_casing_port"
+    "port=east,powered=true": {
+      "model": "distantstock:block/tower/tower_casing_port_east"
+    },
+    "port=south,powered=true": {
+      "model": "distantstock:block/tower/tower_casing_port_south"
+    },
+    "port=west,powered=true": {
+      "model": "distantstock:block/tower/tower_casing_port_west"
     }
   }
 }

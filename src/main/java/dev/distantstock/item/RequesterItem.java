@@ -18,6 +18,19 @@ import java.util.List;
 import java.util.UUID;
 
 public final class RequesterItem extends Item {
+    /**
+     * Says the terminal has not joined a network yet.
+     *
+     * <p>The gesture that configures a device is the same one that opens its screen, and the two are
+     * told apart by whether the terminal is tuned. A click that silently does nothing — or worse,
+     * opens the screen the player was not asking for — leaves them with a device they think they
+     * have pointed somewhere. Saying it out loud costs one line above the hotbar.
+     */
+    public static void sayUntuned(net.minecraft.world.entity.player.Player player) {
+        player.displayClientMessage(
+                net.minecraft.network.chat.Component.translatable("gui.distantstock.untuned"), true);
+    }
+
     public RequesterItem(Properties props) {
         super(props);
     }

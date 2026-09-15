@@ -43,8 +43,14 @@ public final class RemoteRedstoneRequesterBlock extends RedstoneRequesterBlock {
     protected ItemInteractionResult useItemOn(net.minecraft.world.item.ItemStack stack, BlockState state,
                                               Level level, BlockPos pos, Player player,
                                               InteractionHand hand, BlockHitResult hit) {
-        if (!(stack.getItem() instanceof RequesterItem) || !RequesterData.tuned(stack)) {
+        if (!(stack.getItem() instanceof RequesterItem)) {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);
+        }
+        if (!RequesterData.tuned(stack)) {
+            if (!level.isClientSide) {
+                RequesterItem.sayUntuned(player);
+            }
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
         if (!(level.getBlockEntity(pos) instanceof RemoteRedstoneRequesterBlockEntity be)) {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);

@@ -100,6 +100,12 @@ public final class MonitorBlock extends WallPanelBlock implements IWrenchable {
             open(level, pos, player);
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
+        if (stack.getItem() instanceof RequesterItem && !RequesterData.tuned(stack)) {
+            if (!level.isClientSide) {
+                RequesterItem.sayUntuned(player);
+            }
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        }
         if (stack.getItem() instanceof RequesterItem && RequesterData.tuned(stack)) {
             if (!level.isClientSide && level.getBlockEntity(pos) instanceof MonitorBlockEntity be) {
                 RequesterData.network(stack).ifPresentOrElse(be::setNetwork,

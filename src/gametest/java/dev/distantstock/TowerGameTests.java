@@ -208,14 +208,20 @@ public final class TowerGameTests {
                         net.minecraft.core.Direction.UP) == null,
                 "a closed casing offered a pipe the tank");
 
-        h.setBlock(X + 1, 1, Z, closed.setValue(dev.distantstock.block.TowerCasingBlock.PORT, true));
+        h.setBlock(X + 1, 1, Z, closed.setValue(dev.distantstock.block.TowerCasingBlock.PORT,
+                dev.distantstock.block.TowerCasingBlock.Port.NORTH));
         var open = h.getLevel().getBlockState(casing);
+        // The port is one face, and only that face: a pipe arriving at the casing's east side finds
+        // a wall even when its north side is open.
         h.assertTrue(dev.distantstock.block.TowerCasingBlock.portTank(h.getLevel(), casing, open,
-                        net.minecraft.core.Direction.DOWN) == null,
+                        net.minecraft.core.Direction.EAST) == null,
+                "a port opened more than the face it was put on");
+        h.assertTrue(dev.distantstock.block.TowerCasingBlock.portTank(h.getLevel(), casing, open,
+                        net.minecraft.core.Direction.UP) == null,
                 "the port opened onto the face the driveshaft uses");
 
         var tank = dev.distantstock.block.TowerCasingBlock.portTank(h.getLevel(), casing, open,
-                net.minecraft.core.Direction.UP);
+                net.minecraft.core.Direction.NORTH);
         h.assertTrue(tank != null, "an open port reached no tank");
         int filled = tank.fill(new net.neoforged.neoforge.fluids.FluidStack(
                 dev.distantstock.fluid.ModFluids.ETHER.get(), 250),

@@ -147,7 +147,12 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                                     Component.translatable("gui.distantstock.group.closed"), true);
                         }
                     });
-                } else if (RequesterData.tuned(stack)) {
+                } else if (!RequesterData.tuned(stack)) {
+                    // Untuned terminal, plain click: say so rather than doing nothing. Sneak-click
+                    // still works — writing an address and joining a group need no network, and a
+                    // terminal is the only thing that can do either.
+                    RequesterItem.sayUntuned(player);
+                } else {
                     be.setMode(DockMode.SEND);
                     // What the requester carries is the destination. Sneak-click is what sets a
                     // dock's own group, so the two gestures read as one sentence: sneak to say

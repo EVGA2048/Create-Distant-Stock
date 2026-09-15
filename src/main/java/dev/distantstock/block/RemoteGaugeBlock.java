@@ -88,6 +88,12 @@ public final class RemoteGaugeBlock extends FactoryPanelBlock {
         if (!(level.getBlockEntity(pos) instanceof RemoteGaugeBlockEntity be)) {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);
         }
+        if (stack.getItem() instanceof RequesterItem && !RequesterData.tuned(stack)) {
+            if (!level.isClientSide) {
+                RequesterItem.sayUntuned(player);
+            }
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        }
         var network = networkFromStack(stack);
         if (network == null) {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);

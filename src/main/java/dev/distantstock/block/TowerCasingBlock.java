@@ -35,14 +35,53 @@ public final class TowerCasingBlock extends Block
     public static final MapCodec<TowerCasingBlock> CODEC = simpleCodec(TowerCasingBlock::new);
     public static final BooleanProperty POWERED = BooleanProperty.create("powered");
     /**
-     * Whether this casing is a fluid port.
+     * Which face of this casing is a fluid port, if any.
      *
      * <p>A complete tower's base is walled in: the core's tank answers pipes on every face but the
      * bottom, and a finished skirt covers all four sides of it, so the tank is sealed inside a
-     * machine that is built exactly as it is meant to be. The port is how ether gets in — the
-     * player opens one where they want the pipe to arrive, rather than the mod picking a face.
+     * machine that is built exactly as it is meant to be. The port is how ether gets in, and it is
+     * one face rather than the whole block — a pipe arrives somewhere, and a casing with ports on
+     * every side would show a socket to four faces that have nothing plugged into them.
+     *
+     * <p>One port per block, not one per face: two pipes into one casing is two pipes into a wall,
+     * and the skirt has eight casings.
      */
-    public static final BooleanProperty PORT = BooleanProperty.create("port");
+    public static final net.minecraft.world.level.block.state.properties.EnumProperty<Port> PORT =
+            net.minecraft.world.level.block.state.properties.EnumProperty.create("port", Port.class);
+
+    /** Which face carries the port. Up and down are left out: one is the coupler, one the ground. */
+    public enum Port implements net.minecraft.util.StringRepresentable {
+        NONE(null),
+        NORTH(Direction.NORTH),
+        EAST(Direction.EAST),
+        SOUTH(Direction.SOUTH),
+        WEST(Direction.WEST);
+
+        private final Direction face;
+
+        Port(Direction face) {
+            this.face = face;
+        }
+
+        /** The face this value opens, or null for a casing that has no port. */
+        public Direction face() {
+            return face;
+        }
+
+        public static Port of(Direction face) {
+            for (Port port : values()) {
+                if (port.face == face) {
+                    return port;
+                }
+            }
+            return NONE;
+        }
+
+        @Override
+        public String getSerializedName() {
+            return name().toLowerCase(java.util.Locale.ROOT);
+        }
+    }
 
     private static final Direction[] DIRECTIONS = Direction.values();
     /**
@@ -56,7 +95,7 @@ public final class TowerCasingBlock extends Block
 
     public TowerCasingBlock(Properties props) {
         super(props);
-        registerDefaultState(stateDefinition.any().setValue(POWERED, false).setValue(PORT, false));
+        registerDefaultState(stateDefinition.any().setValue(POWERED, false).setValue(PORT, Port.NONE));
     }
 
     @Override
@@ -80,8 +119,14 @@ public final class TowerCasingBlock extends Block
             return super.useItemOn(stack, state, level, pos, player, hand, hit);
         }
         if (!level.isClientSide) {
-            boolean open = !state.getValue(PORT);
-            level.setBlock(pos, state.setValue(PORT, open), 3);
+            // The clicked face, not the block: a pipe arrives at one side of one casing. Clicking
+            // the face that is already open closes it; clicking another moves the port there, which
+            // is one gesture instead of "close it first, then open it where you meant".
+            Port wanted = hit.getDirection().getAxis().isHorizontal()
+                    && state.getValue(PORT) != Port.of(hit.getDirection())
+                    ? Port.of(hit.getDirection()) : Port.NONE;
+            boolean open = wanted != Port.NONE;
+            level.setBlock(pos, state.setValue(PORT, wanted), 3);
             level.playSound(null, pos, open ? net.minecraft.sounds.SoundEvents.IRON_TRAPDOOR_OPEN
                     : net.minecraft.sounds.SoundEvents.IRON_TRAPDOOR_CLOSE,
                     net.minecraft.sounds.SoundSource.BLOCKS, 0.6f, 1.2f);
@@ -137,7 +182,7 @@ public final class TowerCasingBlock extends Block
     /** The tank behind an open port, or null for a casing that is closed or in no tower. */
     public static net.neoforged.neoforge.fluids.capability.IFluidHandler portTank(
             Level level, BlockPos pos, BlockState state, Direction side) {
-        if (level == null || side == null || !state.getValue(PORT)) {
+        if (level == null || side == null || state.getValue(PORT).face() != side) {
             return null;
         }
         TowerCoreBlockEntity core = coreFor(level, pos);

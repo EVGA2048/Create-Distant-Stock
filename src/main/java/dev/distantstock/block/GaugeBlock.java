@@ -141,12 +141,26 @@ public final class GaugeBlock extends BaseEntityBlock implements IWrenchable {
         if (DockBlock.isWrench(stack)) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
-        if (stack.getItem() instanceof RequesterItem && RequesterData.tuned(stack)) {
+        if (stack.getItem() instanceof RequesterItem) {
+            // Holding the terminal means configuring, never opening: the desk's own screen is what
+            // an empty hand is for. A player who came to point this desk at their network would
+            // otherwise get a menu and no binding, and would have to work out that the two gestures
+            // are one.
+            if (!RequesterData.tuned(stack)) {
+                if (!level.isClientSide) {
+                    RequesterItem.sayUntuned(player);
+                }
+                return ItemInteractionResult.sidedSuccess(level.isClientSide);
+            }
             if (!level.isClientSide && level.getBlockEntity(pos) instanceof GaugeBlockEntity be) {
                 be.setFreq(RequesterData.freq(stack));
                 if (!RequesterData.address(stack).isEmpty()) {
                     be.setAddress(RequesterData.address(stack));
                 }
+                // The receiving group travels with the rest of the binding: a desk pointed at a
+                // network but left on the default group would deliver into a system the player
+                // never chose.
+                RequesterData.receivingGroup(stack).ifPresent(be::setReceivingGroup);
                 player.displayClientMessage(Component.translatable("gui.distantstock.tuned")
                         .append(Component.literal(" " + RequesterData.shortFreq(be.freq()))), true);
             }
