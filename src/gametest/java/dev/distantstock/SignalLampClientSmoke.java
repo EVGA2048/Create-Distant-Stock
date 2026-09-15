@@ -34,6 +34,15 @@ public final class SignalLampClientSmoke {
                     .noneMatch(m -> m.getName().contains("distantstock$lampOutput"))) {
                 throw new AssertionError("Client lamp connection mixin was not applied");
             }
+            // The casing's connected texture attaches by swapping its baked model, and a swap that
+            // silently did not happen leaves a perfectly ordinary-looking block with no connection
+            // logic at all. Nothing else in the game reports that, so it is asserted here.
+            for (var state : ModBlocks.TOWER_CASING.get().getStateDefinition().getPossibleStates()) {
+                if (!(mc.getBlockRenderer().getBlockModel(state)
+                        instanceof com.simibubi.create.foundation.block.connected.CTModel)) {
+                    throw new AssertionError("Distant casing is not using a connected-texture model: " + state);
+                }
+            }
             int states = 0;
             for (var block : java.util.List.of(ModBlocks.CYAN_INDICATOR_LAMP.get(), ModBlocks.ORANGE_INDICATOR_LAMP.get(),
                     ModBlocks.RED_INDICATOR_LAMP.get(), ModBlocks.GREEN_INDICATOR_LAMP.get(),

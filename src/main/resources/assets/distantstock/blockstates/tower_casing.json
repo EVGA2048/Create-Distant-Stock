@@ -1,5 +1,6 @@
 {
   "variants": {
-    "": { "model": "distantstock:block/tower/tower_casing" }
+    "powered=false": { "model": "distantstock:block/tower/tower_casing" },
+    "powered=true": { "model": "distantstock:block/tower/tower_casing" }
   }
 }

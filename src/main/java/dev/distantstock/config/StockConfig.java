@@ -25,6 +25,7 @@ public final class StockConfig {
     public static final ModConfigSpec.ConfigValue<String> TOKEN;
     public static final ModConfigSpec.BooleanValue DEMO_STOCK;
     public static final ModConfigSpec.BooleanValue GIVE_MANUAL;
+    public static final ModConfigSpec.IntValue CASING_REDSTONE_RANGE;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -49,7 +50,25 @@ public final class StockConfig {
         DEMO_STOCK = b.define("debug.demoStock", false);
         GIVE_MANUAL = b.comment("Give one manual the first time a player joins this world.")
                 .define("giveManual", true);
+        CASING_REDSTONE_RANGE = b.comment(
+                        "How far a redstone signal spreads through connected distant casings, in blocks,",
+                        "before the window stops opening. Bounds a search per casing, so a large build",
+                        "does not hitch when a lever is flipped.")
+                .defineInRange("casing.redstoneRange", 32, 1, 64);
         SPEC = b.build();
+    }
+
+    /**
+     * The casing window's reach, read often enough that the config's own value is worth not
+     * unwrapping each time. Zero means the config is not loaded yet — the block can be ticked
+     * before the server config file is read — and the compile-time default stands in.
+     */
+    public static int casingRedstoneRange() {
+        try {
+            return CASING_REDSTONE_RANGE.get();
+        } catch (IllegalStateException notLoaded) {
+            return 32;
+        }
     }
 
     /** Returns "transerver", "legacy", or "both". */

@@ -2,6 +2,7 @@ package dev.distantstock.client;
 
 import dev.distantstock.DistantStock;
 import dev.distantstock.block.ModBlockEntities;
+import dev.distantstock.block.ModBlocks;
 import dev.distantstock.fluid.ModFluids;
 import dev.distantstock.client.ponder.DistantStockPonderPlugin;
 import dev.distantstock.item.ManualItem;
@@ -97,6 +98,24 @@ public final class ClientSetup {
                     .apply();
         }
 
+
+        /**
+         * Hand the casing's model to Create's connected-texture wrapper.
+         *
+         * Create normally reaches this through its own registrate builder, and this mod does not use
+         * registrate, so the same call is made by hand: a baking-result listener that swaps the model
+         * behind every block state of the casing. The sheet size lives in the CT type and the layout
+         * is Create's own 16x16 grid, so there is nothing to override on the shift itself.
+         */
+        @SubscribeEvent
+        public static void connectedTextures(net.neoforged.neoforge.client.event.ModelEvent.ModifyBakingResult e) {
+            com.simibubi.create.foundation.block.connected.CTTypeRegistry.register(TowerCasingCTType.INSTANCE);
+            com.simibubi.create.foundation.model.ModelSwapper.swapModels(e.getModels(),
+                    com.simibubi.create.foundation.model.ModelSwapper.getAllBlockStateModelLocations(
+                            ModBlocks.TOWER_CASING.get()),
+                    model -> new com.simibubi.create.foundation.block.connected.CTModel(
+                            model, new TowerCasingCTBehaviour()));
+        }
 
         @SubscribeEvent
         public static void renderers(EntityRenderersEvent.RegisterRenderers e) {
