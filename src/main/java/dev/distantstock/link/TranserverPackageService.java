@@ -40,8 +40,17 @@ public final class TranserverPackageService {
         return result;
     }
 
-    private static DeliveryResult apply(MinecraftServer server, PackageDispatchCodec.Dispatch dispatch,
-                                        String sourceNode) {
+    /**
+     * Validates a dispatch against this server and inserts the parcel, returning what the caller
+     * should do with the source-side record.
+     *
+     * <p>Public because the escrow pump delivers parcels addressed to this node in-process, with no
+     * transport in between: the same validation, de-duplication and insertion must run for a local
+     * delivery as for one that arrived over Transerver, or a parcel sent to "this node" would take a
+     * second, weaker path through the code.
+     */
+    public static DeliveryResult apply(MinecraftServer server, PackageDispatchCodec.Dispatch dispatch,
+                                       String sourceNode) {
         ParcelLedger ledger = ParcelLedger.get(server);
         if (ledger.contains(dispatch.parcelId())) {
             LOG.info("[DistantStock/Parcel] duplicate already applied parcel={} source={} group={}",

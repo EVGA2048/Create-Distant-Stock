@@ -7,6 +7,7 @@ import dev.distantstock.block.LoadedDocks;
 import dev.distantstock.routing.RemoteRouteData;
 import dev.distantstock.routing.RoutingChannels;
 import dev.transerver.api.CompletedSend;
+import dev.transerver.api.DeliveryResult;
 import dev.transerver.api.DeliveryState;
 import dev.transerver.api.TranserverApi;
 import net.minecraft.server.MinecraftServer;
@@ -71,6 +72,33 @@ public final class ParcelEscrowPump {
                 PackageDispatchCodec.Dispatch dispatch = PackageDispatchCodec.create(
                         record.parcelId(), record.receivingDockGroupId(), record.address(),
                         PayloadManifest.fromPackage(parcel), record.encodedPackage());
+                if (TranserverBridge.isLocal(record.destinationNode())) {
+                    // 目的地就是本机：没有 Transerver 也要送到，所以直接在同一条服务器线程上跑接收侧校验。
+                    // The destination is this very node, so there is no transport to hand the parcel to.
+                    // Without this branch an unattached bridge makes TranserverBridge.send return null and
+                    // the record silently stays HELD forever: the parcel has left the dock, the goggles
+                    // count it as in flight, and it never arrives. Running the receiver's own apply() here
+                    // is what makes "send to my other dock group" work on a save with no Transerver at all.
+                    DeliveryResult result = TranserverPackageService.apply(server, dispatch,
+                            TranserverBridge.localNodeId());
+                    if (result == DeliveryResult.APPLIED) {
+                        // The parcel is in the target dock now. Remove the escrow record first and flush,
+                        // because a crash between the two leaves a record the ledger will recognise as a
+                        // duplicate (apply() short-circuits on it) rather than a second parcel.
+                        escrow.remove(record.parcelId());
+                        escrow.flush(server);
+                        LOG.info("[DistantStock/Parcel] delivered parcel={} target=local group={} strips={}",
+                                record.parcelId(), record.receivingDockGroupId(), record.strips());
+                        sent++;
+                    } else if (result == DeliveryResult.REJECTED) {
+                        // 永久拒绝：本机收不了这个包裹（清单缺条目／包裹解不开）。交给既有的退件流程。
+                        escrow.rejected(record.parcelId(), "local_incompatible");
+                    }
+                    // RETRY 不是失败：目标港所在区块还没加载、港满了或在忙，下一个 tick 会再试。
+                    // RETRY is not a failure: it is the same "not yet" the transport path reports, and the
+                    // record deliberately stays HELD so a later tick can finish the delivery.
+                    continue;
+                }
                 UUID messageId = TranserverBridge.send(record.destinationNode(), RoutingChannels.PACKAGE_DISPATCH,
                         PackageDispatchCodec.encode(dispatch), record.parcelId().toString());
                 if (messageId != null) {

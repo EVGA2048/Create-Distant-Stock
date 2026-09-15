@@ -93,6 +93,34 @@ public final class TranserverBridge {
         }
     }
 
+    /**
+     * 没有挂上 Transerver 时用的节点 id：一个存档自己就是一个节点。
+     *
+     * <p>The sentinel exists because a single-player save still ships the whole Transerver parcel
+     * pipeline: {@code TranserverBridge.attachedApi()} being null only means no Transerver server
+     * is configured, not that this save has nowhere to deliver. Sending a parcel to "this node" has
+     * to be expressible in the same UUID form a real node id uses, because that is the form
+     * {@code ParcelEscrow.Record.destinationNode()} persists and compares.
+     */
+    public static final String LOCAL_NODE_ID = "00000000-0000-0000-0000-000000000001";
+
+    /** 本机节点 id。挂上了就是 Transerver 的，没挂上就是哨兵。 */
+    public static String localNodeId() {
+        UUID attached = nodeId();
+        return attached == null ? LOCAL_NODE_ID : attached.toString();
+    }
+
+    /**
+     * 记录里的目的地是不是本机。空白也算——那是比节点 id 更早的记录。
+     *
+     * <p>A blank destination is what every record written before node ids existed carries, and this
+     * save is the only node that could ever have meant. Treating it as local is what lets those
+     * parcels finish instead of sitting in the escrow forever.
+     */
+    public static boolean isLocal(String destination) {
+        return destination == null || destination.isBlank() || localNodeId().equals(destination);
+    }
+
     public static Set<String> knownNodes() {
         TranserverApi api = attached;
         if (api == null) {

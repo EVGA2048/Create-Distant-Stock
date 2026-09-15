@@ -101,6 +101,29 @@ public final class LoadedDocks {
         }
     }
 
+    /**
+     * 按组枚举已加载的港，顺序稳定（维度 + 坐标），好让 /distantstock group list 的同一份数据每次打印一致。
+     *
+     * <p>Only server-side docks count. In a single-player save the client half of the same JVM also
+     * builds a DockBlockEntity for every loaded dock, and those copies are not the ones a parcel can
+     * be delivered to, so counting them would double every number an operator reads.
+     */
+    public static List<DockBlockEntity> allInGroup(UUID groupId) {
+        List<DockBlockEntity> matching = new ArrayList<>();
+        for (DockBlockEntity be : ALL) {
+            if (be.isRemoved() || be.getLevel() == null || be.getLevel().isClientSide) {
+                continue;
+            }
+            if (be.groupId().equals(groupId)) {
+                matching.add(be);
+            }
+        }
+        matching.sort(Comparator
+                .comparing((DockBlockEntity be) -> be.getLevel().dimension().location().toString())
+                .thenComparingLong(be -> be.getBlockPos().asLong()));
+        return List.copyOf(matching);
+    }
+
     public static DockBlockEntity at(String dimension, long packedPos) {
         for (DockBlockEntity dock : ALL) {
             if (dock.isRemoved() || dock.getLevel() == null) {

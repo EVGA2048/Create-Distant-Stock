@@ -141,10 +141,25 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                     be.setMode(DockMode.SEND);
                     // Copy this dock's group onto the requester for later application.
                     RequesterData.setReceivingGroup(stack, be.groupId());
-                    RequesterData.network(stack)
-                            .filter(network -> !network.nodeId().equals(TranserverBridge.nodeId()))
-                            .ifPresent(network -> be.setDefaultDestination(network.nodeId(),
-                                    DockGroupDirectory.DEFAULT_GROUP_ID));
+                    RequesterData.network(stack).ifPresent(network -> {
+                        // 旧写法是 .filter(network -> !network.nodeId().equals(TranserverBridge.nodeId()))，
+                        // 想「不要把包裹发给本机」，但它是错的：TranserverBridge.nodeId() 在装了 Transerver
+                        // 却没接上 API 时返回 null（单机存档就是这种情况），而 equals(null) 恒为 false，
+                        // 过滤器等于失效——本机网络照样被写成默认目的地。而且就算它返回了真实节点 id，
+                        // 「发到本机」本身并不非法：同一个存档里的两个港组就是两套系统，服内互传靠的就是它。
+                        // The old filter was meant to skip "send this to myself" but failed at both ends: it
+                        // never fired when nodeId() was null (equals(null) is always false), and a parcel to
+                        // another group on the same node is a legitimate destination, not a mistake.
+                        //
+                        // 新判断：本机节点是合法目的地，只跳过「目的地就是本机 且 组也与本港相同」这种真正
+                        // 无意义的自环——那只会让包裹绕一圈回到自己的收货槽。其余交给 LoadedDocks.importFor
+                        // 按组和地址选港，选不到就 RETRY。
+                        boolean selfLoop = TranserverBridge.isLocal(network.nodeId().toString())
+                                && DockGroupDirectory.DEFAULT_GROUP_ID.equals(be.groupId());
+                        if (!selfLoop) {
+                            be.setDefaultDestination(network.nodeId(), DockGroupDirectory.DEFAULT_GROUP_ID);
+                        }
+                    });
                 }
                 be.clearFault();
                 player.displayClientMessage(be.modeMessage(), true);
