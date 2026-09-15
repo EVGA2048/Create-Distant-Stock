@@ -1,6 +1,8 @@
 package dev.distantstock.client;
 
+import dev.distantstock.block.TowerCoreBlockEntity;
 import dev.distantstock.link.LinkSnapshot;
+import dev.distantstock.routing.TowerReadout;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
@@ -21,11 +23,17 @@ public final class MonitorScreen extends Screen {
     private static final int GOOD = 0x4C9B7A;
     private static final int WARN = 0xC18A4A;
     private static final int BAD = 0xB65E57;
+    /** Row pitch on the tower page: three lines of text and the button strip between them. */
+    private static final int ROW_H = 36;
     private static final ResourceLocation PANEL =
             ResourceLocation.fromNamespaceAndPath("distantstock", "textures/gui/monitor.png");
 
+    /** Rows are built during render and read back on click, so the two cannot disagree. */
+    private final java.util.List<Hit> hits = new java.util.ArrayList<>();
     private final BlockPos source;
     private LinkSnapshot.View view;
+    /** Which half of the dashboard is showing. The tower half needs room the link half is using. */
+    private boolean towerPage;
     private int flipTicks;
     private int previousTps;
     private int previousMspt;
@@ -71,6 +79,13 @@ public final class MonitorScreen extends Screen {
         Component title = Component.translatable("gui.distantstock.monitor");
         g.drawString(font, title, left + 14, top + 13, HEADER, false);
         drawStatus(g);
+        hits.clear();
+        drawPageToggle(g, mouseX, mouseY);
+        if (towerPage) {
+            drawTowerPage(g);
+            super.render(g, mouseX, mouseY, partial);
+            return;
+        }
         drawRoute(g);
 
         drawEndpoint(g, left + 12, top + 51,
@@ -84,6 +99,31 @@ public final class MonitorScreen extends Screen {
 
         drawCounters(g);
         super.render(g, mouseX, mouseY, partial);
+    }
+
+    /**
+     * The switch between the link half and the tower half.
+     *
+     * <p>Two pages rather than one longer panel: the dashboard is a fixed 272x190 of authored
+     * artwork and the tower half wants a list where the link half wants two big readouts. Stacking
+     * them would mean either squashing both or drawing past the panel.
+     */
+    private void drawPageToggle(GuiGraphics g, int mouseX, int mouseY) {
+        toggle(g, left + 12, top + 27, 40, 12, "gui.distantstock.tab.link", !towerPage,
+                () -> towerPage = false, mouseX, mouseY);
+        toggle(g, left + 55, top + 27, 40, 12, "gui.distantstock.tab.tower", towerPage,
+                () -> towerPage = true, mouseX, mouseY);
+    }
+
+    private void toggle(GuiGraphics g, int x, int y, int w, int h, String key, boolean active,
+                        Runnable action, int mouseX, int mouseY) {
+        boolean over = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
+        g.fill(x, y, x + w, y + h, active ? 0xFF3E5A61 : over ? 0xFF44575D : 0xFF38484E);
+        g.fill(x + 1, y + 1, x + w - 1, y + h - 1, active ? 0xFF2E444B : 0xFF2A383E);
+        Component label = Component.translatable(key);
+        g.drawString(font, label, x + (w - font.width(label)) / 2, y + 3,
+                active ? 0xFFD8EEEA : MUTED, false);
+        hits.add(new Hit(x, y, w, h, null, 0, false, false, action));
     }
 
     private void drawStatus(GuiGraphics g) {
@@ -193,6 +233,112 @@ public final class MonitorScreen extends Screen {
         }
     }
 
+    /**
+     * One row per member tower, each with its own dials.
+     *
+     * <p>Per tower and not per system: a radius, a loading switch and a carrying switch belong to
+     * one tower, and two towers in one system are set independently. The row therefore carries all
+     * three, and every button sends the whole record back — the server stores what it is handed, so
+     * a button that sent only its own field would blank the other two.
+     */
+    private void drawTowerPage(GuiGraphics g) {
+        TowerReadout tower = view.tower();
+        if (!tower.attached()) {
+            // Said plainly rather than drawn as zeros. A monitor that is not on a tower has no
+            // towers, no radius and no budget, and showing those as numbers would read as a fault
+            // in the machine rather than as a monitor standing nowhere in particular.
+            Component none = Component.translatable("gui.distantstock.tower.none");
+            g.drawString(font, none, left + W / 2 - font.width(none) / 2, top + 90, BAD, false);
+            return;
+        }
+
+        Component summary = Component.translatable("gui.distantstock.tower.summary",
+                tower.members().size(), tower.carried(), tower.limit());
+        g.drawString(font, summary, left + 14, top + 44, BRASS, false);
+        Component stress = Component.translatable("gui.distantstock.tower.stress",
+                (int) tower.stress(), (int) tower.speed());
+        g.drawString(font, stress, left + W - 14 - font.width(stress), top + 44,
+                tower.speed() <= 0 ? BAD : MUTED, false);
+
+        int y = top + 58;
+        for (TowerReadout.Member member : tower.members()) {
+            if (y + ROW_H > top + H - 4) {
+                Component more = Component.translatable("gui.distantstock.tower.more",
+                        tower.members().size() - (y - top - 58) / ROW_H);
+                g.drawString(font, more, left + 14, y, MUTED, false);
+                return;
+            }
+            drawTowerRow(g, member, y);
+            y += ROW_H;
+        }
+    }
+
+    private void drawTowerRow(GuiGraphics g, TowerReadout.Member member, int y) {
+        BlockPos base = BlockPos.of(member.pos());
+        String where = "#" + base.getX() + "," + base.getY() + "," + base.getZ();
+        String tier = member.tier().isBlank() ? "—" : member.tier();
+        g.drawString(font, where + "  " + tier, left + 14, y + 1, INK, false);
+
+        // The one reading that explains all the others when it is set. Create reports a speed of
+        // zero both for a stalled network and for a tower with no shaft at all; the flag is what
+        // tells the operator which of the two they are looking at.
+        if (member.overstressed()) {
+            Component over = Component.translatable("gui.distantstock.tower.overstressed");
+            g.drawString(font, over, left + 110, y + 1, BAD, false);
+        } else if (!member.running()) {
+            Component stopped = Component.translatable("gui.distantstock.tower.stopped");
+            g.drawString(font, stopped, left + 110, y + 1, WARN, false);
+        }
+        Component speed = Component.translatable("gui.distantstock.tower.speed",
+                (int) Math.abs(member.speed()));
+        g.drawString(font, speed, left + W - 14 - font.width(speed), y + 1, MUTED, false);
+
+        int x = left + 14;
+        x = smallButton(g, x, y + 11, "−", member, member.chunkRadius() - 1);
+        Component radius = Component.translatable("gui.distantstock.tower.radius", member.chunkRadius());
+        g.drawString(font, radius, x + 3, y + 13, INK, false);
+        x += 3 + font.width(radius) + 3;
+        x = smallButton(g, x, y + 11, "+", member, member.chunkRadius() + 1);
+        x += 6;
+        x = switchButton(g, x, y + 11, "gui.distantstock.tower.loading", member.loading(), member,
+                !member.loading(), member.carrying());
+        switchButton(g, x + 4, y + 11, "gui.distantstock.tower.carrying", member.carrying(), member,
+                member.loading(), !member.carrying());
+
+        Component ether = Component.translatable("gui.distantstock.tower.ether",
+                member.ether(), TowerCoreBlockEntity.ETHER_CAPACITY);
+        g.drawString(font, ether, left + 14, y + 24, MUTED, false);
+        Component flow = Component.translatable("gui.distantstock.tower.traffic",
+                member.sent(), member.received());
+        g.drawString(font, flow, left + W - 14 - font.width(flow), y + 24, MUTED, false);
+    }
+
+    /** A radius step. Sends the whole record, because the server stores what it is handed. */
+    private int smallButton(GuiGraphics g, int x, int y, String glyph,
+                            TowerReadout.Member member, int radius) {
+        int w = 11;
+        g.fill(x, y, x + w, y + 11, 0xFF4A5F66);
+        g.fill(x + 1, y + 1, x + w - 1, y + 10, 0xFF2E444B);
+        g.drawString(font, glyph, x + (w - font.width(glyph)) / 2, y + 2, 0xFFD8EEEA, false);
+        hits.add(new Hit(x, y, w, 11, member, radius, member.loading(), member.carrying(), null));
+        return x + w;
+    }
+
+    private int switchButton(GuiGraphics g, int x, int y, String key, boolean on,
+                             TowerReadout.Member member, boolean loading, boolean carrying) {
+        Component label = Component.translatable(key);
+        Component state = Component.translatable(on
+                ? "gui.distantstock.tower.on" : "gui.distantstock.tower.off");
+        int w = font.width(label) + font.width(state) + 10;
+        g.fill(x, y, x + w, y + 11, 0xFF4A5F66);
+        g.fill(x + 1, y + 1, x + w - 1, y + 10, on ? 0xFF2E5A4B : 0xFF2E444B);
+        g.drawString(font, label, x + 3, y + 2, MUTED, false);
+        g.drawString(font, state, x + w - 3 - font.width(state), y + 2,
+                on ? 0xFF9BE0C4 : 0xFFC0A090, false);
+        hits.add(new Hit(x, y, w, 11, member, member.chunkRadius(), loading, carrying, null));
+        return x + w;
+    }
+
     private String fit(String value, int maxWidth) {
         if (font.width(value) <= maxWidth) {
             return value;
@@ -211,7 +357,33 @@ public final class MonitorScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double x, double y, int button) {
+        for (Hit hit : hits) {
+            if (x < hit.x || x >= hit.x + hit.w || y < hit.y || y >= hit.y + hit.h) {
+                continue;
+            }
+            if (hit.action != null) {
+                hit.action.run();
+            } else if (hit.member != null) {
+                // The radius is checked again on the server; stepping past the ceiling here is a
+                // wasted round trip, not a way to store one.
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                        new dev.distantstock.net.SetTowerSettingsC2S(source, hit.member.pos(),
+                                hit.radius, hit.loading, hit.carrying));
+            }
+            return true;
+        }
         return inside(x, y) || super.mouseClicked(x, y, button);
+    }
+
+    /**
+     * One clickable rectangle, rebuilt every frame from what was just drawn.
+     *
+     * <p>Built during render rather than kept in a list beside it, so a rectangle can never describe
+     * a button that has moved or gone. A toggle carries an action; a tower button carries the whole
+     * setting it would store.
+     */
+    private record Hit(int x, int y, int w, int h, TowerReadout.Member member, int radius,
+                       boolean loading, boolean carrying, Runnable action) {
     }
 
     @Override

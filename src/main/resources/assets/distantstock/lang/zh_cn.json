@@ -264,5 +264,21 @@
   "distantstock.ponder.distant_tower.text_6": "等级决定三件事：能带载多少台远仓设备（I 级 8 台，VII 级 128 台）、能照顾到多远的设备（32 格到 144 格）、能常驻加载多大的区块范围（1×1 到 7×7）。",
   "distantstock.ponder.distant_tower.text_7": "塔从下方那根轴吃旋转动力，等级越高吃得越多：I 级 256，此后逐级约翻倍，VII 级 16384。转速掉到中速以下，或者网络应力过载，塔顶的光柱都会暗下去。",
   "distantstock.ponder.distant_tower.text_8": "把拉杆按下去：被红石点亮的机壳，中间会变成透明的观察窗，并顺着相连的机壳一路传开。这只是外观，塔照常工作。",
-  "goggle.distantstock.tower.inactive": "Not activated — outside every running interlink tower"
+  "goggle.distantstock.tower.inactive": "Not activated — outside every running interlink tower",
+  "gui.distantstock.tab.link": "链路",
+  "gui.distantstock.tab.tower": "塔",
+  "gui.distantstock.tower.none": "未接入塔",
+  "gui.distantstock.tower.summary": "%s 座塔 · 带载 %s/%s",
+  "gui.distantstock.tower.stress": "消耗 %s · %s 转",
+  "gui.distantstock.tower.more": "还有 %s 座",
+  "gui.distantstock.tower.overstressed": "应力过载",
+  "gui.distantstock.tower.stopped": "未运转",
+  "gui.distantstock.tower.speed": "%s 转",
+  "gui.distantstock.tower.radius": "半径 %s",
+  "gui.distantstock.tower.loading": "加载 ",
+  "gui.distantstock.tower.carrying": "带载 ",
+  "gui.distantstock.tower.ether": "以太 %s/%s mB",
+  "gui.distantstock.tower.traffic": "10 分钟  发 %s / 收 %s",
+  "gui.distantstock.tower.on": "开",
+  "gui.distantstock.tower.off": "关"
 }

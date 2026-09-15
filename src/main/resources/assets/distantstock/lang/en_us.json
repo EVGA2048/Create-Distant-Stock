@@ -264,5 +264,21 @@
   "distantstock.ponder.distant_tower.text_6": "A tier decides three things: how many distant devices the tower carries (8 at tier I, 128 at VII), how far from the base they may stand (32 blocks out to 144), and how large a square of chunks it keeps loaded (1x1 up to 7x7).",
   "distantstock.ponder.distant_tower.text_7": "The shaft below feeds the tower rotation, and taller towers draw more of it: 256 at tier I, roughly doubling a step to 16384 at VII. Fall below a medium speed, or overstress the network, and the light goes out.",
   "distantstock.ponder.distant_tower.text_8": "Pull the lever and the casing it lights turns its centre into a see-through window, spreading along the casings it touches. It is decoration only — the tower works exactly the same.",
-  "goggle.distantstock.tower.inactive": "未激活：不在任何运转中的互通塔范围内"
+  "goggle.distantstock.tower.inactive": "未激活：不在任何运转中的互通塔范围内",
+  "gui.distantstock.tab.link": "Link",
+  "gui.distantstock.tab.tower": "Towers",
+  "gui.distantstock.tower.none": "Not on a tower",
+  "gui.distantstock.tower.summary": "%s towers · carrying %s/%s",
+  "gui.distantstock.tower.stress": "draw %s · %s rpm",
+  "gui.distantstock.tower.more": "+%s more",
+  "gui.distantstock.tower.overstressed": "OVERSTRESSED",
+  "gui.distantstock.tower.stopped": "not turning",
+  "gui.distantstock.tower.speed": "%s rpm",
+  "gui.distantstock.tower.radius": "radius %s",
+  "gui.distantstock.tower.loading": "chunks ",
+  "gui.distantstock.tower.carrying": "devices ",
+  "gui.distantstock.tower.ether": "ether %s/%s mB",
+  "gui.distantstock.tower.traffic": "10 min  sent %s / got %s",
+  "gui.distantstock.tower.on": "on",
+  "gui.distantstock.tower.off": "off"
 }

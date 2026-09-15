@@ -80,7 +80,8 @@ public record TowerReadout(
      */
     public record Member(long pos, String tier, int radius, int devices, boolean running, float speed,
                          int ether, float capacity, boolean overstressed,
-                         int chunkRadius, boolean loading, boolean carrying) {
+                         int chunkRadius, boolean loading, boolean carrying,
+                         int sent, int received) {
     }
 
     /**
@@ -94,7 +95,7 @@ public record TowerReadout(
      */
     public record Fact(BlockPos base, TowerTier tier, boolean running, float speed,
                        int ether, float capacity, boolean overstressed,
-                       TowerDirectory.Settings settings) {
+                       TowerDirectory.Settings settings, TowerActivation.Traffic traffic) {
     }
 
     /**
@@ -118,6 +119,7 @@ public record TowerReadout(
         int maxSide = 0;
         for (Fact fact : facts) {
             TowerTier tier = fact.tier();
+            TowerActivation.Traffic traffic = fact.traffic();
             members.add(new Member(fact.base().asLong(), tier == null ? "" : tier.name(),
                     tier == null ? 0 : tier.radius(), tier == null ? 0 : tier.devices(),
                     fact.running(), fact.speed(),
@@ -127,7 +129,8 @@ public record TowerReadout(
                     // one in force; a stored three over a tier that pays for one would otherwise
                     // come back as a three the buttons could not step down from.
                     fact.settings().radiusFor(tier),
-                    fact.settings().loading(), fact.settings().carrying()));
+                    fact.settings().loading(), fact.settings().carrying(),
+                    count(traffic.sent()), count(traffic.received())));
             if (tier != null) {
                 stress += tier.stress();
                 devices += tier.devices();
@@ -175,11 +178,13 @@ public record TowerReadout(
             if (own == null) {
                 return NONE;
             }
-            facts.add(factOf(own, BlockPos.of(carrier.packedPos()), directory.settings(carrier)));
+            facts.add(factOf(own, BlockPos.of(carrier.packedPos()), directory.settings(carrier),
+                    TowerActivation.snapshot().traffic(carrier)));
             return describe(carrier, facts, TowerActivation.usage(carrier), selectedSide(level, carrier));
         }
         for (TowerSystem.Member member : members) {
-            facts.add(factOf(loaded.get(member.id()), member.base(), directory.settings(member.id())));
+            facts.add(factOf(loaded.get(member.id()), member.base(), directory.settings(member.id()),
+                    TowerActivation.snapshot().traffic(member.id())));
         }
         return describe(carrier, facts, TowerActivation.usage(carrier), selectedSide(level, carrier));
     }
@@ -236,12 +241,24 @@ public record TowerReadout(
         return TowerTier.sideForRadius(settings.radiusFor(tower == null ? null : tower.tier()));
     }
 
-    private static Fact factOf(TowerCoreBlockEntity tower, BlockPos base, TowerDirectory.Settings settings) {
+    /**
+     * A ten-minute count, narrowed for the wire.
+     *
+     * <p>The counter is a long because it is a running total; the readout is an int because it goes
+     * out as a varint and a screen is not going to draw a number anywhere near this large. Saturating
+     * rather than wrapping keeps a nonsensical total reading as "a lot" instead of as a small number.
+     */
+    private static int count(long value) {
+        return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) Math.max(0, value);
+    }
+
+    private static Fact factOf(TowerCoreBlockEntity tower, BlockPos base,
+                               TowerDirectory.Settings settings, TowerActivation.Traffic traffic) {
         if (tower == null) {
-            return new Fact(base, null, false, 0, 0, 0, false, settings);
+            return new Fact(base, null, false, 0, 0, 0, false, settings, traffic);
         }
         return new Fact(base, tower.tier(), tower.isRunning(), tower.getSpeed(),
-                tower.ether(), tower.networkCapacity(), tower.overstressed(), settings);
+                tower.ether(), tower.networkCapacity(), tower.overstressed(), settings, traffic);
     }
 
     private static Map<TowerSystem.TowerId, TowerCoreBlockEntity> loadedTowers() {

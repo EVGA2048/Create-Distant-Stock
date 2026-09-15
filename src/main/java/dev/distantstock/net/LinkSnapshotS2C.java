@@ -100,6 +100,8 @@ public record LinkSnapshotS2C(BlockPos source, LinkSnapshot.View view) implement
             buf.writeVarInt(member.chunkRadius());
             buf.writeBoolean(member.loading());
             buf.writeBoolean(member.carrying());
+            buf.writeVarInt(member.sent());
+            buf.writeVarInt(member.received());
         }
     }
 
@@ -125,7 +127,8 @@ public record LinkSnapshotS2C(BlockPos source, LinkSnapshot.View view) implement
             members.add(new TowerReadout.Member(buf.readLong(), buf.readUtf(), buf.readVarInt(),
                     buf.readVarInt(), buf.readBoolean(), buf.readFloat(),
                     buf.readVarInt(), buf.readFloat(), buf.readBoolean(),
-                    buf.readVarInt(), buf.readBoolean(), buf.readBoolean()));
+                    buf.readVarInt(), buf.readBoolean(), buf.readBoolean(),
+                    buf.readVarInt(), buf.readVarInt()));
         }
         return new TowerReadout(attached, carrierPos, dimension, carried, limit, stress, speed,
                 maxSide, selectedSide, members);
