@@ -22,13 +22,20 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * <p>The world half of the pairing is in {@link dev.distantstock.block.DockBlock}: sneak to make a
  * dock join the carried group, plain click to make it send there.
  */
-public record SetDockGroupC2S(String name, boolean rename) implements CustomPacketPayload {
+public record SetDockGroupC2S(String name, int action) implements CustomPacketPayload {
+    /** Point the requester at this name, making the system if nobody has used the name yet. */
+    public static final int SELECT = 0;
+    /** Give the requester's current system this name. */
+    public static final int RENAME = 1;
+    /** Flip whether the named system lets anyone but its owner in. */
+    public static final int TOGGLE_OPEN = 2;
+
     public static final Type<SetDockGroupC2S> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "set_dock_group"));
     public static final StreamCodec<RegistryFriendlyByteBuf, SetDockGroupC2S> STREAM_CODEC =
             StreamCodec.composite(
                     ByteBufCodecs.STRING_UTF8, SetDockGroupC2S::name,
-                    ByteBufCodecs.BOOL, SetDockGroupC2S::rename,
+                    ByteBufCodecs.VAR_INT, SetDockGroupC2S::action,
                     SetDockGroupC2S::new);
 
     @Override
@@ -40,7 +47,7 @@ public record SetDockGroupC2S(String name, boolean rename) implements CustomPack
         ctx.enqueueWork(() -> {
             Player player = ctx.player();
             if (player.containerMenu instanceof RequesterMenu menu) {
-                menu.writeDockGroup(player, msg.name, msg.rename);
+                menu.writeDockGroup(player, msg.name, msg.action);
             }
         });
     }

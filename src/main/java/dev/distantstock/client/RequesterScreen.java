@@ -148,7 +148,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
      * unknown name into a new group. Committing per key would leave a trail of systems called "甲",
      * "甲站", "甲站二".
      */
-    private void commitDockGroup(boolean rename) {
+    private void commitDockGroup(int action) {
         if (minecraft == null || minecraft.player == null || receivingGroup == null) {
             return;
         }
@@ -158,13 +158,83 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         }
         committedGroup = name;
         net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-                new dev.distantstock.net.SetDockGroupC2S(name, rename));
+                new dev.distantstock.net.SetDockGroupC2S(name, action));
     }
 
     @Override
     public void onClose() {
-        commitDockGroup(false);
+        commitDockGroup(dev.distantstock.net.SetDockGroupC2S.SELECT);
         super.onClose();
+    }
+
+    /** The list the server last sent: what this player may point the requester at. */
+    private dev.distantstock.net.DockGroupsS2C groups;
+
+    public void applyGroups(dev.distantstock.net.DockGroupsS2C next) {
+        groups = next;
+    }
+
+    /**
+     * The systems on offer, drawn over whatever is under them and only while the field has focus.
+     *
+     * <p>A dropdown rather than a permanent panel: the screen's fixed artwork has no room for a
+     * list, and the list is only wanted at the moment somebody is choosing. Drawing it only when
+     * focused also means a player who knows the name can keep ignoring it.
+     */
+    private void drawGroupList(GuiGraphics g, int mouseX, int mouseY) {
+        if (groups == null || receivingGroup == null || !receivingGroup.isFocused()) {
+            return;
+        }
+        int x = leftPos + 82;
+        int y = topPos + this.imageHeight - 76;
+        int w = 112;
+        int rows = Math.min(groups.groups().size(), 6);
+        if (rows == 0) {
+            return;
+        }
+        g.fill(x - 1, y - 1, x + w + 1, y + rows * 10 + 1, 0xFF24343A);
+        for (int i = 0; i < rows; i++) {
+            var entry = groups.groups().get(i);
+            boolean over = mouseX >= x && mouseX < x + w && mouseY >= y + i * 10 && mouseY < y + i * 10 + 10;
+            g.fill(x, y + i * 10, x + w, y + i * 10 + 10, over ? 0xFF3E5A61 : 0xFF2E444B);
+            // The carried one is marked so the field's value and the list agree at a glance.
+            boolean here = groups.carried() != null && groups.carried().equals(entry.id());
+            g.drawString(font, entry.name(), x + 3, y + i * 10 + 1, here ? 0xFF9BE0C4 : INK, false);
+            String tail = entry.docks() + (entry.open() ? "  ○" : "  ●");
+            g.drawString(font, tail, x + w - 2 - font.width(tail), y + i * 10 + 1,
+                    entry.open() ? HINT : 0xFFC0A090, false);
+        }
+    }
+
+    private boolean groupListClick(double mx, double my) {
+        if (groups == null || receivingGroup == null || !receivingGroup.isFocused()) {
+            return false;
+        }
+        int x = leftPos + 82;
+        int y = topPos + this.imageHeight - 76;
+        int w = 112;
+        int rows = Math.min(groups.groups().size(), 6);
+        for (int i = 0; i < rows; i++) {
+            if (mx < x || mx >= x + w || my < y + i * 10 || my >= y + i * 10 + 10) {
+                continue;
+            }
+            var entry = groups.groups().get(i);
+            // The right-hand end of the row is the lock, and only on a system this player owns.
+            if (mx >= x + w - 18 && entry.mine()) {
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                        new dev.distantstock.net.SetDockGroupC2S(entry.name(),
+                                dev.distantstock.net.SetDockGroupC2S.TOGGLE_OPEN));
+                return true;
+            }
+            receivingGroup.setValue(entry.name());
+            committedGroup = entry.name();
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                    new dev.distantstock.net.SetDockGroupC2S(entry.name(),
+                            dev.distantstock.net.SetDockGroupC2S.SELECT));
+            receivingGroup.setFocused(false);
+            return true;
+        }
+        return false;
     }
 
     private int computeHeight() {
@@ -237,6 +307,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         receivingGroup.setVisible(tuned);
         renderBackground(g, mouseX, mouseY, partial);
         super.render(g, mouseX, mouseY, partial);
+        // After everything, because a dropdown that the widgets behind it paint over is not one.
+        drawGroupList(g, mouseX, mouseY);
         ItemStack hover = hoveredStock(mouseX, mouseY);
         if (hover.isEmpty()) {
             hover = hoveredCart(mouseX, mouseY);
@@ -474,6 +546,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
+        if (groupListClick(mx, my)) {
+            return true;
+        }
         int network = networkIndex(mx, my);
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && network >= 0) {
             NetworkDirectory.Entry entry = menu.networks.get(network);
@@ -528,7 +603,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (receivingGroup != null && receivingGroup.isFocused()
                 && (key == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER
                 || key == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER)) {
-            commitDockGroup(false);
+            commitDockGroup(dev.distantstock.net.SetDockGroupC2S.SELECT);
             receivingGroup.setFocused(false);
             return true;
         }

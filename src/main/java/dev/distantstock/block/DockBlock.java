@@ -136,7 +136,17 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                 if (player.isShiftKeyDown()) {
                     // Sneak + requester: apply the requester's dock group and address to this dock.
                     be.setImport(RequesterData.address(stack));
-                    RequesterData.receivingGroup(stack).ifPresent(be::setGroupId);
+                    RequesterData.receivingGroup(stack).ifPresent(group -> {
+                        // Joining someone else's group means their parcels come out of this dock.
+                        // A closed group refuses, and says so out loud: a click that is silently
+                        // ignored reads as a broken item, not as a locked door.
+                        if (admits(level, group, player)) {
+                            be.setGroupId(group);
+                        } else {
+                            player.displayClientMessage(
+                                    Component.translatable("gui.distantstock.group.closed"), true);
+                        }
+                    });
                 } else if (RequesterData.tuned(stack)) {
                     be.setMode(DockMode.SEND);
                     // What the requester carries is the destination. Sneak-click is what sets a
@@ -152,6 +162,14 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                     java.util.UUID node = RequesterData.network(stack)
                             .map(dev.distantstock.routing.RemoteNetworkId::nodeId)
                             .orElseGet(() -> java.util.UUID.fromString(TranserverBridge.localNodeId()));
+                    if (!admits(level, carried, player)) {
+                        // The same refusal for the sending side. Pointing a dock at a group fills
+                        // that group's docks with parcels, which is no more a stranger's business
+                        // than adding a dock to it.
+                        player.displayClientMessage(
+                                Component.translatable("gui.distantstock.group.closed"), true);
+                        return ItemInteractionResult.sidedSuccess(level.isClientSide);
+                    }
                     be.setDefaultDestination(node, carried);
                     RequesterData.setReceivingGroup(stack, carried, carriedName);
                     RequesterData.network(stack).ifPresent(network -> {
@@ -230,5 +248,22 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
 
     static boolean isWrench(ItemStack stack) {
         return stack.is(net.neoforged.neoforge.common.Tags.Items.TOOLS_WRENCH);
+    }
+
+    /**
+     * Whether this player may point anything at that group.
+     *
+     * <p>One check for both gestures, because from the group's side they are the same act: a dock
+     * that joins it receives into it, and a dock that sends to it fills it. Both make machinery work
+     * for a group the player does not own, and a lock that allowed half of that would not be one.
+     */
+    private static boolean admits(Level level, java.util.UUID group, Player player) {
+        if (level.getServer() == null) {
+            return false;
+        }
+        dev.distantstock.routing.DockGroup found = DockGroupDirectory.get(level.getServer()).find(group).orElse(null);
+        // A group that is gone cannot be joined, and saying yes would leave a dock pointed at
+        // nothing while reporting success.
+        return found != null && found.admits(player.getUUID());
     }
 }

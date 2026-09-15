@@ -282,5 +282,6 @@
   "gui.distantstock.tower.on": "开",
   "gui.distantstock.tower.off": "关",
   "gui.distantstock.group.default": "默认收货港组",
-  "gui.distantstock.route.group.hint": "输入系统名；不存在就新建一个"
+  "gui.distantstock.route.group.hint": "输入系统名；不存在就新建一个",
+  "gui.distantstock.group.closed": "那个系统不对你开放"
 }

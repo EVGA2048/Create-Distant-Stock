@@ -282,5 +282,6 @@
   "gui.distantstock.tower.on": "on",
   "gui.distantstock.tower.off": "off",
   "gui.distantstock.group.default": "Default receiving group",
-  "gui.distantstock.route.group.hint": "Type a system name; a new one is made if it does not exist"
+  "gui.distantstock.route.group.hint": "Type a system name; a new one is made if it does not exist",
+  "gui.distantstock.group.closed": "That system is closed to you"
 }

@@ -35,6 +35,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
         this.gaugePos = null;
         if (!inv.player.level().isClientSide) {
             refresh(inv.player);
+            // The screen cannot draw a list it has never been given, and the field it replaces used
+            // to be free text precisely because there was nothing to list.
+            sendGroupList(inv.player, device(inv.player));
         }
     }
 
@@ -116,7 +119,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
      * rename case is why the flag is here rather than being inferred — without it, renaming a group
      * to a name nobody has used would create a second group and leave the original behind.
      */
-    public void writeDockGroup(Player player, String name, boolean rename) {
+    public void writeDockGroup(Player player, String name, int action) {
         ItemStack stack = device(player);
         if (stack.isEmpty() || name == null) {
             return;
@@ -131,7 +134,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
         }
         dev.distantstock.routing.DockGroupDirectory directory =
                 dev.distantstock.routing.DockGroupDirectory.get(player.level().getServer());
-        if (rename) {
+        if (action == dev.distantstock.net.SetDockGroupC2S.RENAME) {
             // Rename the group this requester already carries. With nothing carried there is
             // nothing to rename, so the same gesture falls through to selecting or creating —
             // otherwise the button would appear to do nothing at all on a fresh requester.
@@ -150,9 +153,42 @@ public final class RequesterMenu extends AbstractContainerMenu {
                 return;
             }
         }
-        dev.distantstock.routing.DockGroup group = directory.findByName(trimmed)
-                .orElseGet(() -> directory.create(trimmed));
+        java.util.UUID who = player == null ? null : player.getUUID();
+        if (action == dev.distantstock.net.SetDockGroupC2S.TOGGLE_OPEN) {
+            // Only the owner may open or close their own system. Anyone else flipping it would be
+            // handing themselves a key to somebody else's warehouse.
+            dev.distantstock.routing.DockGroup target = directory.findByName(trimmed).orElse(null);
+            if (target != null && target.ownedBy(who)) {
+                directory.setOpen(target.id(), !target.open());
+            }
+            sendGroupList(player, stack);
+            return;
+        }
+        dev.distantstock.routing.DockGroup existing = directory.findByName(trimmed).orElse(null);
+        if (existing != null && !existing.admits(who)) {
+            // Selecting a closed group would only fail later, at the dock. Refusing here is the one
+            // moment the player can still be told why.
+            return;
+        }
+        // A group made here belongs to whoever made it, and starts closed. See
+        // DockGroupDirectory.createFor for why the default is the quiet one.
+        dev.distantstock.routing.DockGroup group = existing != null
+                ? existing : directory.createFor(trimmed, who);
         RequesterData.setReceivingGroup(stack, group.id(), group.name());
+    }
+
+    /** Pushes the current list to whoever has this screen open. */
+    public static void sendGroupList(Player player, ItemStack stack) {
+        if (player == null || player.level().getServer() == null) {
+            return;
+        }
+        dev.distantstock.routing.DockGroupDirectory directory =
+                dev.distantstock.routing.DockGroupDirectory.get(player.level().getServer());
+        java.util.UUID carried = dev.distantstock.item.RequesterData.receivingGroup(stack).orElse(null);
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(
+                (net.minecraft.server.level.ServerPlayer) player,
+                dev.distantstock.net.DockGroupsS2C.of(directory, player.getUUID(), carried,
+                        group -> dev.distantstock.block.LoadedDocks.allInGroup(group).size()));
     }
 
     public ItemStack device(Player player) {
