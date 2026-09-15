@@ -153,17 +153,12 @@ OPEN_CUBOIDS = {'gauge', 'gauge_lit'}
 
 # Textures the console is allowed to sample with alpha below 255.
 #
-#   glass   - the lamp cover is meant to be see-through, which is also why the console
-#             renders as a whole-model translucent.
-#   requester - the antenna reuses the portable requester's item texture, whose alpha
-#             layout leaves most of its faces redundant. Rendering the finished model
-#             through the handoff's own renderer reproduces both approved previews
-#             pixel-for-pixel, so the holes those faces would leave are all covered.
 #   bulb    - the monitor's bulb, alpha 0..206 on an already-translucent model.
+#
+# The console used to be listed here three times over. It renders cutout now, which discards
+# anything below alpha 128, so every texture it samples has to be opaque and the check that says
+# so is worth more than the exemption was.
 PARTIAL_ALPHA_OK = {
-    'distantstock:block/requester_console/glass',
-    'distantstock:block/requester_console/glass_lit',
-    'distantstock:item/requester',
     'distantstock:block/monitor_bulb',
 }
 

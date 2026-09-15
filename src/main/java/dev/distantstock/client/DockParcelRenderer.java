@@ -56,35 +56,12 @@ public final class DockParcelRenderer implements BlockEntityRenderer<DockBlockEn
     private static final ResourceLocation LIFT_TEXTURE =
             ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "block/dock_cap");
 
-    /** Deck and lip, in model units. The lip is what stops the box sliding off. */
-    private static final float[][] LIFT_BOXES = {
-            {2, 0, 2, 14, 1, 14},
-            {2, 1, 2, 14, 2, 3},
-            {2, 1, 13, 14, 2, 14},
-            {2, 1, 3, 3, 2, 13},
-            {13, 1, 3, 14, 2, 13},
-    };
-
     /** The lift plate's deck sits at model y=1, so the model is offset down by that much. */
     private static final float LIFT_DECK_Y = 1f / 16f;
 
-    /**
-     * Vanilla's FaceInfo corner order, as indices into the box, with the matching normal. Winding
-     * matters: this draws into a culling render type.
-     */
-    private static final int[][][] FACE_CORNERS = {
-            {{0, 0, 1}, {0, 0, 0}, {1, 0, 0}, {1, 0, 1}},
-            {{0, 1, 0}, {0, 1, 1}, {1, 1, 1}, {1, 1, 0}},
-            {{1, 1, 0}, {1, 0, 0}, {0, 0, 0}, {0, 1, 0}},
-            {{0, 1, 1}, {0, 0, 1}, {1, 0, 1}, {1, 1, 1}},
-            {{0, 1, 0}, {0, 0, 0}, {0, 0, 1}, {0, 1, 1}},
-            {{1, 1, 1}, {1, 0, 1}, {1, 0, 0}, {1, 1, 0}},
-    };
     private static final Direction[] FACE_NORMALS = {
             Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST,
     };
-    /** BlockFaceUV: vertex k reads rectangle corner (k + rotation / 90) % 4 of these. */
-    private static final float[][] UV_CORNERS = {{0, 0}, {0, 1}, {1, 1}, {1, 0}};
 
     public DockParcelRenderer(BlockEntityRendererProvider.Context context) {
     }
@@ -148,7 +125,7 @@ public final class DockParcelRenderer implements BlockEntityRenderer<DockBlockEn
         // lift at 1/256 of a block, which is why it was never visible.
         pose.scale(1f / 16f, 1f / 16f, 1f / 16f);
         pose.translate(-8, 0, -8);
-        for (float[] box : LIFT_BOXES) {
+        for (float[] box : DockParcelMotion.LIFT_BOXES) {
             box(pose, out, light, sprite, box);
         }
         pose.popPose();
@@ -157,20 +134,22 @@ public final class DockParcelRenderer implements BlockEntityRenderer<DockBlockEn
     /** One axis-aligned box, six faces, drawn the way the baker would have drawn it. */
     private static void box(PoseStack pose, VertexConsumer out, int light, TextureAtlasSprite sprite,
                             float[] bounds) {
-        for (int face = 0; face < FACE_CORNERS.length; face++) {
+        float uSpan = sprite.getU1() - sprite.getU0();
+        float vSpan = sprite.getV1() - sprite.getV0();
+
+        for (int face = 0; face < DockParcelMotion.FACE_CORNERS.length; face++) {
             Direction normal = FACE_NORMALS[face];
             for (int corner = 0; corner < 4; corner++) {
-                int[] pick = FACE_CORNERS[face][corner];
-                // Bounds are minX,minY,minZ,maxX,maxY,maxZ: a 0 picks the low end, a 1 the high one.
-                // Model units, not blocks: the pose already carries the 1/16 scale.
+                int[] pick = DockParcelMotion.FACE_CORNERS[face][corner];
+                // Bounds are minX,minY,minZ,maxX,maxY,maxZ. Model units, not blocks: the pose
+                // already carries the 1/16 scale.
                 float x = bounds[pick[0] == 0 ? 0 : 3];
                 float y = bounds[pick[1] == 0 ? 1 : 4];
                 float z = bounds[pick[2] == 0 ? 2 : 5];
-                float[] uv = UV_CORNERS[corner];
+                float[] uv = DockParcelMotion.faceUv(face, bounds, corner);
                 out.addVertex(pose.last(), x, y, z)
                         .setColor(255, 255, 255, 255)
-                        .setUv(uv[0] == 0 ? sprite.getU0() : sprite.getU1(),
-                                uv[1] == 0 ? sprite.getV0() : sprite.getV1())
+                        .setUv(sprite.getU0() + uv[0] * uSpan, sprite.getV0() + uv[1] * vSpan)
                         .setLight(light)
                         .setNormal(pose.last(), normal.getStepX(), normal.getStepY(), normal.getStepZ());
             }

@@ -2,7 +2,7 @@
   "credit": "Antenna from Create: Mobile Packages (MIT, Tim Heidler). Girder beam textures derived from Create: Diesel Generators (MIT, George VI). Console body and andesite palette by Distant Stock.",
   "parent": "minecraft:block/block",
   "ambientocclusion": true,
-  "render_type": "minecraft:translucent",
+  "render_type": "minecraft:cutout",
   "textures": {
     "shell": "distantstock:block/requester_console/shell",
     "control": "distantstock:block/requester_console/control",
@@ -14,9 +14,8 @@
     "base_andesite": "distantstock:block/requester_console/base_andesite",
     "andesite_girder": "distantstock:block/requester_console/andesite_girder",
     "girder_front": "distantstock:block/requester_console/girder_front",
-    "antenna": "distantstock:item/requester",
-    "particle": "distantstock:block/requester_console/base_andesite",
-    "dish": "distantstock:block/requester_console/antenna_dish"
+    "antenna": "distantstock:block/requester_console/antenna",
+    "particle": "distantstock:block/requester_console/base_andesite"
   },
   "elements": [
     {
@@ -540,54 +539,25 @@
     },
     {
       "from": [
-        3.0,
+        4.0,
         15,
         13.0
       ],
       "to": [
-        6.0,
+        5.0,
         25,
         14.0
       ],
       "faces": {
-        "up": {
+        "north": {
           "texture": "#antenna",
           "uv": [
-            10.5,
-            9,
-            9,
-            9.5
+            1.5,
+            7,
+            0,
+            12
           ],
           "rotation": 180
-        },
-        "west": {
-          "texture": "#antenna",
-          "uv": [
-            10.5,
-            9,
-            9,
-            9.5
-          ],
-          "rotation": 90
-        },
-        "down": {
-          "texture": "#antenna",
-          "uv": [
-            3,
-            9.5,
-            1.5,
-            10
-          ]
-        },
-        "east": {
-          "texture": "#antenna",
-          "uv": [
-            10.5,
-            9,
-            9,
-            9.5
-          ],
-          "rotation": 270
         },
         "south": {
           "texture": "#antenna",
@@ -598,39 +568,14 @@
             7
           ]
         },
-        "north": {
+        "down": {
           "texture": "#antenna",
           "uv": [
-            1.5,
-            7,
-            0,
-            12
-          ],
-          "rotation": 180
-        }
-      }
-    },
-    {
-      "from": [
-        4.0,
-        15,
-        12.0
-      ],
-      "to": [
-        5.0,
-        25,
-        15.0
-      ],
-      "faces": {
-        "up": {
-          "texture": "#antenna",
-          "uv": [
-            3.5,
-            9.5,
             3,
-            11
-          ],
-          "rotation": 180
+            9.5,
+            1.5,
+            10
+          ]
         },
         "west": {
           "texture": "#antenna",
@@ -642,15 +587,6 @@
           ],
           "rotation": 90
         },
-        "down": {
-          "texture": "#antenna",
-          "uv": [
-            3.5,
-            9.5,
-            3,
-            11
-          ]
-        },
         "east": {
           "texture": "#antenna",
           "uv": [
@@ -661,26 +597,18 @@
           ],
           "rotation": 90
         },
-        "south": {
+        "up": {
           "texture": "#antenna",
           "uv": [
-            3,
-            11,
-            3.5,
-            9.5
-          ]
-        },
-        "north": {
-          "texture": "#antenna",
-          "uv": [
-            3,
+            4,
             9.5,
             3.5,
-            11
+            10
           ],
           "rotation": 180
         }
-      }
+      },
+      "name": "antenna_mast"
     },
     {
       "from": [
@@ -695,47 +623,23 @@
       ],
       "faces": {
         "up": {
-          "texture": "#dish",
+          "texture": "#antenna",
           "uv": [
-            16.0,
-            0.0,
-            0.0,
-            16.0
+            9,
+            8,
+            6.5,
+            10.5
           ],
           "rotation": 180
         },
         "down": {
-          "texture": "#dish",
-          "uv": [
-            16.0,
-            0.0,
-            0.0,
-            16.0
-          ]
-        }
-      }
-    },
-    {
-      "from": [
-        4.0,
-        23,
-        13.0
-      ],
-      "to": [
-        5.0,
-        24,
-        14.0
-      ],
-      "faces": {
-        "up": {
           "texture": "#antenna",
           "uv": [
-            4,
-            9.5,
-            3.5,
-            10
-          ],
-          "rotation": 180
+            9,
+            8,
+            6.5,
+            10.5
+          ]
         }
       }
     }

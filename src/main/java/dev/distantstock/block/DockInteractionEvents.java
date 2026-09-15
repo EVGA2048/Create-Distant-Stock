@@ -2,53 +2,64 @@ package dev.distantstock.block;
 
 import com.simibubi.create.content.logistics.box.PackageItem;
 import dev.distantstock.DistantStock;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.neoforge.common.util.TriState;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 /**
- * Makes a parcel in hand always reach the dock, sneaking or not.
+ * Routes a parcel in the player's hand into the dock, without asking vanilla whether the block may
+ * be used.
  *
- * Vanilla decides whether to offer a click to the block before the block ever hears about it:
+ * <p>The click was not reliably reaching {@link DockBlock#useItemOn}. Vanilla gates that call before
+ * the block hears about it, and the gate is written differently on the two sides:
  *
  * <pre>
+ * // server, ServerPlayerGameMode
  * boolean flag1 = player.isSecondaryUseActive() &amp;&amp; holdingSomething
  *         &amp;&amp; !(mainHand.doesSneakBypassUse(..) &amp;&amp; offhand.doesSneakBypassUse(..));
- * if (event.getUseBlock().isTrue() || (event.getUseBlock().isDefault() &amp;&amp; !flag1)) {
- *     blockstate.useItemOn(..);
+ *
+ * // client, MultiPlayerGameMode
+ * boolean flag1 = player.isSecondaryUseActive()
+ *         &amp;&amp; (!mainHand.doesSneakBypassUse(..) || !offhand.doesSneakBypassUse(..));
  * </pre>
  *
- * Both hands have to bypass the sneak for {@code flag1} to clear, and an empty off hand never
- * does, so a player who sneaks while holding a parcel skips {@link DockBlock#useItemOn} outright.
- * That is a silent nothing: no insert, no refusal, not even the diagnostic line, which is exactly
- * how it was reported. The event itself still fires that early, so answering it with an explicit
- * "yes, use the block" is enough, and it keeps a single code path rather than a second copy of the
- * insert logic here.
+ * <p>Both hands have to bypass the sneak for the server's version to clear, and an empty off hand
+ * never does, so sneaking skipped the block outright. The unsneaking case had no such explanation:
+ * it passed both gates on paper and still did nothing, and reading the block's own code could not
+ * show why.
+ *
+ * <p>So the gate is stepped over. This handler calls the block itself and cancels the event, and
+ * cancellation is checked at the very top of both call paths after every handler has run, so nothing
+ * that ran before can take the click back. The block keeps the logic, so there is still one
+ * implementation and the game tests that call {@code useItemOn} directly still exercise it.
+ *
+ * <p>"Plain right-click does not work" turned out not to be about this at all. Logging every parcel
+ * right-click, with the block it landed on, showed six attempts at a `create:depot` next to the
+ * dock — a block lower and one block over, where a slightly low crosshair lands — and every attempt
+ * that reached the dock being taken, sneaking or not. The gate above is real and the sneak case
+ * genuinely needed stepping over; the rest was aim.
  */
 @EventBusSubscriber(modid = DistantStock.MODID)
 public final class DockInteractionEvents {
-    private static final Logger LOG = LogManager.getLogger();
 
     @SubscribeEvent
     public static void offerParcelToDock(PlayerInteractEvent.RightClickBlock event) {
-        if (!(event.getLevel().getBlockState(event.getPos()).getBlock() instanceof DockBlock)) {
+        if (!PackageItem.isPackage(event.getItemStack())) {
             return;
         }
-        ItemStack held = event.getItemStack();
-        if (!PackageItem.isPackage(held)) {
+
+        BlockState state = event.getLevel().getBlockState(event.getPos());
+        if (!(state.getBlock() instanceof DockBlock)) {
             return;
         }
-        if (event.getEntity().isSecondaryUseActive()) {
-            // Worth a line in the log: this is the case that used to do nothing at all, and a
-            // report of "the dock ignored me" is otherwise impossible to tell from a missed click.
-            LOG.info("Dock at {} taking a parcel from a sneaking player; overriding the "
-                    + "sneak-use gate", event.getPos());
+        ItemInteractionResult result = state.useItemOn(event.getItemStack(), event.getLevel(),
+                event.getEntity(), event.getHand(), event.getHitVec());
+        if (result.consumesAction()) {
+            event.setCancellationResult(result.result());
+            event.setCanceled(true);
         }
-        event.setUseBlock(TriState.TRUE);
     }
 
     private DockInteractionEvents() {

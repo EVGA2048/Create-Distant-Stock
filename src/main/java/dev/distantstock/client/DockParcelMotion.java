@@ -34,6 +34,74 @@ public final class DockParcelMotion {
 
     public record Frame(float baseY, float scale, float clipY) {}
 
+    // --- the lift plate's box geometry ------------------------------------------------------
+    // Kept here rather than in the renderer so the tables below can be checked without a client.
+
+    /** Deck and lip, in model units. The lip is what stops the box sliding off. */
+    public static final float[][] LIFT_BOXES = {
+            {2, 0, 2, 14, 1, 14},
+            {2, 1, 2, 14, 2, 3},
+            {2, 1, 13, 14, 2, 14},
+            {2, 1, 3, 3, 2, 13},
+            {13, 1, 3, 14, 2, 13},
+    };
+
+    /**
+     * Vanilla's FaceInfo corner order, as indices into the box. Winding matters: the lift is drawn
+     * into a culling render type.
+     */
+    public static final int[][][] FACE_CORNERS = {
+            {{0, 0, 1}, {0, 0, 0}, {1, 0, 0}, {1, 0, 1}},
+            {{0, 1, 0}, {0, 1, 1}, {1, 1, 1}, {1, 1, 0}},
+            {{1, 1, 0}, {1, 0, 0}, {0, 0, 0}, {0, 1, 0}},
+            {{0, 1, 1}, {0, 0, 1}, {1, 0, 1}, {1, 1, 1}},
+            {{0, 1, 0}, {0, 0, 0}, {0, 0, 1}, {0, 1, 1}},
+            {{1, 1, 1}, {1, 0, 1}, {1, 0, 0}, {1, 1, 0}},
+    };
+
+    /**
+     * Which way the texture runs across each face, as {@code {uAxis, uPositive, vAxis, vPositive}}.
+     *
+     * <p>Read off vanilla rather than guessed at. A face covering a whole sprite hands vertex k the
+     * rectangle corner {@code (0,0), (0,V), (U,V), (U,0)} of {@code BlockFaceUV}, so walking
+     * FACE_CORNERS against that sequence says which world axis each of u and v follows and which
+     * way round it goes. {@code DockParcelMotionCheck} re-derives it the same way, because a table
+     * like this is exactly the sort of thing that is wrong in a way nobody notices.
+     */
+    private static final int[][] FACE_UV_AXES = {
+            {0, 1, 2, -1},   // down:  u along +x, v along -z
+            {0, 1, 2, 1},    // up:    u along +x, v along +z
+            {0, -1, 1, -1},  // north: u along -x, v along -y
+            {0, 1, 1, -1},   // south: u along +x, v along -y
+            {2, 1, 1, -1},   // west:  u along +z, v along -y
+            {2, -1, 1, -1},  // east:  u along -z, v along -y
+    };
+
+    /**
+     * One corner of one face, as a fraction of the sprite, measured from the face's own low edge.
+     *
+     * <p>Proportional to the face rather than stretched across it, so a strip one unit wide shows
+     * one unit of texture: a turn of the sprite per block. Drawing the whole square on every face
+     * smeared the two-unit lips into stripes.
+     */
+    public static float[] faceUv(int face, float[] bounds, int corner) {
+        int[] axes = FACE_UV_AXES[face];
+        int[] pick = FACE_CORNERS[face][corner];
+        float u = pick[axes[0]] == 0 ? bounds[axes[0]] : bounds[axes[0] + 3];
+        float uLow = bounds[axes[0]];
+        float uHigh = bounds[axes[0] + 3];
+        float v = pick[axes[2]] == 0 ? bounds[axes[2]] : bounds[axes[2] + 3];
+        float vLow = bounds[axes[2]];
+        float vHigh = bounds[axes[2] + 3];
+        // Divided by 16, not by the face's own extent: one turn of the sprite per block. Dividing by
+        // the extent would fit the whole sprite to every face, which is the same thing the fixed
+        // 0..1 uv did and smears a twelve-by-one lip into stripes of the entire texture.
+        return new float[]{
+                (axes[1] > 0 ? u - uLow : uHigh - u) / 16f,
+                (axes[3] > 0 ? v - vLow : vHigh - v) / 16f,
+        };
+    }
+
     /** The parcel's own progress, 0 at the tray and 1 at the portal. */
     public static float parcelT(float send, float receive) {
         return Math.clamp(send >= 0 ? send : receive >= 0 ? 1 - receive : 0, 0, 1);

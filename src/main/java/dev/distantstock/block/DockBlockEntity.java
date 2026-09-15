@@ -93,6 +93,12 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         }
     };
 
+    /** Takes one parcel into the bay, answering whether it fit. The bay holds exactly one. */
+    public boolean acceptParcel(ItemStack stack) {
+        return PackageItem.isPackage(stack)
+                && automation.insertItem(0, stack.copyWithCount(1), false).isEmpty();
+    }
+
     /**
      * The bottom face serves both directions: hoppers and chutes below can pull received parcels
      * out, and insert outbound parcels in. Received and outbound caches remain separate internally.

@@ -23,8 +23,9 @@ public final class DockParcelMotionCheck {
             }
         }
         lift();
+        liftTexture();
         System.out.println("Dock motion checks PASSED: 16 sizes, 301 frames, lift catch, "
-                + "reversible motion and clearance.");
+                + "reversible motion, clearance and deck uvs.");
     }
 
     /**
@@ -90,6 +91,42 @@ public final class DockParcelMotionCheck {
         // The whole point of the ceiling: a lift never has to be clipped against the lid.
         require(DockParcelMotion.liftTopY(DockParcelMotion.LIFT_CEILING) < DockParcelMotion.PORTAL_Y,
                 "the ceiling must keep the lift below the portal");
+    }
+
+    /**
+     * The deck's uv table has to agree with vanilla's corner pairing.
+     *
+     * A face covering a whole sprite hands vertex k the rectangle corner (0,0), (0,V), (U,V), (U,0)
+     * of BlockFaceUV. Walking FACE_CORNERS against that sequence re-derives which axis u and v run
+     * along and which way round; the renderer's table has to say the same thing. Checked on a box
+     * that is different on all three axes, so a swapped pair or a flipped sign cannot pass by luck.
+     */
+    private static void liftTexture() {
+        // Different on all three axes, so a swapped pair or a flipped sign cannot pass by luck.
+        float[] bounds = {3f, 5f, 7f, 11f, 9f, 15f};
+        for (int face = 0; face < DockParcelMotion.FACE_CORNERS.length; face++) {
+            float[][] uv = new float[4][];
+            for (int corner = 0; corner < 4; corner++) {
+                uv[corner] = DockParcelMotion.faceUv(face, bounds, corner);
+            }
+            // Vanilla hands vertex k the rectangle corner (0,0), (0,V), (U,V), (U,0), so the
+            // sequence is pinned as soon as one corner gives the opposite pair.
+            float u = uv[2][0], v = uv[2][1];
+            require(u > 0 && v > 0, "a cuboid face must map to a real rectangle");
+            require(same(uv[0], 0, 0) && same(uv[1], 0, v) && same(uv[3], u, 0),
+                    "deck face " + face + " does not follow vanilla's corner order");
+        }
+        // Proportional, not stretched: one turn of the sprite per block.
+        float[] lip = DockParcelMotion.LIFT_BOXES[1];
+        float[] far = DockParcelMotion.faceUv(1, lip, 2);
+        require(Math.abs(Math.max(far[0], far[1]) - 12f / 16f) < 1e-6f,
+                "a twelve-unit edge should read three quarters of the tile");
+        require(Math.abs(Math.min(far[0], far[1]) - 1f / 16f) < 1e-6f,
+                "a one-unit edge should read a sixteenth of the tile");
+    }
+
+    private static boolean same(float[] uv, float u, float v) {
+        return Math.abs(uv[0] - u) < 1e-5f && Math.abs(uv[1] - v) < 1e-5f;
     }
 
     private static void require(boolean condition, String message) {

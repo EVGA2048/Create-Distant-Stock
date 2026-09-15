@@ -164,7 +164,7 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
             if (!level.isClientSide) {
                 // The dock holds one parcel at a time, so a refusal here is normal and it used to be
                 // silent: the click reported success and the parcel stayed in hand with no hint why.
-                boolean accepted = be.automation.insertItem(0, stack.copyWithCount(1), false).isEmpty();
+                boolean accepted = be.acceptParcel(stack);
                 if (accepted && !player.isCreative()) {
                     stack.shrink(1);
                 }
@@ -190,10 +190,9 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
             }
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
-        // Holding something the dock has no use for is worth saying out loud. It is also the only
-        // way to tell "the dock looked at this item and shrugged" apart from "the dock never saw
-        // the click", which is what a sneaking player gets: vanilla skips the block entirely when a
-        // held item does not bypass sneak-use, so nothing below this line ever runs for them.
+        // Holding something the dock has no use for is worth saying out loud: it is the only way to
+        // tell "the dock looked at this item and shrugged" apart from "the dock never saw the
+        // click".
         if (!level.isClientSide && !stack.isEmpty() && !(stack.getItem() instanceof BlockItem)) {
             player.sendSystemMessage(Component.translatable("gui.distantstock.dock.unhandled",
                     stack.getHoverName()));

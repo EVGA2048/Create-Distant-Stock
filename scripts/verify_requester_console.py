@@ -51,12 +51,28 @@ VIEWS = {
 }
 
 
+# Textures the shipped model uses that the handoff does not have, mapped back to the artwork the
+# approval was given against. The antenna and the lamp cover are deliberately re-drawn for the game
+# -- the icon's holes filled in, the glass made opaque so it survives cutout -- and none of that is
+# a statement about the mesh. Rendering the shipped texture here would just measure how much of the
+# art changed; this check exists to measure whether the geometry and its uv mapping still match.
+HANDOFF_EQUIVALENT = {
+    'requester_study:antenna': 'distantstock:item/requester',
+    'requester_study:glass_lit': 'requester_study:glass',
+}
+
+
 def texture_file(material):
     if material == 'distantstock:item/requester':
         return HANDOFF / 'textures/portable_requester.png'
-    # Everything else is a console texture, renamed into the preview's own namespace.
+    # Everything else is a console texture, renamed into the preview's own namespace. The handoff's
+    # own copy is preferred, so the comparison is against the approved art rather than ours.
+    name = material.split(':', 1)[1]
+    original = HANDOFF / 'textures' / (name + '.png')
+    if original.exists():
+        return original
     return ROOT / ('src/main/resources/assets/distantstock/textures/block/requester_console/'
-                   + material.split(':', 1)[1] + '.png')
+                   + name + '.png')
 
 
 def build_mesh():
@@ -77,6 +93,7 @@ def build_mesh():
             reference = model['textures'][face['texture'].lstrip('#')]
             material = ('distantstock:item/requester' if reference == 'distantstock:item/requester'
                         else 'requester_study:' + reference.rsplit('/', 1)[1])
+            material = HANDOFF_EQUIVALENT.get(material, material)
             mesh.append({
                 'points': [list(bake.rotate(p, element.get('rotation'))) for p in order],
                 'uv': [list(uv_at[p]) for p in order],
@@ -100,18 +117,18 @@ def main():
         b = np.asarray(rendered).astype(int)
         differing = int((np.abs(a - b).sum(axis=2) > 12).sum())
         total = a.shape[0] * a.shape[1]
-        # Two intended differences, both understood. The dropped lamp core shows through the
-        # translucent cover at about 0.2% of the frame. The antenna dish is now an opaque
-        # square where the approved render draws a soft blob, because the handoff's renderer
-        # ignores alpha and the game does not: the patch the dish used to read has holes in
-        # it, and in game it came out as a shredded star. Together they measure 1.0%.
-        # Anything structural lands far above that; the antenna built as a 90 degree element
-        # rotation, which is what this check was written for, was many times larger.
-        verdict = 'MATCH' if differing < total * 0.015 else 'DIFFERS'
+        # Rendered with the handoff's own artwork, so what is left is mesh only, and three
+        # deliberate departures from it: the dropped lamp core, the antenna dish given real
+        # thickness, and the mast narrowed from the crossed pair to the rod they share (at the
+        # user's request — on a block the crossing reads as a plus, not as an aerial). Together
+        # they measure about 1.4%. Anything structural lands far above that; the antenna built
+        # as a 90 degree element rotation, which is what this check was written for, was many
+        # times larger.
+        verdict = 'MATCH' if differing < total * 0.02 else 'DIFFERS'
         if verdict == 'DIFFERS':
             failed.append(name)
         print(f'{verdict} {name}: {differing} of {total} pixels differ from the approved render'
-              f' ({differing / total:.2%}; lamp core ~0.2%, opaque antenna dish ~0.8%)')
+              f' ({differing / total:.2%}; lamp core, dish thickness and the slender mast)')
     if failed:
         raise SystemExit('console no longer matches the approved art: ' + ', '.join(failed))
     print('requester console matches the approved art')
