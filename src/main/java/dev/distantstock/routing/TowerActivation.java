@@ -63,22 +63,44 @@ public final class TowerActivation {
     public record Usage(int limit, int carried) {
     }
 
+    /**
+     * Parcels that crossed one tower in the last ten minutes, counted at the docks it carries.
+     *
+     * <p>A rolling window, not a lifetime total: what an operator wants to know is whether the line
+     * is moving now, and a number that only ever grows cannot answer that. The buckets live on the
+     * docks — see {@code DockBlockEntity} — because a dock is the only place that sees both a parcel
+     * leaving and a parcel arriving.
+     */
+    public record Traffic(long sent, long received) {
+        public static final Traffic NONE = new Traffic(0, 0);
+
+        public Traffic plus(Traffic other) {
+            return new Traffic(sent + other.sent, received + other.received);
+        }
+    }
+
     /** A frozen answer: the systems, the dimensions they claim, and the devices they carry. */
     public static final class Snapshot {
-        private static final Snapshot EMPTY = new Snapshot(List.of(), Map.of(), Map.of(), Map.of());
+        private static final Snapshot EMPTY = new Snapshot(
+                List.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
 
         private final List<TowerSystem.System> systems;
         private final Map<ResourceKey<Level>, LongSet> activated;
         private final Map<ResourceKey<Level>, Long2ObjectMap<TowerSystem.TowerId>> carriers;
         private final Map<TowerSystem.TowerId, Usage> usage;
+        private final Map<TowerSystem.TowerId, Integer> carriedBy;
+        private final Map<TowerSystem.TowerId, Traffic> traffic;
 
         Snapshot(List<TowerSystem.System> systems, Map<ResourceKey<Level>, LongSet> activated,
                  Map<ResourceKey<Level>, Long2ObjectMap<TowerSystem.TowerId>> carriers,
-                 Map<TowerSystem.TowerId, Usage> usage) {
+                 Map<TowerSystem.TowerId, Usage> usage, Map<TowerSystem.TowerId, Integer> carriedBy,
+                 Map<TowerSystem.TowerId, Traffic> traffic) {
             this.systems = systems;
             this.activated = activated;
             this.carriers = carriers;
             this.usage = usage;
+            this.carriedBy = carriedBy;
+            this.traffic = traffic;
         }
 
         public List<TowerSystem.System> systems() {
@@ -101,6 +123,18 @@ public final class TowerActivation {
             return usage.get(tower);
         }
 
+        /** How many devices this one tower carries, which is what its row on a monitor shows. */
+        public int carriedBy(TowerSystem.TowerId tower) {
+            Integer count = carriedBy.get(tower);
+            return count == null ? 0 : count;
+        }
+
+        /** What crossed this tower's docks in the last ten minutes, or zero for a tower in none. */
+        public Traffic traffic(TowerSystem.TowerId tower) {
+            Traffic found = traffic.get(tower);
+            return found == null ? Traffic.NONE : found;
+        }
+
         /**
          * Whether a device at this position is switched on.
          *
@@ -116,6 +150,24 @@ public final class TowerActivation {
         public TowerSystem.TowerId carrier(ResourceKey<Level> dimension, BlockPos pos) {
             Long2ObjectMap<TowerSystem.TowerId> found = carriers.get(dimension);
             return found == null ? null : found.get(pos.asLong());
+        }
+
+        /**
+         * The towers that share a system with this one, or an empty list for a tower in none.
+         *
+         * <p>What a monitor shows its operator: the merged machine, not just the tower the device
+         * happens to stand closest to in it. The list is the snapshot's own, so a caller can read it
+         * without searching and without touching the world.
+         */
+        public List<TowerSystem.Member> systemMembers(TowerSystem.TowerId tower) {
+            for (TowerSystem.System system : systems) {
+                for (TowerSystem.Member member : system.members()) {
+                    if (member.id().equals(tower)) {
+                        return system.members();
+                    }
+                }
+            }
+            return List.of();
         }
     }
 
@@ -215,6 +267,20 @@ public final class TowerActivation {
      * world half, and it does no deciding of its own beyond which entities are loaded.
      */
     public static Snapshot of(List<TowerSystem.Member> towers, List<TowerSystem.Device> devices) {
+        return of(towers, devices, Map.of());
+    }
+
+    /**
+     * The same, with the parcels the docks counted this minute.
+     *
+     * <p>The counts arrive already taken, keyed by device, because the ticking is the docks' — this
+     * half only has to add each device's window to the tower that carries it, which is the same
+     * decision it has just made for every other purpose.
+     *
+     * @param traffic per device, the parcels that crossed it in the last ten minutes
+     */
+    public static Snapshot of(List<TowerSystem.Member> towers, List<TowerSystem.Device> devices,
+                             Map<TowerSystem.Device, Traffic> traffic) {
         List<TowerSystem.System> systems = TowerSystem.merge(towers);
         if (systems.isEmpty()) {
             return Snapshot.EMPTY;
@@ -241,6 +307,15 @@ public final class TowerActivation {
         }
 
         Map<TowerSystem.TowerId, Usage> usage = new HashMap<>();
+        Map<TowerSystem.TowerId, Integer> carriedBy = new HashMap<>();
+        Map<TowerSystem.TowerId, Traffic> trafficByTower = new HashMap<>();
+        for (TowerSystem.Carried entry : carried) {
+            carriedBy.merge(entry.carrier(), 1, Integer::sum);
+            Traffic window = traffic.get(entry.device());
+            if (window != null) {
+                trafficByTower.merge(entry.carrier(), window, Traffic::plus);
+            }
+        }
         for (TowerSystem.System system : systems) {
             Set<TowerSystem.TowerId> members = Set.copyOf(system.ids());
             int carriedHere = 0;
@@ -254,7 +329,7 @@ public final class TowerActivation {
             }
         }
         return new Snapshot(List.copyOf(systems), Map.copyOf(activated), Map.copyOf(carriers),
-                Map.copyOf(usage));
+                Map.copyOf(usage), Map.copyOf(carriedBy), Map.copyOf(trafficByTower));
     }
 
     /**
@@ -267,15 +342,16 @@ public final class TowerActivation {
         if (server == null) {
             return Snapshot.EMPTY;
         }
+        TowerDirectory directory = TowerDirectory.get(server);
         List<TowerSystem.Member> towers = new ArrayList<>();
         for (TowerCoreBlockEntity be : LoadedTowers.all()) {
             TowerTier tier = be.tier();
             if (tier == null || be.getLevel() == null) {
                 continue;
             }
-            towers.add(new TowerSystem.Member(
-                    TowerSystem.TowerId.of(be.getLevel().dimension(), be.getBlockPos()),
-                    be.getBlockPos(), tier.radius(), tier.devices(), be.isRunning()));
+            TowerSystem.TowerId id = TowerSystem.TowerId.of(be.getLevel().dimension(), be.getBlockPos());
+            towers.add(new TowerSystem.Member(id, be.getBlockPos(), tier.radius(), tier.devices(),
+                    be.isRunning(), directory.settings(id).carrying()));
         }
         Set<String> claimed = new HashSet<>();
         for (TowerSystem.Member member : towers) {
@@ -291,8 +367,12 @@ public final class TowerActivation {
 
         List<TowerSystem.Device> devices = new ArrayList<>();
         Map<String, LongSet> seen = new HashMap<>();
+        Map<TowerSystem.Device, Traffic> traffic = new HashMap<>();
         for (var be : LoadedDocks.allDocks()) {
-            addDevice(devices, seen, claimed, be.getLevel(), be.getBlockPos());
+            TowerSystem.Device device = addDevice(devices, seen, claimed, be.getLevel(), be.getBlockPos());
+            if (device != null) {
+                traffic.put(device, be.traffic());
+            }
         }
         for (var be : LoadedDocks.allGauges()) {
             addDevice(devices, seen, claimed, be.getLevel(), be.getBlockPos());
@@ -351,19 +431,22 @@ public final class TowerActivation {
         }
     }
 
-    private static void addDevice(List<TowerSystem.Device> devices, Map<String, LongSet> seen,
-                                  Set<String> claimed, Level level, BlockPos pos) {
+    /** Collects one device, and answers the one it made so a caller can hang a reading on it. */
+    private static TowerSystem.Device addDevice(List<TowerSystem.Device> devices, Map<String, LongSet> seen,
+                                                Set<String> claimed, Level level, BlockPos pos) {
         if (level == null) {
-            return;
+            return null;
         }
         String dimension = level.dimension().location().toString();
         if (!claimed.contains(dimension)) {
-            return;
+            return null;
         }
         if (!seen.computeIfAbsent(dimension, ignored -> new LongOpenHashSet()).add(pos.asLong())) {
-            return;
+            return null;
         }
-        devices.add(new TowerSystem.Device(pos, dimension));
+        TowerSystem.Device device = new TowerSystem.Device(pos, dimension);
+        devices.add(device);
+        return device;
     }
 
     private static ServerLevel levelOf(MinecraftServer server, String dimension) {

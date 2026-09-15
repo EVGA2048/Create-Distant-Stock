@@ -4,6 +4,7 @@ import dev.distantstock.block.DockBlockEntity;
 import dev.distantstock.block.DockStatus;
 import dev.distantstock.block.ModBlocks;
 import dev.distantstock.block.TowerCoreBlockEntity;
+import dev.distantstock.block.TowerTier;
 import dev.distantstock.item.ModItems;
 import dev.distantstock.routing.DockGroupDirectory;
 import dev.distantstock.routing.TowerActivation;
@@ -128,7 +129,7 @@ public final class TowerActivationGameTests {
         // Another dimension is never part of the same system, however close it is on paper.
         TowerSystem.Member elsewhere = new TowerSystem.Member(
                 new TowerSystem.TowerId("minecraft:the_nether", new BlockPos(0, 64, 0).asLong()),
-                new BlockPos(0, 64, 0), 20, 8, true);
+                new BlockPos(0, 64, 0), 20, 8, true, true);
         h.assertTrue(TowerSystem.merge(List.of(first, elsewhere)).size() == 2,
                 "a tower in another dimension joined the system");
         h.succeed();
@@ -265,23 +266,52 @@ public final class TowerActivationGameTests {
         });
     }
 
-    /** The monitor's selection file stores what it is handed, per tower, and forgets on request. */
+    /** The settings file stores what it is handed, per tower, and forgets on request. */
     @GameTest(template = "empty", timeoutTicks = 20)
-    public static void theTowerDirectoryKeepsSelectionsPerTower(GameTestHelper h) {
+    public static void theTowerDirectoryKeepsSettingsPerTower(GameTestHelper h) {
         TowerDirectory directory = TowerDirectory.get(h.getLevel().getServer());
         TowerSystem.TowerId tower = TowerSystem.TowerId.of(h.getLevel().dimension(),
                 h.absolutePos(new BlockPos(1, 1, 1)));
         TowerSystem.TowerId other = TowerSystem.TowerId.of(h.getLevel().dimension(),
                 h.absolutePos(new BlockPos(2, 1, 1)));
-        LongSet chunks = new LongOpenHashSet();
-        chunks.add(ChunkPos.asLong(4, 5));
-        chunks.add(ChunkPos.asLong(4, 6));
 
-        directory.setSelection(tower, chunks);
-        h.assertTrue(directory.selection(tower).size() == 2, "a selection did not come back");
-        h.assertTrue(directory.selection(other).isEmpty(), "a selection leaked onto another tower");
+        h.assertTrue(directory.settings(tower) == TowerDirectory.Settings.DEFAULT,
+                "an untouched tower did not start from the defaults");
+
+        directory.setSettings(tower, new TowerDirectory.Settings(2, false, true));
+        TowerDirectory.Settings stored = directory.settings(tower);
+        h.assertTrue(stored.radius() == 2 && !stored.loading() && stored.carrying(),
+                "the settings did not come back as written: " + stored);
+        h.assertTrue(directory.settings(other) == TowerDirectory.Settings.DEFAULT,
+                "settings leaked onto another tower");
+
         directory.clear(tower);
-        h.assertTrue(directory.selection(tower).isEmpty(), "a cleared selection came back");
+        h.assertTrue(directory.settings(tower) == TowerDirectory.Settings.DEFAULT,
+                "cleared settings came back");
+        h.succeed();
+    }
+
+    /**
+     * A radius is clamped to the tower's tier, and the stored number is not.
+     *
+     * <p>The clamp is what stops a mast that was taken down from still holding a square its new tier
+     * does not pay for. Leaving the stored number alone is the other half: building the mast back up
+     * has to restore what the operator asked for rather than what the tower could pay for at its
+     * lowest point.
+     */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void aRadiusIsClampedToTheTierButStoredUnchanged(GameTestHelper h) {
+        TowerDirectory.Settings asked = new TowerDirectory.Settings(3, true, true);
+        h.assertTrue(asked.radiusFor(TowerTier.I) == 0,
+                "a tier I tower did not clamp a radius of three down to its own");
+        h.assertTrue(asked.radiusFor(TowerTier.VII) == 3,
+                "a tier VII tower refused a radius it can pay for");
+        h.assertTrue(asked.radius() == 3, "the clamp wrote back over what the operator chose");
+
+        TowerDirectory.Settings untouched = TowerDirectory.Settings.DEFAULT;
+        h.assertTrue(untouched.radiusFor(TowerTier.IV) == TowerTier.IV.chunkRadius(),
+                "an untouched tower did not take its tier's full radius");
+        h.assertTrue(untouched.radiusFor(null) == 0, "a tower with no tier asked for chunks");
         h.succeed();
     }
 
@@ -309,8 +339,14 @@ public final class TowerActivationGameTests {
     }
 
     private static TowerSystem.Member tower(BlockPos base, int radius, int devices, boolean running) {
-        return new TowerSystem.Member(
-                new TowerSystem.TowerId(TEST_DIMENSION, base.asLong()), base, radius, devices, running);
+        return tower(base, radius, devices, running, true);
+    }
+
+    /** A member with its carrying switch spelled out, for the cases that turn it off. */
+    private static TowerSystem.Member tower(BlockPos base, int radius, int devices, boolean running,
+                                            boolean carrying) {
+        return new TowerSystem.Member(new TowerSystem.TowerId(TEST_DIMENSION, base.asLong()), base,
+                radius, devices, running, carrying);
     }
 
     private static TowerSystem.Device device(BlockPos pos) {

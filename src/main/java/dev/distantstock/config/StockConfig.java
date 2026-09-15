@@ -28,6 +28,7 @@ public final class StockConfig {
     public static final ModConfigSpec.IntValue CASING_REDSTONE_RANGE;
     public static final ModConfigSpec.BooleanValue TOWER_CHARGE_PARCELS;
     public static final ModConfigSpec.IntValue TOWER_PARCEL_COST;
+    public static final ModConfigSpec.IntValue TOWER_MAX_SELECTED_CHUNKS;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -66,6 +67,11 @@ public final class StockConfig {
                         "Millibuckets of ether one parcel costs while tower.chargeParcels is on.",
                         "A parcel that cannot pay stays in its dock; it is never sent unbilled.")
                 .defineInRange("tower.parcelCost", 250, 1, 1000000);
+        TOWER_MAX_SELECTED_CHUNKS = b.comment(
+                        "Ceiling on the chunks all monitors together may select, on top of the square",
+                        "each tower already keeps around its own base. A selection that does not fit is",
+                        "refused whole and the previous one stays. 0 turns the selector off.")
+                .defineInRange("tower.maxSelectedChunks", 512, 0, 100000);
         SPEC = b.build();
     }
 
@@ -101,6 +107,20 @@ public final class StockConfig {
             return TOWER_PARCEL_COST.get();
         } catch (IllegalStateException notLoaded) {
             return 250;
+        }
+    }
+
+    /**
+     * How many chunks the monitors may select between them. See {@link #towerChargeParcels()}.
+     *
+     * <p>Zero is a real answer — no selections at all — and is meant to be: a server owner who does
+     * not want the feature can turn it off without taking the towers down with it.
+     */
+    public static int towerMaxSelectionChunks() {
+        try {
+            return TOWER_MAX_SELECTED_CHUNKS.get();
+        } catch (IllegalStateException notLoaded) {
+            return 512;
         }
     }
 

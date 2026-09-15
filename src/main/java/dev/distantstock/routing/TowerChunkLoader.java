@@ -12,6 +12,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.world.chunk.RegisterTicketControllersEvent;
@@ -168,14 +169,14 @@ public final class TowerChunkLoader {
     /**
      * The square of chunks a tower keeps loaded, centred on its base.
      *
-     * <p>The side is a tier's, and the offset is {@code (side - 1) / 2}: a side of one is the
-     * tower's own chunk and nothing else, a side of three is that chunk and its eight neighbours.
-     * Using the side itself as the radius would load the wrong square for every tier, and would
-     * still look plausible on the two sides where the two happen to agree.
+     * <p>The offset is {@code (side - 1) / 2}: a side of one is the tower's own chunk and nothing
+     * else, a side of three is that chunk and its eight neighbours. Using the side itself as the
+     * radius would load the wrong square for every tier, and would still look plausible on the two
+     * sides where the two happen to agree.
      *
-     * <p>Which chunk the square is centred on is still the base, because nothing can choose a
-     * centre yet. The monitor is stage six's problem; until it exists, a tower loads the ground it
-     * stands on.
+     * <p>Centred on the base, always. Whatever radius a tower has been given, its own chunk is the
+     * middle of the square, which is what makes radius zero mean "this tower and nothing else" and
+     * what keeps a tower from unloading the chunk it stands in.
      */
     public static LongSet chunksAround(BlockPos base, int side) {
         int radius = Math.max(0, (side - 1) / 2);
@@ -190,6 +191,17 @@ public final class TowerChunkLoader {
         return chunks;
     }
 
+    /**
+     * The chunks the reconciler has already forced for a tower, as it remembers them.
+     *
+     * <p>Read-only, and copied: the only writer is the reconciler itself, and a caller that could
+     * edit this set would be able to lie to it about what is already forced.
+     */
+    public static LongSet forced(Level level, BlockPos owner) {
+        Tracked tracked = OWNED.get(TowerSystem.TowerId.of(level.dimension(), owner));
+        return tracked == null ? new LongOpenHashSet() : new LongOpenHashSet(tracked.ticking);
+    }
+
     private static void reconcile(MinecraftServer server) {
         if (server == null) {
             return;
@@ -202,6 +214,7 @@ public final class TowerChunkLoader {
         // went with the level.
         OWNED.entrySet().removeIf(entry -> !levels.contains(entry.getValue().level));
 
+        TowerDirectory directory = TowerDirectory.get(server);
         for (TowerCoreBlockEntity be : LoadedTowers.all()) {
             if (!(be.getLevel() instanceof ServerLevel level)) {
                 continue;
@@ -218,14 +231,24 @@ public final class TowerChunkLoader {
                 // anything now would race the tickets that are about to be reinstated.
                 continue;
             }
-            apply(level, be.getBlockPos(), tier.chunkSide());
+            TowerDirectory.Settings settings = directory.settings(
+                    TowerSystem.TowerId.of(level.dimension(), be.getBlockPos()));
+            if (!settings.loading()) {
+                // Switched off is off for this tower's own chunk too. The tickets have to be given
+                // back rather than left alone: a ticket in the level keeps forcing a chunk whether
+                // or not this loop still wants it, and "the reconciler stopped looking" is exactly
+                // how a switch that does nothing gets written.
+                forget(level, be.getBlockPos());
+                continue;
+            }
+            apply(level, be.getBlockPos(), chunksAround(be.getBlockPos(),
+                    TowerTier.sideForRadius(settings.radiusFor(tier))));
         }
     }
 
-    private static void apply(ServerLevel level, BlockPos owner, int side) {
+    private static void apply(ServerLevel level, BlockPos owner, LongSet wanted) {
         Tracked tracked = OWNED.computeIfAbsent(TowerSystem.TowerId.of(level.dimension(), owner),
                 ignored -> new Tracked(level, owner));
-        LongSet wanted = chunksAround(owner, side);
         for (LongIterator it = wanted.iterator(); it.hasNext(); ) {
             long chunk = it.nextLong();
             if (tracked.ticking.add(chunk)) {

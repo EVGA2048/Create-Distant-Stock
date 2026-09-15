@@ -45,8 +45,16 @@ public final class TowerSystem {
      * it is the only field that can change without the tower being rebuilt. A stalled tower is
      * dropped from the system entirely — see {@link TowerActivation} for why a dimension whose
      * towers are all stalled goes back to behaving exactly as it did before there were towers.
+     *
+     * <p>{@code carrying} is the operator's switch, per tower. A tower with it off still stands,
+     * still merges and still holds the system together — its reach is part of how the system is
+     * shaped — but nothing is ever carried by it and its device budget is not counted. Switching
+     * one tower off therefore cannot stall a system: the devices it would have carried are offered
+     * to its neighbours, and if none reaches them they are simply off, which is the same answer a
+     * tower that was never built gives.
      */
-    public record Member(TowerId id, BlockPos base, int radius, int devices, boolean running) {
+    public record Member(TowerId id, BlockPos base, int radius, int devices, boolean running,
+                         boolean carrying) {
     }
 
     /**
@@ -71,16 +79,24 @@ public final class TowerSystem {
             return radius;
         }
 
-        /** The budget the whole system carries: every tower in it adds its own device count. */
+        /**
+         * The budget the whole system carries: every tower that is switched on adds its own count.
+         *
+         * <p>A tower the operator switched off contributes nothing, which is the whole of what that
+         * switch does to the system: the neighbours keep their own budgets and the system's total
+         * shrinks by exactly the one tower's share.
+         */
         public int devices() {
             int devices = 0;
             for (Member member : members) {
-                devices += member.devices();
+                if (member.carrying()) {
+                    devices += member.devices();
+                }
             }
             return devices;
         }
 
-        /** Whether any member reaches this position. */
+        /** Whether any member reaches this position, carrying or not. */
         public boolean covers(BlockPos pos) {
             for (Member member : members) {
                 if (withinReach(member, pos)) {
@@ -90,11 +106,20 @@ public final class TowerSystem {
             return false;
         }
 
-        /** The member that reaches this position and stands closest to it. */
+        /**
+         * The member that reaches this position and stands closest to it.
+         *
+         * <p>Only members that are switched on: a tower with carrying off is absent from the choice
+         * rather than a loser in it, so a device it would have taken is offered to whichever
+         * neighbour also reaches it — and is refused, right here, when none does.
+         */
         public Member nearest(BlockPos pos) {
             Member best = null;
             long bestDistance = Long.MAX_VALUE;
             for (Member member : members) {
+                if (!member.carrying()) {
+                    continue;
+                }
                 long distance = distanceSq(member.base(), pos);
                 if (distance <= (long) member.radius() * member.radius() && distance < bestDistance) {
                     best = member;

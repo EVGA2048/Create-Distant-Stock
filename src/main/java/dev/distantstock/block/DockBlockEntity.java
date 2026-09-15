@@ -183,6 +183,12 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     private int inFlight;
     private long transmitStartedAt = -1;
     private long receiveStartedAt = -1;
+    /**
+     * Ten minutes of parcel counts, for the monitor. Counting lives here because this is the only
+     * place that sees both ends of a transfer: a parcel leaves one dock and arrives at another, and
+     * neither the tower above them nor the escrow between them knows both halves.
+     */
+    private final dev.distantstock.routing.DockTraffic traffic = new dev.distantstock.routing.DockTraffic();
     private String faultNote = "";
     private String fallbackNote = "";
     private UUID defaultDestinationNode;
@@ -460,6 +466,9 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     public boolean insert(ItemStack pkg) {
         if (!canReceive() || occupied() || pkg.getCount() != 1 || !insertInto(receivedInv, pkg)) return false;
         receiveStartedAt = level == null ? -1 : level.getGameTime();
+        if (level != null && !level.isClientSide) {
+            traffic.noteReceived(level.getGameTime());
+        }
         sync();
         return true;
     }
@@ -755,11 +764,20 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
      * supposed to mean "in flight", not "busy".
      */
     private void noteTraffic(Level level) {
+        if (level.isClientSide) {
+            return;
+        }
+        traffic.noteSent(level.getGameTime());
         dev.distantstock.routing.TowerSystem.TowerId carrier =
                 TowerActivation.carrier(level, worldPosition);
         if (carrier != null) {
             TowerBeacon.ping(level, BlockPos.of(carrier.packedPos()));
         }
+    }
+
+    /** The last ten minutes of this dock's parcels, for the monitor's readout. */
+    public TowerActivation.Traffic traffic() {
+        return traffic.window(level == null ? 0 : level.getGameTime());
     }
 
     /**

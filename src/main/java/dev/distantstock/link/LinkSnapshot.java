@@ -1,6 +1,7 @@
 package dev.distantstock.link;
 
 import dev.distantstock.config.StockConfig;
+import dev.distantstock.routing.TowerReadout;
 import net.minecraft.server.MinecraftServer;
 
 /** 主线程写本端，io 线程写对端。HTTP / GUI / 护目镜只读。 */
@@ -112,7 +113,18 @@ public final class LinkSnapshot {
         return view().linkLabel();
     }
 
+    /**
+     * The link half of the dashboard, for the callers that are not a monitor.
+     *
+     * <p>The tower readout is absent rather than looked up: it belongs to one monitor, and a process
+     * wide field for it would show the wrong tower for a tick every time two monitors were open.
+     */
     public static View view() {
+        return view(TowerReadout.NONE);
+    }
+
+    /** The same view with the readout of the monitor that is asking. */
+    public static View view(TowerReadout tower) {
         return new View(
                 selfId(),
                 peerId == null ? "" : peerId,
@@ -136,10 +148,17 @@ public final class LinkSnapshot {
                 transerverOutbox,
                 transerverInbox,
                 transerverCompleted,
-                transerverDeadLetters
+                transerverDeadLetters,
+                tower == null ? TowerReadout.NONE : tower
         );
     }
 
+    /**
+     * Everything a monitor screen draws.
+     *
+     * <p>The order of the components is the order of the wire; the last one was added as a whole
+     * record for that reason. See {@link dev.distantstock.routing.TowerReadout}.
+     */
     public record View(
             String selfId,
             String peerId,
@@ -163,7 +182,8 @@ public final class LinkSnapshot {
             int transerverOutbox,
             int transerverInbox,
             int transerverCompleted,
-            int transerverDeadLetters
+            int transerverDeadLetters,
+            TowerReadout tower
     ) {
         public boolean linkUp() {
             return transerverAttached ? transerverUp : peerUp;

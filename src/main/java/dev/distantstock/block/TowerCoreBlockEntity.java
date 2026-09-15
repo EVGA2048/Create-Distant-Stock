@@ -169,6 +169,33 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
         return couplers;
     }
 
+    /**
+     * Whether the network this tower draws from is over its capacity.
+     *
+     * <p>Kept apart from {@link #isRunning()} on purpose: an overstressed tower and a tower with no
+     * shaft under it both report a speed of zero, and a readout that showed them the same way would
+     * send an operator looking for a missing shaft when the answer is "add another motor".
+     */
+    public boolean overstressed() {
+        return isOverStressed();
+    }
+
+    /**
+     * What this tower's network can supply, in Create's stress units; zero when it has no network.
+     *
+     * <p>Asked of the network rather than of this block because capacity is not the tower's — it
+     * belongs to whatever is turning the shaft, and the useful comparison is the whole network's
+     * supply against the whole network's draw. Read only on the readout's beat: the sum walks the
+     * network's members.
+     */
+    public float networkCapacity() {
+        if (!hasNetwork()) {
+            return 0;
+        }
+        var network = getOrCreateNetwork();
+        return network == null ? 0 : network.calculateCapacity();
+    }
+
     public TowerTier tier() {
         return tier;
     }
@@ -252,6 +279,14 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
         LoadedTowers.remove(this);
         if (level instanceof ServerLevel serverLevel) {
             TowerChunkLoader.forget(serverLevel, worldPosition);
+            // The settings go with the tower. A base broken and placed again is a new machine with
+            // new decisions to make, and keeping a radius somebody chose for a tower that no longer
+            // exists would charge the new one for the old one's choices. A tower that is merely
+            // unloaded never comes through here, so its settings survive a chunk going away.
+            if (serverLevel.getServer() != null) {
+                dev.distantstock.routing.TowerDirectory.get(serverLevel.getServer())
+                        .clear(TowerSystem.TowerId.of(serverLevel.dimension(), worldPosition));
+            }
         }
         TowerActivation.markDirty();
         super.remove();

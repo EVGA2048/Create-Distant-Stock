@@ -3,6 +3,7 @@ package dev.distantstock.net;
 import dev.distantstock.DistantStock;
 import dev.distantstock.client.ClientPayloadHandlers;
 import dev.distantstock.link.LinkSnapshot;
+import dev.distantstock.routing.TowerReadout;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -51,10 +52,75 @@ public record LinkSnapshotS2C(BlockPos source, LinkSnapshot.View view) implement
         buf.writeVarInt(view.transerverInbox());
         buf.writeVarInt(view.transerverCompleted());
         buf.writeVarInt(view.transerverDeadLetters());
+        writeTower(buf, view.tower());
+    }
+
+    /**
+     * The tower readout, written as one block at the very end of the view.
+     *
+     * <p>Kept in its own pair of methods so the twelve values it holds are read in the same order
+     * they were written without the reader having to scan a hundred lines of the link half to check.
+     * Every field is written unconditionally, attached or not: a branch would be one more thing the
+     * two sides could disagree about, and the unattached case is a handful of bytes.
+     */
+    /**
+     * The most members a system may report.
+     *
+     * <p>A count is the one thing a malformed packet can turn into an allocation, so the reader
+     * refuses anything past this before it reserves a list. Sixty-four is far more towers than a
+     * system can usefully merge and far less than a packet could ask for.
+     */
+    static final int MAX_TOWER_MEMBERS = 64;
+
+    private static void writeTower(RegistryFriendlyByteBuf buf, TowerReadout tower) {
+        buf.writeBoolean(tower.attached());
+        buf.writeLong(tower.carrierPos());
+        buf.writeUtf(tower.dimension());
+        buf.writeVarInt(tower.carried());
+        buf.writeVarInt(tower.limit());
+        buf.writeFloat(tower.stress());
+        buf.writeFloat(tower.speed());
+        buf.writeVarInt(tower.maxSide());
+        buf.writeVarInt(tower.selectedSide());
+        buf.writeVarInt(tower.members().size());
+        for (TowerReadout.Member member : tower.members()) {
+            buf.writeLong(member.pos());
+            buf.writeUtf(member.tier());
+            buf.writeVarInt(member.radius());
+            buf.writeVarInt(member.devices());
+            buf.writeBoolean(member.running());
+            buf.writeFloat(member.speed());
+        }
+    }
+
+    private static TowerReadout readTower(RegistryFriendlyByteBuf buf) {
+        boolean attached = buf.readBoolean();
+        long carrierPos = buf.readLong();
+        String dimension = buf.readUtf();
+        int carried = buf.readVarInt();
+        int limit = buf.readVarInt();
+        float stress = buf.readFloat();
+        float speed = buf.readFloat();
+        int maxSide = buf.readVarInt();
+        int selectedSide = buf.readVarInt();
+        int memberCount = buf.readVarInt();
+        if (memberCount < 0 || memberCount > MAX_TOWER_MEMBERS) {
+            // A count is the one thing a malformed packet can turn into an allocation, and the
+            // screen has room for a handful of rows anyway.
+            throw new io.netty.handler.codec.DecoderException("tower member count " + memberCount);
+        }
+        java.util.List<TowerReadout.Member> members = new java.util.ArrayList<>(memberCount);
+        for (int i = 0; i < memberCount; i++) {
+            members.add(new TowerReadout.Member(buf.readLong(), buf.readUtf(), buf.readVarInt(),
+                    buf.readVarInt(), buf.readBoolean(), buf.readFloat()));
+        }
+        return new TowerReadout(attached, carrierPos, dimension, carried, limit, stress, speed,
+                maxSide, selectedSide, members);
     }
 
     static LinkSnapshot.View readView(RegistryFriendlyByteBuf buf) {
         return new LinkSnapshot.View(
+                // Kept in the order of the record's components, which is the order writeView uses.
                 buf.readUtf(),
                 buf.readUtf(),
                 buf.readDouble(),
@@ -77,7 +143,8 @@ public record LinkSnapshotS2C(BlockPos source, LinkSnapshot.View view) implement
                 buf.readVarInt(),
                 buf.readVarInt(),
                 buf.readVarInt(),
-                buf.readVarInt()
+                buf.readVarInt(),
+                readTower(buf)
         );
     }
 

@@ -58,9 +58,27 @@ public enum TowerTier {
         return radius;
     }
 
-    /** The side of the square of chunks a monitor may keep loaded: 1, 3, 5 or 7. */
+    /** The side of the square of chunks a tower may keep loaded: 1, 3, 5 or 7. */
     public int chunkSide() {
         return chunkSide;
+    }
+
+    /**
+     * How far, in chunks, this tier's square reaches out from the tower's own chunk: 0 to 3.
+     *
+     * <p>The number an operator sets on a monitor is this one, because it is the one that means
+     * something at the block level: radius zero is "my own chunk and nothing else", radius two is
+     * "two chunks out in every direction". The side is what the table holds and what the loader
+     * calculates with, so the two are converted in exactly one place — {@link #sideForRadius} —
+     * rather than being worked out again on the screen and in the loader, where they could drift.
+     */
+    public int chunkRadius() {
+        return (chunkSide - 1) / 2;
+    }
+
+    /** The square's side a radius asks for: {@code 2r + 1}, the inverse of {@link #chunkRadius()}. */
+    public static int sideForRadius(int radius) {
+        return 2 * Math.max(0, radius) + 1;
     }
 
     /**
