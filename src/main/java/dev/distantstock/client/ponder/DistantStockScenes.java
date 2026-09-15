@@ -2,6 +2,7 @@ package dev.distantstock.client.ponder;
 
 import dev.distantstock.block.DockBlock;
 import dev.distantstock.block.DockStatus;
+import dev.distantstock.block.TowerCasingBlock;
 import net.createmod.ponder.api.PonderPalette;
 import net.createmod.ponder.api.scene.SceneBuilder;
 import net.createmod.ponder.api.scene.SceneBuildingUtil;
@@ -220,6 +221,124 @@ public final class DistantStockScenes {
                 .pointAt(util.vector().blockSurface(util.grid().at(4, 1, 2), Direction.DOWN))
                 .placeNearTarget();
         scene.idle(115);
+        scene.markAsFinished();
+    }
+
+    /**
+     * tower.nbt: shaft (4,1,3) - core (4,2,3) with the 3x3 casing skirt on the same layer -
+     * couplers (4,3..7,3) - resonator (4,8,3), plus a lever (3,3,3) on a skirt corner.
+     *
+     * The mast stops at five segments, which is tier I. Seventeen would push the cap out of frame,
+     * and "taller is better" was never something a picture could carry anyway — that is the text's
+     * job. What the scene has to guarantee is that every block in it can actually be placed that way.
+     *
+     * The shots follow the order a player would build in: power first, then the base, then the mast,
+     * then the cap, and only after that the tier, the stress and the skirt's window. The tower is the
+     * only thing in this mod that stands up, so it is the only scene that pulls the camera up.
+     */
+    public static void tower(SceneBuilder scene, SceneBuildingUtil util) {
+        scene.title("distant_tower", "Raising an interlink tower");
+        scene.configureBasePlate(0, 0, 8);
+        scene.showBasePlate();
+        scene.idle(8);
+
+        // Power enters from underneath: the core only takes a shaft on its bottom face, so the
+        // shaft stands directly below it.
+        scene.world().showSection(util.select().position(4, 1, 3), Direction.DOWN);
+        scene.overlay().showText(85)
+                .text("A tower is driven from below: one vertical shaft, set directly under the "
+                        + "base. The underside is the only face that takes rotation, so a shaft run "
+                        + "in from the side meets nothing. Speed is not the price — a medium "
+                        + "network will do; what a tower spends is stress.")
+                .pointAt(util.vector().centerOf(4, 1, 3))
+                .placeNearTarget()
+                .attachKeyFrame();
+        scene.idle(90);
+
+        // The base and its skirt land together. The core goes down first so the player gets a look
+        // at it before the casings close around it.
+        scene.world().showSection(util.select().position(4, 2, 3), Direction.DOWN);
+        scene.world().showSection(util.select().fromTo(3, 2, 2, 5, 2, 4)
+                .substract(util.select().position(4, 2, 3)), Direction.DOWN);
+        scene.overlay().showText(95)
+                .text("Above the shaft goes the Interlink Tower Base — the one part of a tower that "
+                        + "turns, and the one that keeps the count. Close the base off with a 3x3 "
+                        + "ring of Distant Casing: the casing has no say in whether a tower "
+                        + "stands, but it is the base's face.")
+                .pointAt(util.vector().centerOf(4, 2, 3))
+                .placeNearTarget()
+                .attachKeyFrame();
+        scene.idle(100);
+
+        scene.world().showSection(util.select().fromTo(4, 3, 3, 4, 7, 3), Direction.UP);
+        scene.overlay().showText(85)
+                .text("Stack Interlink Tower Couplers upward, and keep the mast unbroken from the "
+                        + "base: one gap, or one segment of another block, and there is no tower at "
+                        + "all. Five segments is the first tier.")
+                .pointAt(util.vector().centerOf(4, 5, 3))
+                .placeNearTarget()
+                .attachKeyFrame();
+        scene.idle(90);
+
+        scene.world().showSection(util.select().position(4, 8, 3), Direction.UP);
+        scene.overlay().showText(95)
+                .text("Cap the mast with an Ether Resonator and the tower is up. The column over "
+                        + "the cap is its state lamp: grey while the tower is unfinished or standing "
+                        + "still, cyan while it works, and a deeper, self-lit blue while a parcel "
+                        + "crosses it.")
+                .pointAt(util.vector().centerOf(4, 8, 3))
+                .placeNearTarget()
+                .attachKeyFrame();
+        scene.idle(100);
+
+        // Tier: five segments is all the frame can usefully count, and the rest is text.
+        scene.overlay().showOutline(PonderPalette.BLUE, "mast", util.select().fromTo(4, 3, 3, 4, 7, 3), 90);
+        scene.overlay().showText(90)
+                .text("Height is rank: five couplers is tier I, two more takes the next step, and "
+                        + "seventeen couplers is the last of them, tier VII.")
+                .pointAt(util.vector().centerOf(4, 5, 3))
+                .placeNearTarget()
+                .attachKeyFrame();
+        scene.idle(95);
+
+        scene.overlay().showText(105)
+                .text("A tier decides three things: how many distant devices the tower carries (8 "
+                        + "at tier I, 128 at VII), how far from the base they may stand (32 blocks "
+                        + "out to 144), and how large a square of chunks it keeps loaded (1x1 up to "
+                        + "7x7).")
+                .independent(30);
+        scene.idle(110);
+
+        // Stress: the tower's draw lands on the shaft underneath and grows with every tier. A shaft
+        // that cannot turn, or a network that is overloaded, leaves the light dark.
+        scene.overlay().showOutline(PonderPalette.RED, "drive", util.select().position(4, 1, 3), 90);
+        scene.overlay().showText(90)
+                .text("The shaft below feeds the tower rotation, and taller towers draw more of it: "
+                        + "256 at tier I, roughly doubling a step to 16384 at VII. Fall below a "
+                        + "medium speed, or overstress the network, and the light goes out.")
+                .pointAt(util.vector().centerOf(4, 1, 3))
+                .placeNearTarget()
+                .attachKeyFrame();
+        scene.idle(95);
+
+        scene.world().showSection(util.select().position(3, 3, 3), Direction.DOWN);
+        scene.overlay().showText(85)
+                .text("Pull the lever and the casing it lights turns its centre into a see-through "
+                        + "window, spreading along the casings it touches. It is decoration only — "
+                        + "the tower works exactly the same.")
+                .pointAt(util.vector().centerOf(3, 3, 3))
+                .placeNearTarget()
+                .attachKeyFrame();
+        scene.idle(20);
+        scene.world().toggleRedstonePower(util.select().position(3, 3, 3));
+        // The window is the casing's own state rather than something redstone sets directly: the
+        // signal spreads between connected casings and each lit one has to be told. Setting the whole
+        // skirt here is what the world looks like a second later.
+        scene.world().modifyBlocks(util.select().fromTo(3, 2, 2, 5, 2, 4),
+                state -> state.hasProperty(TowerCasingBlock.POWERED)
+                        ? state.setValue(TowerCasingBlock.POWERED, true)
+                        : state, false);
+        scene.idle(65);
         scene.markAsFinished();
     }
 

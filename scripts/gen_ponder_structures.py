@@ -157,8 +157,9 @@ class Scene:
     def __init__(self, width, depth, height=4):
         self.width = width
         self.depth = depth
-        # 场景的高度就是结构的包围盒，Ponder 按它取景。四格够平放的机器用，立起来的塔不够：
-        # 塔顶要九格，镜头才不会把谐振器切在画面外。
+        # The scene's height is the structure's bounding box, and Ponder frames from it. Four
+        # layers is enough for a machine that lies flat; a tower is not. Nine keeps the resonator
+        # inside the shot instead of cutting it off at the top.
         self.height = height
         self.palette = [{"Name": "minecraft:white_concrete"}, {"Name": "minecraft:snow_block"}]
         self.blocks = []
@@ -328,47 +329,55 @@ def status_scene():
 
 
 def tower_scene():
-    """互通塔：立轴、3x3 底座、五段耦合器、谐振器，外加裙板角上的一只拉杆。
+    """An interlink tower: shaft, 3x3 base, five couplers, a resonator, and a lever on the skirt.
 
-    桅杆只堆到五段（I 级的第一档）。十七段会把塔顶顶出画面，而「越高越强」本来就讲不完，交给
-    文案；场景只负责把结构讲到没有歧义。
+    The mast stops at five segments, the first rung of tier I. Seventeen would push the cap out of
+    frame, and "taller is better" is not something a structure can say — that is the text's job, and
+    the structure only has to be unambiguous.
 
-    所有摆出来的方块都必须是真的能这么搭的：立轴正对底座下方，耦合器上下相接，谐振器盖在桅杆
-    顶上，拉杆压在裙板顶面。少一样、错一格，玩家照着学就会得到一座不成立的塔。
+    Every block in it has to be placeable exactly as shown: the shaft directly under the base, the
+    couplers meeting end to end, the resonator on the top of the mast, the lever on the skirt's top
+    face. One block missing or one square out and a player who copies it gets a tower that is not a
+    tower.
     """
     scene = Scene(8, 6, height=9)
 
-    # 动力从底面进。底座只认底面，侧面接不进轴，所以立轴必须正对它的下方；32 转/分是中等转速，
-    # 刚好满足底座要求的最低档，塔本来的开销在应力上。
+    # Power enters from underneath. The core only takes a shaft on its bottom face, so the shaft
+    # stands directly below it. 32 rpm is a medium network and just clears the speed the core asks
+    # for; what a tower really costs is stress, not speed.
     scene.place((4, 1, 3), "create:shaft", {"axis": "y"},
                 {"id": "create:simple_kinetic", "Speed": 32.0,
                  "Source": {"X": 4, "Y": 1, "Z": 3}})
 
-    # 底座正中央。方块实体里写的是服务器本来会同步过来的那几个数——桅杆有几段、到了哪一级、轴
-    # 转多快。塔顶的光柱读的就是它们，不写的话场景里立着的会是一座「还没成塔」的塔。
+    # The centre of the base. The block entity carries the numbers the server would have synced:
+    # how many couplers, which tier, how fast the shaft turns. The light on the cap reads them, and
+    # without them the scene would show a tower that has not been recognised as one.
     scene.place((4, 2, 3), "distantstock:tower_core", None,
                 {"id": "distantstock:tower_core", "Speed": 32.0,
                  "Source": {"X": 4, "Y": 1, "Z": 3}, "Couplers": 5, "Tier": "I"})
 
-    # 3x3 的裙板，底座收在正中央（中心那格是底座本身，不是机壳）。
+    # The 3x3 skirt, with the base in the middle square - that square is the core, not a casing.
     for x in range(3, 6):
         for z in range(2, 5):
             if (x, z) != (4, 3):
                 scene.place((x, 2, z), "distantstock:tower_casing", {"powered": "false"})
 
-    # 桅杆。above/below 描述的是邻居而不是这块方块：接口上下各有各的模型，五段里只有最下一段
-    # 的 below 和最上一段的 above 是 false。
+    # The mast. above/below describe the neighbours rather than the block: the coupler draws a
+    # different model at each end, so only the bottom segment has below=false and only the top one
+    # has above=false.
     for y in range(3, 8):
         scene.place((4, y, 3), "distantstock:tower_coupler",
                     {"above": "true" if y < 7 else "false",
                      "below": "true" if y > 3 else "false"})
 
-    # 塔顶。1 是「塔在转、没有包裹经过」的那一档光——场景里立着的就是一座建成并且通着动力的塔。
+    # The cap. 1 is the "turning, nothing crossing it" light: what stands in the scene is a finished
+    # tower with power going into it.
     scene.place((4, 8, 3), "distantstock:ether_resonator", None,
                 {"id": "distantstock:ether_resonator", "Beam": 1})
 
-    # 裙板角上的拉杆：floor 朝向的拉杆压在机壳顶面，红石信号由这块机壳进入裙板，正好用来演示
-    # 观察窗。位置在 (3,3,3)，即 (3,2,3) 那块机壳的正上方。
+    # A lever on a skirt corner. A floor-facing lever sits on the casing's top face and feeds
+    # redstone into the skirt through it, which is what the window shot needs. It stands at
+    # (3,3,3), directly above the casing at (3,2,3).
     scene.place((3, 3, 3), "minecraft:lever",
                 {"face": "floor", "facing": "north", "powered": "false"})
     return scene
