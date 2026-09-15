@@ -280,5 +280,7 @@
   "gui.distantstock.tower.ether": "以太 %s/%s mB",
   "gui.distantstock.tower.traffic": "10 分钟  发 %s / 收 %s",
   "gui.distantstock.tower.on": "开",
-  "gui.distantstock.tower.off": "关"
+  "gui.distantstock.tower.off": "关",
+  "gui.distantstock.group.default": "默认收货港组",
+  "gui.distantstock.route.group.hint": "输入系统名；不存在就新建一个"
 }

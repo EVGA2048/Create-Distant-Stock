@@ -40,6 +40,27 @@ public final class DockGroupDirectory extends SavedData {
         return group;
     }
 
+    /**
+     * The system with this name, if there is one.
+     *
+     * <p>Names are how a player refers to a system — there is no id to type and no list to pick
+     * from in the world — so this is the lookup the requester's field runs on. Matching ignores
+     * case but not space: two systems called the same thing would be indistinguishable in every
+     * readout, so the second one is refused rather than silently created.
+     */
+    public Optional<DockGroup> findByName(String name) {
+        if (name == null || name.isBlank()) {
+            return Optional.empty();
+        }
+        String wanted = name.trim();
+        for (DockGroup group : groups.values()) {
+            if (group.name().equalsIgnoreCase(wanted)) {
+                return Optional.of(group);
+            }
+        }
+        return Optional.empty();
+    }
+
     public Optional<DockGroup> find(UUID id) {
         return Optional.ofNullable(groups.get(id));
     }

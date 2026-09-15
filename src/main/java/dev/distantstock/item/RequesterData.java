@@ -14,6 +14,8 @@ public final class RequesterData {
     public static final String ADDRESS = "Address";
     public static final String NETWORK = "RemoteNetwork";
     public static final String RECEIVING_GROUP = "ReceivingDockGroup";
+    /** The carried system's name, cached on the item so the screen can draw it offline. */
+    public static final String RECEIVING_GROUP_NAME = "ReceivingDockGroupName";
 
     public static boolean tuned(ItemStack stack) {
         return freq(stack) != null;
@@ -70,12 +72,35 @@ public final class RequesterData {
         return root.hasUUID(RECEIVING_GROUP) ? Optional.of(root.getUUID(RECEIVING_GROUP)) : Optional.empty();
     }
 
+    /**
+     * The system this requester points at, by name as well as by id.
+     *
+     * <p>The name rides along on the item rather than being looked up when the screen opens. Names
+     * live in a server-side file and the screen is drawn on the client, so without the copy the
+     * field would have to be blank until a packet arrived, and a requester in a chest would show
+     * nothing at all.
+     */
+    public static Optional<String> receivingGroupName(ItemStack stack) {
+        CompoundTag root = tag(stack);
+        String name = root.getString(RECEIVING_GROUP_NAME);
+        return name.isBlank() ? Optional.empty() : Optional.of(name);
+    }
+
     public static void setReceivingGroup(ItemStack stack, UUID groupId) {
+        setReceivingGroup(stack, groupId, null);
+    }
+
+    public static void setReceivingGroup(ItemStack stack, UUID groupId, String name) {
         update(stack, tag -> {
             if (groupId == null) {
                 tag.remove(RECEIVING_GROUP);
             } else {
                 tag.putUUID(RECEIVING_GROUP, groupId);
+            }
+            if (name == null || name.isBlank()) {
+                tag.remove(RECEIVING_GROUP_NAME);
+            } else {
+                tag.putString(RECEIVING_GROUP_NAME, name);
             }
         });
     }

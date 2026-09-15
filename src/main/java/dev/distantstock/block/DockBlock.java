@@ -139,8 +139,21 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                     RequesterData.receivingGroup(stack).ifPresent(be::setGroupId);
                 } else if (RequesterData.tuned(stack)) {
                     be.setMode(DockMode.SEND);
-                    // Copy this dock's group onto the requester for later application.
-                    RequesterData.setReceivingGroup(stack, be.groupId());
+                    // What the requester carries is the destination. Sneak-click is what sets a
+                    // dock's own group, so the two gestures read as one sentence: sneak to say
+                    // "this dock belongs here", plain to say "this dock sends there".
+                    java.util.UUID carried = RequesterData.receivingGroup(stack)
+                            .orElse(DockGroupDirectory.DEFAULT_GROUP_ID);
+                    String carriedName = RequesterData.receivingGroupName(stack)
+                            .orElse(DockGroupDirectory.DEFAULT_GROUP_NAME);
+                    // The node is this one unless a network is bound, which is what makes an
+                    // in-save pair of systems work with no Transerver anywhere: the destination is
+                    // (my node, that group), and the node delivers it to itself.
+                    java.util.UUID node = RequesterData.network(stack)
+                            .map(dev.distantstock.routing.RemoteNetworkId::nodeId)
+                            .orElseGet(() -> java.util.UUID.fromString(TranserverBridge.localNodeId()));
+                    be.setDefaultDestination(node, carried);
+                    RequesterData.setReceivingGroup(stack, carried, carriedName);
                     RequesterData.network(stack).ifPresent(network -> {
                         // 旧写法是 .filter(network -> !network.nodeId().equals(TranserverBridge.nodeId()))，
                         // 想「不要把包裹发给本机」，但它是错的：TranserverBridge.nodeId() 在装了 Transerver

@@ -280,5 +280,7 @@
   "gui.distantstock.tower.ether": "ether %s/%s mB",
   "gui.distantstock.tower.traffic": "10 min  sent %s / got %s",
   "gui.distantstock.tower.on": "on",
-  "gui.distantstock.tower.off": "off"
+  "gui.distantstock.tower.off": "off",
+  "gui.distantstock.group.default": "Default receiving group",
+  "gui.distantstock.route.group.hint": "Type a system name; a new one is made if it does not exist"
 }

@@ -108,6 +108,53 @@ public final class RequesterMenu extends AbstractContainerMenu {
         }
     }
 
+    /**
+     * Points the requester at a group, making or renaming one if that is what the name asks for.
+     *
+     * <p>Three outcomes from one field, because the screen has one field: an existing name selects,
+     * an unused name creates, and a rename renames whatever the requester is already carrying. The
+     * rename case is why the flag is here rather than being inferred — without it, renaming a group
+     * to a name nobody has used would create a second group and leave the original behind.
+     */
+    public void writeDockGroup(Player player, String name, boolean rename) {
+        ItemStack stack = device(player);
+        if (stack.isEmpty() || name == null) {
+            return;
+        }
+        String trimmed = name.trim();
+        if (trimmed.isEmpty()) {
+            RequesterData.setReceivingGroup(stack, null, null);
+            return;
+        }
+        if (player.level().getServer() == null) {
+            return;
+        }
+        dev.distantstock.routing.DockGroupDirectory directory =
+                dev.distantstock.routing.DockGroupDirectory.get(player.level().getServer());
+        if (rename) {
+            // Rename the group this requester already carries. With nothing carried there is
+            // nothing to rename, so the same gesture falls through to selecting or creating —
+            // otherwise the button would appear to do nothing at all on a fresh requester.
+            java.util.Optional<java.util.UUID> carried =
+                    dev.distantstock.item.RequesterData.receivingGroup(stack);
+            if (carried.isPresent()) {
+                dev.distantstock.routing.DockGroup existing = directory.findByName(trimmed).orElse(null);
+                if (existing != null && !existing.id().equals(carried.get())) {
+                    // The name is taken by a different group. Refusing keeps two groups from
+                    // sharing a name, which would make every readout ambiguous.
+                    return;
+                }
+                dev.distantstock.routing.DockGroup renamed =
+                        directory.rename(carried.get(), trimmed);
+                RequesterData.setReceivingGroup(stack, renamed.id(), renamed.name());
+                return;
+            }
+        }
+        dev.distantstock.routing.DockGroup group = directory.findByName(trimmed)
+                .orElseGet(() -> directory.create(trimmed));
+        RequesterData.setReceivingGroup(stack, group.id(), group.name());
+    }
+
     public ItemStack device(Player player) {
         if (isGauge()) {
             return new ItemStack(ModBlocks.GAUGE.get());

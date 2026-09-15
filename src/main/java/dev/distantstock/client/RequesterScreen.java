@@ -48,6 +48,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private EditBox localAddress;
     private EditBox receivingGroup;
     private final List<CartLine> cart = new ArrayList<>();
+    /** The last name sent to the server, so closing a screen the player did not edit sends nothing. */
+    private String committedGroup = "";
     private int scroll;
     private int emptyTicks;
     private int successTicks;
@@ -70,6 +72,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         String keepSearch = search == null ? "" : search.getValue();
         String keepAddr = address == null ? menu.address(minecraft.player) : address.getValue();
         String keepLocal = localAddress == null ? "" : localAddress.getValue();
+        String keepGroup = receivingGroup == null || receivingGroup.getValue().isBlank()
+                ? defaultGroupName() : receivingGroup.getValue();
 
         search = new EditBox(font, leftPos + 71, topPos + 22, 100, 9,
                 Component.translatable("create.gui.stock_keeper.search_items"));
@@ -101,8 +105,13 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 Component.translatable("gui.distantstock.route.group"));
         receivingGroup.setBordered(false);
         receivingGroup.setTextColor(INK);
-        receivingGroup.setValue(Component.translatable("gui.distantstock.route.pending").getString());
-        receivingGroup.setEditable(false);
+        // Editable, and it starts on what this requester already carries. Typing a name nobody has
+        // used makes that system; typing one that exists points at it. One field for both, because
+        // the design has the player never see a UUID and there is nothing else to type.
+        receivingGroup.setMaxLength(dev.distantstock.routing.DockGroup.MAX_NAME_LENGTH);
+        receivingGroup.setValue(keepGroup);
+        receivingGroup.setResponder(ignore -> {
+        });
         addRenderableWidget(receivingGroup);
 
         if (!opened) {
@@ -110,6 +119,52 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             uiSound(SoundEvents.WOOD_HIT, 0.5f, 1.5f);
             uiSound(SoundEvents.BOOK_PAGE_TURN, 1f, 1f);
         }
+    }
+
+    /**
+     * What to put in the group field before the player has typed anything.
+     *
+     * <p>The name the requester carries, falling back to the default system's name: a requester that
+     * has never been pointed anywhere is pointing at the default group, and showing an empty box
+     * would suggest it is pointing at nothing.
+     */
+    private String defaultGroupName() {
+        var menu = this.getMenu();
+        var stack = menu.device(this.minecraft == null ? null : this.minecraft.player);
+        if (stack != null && !stack.isEmpty()) {
+            var carried = dev.distantstock.item.RequesterData.receivingGroupName(stack);
+            if (carried.isPresent()) {
+                return carried.get();
+            }
+        }
+        return net.minecraft.network.chat.Component
+                .translatable("gui.distantstock.group.default").getString();
+    }
+
+    /**
+     * Sends the field to the server when the player is done with it.
+     *
+     * <p>On Enter and on close, not on every keystroke: the field is a name, and the server turns an
+     * unknown name into a new group. Committing per key would leave a trail of systems called "甲",
+     * "甲站", "甲站二".
+     */
+    private void commitDockGroup(boolean rename) {
+        if (minecraft == null || minecraft.player == null || receivingGroup == null) {
+            return;
+        }
+        String name = receivingGroup.getValue().trim();
+        if (name.equals(committedGroup)) {
+            return;
+        }
+        committedGroup = name;
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new dev.distantstock.net.SetDockGroupC2S(name, rename));
+    }
+
+    @Override
+    public void onClose() {
+        commitDockGroup(false);
+        super.onClose();
     }
 
     private int computeHeight() {
@@ -468,6 +523,15 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     @Override
     public boolean keyPressed(int key, int scan, int mods) {
+        // Enter is how the group field is committed: the server turns an unknown name into a new
+        // system, so sending per keystroke would leave a trail of half-typed ones behind.
+        if (receivingGroup != null && receivingGroup.isFocused()
+                && (key == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER
+                || key == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER)) {
+            commitDockGroup(false);
+            receivingGroup.setFocused(false);
+            return true;
+        }
         if (key == GLFW.GLFW_KEY_ENTER && hasShiftDown()) {
             request();
             return true;
