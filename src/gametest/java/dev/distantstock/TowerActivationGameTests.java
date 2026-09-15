@@ -65,7 +65,12 @@ public final class TowerActivationGameTests {
         DockBlockEntity dock = (DockBlockEntity) level.getBlockEntity(pos);
         dock.setExport(UUID.randomUUID());
         dock.setDefaultDestination(UUID.randomUUID(), DockGroupDirectory.DEFAULT_GROUP_ID);
-        h.assertTrue(dock.canSend(), "a dock in a world without towers cannot send");
+        h.assertTrue(dock.canSend(), "a dock in a world without towers cannot send | gated="
+                + dev.distantstock.routing.TowerActivation.snapshot().gated(level.dimension())
+                + " running=" + dev.distantstock.block.LoadedTowers.all().stream()
+                        .filter(dev.distantstock.block.TowerCoreBlockEntity::isRunning).count()
+                + " tiers=" + dev.distantstock.block.LoadedTowers.all().stream()
+                        .map(be -> String.valueOf(be.tier())).toList());
 
         h.assertTrue(insertParcel(level, pos), "the parcel did not enter the outgoing slot");
         h.runAfterDelay(140, () -> {

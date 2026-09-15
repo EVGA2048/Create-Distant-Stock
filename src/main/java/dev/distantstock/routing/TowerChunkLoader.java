@@ -273,6 +273,19 @@ public final class TowerChunkLoader {
         }
     }
 
+    /**
+     * Whether this tower is holding this chunk, by the loader's own ledger.
+     *
+     * <p>Asked of the ledger rather than of the level because the level cannot answer: a forced chunk
+     * is keyed by NeoForge's own owner object, which is package-private and has no public accessor,
+     * so "which of these tickets is this tower's" is not a question the save can be asked. What the
+     * ledger holds is what the loader gives back when the tower goes.
+     */
+    public static boolean forces(ServerLevel level, BlockPos owner, ChunkPos chunk) {
+        Tracked tracked = OWNED.get(TowerSystem.TowerId.of(level.dimension(), owner));
+        return tracked != null && tracked.ticking.contains(chunk.toLong());
+    }
+
     private static void force(ServerLevel level, BlockPos owner, long chunk, boolean add) {
         CONTROLLER.forceChunk(level, owner, ChunkPos.getX(chunk), ChunkPos.getZ(chunk), add, true);
     }

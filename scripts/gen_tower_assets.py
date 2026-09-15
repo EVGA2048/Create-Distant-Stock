@@ -322,6 +322,25 @@ FORCE_OPAQUE = {"crystal"}
 SOFT_CRYSTAL = "crystal_shell"
 
 
+# The window, made into glass you cannot read the room through.
+#
+# The handoff drew the pane at alpha 40 with a bright core at 112, which is a lovely window against
+# the preview's flat background and a nearly empty hole in a game where what is behind it is the
+# inside of a 3x3 skirt: reported from play as "you can still see the texture in the middle". Raising
+# the alpha keeps the pane's shape, its glow and its colour, and stops it being a doorway.
+WINDOW_ALPHA = {40: 216, 64: 208, 91: 222, 112: 238, 113: 238}
+
+
+def opaque_window(image):
+    out = image.copy()
+    for y in range(out.height):
+        for x in range(out.width):
+            r, g, b, a = out.getpixel((x, y))
+            if a in WINDOW_ALPHA:
+                out.putpixel((x, y), (r, g, b, WINDOW_ALPHA[a]))
+    return out
+
+
 def copy_textures():
     TEX_OUT.mkdir(parents=True, exist_ok=True)
     sources = sorted((HANDOFF / "tower/textures").glob("*.png")) \
@@ -329,6 +348,9 @@ def copy_textures():
     for source in sources:
         out = TEX_OUT / source.name
         shutil.copyfile(source, out)
+        if source.stem == "ct_active":
+            from PIL import Image
+            opaque_window(Image.open(out).convert("RGBA")).save(out)
         if source.stem == "crystal":
             from PIL import Image
             # Two files from one drawing: the opaque copy every cutout model uses, and the soft one

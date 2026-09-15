@@ -1,6 +1,8 @@
 package dev.distantstock.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.resources.ResourceLocation;
 import com.simibubi.create.foundation.blockEntity.renderer.SmartBlockEntityRenderer;
 import dev.distantstock.DistantStock;
 import dev.distantstock.block.ResonatorBlockEntity;
@@ -10,8 +12,8 @@ import net.createmod.catnip.render.CachedBuffers;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
@@ -69,6 +71,18 @@ public final class ResonatorRenderer extends SmartBlockEntityRenderer<ResonatorB
         super(context);
     }
 
+    /**
+     * Far enough to see the beam from where it is meant to be seen.
+     *
+     * <p>A block entity renderer is culled by distance like any other, and the default is sixty-four
+     * blocks — which would make a landmark for the far side of the world a thing you have to walk up
+     * to before it appears.
+     */
+    @Override
+    public int getViewDistance() {
+        return 256;
+    }
+
     @Override
     protected void renderSafe(ResonatorBlockEntity be, float partialTick, PoseStack pose,
                               MultiBufferSource buffers, int light, int overlay) {
@@ -78,7 +92,15 @@ public final class ResonatorRenderer extends SmartBlockEntityRenderer<ResonatorB
         BlockState state = be.getBlockState();
         ResonatorBlockEntity.Beam beam = be.beam();
         drawBeam(state, beam, pose, buffers, light, overlay);
-        if (!TowerStructure.assembled(be.getLevel(), be.getBlockPos())) {
+        drawSkyBeam(be, beam, pose, buffers);
+        // Assembled is not enough. A mast with no shaft under it is a complete structure and a
+        // machine that is not running, and a rotor turning above it would be telling the player the
+        // tower is working when nothing is driving it — the one thing this renderer exists to make
+        // legible. Assembled only decides whether the arms are there at all.
+        BlockPos cap = be.getBlockPos();
+        if (!TowerStructure.assembled(be.getLevel(), cap)
+                || TowerStructure.coreUnder(be.getLevel(), cap).stream()
+                        .noneMatch(core -> TowerStructure.running(be.getLevel(), core))) {
             return;
         }
         float angle = ((be.getLevel().getGameTime() + partialTick) * SPEED) % 360.0f;
@@ -88,6 +110,93 @@ public final class ResonatorRenderer extends SmartBlockEntityRenderer<ResonatorB
                 .overlay(overlay)
                 .renderInto(pose, buffers.getBuffer(RenderType.cutout()));
     }
+
+    /**
+     * The column into the sky, seen from across the world.
+     *
+     * <p>Vanilla's own beacon beam, drawn from the top of the cap to the build limit: the machine
+     * already says what it is doing on its own surface, and what a tower needs is a marker that can
+     * be found from a hill two hundred blocks away. It appears when the tower is running and not
+     * before — a beam over a mast with no shaft under it would be a landmark pointing at a machine
+     * that is not working.
+     *
+     * <p>The colour follows the cap's own state, so the flash that says "a parcel just crossed here"
+     * is visible at the distance the beam was built for. Vanilla's beam texture is in the entity
+     * atlas and needs no registration of ours.
+     */
+    private static void drawSkyBeam(ResonatorBlockEntity be, ResonatorBlockEntity.Beam beam,
+                                    PoseStack pose, MultiBufferSource buffers) {
+        if (be.getLevel() == null || beam == ResonatorBlockEntity.Beam.DORMANT) {
+            return;
+        }
+        float[] colour = BEAM_COLOUR[beam.ordinal()];
+        int height = be.getLevel().getMaxBuildHeight() - be.getBlockPos().getY() - 1;
+        if (height <= 0) {
+            return;
+        }
+        pose.pushPose();
+        pose.translate(0.5, 1.0, 0.5);
+        // Drawn as four walls of a square column rather than with vanilla's beacon renderer: that
+        // helper is built around the beacon block entity's own scale and scrolling, and a column of
+        // our own costs four quads and lets the colour answer to the tower's state directly.
+        // Vanilla's beacon render type, which is a texture of its own rather than a sprite in an
+        // atlas: it is set to repeat, so the column tiles up the sky instead of stretching one image
+        // over two hundred blocks.
+        VertexConsumer out = buffers.getBuffer(RenderType.beaconBeam(BEACON_BEAM, true));
+        float half = 0.22f;
+
+        // The texture scrolls upward, so a beam reads as moving even while the machine turns slowly.
+        float scroll = (be.getLevel().getGameTime() % 40) / 40.0f;
+        for (int face = 0; face < 4; face++) {
+            float nx = face == 0 ? -1 : face == 1 ? 1 : 0;
+            float nz = face == 2 ? -1 : face == 3 ? 1 : 0;
+            float ax = -nz * half;
+            float az = nx * half;
+            wall(out, pose, ax, az, nx, nz, height, scroll, colour);
+        }
+        pose.popPose();
+    }
+
+    private static void wall(VertexConsumer out, PoseStack pose, float ax, float az,
+                             float nx, float nz, int height, float scroll, float[] colour) {
+        float u0 = 0.0f;
+        float u1 = 1.0f;
+        float vBase = 0.0f;
+        float vSpan = 1.0f;
+        int light = net.minecraft.client.renderer.LightTexture.FULL_BRIGHT;
+        // Two quads per wall, so the column is not one enormously stretched texture.
+        int segments = 4;
+        float segment = height / (float) segments;
+        for (int i = 0; i < segments; i++) {
+            float y0 = i * segment;
+            float y1 = y0 + segment;
+            float vv0 = vBase + (i + scroll) % 1.0f * vSpan;
+            float vv1 = vBase + ((i + scroll) % 1.0f + 1.0f) * vSpan;
+            out.addVertex(pose.last(), ax, y1, az).setColor(colour[0], colour[1], colour[2], colour[3])
+                    .setUv(u1, vv1).setLight(light).setNormal(pose.last(), nx, 0, nz);
+            out.addVertex(pose.last(), -ax, y1, -az).setColor(colour[0], colour[1], colour[2], colour[3])
+                    .setUv(u0, vv1).setLight(light).setNormal(pose.last(), nx, 0, nz);
+            out.addVertex(pose.last(), -ax, y0, -az).setColor(colour[0], colour[1], colour[2], colour[3])
+                    .setUv(u0, vv0).setLight(light).setNormal(pose.last(), nx, 0, nz);
+            out.addVertex(pose.last(), ax, y0, az).setColor(colour[0], colour[1], colour[2], colour[3])
+                    .setUv(u1, vv0).setLight(light).setNormal(pose.last(), nx, 0, nz);
+        }
+    }
+
+    /**
+     * The beam's colour per state: dark and absent when dormant, pale cyan at rest, and a deep
+     * saturated blue with more body while a parcel is crossing — the difference has to read from
+     * the ground at the base of a tower thirty blocks tall.
+     */
+    private static final float[][] BEAM_COLOUR = {
+            {0.42f, 0.48f, 0.52f, 0.0f},
+            {0.55f, 0.85f, 1.0f, 0.30f},
+            {0.25f, 0.60f, 1.0f, 0.55f},
+    };
+
+    /** Vanilla's beam texture: a bright vertical streak, already stitched into the block atlas. */
+    private static final ResourceLocation BEACON_BEAM =
+            ResourceLocation.withDefaultNamespace("textures/entity/beacon_beam.png");
 
     /**
      * The light column, drawn whatever the tower is doing.

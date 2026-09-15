@@ -31,7 +31,8 @@ import java.util.Set;
  * nothing attached to it.
  */
 public final class TowerCasingBlock extends Block
-        implements com.simibubi.create.api.equipment.goggles.IProxyHoveringInformation {
+        implements com.simibubi.create.foundation.block.IBE<TowerCasingBlockEntity>,
+        com.simibubi.create.api.equipment.goggles.IProxyHoveringInformation {
     public static final MapCodec<TowerCasingBlock> CODEC = simpleCodec(TowerCasingBlock::new);
     public static final BooleanProperty POWERED = BooleanProperty.create("powered");
     /**
@@ -101,6 +102,17 @@ public final class TowerCasingBlock extends Block
     @Override
     protected MapCodec<? extends Block> codec() {
         return CODEC;
+    }
+
+    @Override
+    public Class<TowerCasingBlockEntity> getBlockEntityClass() {
+        return TowerCasingBlockEntity.class;
+    }
+
+    @Override
+    public net.minecraft.world.level.block.entity.BlockEntityType<? extends TowerCasingBlockEntity>
+            getBlockEntityType() {
+        return ModBlockEntities.TOWER_CASING.get();
     }
 
     /**

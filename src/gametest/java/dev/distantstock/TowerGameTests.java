@@ -182,6 +182,12 @@ public final class TowerGameTests {
         h.runAfterDelay(40, () -> {
             h.assertTrue(Math.abs(core.getSpeed()) > 0,
                     "a driven shaft under the core left the tower standing still");
+            // Taken back down before the case ends. A tower that is turning claims its whole
+            // dimension and switches off every distant device outside its reach, and this level is
+            // shared with every other case in the run: a tower left standing here does not fail
+            // this test, it fails the dock tests in whichever batch runs next.
+            h.setBlock(X, 1, Z, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState());
+            dev.distantstock.routing.TowerActivation.markDirty();
             h.succeed();
         });
     }
@@ -220,8 +226,13 @@ public final class TowerGameTests {
                         net.minecraft.core.Direction.UP) == null,
                 "the port opened onto the face the driveshaft uses");
 
-        var tank = dev.distantstock.block.TowerCasingBlock.portTank(h.getLevel(), casing, open,
-                net.minecraft.core.Direction.NORTH);
+        // Asked the way a pipe asks: through the capability registry, by the block entity it
+        // requires. Create's pipes refuse to connect to a block with no block entity at all, so a
+        // test that called the block's own helper would pass while every pipe in the game failed.
+        h.assertTrue(h.getLevel().getBlockEntity(casing) != null,
+                "the casing has no block entity, so no pipe will ever look at it");
+        var tank = h.getLevel().getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.BLOCK,
+                casing, net.minecraft.core.Direction.NORTH);
         h.assertTrue(tank != null, "an open port reached no tank");
         int filled = tank.fill(new net.neoforged.neoforge.fluids.FluidStack(
                 dev.distantstock.fluid.ModFluids.ETHER.get(), 250),
@@ -260,5 +271,48 @@ public final class TowerGameTests {
                         h.getLevel().getBlockState(stray)).equals(stray),
                 "a casing in no tower claimed to be part of one");
         h.succeed();
+    }
+
+    /**
+     * A monitor standing beside a tower is attached to it, without being told which tower.
+     *
+     * <p>The screen's tower page says "no tower carries this monitor" whenever the snapshot has no
+     * answer for its position, and that answer comes from a rebuild that has to have seen the
+     * monitor at all. Both halves are easy to get wrong in ways nobody notices from the code — a
+     * device registry that never marks the snapshot dirty leaves a monitor standing in plain sight
+     * reporting that it is nowhere.
+     *
+     * <p>The tower is pinned rather than driven, and that is not a shortcut: a tower that is really
+     * turning claims its whole dimension and switches off every distant device outside its reach,
+     * which is the mod working as designed and would leave the dock cases running beside this one
+     * with their devices dark. The pin is the same seam the activation cases use for the same
+     * reason.
+     */
+    @GameTest(template = "empty", timeoutTicks = 200)
+    public static void aMonitorBesideATowerAttachesToIt(GameTestHelper h) {
+        build(h, TowerTier.I.couplers(), true);
+        BlockPos tower = h.absolutePos(new BlockPos(X, 0, Z));
+        BlockPos monitor = h.absolutePos(new BlockPos(X + 6, 1, Z));
+        h.getLevel().setBlock(monitor, ModBlocks.MONITOR.get().defaultBlockState(), 3);
+
+        dev.distantstock.routing.TowerActivation.pinDevice(
+                dev.distantstock.routing.TowerSystem.TowerId.of(h.getLevel().dimension(), monitor),
+                true,
+                dev.distantstock.routing.TowerSystem.TowerId.of(h.getLevel().dimension(), tower));
+        try {
+            h.runAfterDelay(60, () -> {
+                dev.distantstock.routing.TowerReadout readout =
+                        dev.distantstock.routing.TowerReadout.survey(h.getLevel(), monitor);
+                h.assertTrue(readout.attached(),
+                        "a monitor six blocks from a tower reported that nothing carries it");
+                h.assertTrue(readout.members().size() == 1,
+                        "the readout saw " + readout.members().size() + " towers instead of one");
+                h.succeed();
+            });
+        } finally {
+            // Cleared by the activation cases' own teardown as well; this keeps a failing case from
+            // leaving a pin behind for the next one.
+            h.runAfterDelay(120, dev.distantstock.routing.TowerActivation::unpinDevices);
+        }
     }
 }

@@ -42,6 +42,13 @@ public final class ModBlockEntities {
             BES.register("signal_panel", () -> BlockEntityType.Builder.of(SignalPanelBlockEntity::new,
                     ModBlocks.SIGNAL_PANEL.get()).build(null));
 
+    /**
+     * The casing's, which exists so pipes will look at it. See {@link TowerCasingBlockEntity}.
+     */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TowerCasingBlockEntity>> TOWER_CASING =
+            BES.register("tower_casing", () -> BlockEntityType.Builder.of(TowerCasingBlockEntity::new,
+                    ModBlocks.TOWER_CASING.get()).build(null));
+
     /** Same registry id as Create's would be, so nothing about the block is shared with it. */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RemoteRedstoneRequesterBlockEntity>> REMOTE_REDSTONE_REQUESTER =
             BES.register("remote_redstone_requester", () -> BlockEntityType.Builder.of(

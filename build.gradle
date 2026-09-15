@@ -49,6 +49,21 @@ neoForge {
 }
 
 if (providers.gradleProperty('withGameTests').isPresent()) {
+    /*
+     * Every run starts from an empty world.
+     *
+     * The game test world is a save like any other: it is written back at the end of a run and read
+     * again at the start of the next one. That makes cases depend on history — a tower left standing
+     * by one run is a tower that is already turning when the next run begins, and a running tower
+     * switches off every distant device outside its reach, which is half the suite. It cost an
+     * afternoon to find, twice, and the diagnostic that found it (owners=2 ticking) was only
+     * possible because the leftovers were real tickets in a real save.
+     */
+    tasks.named('runGameTestServer').configure {
+        doFirst {
+            delete layout.buildDirectory.dir('gametest-run/world')
+        }
+    }
     tasks.named('runClientSmoke').configure {
         doLast {
             def report = layout.buildDirectory.file('client-smoke-run/logs/latest.log').get().asFile

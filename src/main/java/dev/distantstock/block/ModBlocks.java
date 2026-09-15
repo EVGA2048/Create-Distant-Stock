@@ -50,7 +50,14 @@ public final class ModBlocks {
                     // as a light rather than as a brightly painted texture.
                     .lightLevel(state -> state.getValue(TowerCasingBlock.POWERED) ? 12 : 0)));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, TowerCouplerBlock> TOWER_COUPLER =
-            BLOCKS.register("tower_coupler", () -> new TowerCouplerBlock(tower().noOcclusion()));
+            BLOCKS.register("tower_coupler", () -> new TowerCouplerBlock(tower().noOcclusion()
+                    // The crystal through the middle of a coupler glows, and block light is the only
+                    // way a model can say so: a texture cannot be told to ignore the light it is in.
+                    // Only the segments that are part of a mast light up — a coupler stacked on
+                    // nothing has no crystal running through it — which is what the two neighbour
+                    // properties already say.
+                    .lightLevel(state -> state.getValue(TowerCouplerBlock.ABOVE)
+                            || state.getValue(TowerCouplerBlock.BELOW) ? 12 : 0)));
     /** The 3x3 base's centre: the one part of a tower that takes rotation, from the shaft below. */
     public static final DeferredHolder<net.minecraft.world.level.block.Block, TowerCoreBlock> TOWER_CORE =
             BLOCKS.register("tower_core", () -> new TowerCoreBlock(tower().noOcclusion()));
