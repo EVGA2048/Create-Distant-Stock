@@ -305,3 +305,50 @@ for bit in range(4):
 写盘前跑一次**共面重叠检查**（装配后的整塔 336 个面里不允许有两个同朝向的面共面且投影相交），是唯一能把这类错误变成失败而不是截图的办法。
 
 **教训**：离线预览好看不等于进游戏好看。零厚度面、共面细节、半透明批次不写深度 —— 这三件事在预览里全都不存在。
+
+## 十五、建模用的预览渲染器忽略 alpha，游戏不忽略
+
+同一个交接包，同一个根因。离线预览把贴图直接合成到背景上，**完全不看 alpha**；游戏里的区块模型走 `cutout`，**alpha 低于 128 的像素直接丢弃**。
+
+`crystal.png` 256 个像素全是半透明（92~185）—— 那是画的人用软边做光晕。`cutout` 下 220 个像素变成洞，塔的水晶柱会出来像蕾丝。
+
+第二个更隐蔽：机壳的观察窗贴图中心是半透明的，但机壳模型是 `solid`，**`solid` 层直接无视 alpha**，窗会画成实心色块。**渲染层属于模型，不属于方块状态**，所以两个状态只能拆成两个模型，用方块状态去选。
+
+**教训**：拿到美术资源先跑一遍 alpha 直方图，再决定每个材质该走哪个渲染层。判断规则：
+
+| 层 | alpha 行为 | 适合 |
+|---|---|---|
+| `solid` | 无视 alpha | 不透明方块 |
+| `cutout` | < 128 丢弃，其余不透明 | 有洞的形状（树叶、栏杆） |
+| `translucent` | 混合、不写深度 | 玻璃、光柱、水 |
+
+**不该修的别修**：`axis` / `frame` 这类贴图是 0/255 二值的，那些洞**是形状不是光晕**，强行填不透明会把轴和边框糊成方块。判断依据是 alpha 是不是只有 0 和 255。
+
+## 十六、Create 的应力是按方块注册的，不是按方块状态
+
+`BlockStressValues.IMPACTS` 是 `SimpleRegistry<Block, DoubleSupplier>`，键是**方块**。应力会随等级变的机器（比如越高越费应力的塔）没法用它表达，得覆写 `KineticBlockEntity.calculateStressApplied()`。
+
+两件容易搞错的事：
+
+- **没有 `addStress()` 这种东西**。应力是网络汇总时算的：`实际消耗 = calculateStressApplied() × |转速|`，所以「转速翻倍消耗翻倍」是框架行为，不是你要写的。
+- **`CStress.setImpact` 对非 create 命名空间直接抛异常**（`Non-Create blocks cannot be added to Create's config.`）。那是 Create 给自己生成配置文件用的。
+
+改完应力记得让网络重算（置 `networkDirty`），否则新等级要等下一次别的什么事件才会生效。
+
+## 十七、区块加载要用 TicketController，不要用 setChunkForced
+
+`ServerLevel.setChunkForced` 和 `ChunkMap.addRegionTicket` 都绕开 NeoForge 的 owner 记账：没有 controller 隔离（多个模组互相踩），也不会进 `validateTickets` 的清理回调。
+
+**清理回调是这个 API 存在的主要理由**。方块拆了、存档残留了、区块卸载了 —— 只要 `validateTickets` 里没把票删干净，那些区块就**永久强加载**，服主的服务器慢慢被拖死，而且看不出是谁干的。
+
+照 `create_power_loader` 的形状写：
+
+- owner 用**方块坐标**（这样回调里能 `level.getBlockEntity(pos)` 反查），不要用 UUID
+- 查不到方块实体 → `removeAllTickets(pos)`
+- 查得到 → 删掉所有 non-ticking 票，把 ticking 票交给方块实体认领（不认领就会重复 force 或误卸）
+- **世界加载后留宽限期**（它是 100 tick）：校验回调发生在世界加载早期，那时方块实体还没加载完，立刻删会让刚恢复的区块马上卸载
+- 增删票**延后到服务器 tick 里做**，别在遍历或卸载过程中改
+- 半径 r 覆盖 `(2r-1)²` 个区块，**r=1 只有中心那一格** —— 写成 `±r` 就是经典 off-by-one
+- 做查找时**不要加载区块**，碰到没加载的跳过
+
+**教训**：Create 本体里没有区块加载器，`create_power_loader` 是独立模组。别在 Create 的 jar 里找，找不到的。
