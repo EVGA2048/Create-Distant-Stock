@@ -45,7 +45,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     private EditBox search;
     private EditBox address;
-    private EditBox localAddress;
     private EditBox receivingGroup;
     private net.minecraft.client.gui.components.Button renameButton;
     private final List<CartLine> cart = new ArrayList<>();
@@ -72,7 +71,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
         String keepSearch = search == null ? "" : search.getValue();
         String keepAddr = address == null ? menu.address(minecraft.player) : address.getValue();
-        String keepLocal = localAddress == null ? "" : localAddress.getValue();
         String keepGroup = receivingGroup == null || receivingGroup.getValue().isBlank()
                 ? defaultGroupName() : receivingGroup.getValue();
 
@@ -94,13 +92,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         address.setResponder(v -> PacketDistributor.sendToServer(new SetAddressC2S(v)));
         addRenderableWidget(address);
 
-        localAddress = new EditBox(font, leftPos + 82, topPos + imageHeight - 113, 112, 10,
-                Component.translatable("gui.distantstock.route.local"));
-        localAddress.setMaxLength(40);
-        localAddress.setBordered(false);
-        localAddress.setTextColor(INK);
-        localAddress.setValue(keepLocal);
-        addRenderableWidget(localAddress);
 
         receivingGroup = new EditBox(font, leftPos + 82, topPos + imageHeight - 87, 112, 10,
                 Component.translatable("gui.distantstock.route.group"));
@@ -372,7 +363,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         boolean tuned = menu.tuned(minecraft.player);
         search.setVisible(tuned);
         address.setVisible(tuned);
-        localAddress.setVisible(tuned);
         receivingGroup.setVisible(tuned);
         if (renameButton != null) {
             renameButton.visible = tuned;
@@ -416,7 +406,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             return;
         }
 
-        renderRouteRow(g, imageHeight - 124, "gui.distantstock.route.local");
         renderRouteRow(g, imageHeight - 98, "gui.distantstock.route.group");
 
         if (address.getValue().isBlank() && !address.isFocused()) {
@@ -694,10 +683,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             return;
         }
         // The dual-address transport is not implemented yet: never silently discard an entered route.
-        if (!localAddress.getValue().isBlank()) {
-            minecraft.player.displayClientMessage(Component.translatable("gui.distantstock.route.unavailable"), false);
-            return;
-        }
         List<PlaceOrderC2S.Line> lines = new ArrayList<>();
         for (CartLine line : cart) {
             lines.add(new PlaceOrderC2S.Line(BuiltInRegistries.ITEM.getKey(line.stack.getItem()).toString(), line.count));

@@ -30,6 +30,7 @@ public final class StockConfig {
     public static final ModConfigSpec.IntValue TOWER_PARCEL_COST;
     public static final ModConfigSpec.IntValue TOWER_MAX_SELECTED_CHUNKS;
     public static final ModConfigSpec.IntValue REMOTE_GAUGE_ORDER_STACKS;
+    public static final ModConfigSpec.IntValue TOWER_STANDBY_COST;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -73,6 +74,17 @@ public final class StockConfig {
                         "each tower already keeps around its own base. A selection that does not fit is",
                         "refused whole and the previous one stays. 0 turns the selector off.")
                 .defineInRange("tower.maxSelectedChunks", 512, 0, 100000);
+        TOWER_STANDBY_COST = b.comment(
+                        "Millibuckets a running tower spends per second while it carries any device.",
+                        "Zero by default: the tower system is still being priced, and a world that",
+                        "turned this on by accident would drain its towers while nobody was sending",
+                        "anything. The per-parcel charge is tower.chargeParcels, and the two are",
+                        "independent — a tower can charge for parcels without idling on ether, or",
+                        "idle on ether without charging.",
+                        "An empty tank stops nothing: this is a running cost, not a gate. What a",
+                        "tower refuses to do when it cannot pay is send a parcel, and that is the",
+                        "per-parcel charge's job.")
+                .defineInRange("tower.standbyCost", 0, 0, 100000);
         REMOTE_GAUGE_ORDER_STACKS = b.comment(
                         "How many stacks one remote gauge panel may ask for in a single order.",
                         "A bound panel orders the shortfall up to this much each time it is short,",
@@ -128,6 +140,18 @@ public final class StockConfig {
             return TOWER_MAX_SELECTED_CHUNKS.get();
         } catch (IllegalStateException notLoaded) {
             return 512;
+        }
+    }
+
+    /**
+     * Millibuckets a running tower spends per second while it carries a device. See
+     * {@link #towerChargeParcels()} for why these are read through a method.
+     */
+    public static int towerStandbyCost() {
+        try {
+            return TOWER_STANDBY_COST.get();
+        } catch (IllegalStateException notLoaded) {
+            return 0;
         }
     }
 

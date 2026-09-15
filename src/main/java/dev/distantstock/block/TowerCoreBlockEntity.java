@@ -116,6 +116,32 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
             return;
         }
         rescan();
+        billStandby();
+    }
+
+    /**
+     * The tower's running cost, once a second, while it carries something.
+     *
+     * <p>Off unless {@code tower.standbyCost} is set, and it charges nothing for a tower that is not
+     * a tower or carries nothing: a bare base standing in a field is not a machine that is running,
+     * and a mast with no devices attached has nothing to keep alive.
+     *
+     * <p>An empty tank does not stop the tower. This is what running costs, not what it takes to
+     * run: the charge with teeth is the per-parcel one, which refuses to send goods the tower cannot
+     * pay for. A standby charge that switched the machine off would make an unattended tower go dark
+     * with no one watching, which is a worse failure than a bill the operator can see.
+     */
+    private void billStandby() {
+        int cost = dev.distantstock.config.StockConfig.towerStandbyCost();
+        if (cost <= 0 || !isRunning()) {
+            return;
+        }
+        TowerSystem.TowerId id = id();
+        TowerActivation.Usage usage = TowerActivation.usage(id);
+        if (usage == null || usage.carried() <= 0) {
+            return;
+        }
+        drawEther(cost);
     }
 
     /** Re-read the mast above and react if the answer moved. */

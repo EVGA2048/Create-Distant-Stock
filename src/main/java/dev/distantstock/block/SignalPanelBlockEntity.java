@@ -88,11 +88,22 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
     public static final int REPORTED_MISSING_LINKS = 3;
     /** Create's logistics live on the server thread, so bound lamps resample once a second. */
     private static final int SAMPLE_INTERVAL_TICKS = 20;
+    /**
+     * Seconds a gauge may spend promising before the lamp calls it stuck: one minute.
+     *
+     * <p>Long on purpose. A promise covers the time a parcel takes to be packed, carried and booked
+     * in, which in a big factory is tens of seconds of normal operation; a shorter fuse would turn
+     * every large order into an alarm and the lamp would stop meaning anything.
+     */
+    private static final int STUCK_PROMISE_SAMPLES = 60;
 
     /** How many items one lamp can watch at once. */
     public static final int MONITOR_SLOTS = 8;
 
     private final Map<FactoryPanelBlock.PanelSlot, UUID> lampNetworks =
+            new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
+    /** Consecutive samples each brass lamp's source has spent promising without delivering. */
+    private final Map<FactoryPanelBlock.PanelSlot, Integer> stuckPromises =
             new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
     private final Map<FactoryPanelBlock.PanelSlot, NetworkHealth> lampHealth =
             new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
@@ -137,10 +148,16 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
     }
 
     private void sampleLampNetworks() {
-        if (lampNetworks.isEmpty() || level.getGameTime() % SAMPLE_INTERVAL_TICKS != 0) {
+        if (level.getGameTime() % SAMPLE_INTERVAL_TICKS != 0) {
             return;
         }
-        boolean changed = false;
+        boolean changed = sampleStuckPromises();
+        if (lampNetworks.isEmpty()) {
+            if (changed) {
+                sync();
+            }
+            return;
+        }
         for (var entry : lampNetworks.entrySet()) {
             NetworkHealth next = CreateStock.health(entry.getValue(), REPORTED_MISSING_LINKS);
             NetworkHealth previous = lampHealth.put(entry.getKey(), next);
@@ -154,6 +171,69 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
         if (changed) {
             sync();
         }
+    }
+
+    /**
+     * Counts how long each brass lamp's worst gauge has been saying "covered, not delivered".
+     *
+     * <p>One sample a second, and the count is what the lamp reads. Any other state resets it, so
+     * the number means consecutive seconds of the same promise and not a total that never clears.
+     */
+    private boolean sampleStuckPromises() {
+        boolean changed = false;
+        // The slots whose lamp is a brass one, plus the slots counted last second so a lamp that
+        // was swapped out does not leave its count behind.
+        java.util.Set<FactoryPanelBlock.PanelSlot> brass = java.util.EnumSet.noneOf(
+                FactoryPanelBlock.PanelSlot.class);
+        for (FactoryPanelBlock.PanelSlot slot : FactoryPanelBlock.PanelSlot.values()) {
+            FactoryPanelBehaviour behaviour = panels.get(slot);
+            if (behaviour == null || !behaviour.isActive()) {
+                continue;
+            }
+            SignalLampPanelItem lamp = SignalLampPanelItem.from(behaviour.getFilter());
+            if (lamp != null && lamp.material() == SignalLampPanelItem.Material.BRASS) {
+                brass.add(slot);
+            }
+        }
+        for (FactoryPanelBlock.PanelSlot slot : FactoryPanelBlock.PanelSlot.values()) {
+            boolean watched = brass.contains(slot);
+            boolean waiting = watched && rawLampState(slot) == LampState.ACT;
+            int next = nextStuckSamples(stuckPromises.getOrDefault(slot, 0), waiting,
+                    STUCK_PROMISE_SAMPLES * 2);
+            Integer previous = stuckPromises.get(slot);
+            if (next == 0) {
+                if (previous != null) {
+                    stuckPromises.remove(slot);
+                    changed = true;
+                }
+                continue;
+            }
+            if (previous == null || previous != next) {
+                stuckPromises.put(slot, next);
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
+    /**
+     * The counter's whole rule: one more while the promise is outstanding, nothing at all when it
+     * is not, and a ceiling so a lamp left alone for a week does not count to infinity.
+     *
+     * <p>Pure and public because it is the part of the alert that can be wrong in a way nobody would
+     * notice — a counter that never reset would light the lamp on a factory that has been fine since
+     * the one time it was not.
+     */
+    public static int nextStuckSamples(int current, boolean waiting, int cap) {
+        if (!waiting) {
+            return 0;
+        }
+        return Math.min(Math.max(0, current) + 1, Math.max(1, cap));
+    }
+
+    /** How many consecutive samples this slot's promise has been outstanding. */
+    public int promiseStuckSamples(FactoryPanelBlock.PanelSlot slot) {
+        return stuckPromises.getOrDefault(slot, 0);
     }
 
     /** Re-reads every watched item's stock and promise count. True when something moved. */
@@ -236,6 +316,26 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
      * gauge is attached, which keeps the lamp dark instead of claiming everything is fine.
      */
     public LampState lampState(FactoryPanelBlock.PanelSlot slot) {
+        LampState raw = rawLampState(slot);
+        if (raw == LampState.ACT && promiseStuckSamples(slot) >= STUCK_PROMISE_SAMPLES) {
+            // The network says it has covered the shortfall and the goods still have not moved.
+            // "Coming" and "coming, honestly" look identical from the panel's own fields; the only
+            // thing that tells them apart is how long it has been saying it, so that is what is
+            // counted — once a second, in the sampler, and kept where the client can read it.
+            return LampState.WARN_URGENT;
+        }
+        return raw;
+    }
+
+    /**
+     * The lamp's state before the stuck-promise escalation, which is what the sampler counts on.
+     *
+     * <p>Counting on the escalated value would be a loop that never ends: the moment the counter
+     * crossed the threshold the state would stop being ACT, the sampler would see a change and
+     * reset the counter, and the lamp would drop back to ACT to start over — a warning that blinks
+     * instead of one that stays lit.
+     */
+    private LampState rawLampState(FactoryPanelBlock.PanelSlot slot) {
         FactoryPanelBehaviour behaviour = panels.get(slot);
         if (behaviour == null || !behaviour.isActive() || level == null) {
             return null;
@@ -551,12 +651,24 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
             watches.put(entry.getKey().name(), row);
         }
         tag.put("LampWatches", watches);
+        CompoundTag stuck = new CompoundTag();
+        for (var entry : stuckPromises.entrySet()) {
+            stuck.putInt(entry.getKey().name(), entry.getValue());
+        }
+        tag.put("StuckPromises", stuck);
         orders.write(tag);
     }
 
     @Override
     protected void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.read(tag, registries, clientPacket);
+        stuckPromises.clear();
+        CompoundTag stuck = tag.getCompound("StuckPromises");
+        for (FactoryPanelBlock.PanelSlot slot : FactoryPanelBlock.PanelSlot.values()) {
+            if (stuck.contains(slot.name())) {
+                stuckPromises.put(slot, stuck.getInt(slot.name()));
+            }
+        }
         orders.read(tag, registries, clientPacket);
         lampSignal = tag.getInt("LampSignal");
         remoteGauges.clear();

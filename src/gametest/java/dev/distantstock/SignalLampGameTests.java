@@ -592,4 +592,26 @@ public final class SignalLampGameTests {
             h.succeed();
         });
     }
+
+    /**
+     * The stuck-promise counter: counts up while the promise is outstanding, and clears the moment
+     * it is not.
+     *
+     * <p>The reset is the half that matters. A lamp is an andon light, and one that stayed red
+     * because a promise stalled an hour ago would be ignored exactly when it is finally right.
+     */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void aStuckPromiseCounterClearsWhenThePromiseDoes(GameTestHelper h) {
+        int cap = 120;
+        h.assertTrue(SignalPanelBlockEntity.nextStuckSamples(0, true, cap) == 1, "the first sample did not count");
+        h.assertTrue(SignalPanelBlockEntity.nextStuckSamples(59, true, cap) == 60, "the counter stalled");
+        h.assertTrue(SignalPanelBlockEntity.nextStuckSamples(0, false, cap) == 0, "an idle lamp counted");
+        h.assertTrue(SignalPanelBlockEntity.nextStuckSamples(119, true, cap) == 120, "the counter passed its cap");
+        h.assertTrue(SignalPanelBlockEntity.nextStuckSamples(120, true, cap) == 120, "the counter ran past its cap");
+        h.assertTrue(SignalPanelBlockEntity.nextStuckSamples(-5, true, cap) == 1, "a negative count was carried forward");
+        h.succeed();
+    }
+
+    private SignalLampGameTests() {
+    }
 }
