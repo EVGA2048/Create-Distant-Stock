@@ -2,12 +2,12 @@
   "credit": "Tower art by Distant Stock; crystal and reflective glass drawn in-house. Create andesite, brass and gearbox textures are Create's.",
   "parent": "minecraft:block/block",
   "ambientocclusion": false,
-  "render_type": "minecraft:cutout",
+  "render_type": "minecraft:translucent",
   "textures": {
     "andesite": "distantstock:block/tower/andesite",
     "cap": "distantstock:block/tower/cap",
     "core": "distantstock:block/tower/core",
-    "crystal": "distantstock:block/tower/crystal",
+    "crystal": "distantstock:block/tower/crystal_shell",
     "frame": "distantstock:block/tower/frame",
     "polished": "distantstock:block/tower/polished"
   },

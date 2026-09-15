@@ -266,6 +266,13 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
         }
         if (!isRunning()) {
             GoggleText.value(tip, "goggle.distantstock.tower.stalled", ChatFormatting.RED);
+            // Why is the first question asked of a tower that will not turn, and the answer is
+            // almost always that nothing is turning it: the base takes rotation on its underside
+            // and nowhere else, so a shaft brought in from the side reaches nothing. Saying which
+            // face it wants is cheaper than a player taking the skirt apart to find out.
+            if (getSpeed() == 0) {
+                GoggleText.line(tip, "goggle.distantstock.tower.no_shaft");
+            }
         }
         addStressImpactStats(tip, getSpeed());
         return true;

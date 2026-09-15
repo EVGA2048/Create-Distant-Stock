@@ -44,7 +44,11 @@ public final class ModBlocks {
      * the culled face of the core it is wrapped around and out the other side of the world.
      */
     public static final DeferredHolder<net.minecraft.world.level.block.Block, TowerCasingBlock> TOWER_CASING =
-            BLOCKS.register("tower_casing", () -> new TowerCasingBlock(tower().noOcclusion()));
+            BLOCKS.register("tower_casing", () -> new TowerCasingBlock(tower().noOcclusion()
+                    // The window lights the room it is in. A machine that glows when it is switched
+                    // on is the whole point of an indicator, and block light is what makes it read
+                    // as a light rather than as a brightly painted texture.
+                    .lightLevel(state -> state.getValue(TowerCasingBlock.POWERED) ? 12 : 0)));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, TowerCouplerBlock> TOWER_COUPLER =
             BLOCKS.register("tower_coupler", () -> new TowerCouplerBlock(tower().noOcclusion()));
     /** The 3x3 base's centre: the one part of a tower that takes rotation, from the shaft below. */

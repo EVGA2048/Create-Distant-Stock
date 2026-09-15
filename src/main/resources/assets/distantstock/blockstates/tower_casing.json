@@ -1,10 +1,16 @@
 {
   "variants": {
-    "powered=false": {
+    "port=false,powered=false": {
       "model": "distantstock:block/tower/tower_casing"
     },
-    "powered=true": {
+    "port=false,powered=true": {
       "model": "distantstock:block/tower/tower_casing_active"
+    },
+    "port=true,powered=false": {
+      "model": "distantstock:block/tower/tower_casing_port"
+    },
+    "port=true,powered=true": {
+      "model": "distantstock:block/tower/tower_casing_port"
     }
   }
 }

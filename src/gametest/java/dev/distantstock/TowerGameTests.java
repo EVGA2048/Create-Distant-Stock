@@ -136,6 +136,93 @@ public final class TowerGameTests {
         }
     }
 
+    /** Create's blocks by name, because its {@code AllBlocks} entries are not on this classpath. */
+    private static net.minecraft.world.level.block.Block block(String path) {
+        return net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", path));
+    }
+
     private TowerGameTests() {
+    }
+
+    /**
+     * A shaft under the base drives the tower, and a shaft anywhere else does not.
+     *
+     * <p>Every other case in this file stands a mast up and then asks the snapshot what it carries;
+     * not one of them ever put a shaft under it, so "the tower actually turns" was never checked at
+     * all. The block only accepts rotation on its underside, which makes the difference between a
+     * tower and a very expensive pillar exactly one face wide.
+     */
+    @GameTest(template = "empty", timeoutTicks = 200)
+    public static void onlyTheUndersideTakesRotation(GameTestHelper h) {
+        // A motor under a shaft under the core: the arrangement the tower is designed around, and
+        // the reason the base has to sit one block up off the ground.
+        h.setBlock(X, 0, Z, block("creative_motor").defaultBlockState()
+                .setValue(com.simibubi.create.content.kinetics.motor.CreativeMotorBlock.FACING,
+                        net.minecraft.core.Direction.UP));
+        h.setBlock(X, 1, Z, block("shaft").defaultBlockState()
+                .setValue(net.minecraft.world.level.block.RotatedPillarBlock.AXIS,
+                        net.minecraft.core.Direction.Axis.Y));
+        h.setBlock(X, 2, Z, ModBlocks.TOWER_CORE.get().defaultBlockState());
+
+        dev.distantstock.block.TowerCoreBlockEntity core = (dev.distantstock.block.TowerCoreBlockEntity) h.getLevel()
+                .getBlockEntity(h.absolutePos(new BlockPos(X, 2, Z)));
+        h.assertTrue(core != null, "the core did not appear");
+        h.assertTrue(ModBlocks.TOWER_CORE.get().hasShaftTowards(h.getLevel(),
+                        h.absolutePos(new BlockPos(X, 2, Z)), core.getBlockState(),
+                        net.minecraft.core.Direction.DOWN),
+                "the core refuses a shaft from below");
+        h.assertFalse(ModBlocks.TOWER_CORE.get().hasShaftTowards(h.getLevel(),
+                        h.absolutePos(new BlockPos(X, 2, Z)), core.getBlockState(),
+                        net.minecraft.core.Direction.UP),
+                "the core accepts a shaft from above, where the mast goes");
+
+        // Create propagates rotation on the network's own beat, and the motor's speed is a value
+        // box setting rather than a fixed number.
+        h.runAfterDelay(40, () -> {
+            h.assertTrue(Math.abs(core.getSpeed()) > 0,
+                    "a driven shaft under the core left the tower standing still");
+            h.succeed();
+        });
+    }
+
+    /**
+     * A casing opened with a wrench is a way into the tank, and a closed one is not.
+     *
+     * <p>A finished tower walls its own base in: the core answers pipes on four sides and a skirt
+     * covers all four of them, so without a port the ether has no way in at all. The test fills the
+     * tank through a casing rather than reading a capability back, because "the pipe connects" is
+     * not the thing that has to be true — the ether arriving is.
+     */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void aWrenchedCasingLetsEtherIntoTheTank(GameTestHelper h) {
+        h.setBlock(X, 1, Z, ModBlocks.TOWER_CORE.get().defaultBlockState());
+        dev.distantstock.block.TowerCoreBlockEntity core = (dev.distantstock.block.TowerCoreBlockEntity)
+                h.getLevel().getBlockEntity(h.absolutePos(new BlockPos(X, 1, Z)));
+        h.assertTrue(core != null, "the core did not appear");
+
+        BlockPos casing = h.absolutePos(new BlockPos(X + 1, 1, Z));
+        h.setBlock(X + 1, 1, Z, ModBlocks.TOWER_CASING.get().defaultBlockState());
+        var closed = h.getLevel().getBlockState(casing);
+        h.assertTrue(dev.distantstock.block.TowerCasingBlock.portTank(h.getLevel(), casing, closed,
+                        net.minecraft.core.Direction.UP) == null,
+                "a closed casing offered a pipe the tank");
+
+        h.setBlock(X + 1, 1, Z, closed.setValue(dev.distantstock.block.TowerCasingBlock.PORT, true));
+        var open = h.getLevel().getBlockState(casing);
+        h.assertTrue(dev.distantstock.block.TowerCasingBlock.portTank(h.getLevel(), casing, open,
+                        net.minecraft.core.Direction.DOWN) == null,
+                "the port opened onto the face the driveshaft uses");
+
+        var tank = dev.distantstock.block.TowerCasingBlock.portTank(h.getLevel(), casing, open,
+                net.minecraft.core.Direction.UP);
+        h.assertTrue(tank != null, "an open port reached no tank");
+        int filled = tank.fill(new net.neoforged.neoforge.fluids.FluidStack(
+                dev.distantstock.fluid.ModFluids.ETHER.get(), 250),
+                net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+        h.assertTrue(filled == 250, "the port took " + filled + " mB instead of 250");
+        h.assertTrue(core.ether() == 250,
+                "the ether did not arrive in the tower: " + core.ether() + " mB");
+        h.succeed();
     }
 }

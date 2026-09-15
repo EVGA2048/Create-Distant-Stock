@@ -91,6 +91,7 @@ public final class ClientSetup {
         public static void visualizers(FMLClientSetupEvent e) {
             SignalPanelRenderer.registerModels();
             RemoteGaugeRenderer.registerModels();
+            ResonatorRenderer.registerModels();
             SimpleBlockEntityVisualizer.builder(ModBlockEntities.REMOTE_PACKAGER.get())
                     .factory((context, be, partialTick) -> new PackagerVisual<>(context, be, partialTick))
                     // The renderer still draws the packaged box outside the Flywheel check.

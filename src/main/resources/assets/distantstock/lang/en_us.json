@@ -312,5 +312,8 @@
   "distantstock.ponder.distant_replenish.text_3": "When the amount falls short of the target it orders the difference. One order at a time: the next one waits until the stock arrives or the first is written off, and a single order never asks for more than a stack.",
   "distantstock.ponder.distant_replenish.text_4": "The Distant Redstone Requester is the same idea on a pulse. Give it its nine items and an address in its own screen, bind it the same way, and one rising edge sends one order.",
   "distantstock.ponder.distant_replenish.text_5": "Both order into a receiving group, the same way an order from the desk does, so the goods arrive at a dock on this side. An unbound Requester is just a redstone requester, and an unbound gauge is just a gauge.",
-  "distantstock.ponder.distant_replenish.text_6": "Neither one spends anything without a tower carrying it, so build the tower first."
+  "distantstock.ponder.distant_replenish.text_6": "Neither one spends anything without a tower carrying it, so build the tower first.",
+  "message.distantstock.casing.port.open": "This casing is now an ether port",
+  "message.distantstock.casing.port.closed": "This port is closed again",
+  "goggle.distantstock.tower.no_shaft": "  no shaft under the base (underside only)"
 }

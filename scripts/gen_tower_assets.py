@@ -236,6 +236,15 @@ def coupler_models():
     }
 
 
+def coupler_textures():
+    """The coupler's textures, with the crystal swapped for the copy that keeps its alpha."""
+    textures = coupler_models()["tower_coupler"][1]
+    out = dict(textures)
+    if "crystal" in out:
+        out["crystal"] = f"distantstock:block/tower/{SOFT_CRYSTAL}"
+    return out
+
+
 def seam_crossframe():
     """The cross-frame of one seam, moved into the upper block's own coordinates.
 
@@ -303,6 +312,15 @@ def resonator_models():
 # a softness nothing was going to render anyway.
 FORCE_OPAQUE = {"crystal"}
 
+# The same crystal with its own alpha left alone, for the one model that renders translucent.
+#
+# The coupler's models go on the translucent layer, because that is the only way a crystal reads as
+# a crystal rather than as a painted stick: the handoff drew it at alpha 92..185, and the cutout
+# layer throws away everything under 128. The core and the resonator keep the opaque copy — their
+# crystal is a short tip inside the column, and putting their metalwork on the translucent layer to
+# get it would cost more than it buys.
+SOFT_CRYSTAL = "crystal_shell"
+
 
 def copy_textures():
     TEX_OUT.mkdir(parents=True, exist_ok=True)
@@ -311,7 +329,16 @@ def copy_textures():
     for source in sources:
         out = TEX_OUT / source.name
         shutil.copyfile(source, out)
-        if source.stem in FORCE_OPAQUE:
+        if source.stem == "crystal":
+            from PIL import Image
+            # Two files from one drawing: the opaque copy every cutout model uses, and the soft one
+            # the translucent coupler does.
+            image = Image.open(out).convert("RGBA")
+            soft = image.copy()
+            soft.save(TEX_OUT / f"{SOFT_CRYSTAL}.png")
+            image.putalpha(255)
+            image.save(out)
+        elif source.stem in FORCE_OPAQUE:
             from PIL import Image
             image = Image.open(out).convert("RGBA")
             image.putalpha(255)
@@ -554,8 +581,12 @@ def main():
     (MODEL_OUT / "tower_core.json").write_text(json.dumps(core_model, indent=2) + "\n")
     write_casing()
 
-    for name, (quads, textures) in coupler_models().items():
-        write(name, quads, textures)
+    # Translucent: see the crystal note above. The frame in the same model goes along with it, which
+    # is what a translucent layer costs — the alternative is a second block entity and a renderer
+    # drawing the crystal on its own, for one shade of one texture.
+    coupler_textures_ = coupler_textures()
+    for name, (quads, _ignored) in coupler_models().items():
+        write(name, quads, coupler_textures_, "minecraft:translucent")
 
     for name, (quads, textures) in resonator_models().items():
         write(name, quads, textures)

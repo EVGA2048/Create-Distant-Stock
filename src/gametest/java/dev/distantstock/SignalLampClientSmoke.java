@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelConnectionHandler;
 import dev.distantstock.block.ModBlocks;
 import dev.distantstock.client.RemoteGaugeRenderer;
+import dev.distantstock.client.ResonatorRenderer;
 import dev.distantstock.client.SignalPanelRenderer;
 import dev.engine_room.flywheel.lib.model.baked.PartialModel;
 import net.minecraft.client.Minecraft;
@@ -68,6 +69,20 @@ public final class SignalLampClientSmoke {
                 catch (AssertionError failure) { throw new AssertionError("Remote gauge model: " + entry.getKey(), failure); }
             }
             verify(com.simibubi.create.AllPartialModels.FACTORY_PANEL_WITH_BULB.get(), mc);
+            // The resonator's arms and light column are partial models too, and a partial model is
+            // only baked if something asked for it before the bake. The tower cap shipped with both
+            // of them unbaked: what a player saw was the missing model, a purple-and-black cube
+            // turning above the mast, while the inventory icon looked perfectly normal because it
+            // comes from the block model. Nothing else in the game reports this.
+            for (String part : new String[]{"ROTOR", "BEAM"}) {
+                var resonatorField = ResonatorRenderer.class.getDeclaredField(part);
+                resonatorField.setAccessible(true);
+                try {
+                    verify(((PartialModel) resonatorField.get(null)).get(), mc);
+                } catch (AssertionError failure) {
+                    throw new AssertionError("Resonator partial model: " + part, failure);
+                }
+            }
             // A sprite reaches the block atlas one of two ways: a baked model names it, or an atlas
             // definition lists it. The fluids ship as texture-only models and the dock's lift is
             // drawn straight from its renderer with no model at all, so both depend on
@@ -88,6 +103,7 @@ public final class SignalLampClientSmoke {
             // there reaches the game as a page of checkerboard with nothing upstream to catch it.
             for (String tower : new String[]{"andesite", "axis", "axis_top", "bearing", "bearing_top",
                     "brass", "cap", "casing", "casing_active", "casing_inactive", "core", "crystal",
+                    "crystal_shell", "fluid_port_a", "ct_active", "ct_inactive",
                     "ct_active", "ct_inactive", "fluid", "fluid_port_a", "frame", "gearbox", "iron",
                     "polished", "shell"}) {
                 expected.add(ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "block/tower/" + tower));

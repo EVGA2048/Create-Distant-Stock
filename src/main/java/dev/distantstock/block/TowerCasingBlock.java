@@ -33,6 +33,15 @@ import java.util.Set;
 public final class TowerCasingBlock extends Block {
     public static final MapCodec<TowerCasingBlock> CODEC = simpleCodec(TowerCasingBlock::new);
     public static final BooleanProperty POWERED = BooleanProperty.create("powered");
+    /**
+     * Whether this casing is a fluid port.
+     *
+     * <p>A complete tower's base is walled in: the core's tank answers pipes on every face but the
+     * bottom, and a finished skirt covers all four sides of it, so the tank is sealed inside a
+     * machine that is built exactly as it is meant to be. The port is how ether gets in — the
+     * player opens one where they want the pipe to arrive, rather than the mod picking a face.
+     */
+    public static final BooleanProperty PORT = BooleanProperty.create("port");
 
     private static final Direction[] DIRECTIONS = Direction.values();
     /**
@@ -46,7 +55,7 @@ public final class TowerCasingBlock extends Block {
 
     public TowerCasingBlock(Properties props) {
         super(props);
-        registerDefaultState(stateDefinition.any().setValue(POWERED, false));
+        registerDefaultState(stateDefinition.any().setValue(POWERED, false).setValue(PORT, false));
     }
 
     @Override
@@ -54,9 +63,72 @@ public final class TowerCasingBlock extends Block {
         return CODEC;
     }
 
+    /**
+     * The wrench opens and closes a fluid port.
+     *
+     * <p>Plain right-click, not sneak: sneak-wrench takes the block away, and a build gesture that
+     * also removes things is one players learn to avoid. Nothing else about the casing is
+     * configurable, so the wrench has this click to itself.
+     */
+    @Override
+    protected net.minecraft.world.ItemInteractionResult useItemOn(
+            net.minecraft.world.item.ItemStack stack, BlockState state, Level level, BlockPos pos,
+            net.minecraft.world.entity.player.Player player, net.minecraft.world.InteractionHand hand,
+            net.minecraft.world.phys.BlockHitResult hit) {
+        if (!DockBlock.isWrench(stack) || player.isShiftKeyDown()) {
+            return super.useItemOn(stack, state, level, pos, player, hand, hit);
+        }
+        if (!level.isClientSide) {
+            boolean open = !state.getValue(PORT);
+            level.setBlock(pos, state.setValue(PORT, open), 3);
+            level.playSound(null, pos, open ? net.minecraft.sounds.SoundEvents.IRON_TRAPDOOR_OPEN
+                    : net.minecraft.sounds.SoundEvents.IRON_TRAPDOOR_CLOSE,
+                    net.minecraft.sounds.SoundSource.BLOCKS, 0.6f, 1.2f);
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    open ? "message.distantstock.casing.port.open"
+                            : "message.distantstock.casing.port.closed"), true);
+        }
+        return net.minecraft.world.ItemInteractionResult.sidedSuccess(level.isClientSide);
+    }
+
+    /**
+     * The tower this casing belongs to, or null when it is not part of one.
+     *
+     * <p>The core stands in the middle of the skirt at the same height, so the search is the eight
+     * squares around it. Deliberately not a scan upwards: a casing is decorative nearly everywhere
+     * it is placed, and the common case has to be the cheap one.
+     */
+    public static TowerCoreBlockEntity coreFor(Level level, BlockPos pos) {
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) {
+                    continue;
+                }
+                BlockPos candidate = pos.offset(dx, 0, dz);
+                if (level.getBlockState(candidate).is(ModBlocks.TOWER_CORE.get())
+                        && level.getBlockEntity(candidate) instanceof TowerCoreBlockEntity core) {
+                    return core;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** The tank behind an open port, or null for a casing that is closed or in no tower. */
+    public static net.neoforged.neoforge.fluids.capability.IFluidHandler portTank(
+            Level level, BlockPos pos, BlockState state, Direction side) {
+        if (level == null || side == null || !state.getValue(PORT)) {
+            return null;
+        }
+        TowerCoreBlockEntity core = coreFor(level, pos);
+        // The core's own underside is where the shaft enters, and a port on that face would be a
+        // pipe arriving at a driveshaft. Every other side of a port is fair game.
+        return core == null || side == Direction.DOWN ? null : core.tank();
+    }
+
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(POWERED);
+        builder.add(POWERED, PORT);
     }
 
     /**

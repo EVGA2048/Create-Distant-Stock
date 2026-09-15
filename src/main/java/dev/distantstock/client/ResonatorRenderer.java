@@ -47,6 +47,19 @@ public final class ResonatorRenderer extends SmartBlockEntityRenderer<ResonatorB
     /** And how solid it is. A dormant column is nearly a ghost; a working one is nearly glass. */
     private static final int[] BEAM_ALPHA = {150, 210, 255};
 
+    /**
+     * Forces this class to load, and with it the two partial models above, before anything is baked.
+     *
+     * <p>This is not ceremony. A partial model is registered by the act of asking for it, and a
+     * model that was never registered is never baked — asking for one afterwards hands back the
+     * missing model, which is the purple-and-black cube. The statics here were only ever touched
+     * when the renderer was first constructed, which happens when a player first looks at a
+     * resonator: an entire tower's cap drawn as a spinning checkerboard cube, and nothing in the
+     * log to say why.
+     */
+    public static void registerModels() {
+    }
+
     public ResonatorRenderer(BlockEntityRendererProvider.Context context) {
         super(context);
     }

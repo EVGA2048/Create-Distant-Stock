@@ -20,6 +20,11 @@ public final class ModCapabilities {
         // the stronger claim on the one it already has.
         e.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ModBlockEntities.TOWER_CORE.get(),
                 (be, side) -> side == Direction.DOWN ? null : be.tank());
+        // A finished skirt walls the core in on all four sides, so the tank needs a door in the
+        // wall: a casing the player opened with a wrench. See TowerCasingBlock#portTank.
+        e.registerBlock(Capabilities.FluidHandler.BLOCK,
+                (level, pos, state, be, side) -> TowerCasingBlock.portTank(level, pos, state, side),
+                ModBlocks.TOWER_CASING.get());
     }
 
     private ModCapabilities() {
