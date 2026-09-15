@@ -177,7 +177,10 @@ public final class ParcelOwnershipCheck {
     }
 
     private static UUID hold(ParcelEscrow escrow) {
-        return escrow.holdEncoded(PAYLOAD, ADDRESS, NODE, GROUP, DIMENSION, new BlockPos(12, 64, -8));
+        // 200 ticks of game time: the escrow stamps parcels on the level clock, and this check runs
+        // without a level, so the number only has to be a plausible game time rather than a real one.
+        return escrow.holdEncoded(PAYLOAD, ADDRESS, NODE, GROUP, DIMENSION, new BlockPos(12, 64, -8),
+                200L);
     }
 
     private static ParcelEscrow.Record record(ParcelEscrow escrow, UUID parcelId) {
