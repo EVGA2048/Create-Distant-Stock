@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": {
+    "B": { "item": "create:brass_sheet" },
+    "P": { "item": "distantstock:polished_ether_quartz" },
+    "M": { "item": "create:precision_mechanism" },
+    "A": { "item": "minecraft:amethyst_block" }
+  },
+  "pattern": [
+    "BPB",
+    "PMP",
+    " A "
+  ],
+  "result": { "count": 1, "id": "distantstock:ether_resonator" }
+}

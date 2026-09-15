@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": {
+    "A": { "item": "create:andesite_alloy" },
+    "Q": { "item": "distantstock:ether_quartz" }
+  },
+  "pattern": [
+    " A ",
+    "AQA",
+    " A "
+  ],
+  "result": { "count": 2, "id": "distantstock:tower_coupler" }
+}

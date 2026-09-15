@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "key": {
+    "I": { "item": "create:iron_sheet" },
+    "Q": { "item": "distantstock:polished_ether_quartz" }
+  },
+  "pattern": [
+    " I ",
+    "IQI",
+    " I "
+  ],
+  "result": { "count": 4, "id": "distantstock:tower_casing" }
+}
