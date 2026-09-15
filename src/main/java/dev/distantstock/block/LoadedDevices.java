@@ -84,6 +84,12 @@ public final class LoadedDevices {
                 && be.getType() == ModBlockEntities.REMOTE_GAUGE.get();
     }
 
+    /** Drops a level's devices. See {@link LoadedDocks#forget}: a client level never says goodbye. */
+    public static void forget(Level level) {
+        MONITORS.removeIf(be -> be.getLevel() == level);
+        PACKAGERS.removeIf(be -> be.getLevel() == level);
+    }
+
     private static boolean serverSide(Level level) {
         return level != null && !level.isClientSide;
     }

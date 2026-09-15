@@ -45,7 +45,7 @@ public final class InboundOrderInbox extends SavedData {
     public Record receive(UUID sourceNodeId, OrderRequestCodec.Request request) {
         Record existing = records.get(request.childOrderId());
         if (existing != null) {
-            if (!existing.sourceNodeId().equals(sourceNodeId)
+            if (!java.util.Objects.equals(existing.sourceNodeId(), sourceNodeId)
                     || !existing.request().equals(request)) {
                 return null;
             }
@@ -87,7 +87,11 @@ public final class InboundOrderInbox extends SavedData {
             try {
                 CompoundTag row = new CompoundTag();
                 row.putUUID("ChildOrder", record.childOrderId());
-                row.putUUID("SourceNode", record.sourceNodeId());
+                if (record.sourceNodeId() != null) {
+                    // Absent, not zero: a node with no id and a node with the zero id are different
+                    // senders, and the dedup above compares them as such.
+                    row.putUUID("SourceNode", record.sourceNodeId());
+                }
                 row.putString("Request", Base64.getEncoder().encodeToString(
                         OrderRequestCodec.encode(record.request())));
                 row.putString("State", record.state().name());
@@ -109,7 +113,11 @@ public final class InboundOrderInbox extends SavedData {
             try {
                 OrderRequestCodec.Request request = OrderRequestCodec.decode(
                         Base64.getDecoder().decode(row.getString("Request")));
-                Record record = new Record(row.getUUID("ChildOrder"), row.getUUID("SourceNode"), request,
+                if (!row.hasUUID("ChildOrder")) {
+                    continue;
+                }
+                Record record = new Record(row.getUUID("ChildOrder"),
+                        row.hasUUID("SourceNode") ? row.getUUID("SourceNode") : null, request,
                         State.valueOf(row.getString("State")), row.getLong("UpdatedAt"), row.getString("Detail"));
                 inbox.records.put(record.childOrderId(), record);
             } catch (RuntimeException | IOException ignored) {

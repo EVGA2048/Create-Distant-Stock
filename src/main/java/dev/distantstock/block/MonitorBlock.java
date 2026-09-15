@@ -122,7 +122,11 @@ public final class MonitorBlock extends WallPanelBlock implements IWrenchable {
             if (player.isShiftKeyDown() && player.hasPermissions(2)) {
                 PacketDistributor.sendToPlayer(sp, AdminConfigS2C.fromConfig());
             } else {
-                PacketDistributor.sendToPlayer(sp, new OpenMonitorS2C(pos, LinkSnapshot.view()));
+                // Same reason as the periodic broadcast: the screen's tower half only exists if the
+                // readout is built for the monitor that asked.
+                PacketDistributor.sendToPlayer(sp,
+                        new OpenMonitorS2C(pos, LinkSnapshot.view(
+                                dev.distantstock.routing.TowerReadout.survey(level, pos))));
             }
         }
     }

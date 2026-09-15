@@ -9,6 +9,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.saveddata.SavedData;
+import dev.distantstock.routing.DockGroupDirectory;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -34,6 +35,11 @@ public final class ParcelEscrow extends SavedData {
                          List<String> stripIds, int strips) {
         public Record {
             stripIds = List.copyOf(stripIds);
+            // Never null, and not because every caller remembers: a record whose group came back
+            // absent from a file would otherwise be written out again by putUUID, which throws on a
+            // null — during a world save, which is the one place an exception must not be raised.
+            receivingDockGroupId = receivingDockGroupId == null
+                    ? DockGroupDirectory.DEFAULT_GROUP_ID : receivingDockGroupId;
         }
     }
 
@@ -207,6 +213,11 @@ public final class ParcelEscrow extends SavedData {
             CompoundTag row = rows.getCompound(i);
             try {
                 UUID parcelId = row.getUUID("ParcelId");
+                if (parcelId == null) {
+                    // A row without the id it is keyed by cannot be filed and cannot be saved again.
+                    // Dropping it loses one parcel; keeping it would take the whole save down.
+                    continue;
+                }
                 List<String> stripIds = new ArrayList<>();
                 ListTag storedStripIds = row.getList("StripIds", Tag.TAG_STRING);
                 for (int entry = 0; entry < storedStripIds.size(); entry++) {

@@ -118,6 +118,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                         b -> commitDockGroup(dev.distantstock.net.SetDockGroupC2S.RENAME))
                 .bounds(leftPos + 198, topPos + this.imageHeight - 89, 26, 14).build());
         receivingGroup.setValue(keepGroup);
+        // Remember what was put in the box, so closing an untouched screen sends nothing. Without
+        // this the field's contents were compared against an empty string, so every close looked
+        // like an edit — and on a language where the default group's displayed name is not the
+        // name the server stores, that "edit" made a new empty system every single time.
+        committedGroup = keepGroup;
         receivingGroup.setResponder(ignore -> {
         });
         addRenderableWidget(receivingGroup);
@@ -139,7 +144,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private String defaultGroupName() {
         var menu = this.getMenu();
         var stack = menu.device(this.minecraft == null ? null : this.minecraft.player);
-        if (stack != null && !stack.isEmpty()) {
+        if (!menu.isGauge() && stack != null && !stack.isEmpty()) {
             var carried = dev.distantstock.item.RequesterData.receivingGroupName(stack);
             if (carried.isPresent()) {
                 return carried.get();
@@ -190,6 +195,24 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     public void applyGroups(dev.distantstock.net.DockGroupsS2C next) {
         groups = next;
+        // The list is sent while the screen opens and can land after init(), so the field may be
+        // showing the default system's name for a requester that is pointed somewhere else — a desk
+        // always is, because its group is only knowable from this list. Naming it here is a display
+        // change only: committedGroup moves with the text so that closing an untouched screen still
+        // sends nothing, which is what keeps a displayed name from becoming a new system.
+        if (receivingGroup == null || receivingGroup.isFocused() || next.carried() == null) {
+            return;
+        }
+        if (!receivingGroup.getValue().trim().equals(committedGroup)) {
+            return;
+        }
+        for (var entry : next.groups()) {
+            if (entry.id().equals(next.carried())) {
+                receivingGroup.setValue(entry.name());
+                committedGroup = entry.name();
+                return;
+            }
+        }
     }
 
     /**
@@ -253,6 +276,34 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             return true;
         }
         return false;
+    }
+
+    /**
+     * The group the requester carries, or the default when it carries none.
+     *
+     * <p>Read from the item first and from the synced list second: an older requester holds an id
+     * with no name, and the list the server sent is what knows the name for it.
+     */
+    private java.util.UUID carriedGroupId() {
+        if (minecraft == null || minecraft.player == null) {
+            return dev.distantstock.routing.DockGroupDirectory.DEFAULT_GROUP_ID;
+        }
+        // A desk's group lives in the block, and the list the server sent is the only thing on the
+        // client that knows it. Reading the held item here would answer with the group of whatever
+        // the player happens to be carrying — including a different requester.
+        if (!getMenu().isGauge()) {
+            ItemStack stack = getMenu().device(minecraft.player);
+            if (stack != null && !stack.isEmpty()) {
+                var carried = dev.distantstock.item.RequesterData.receivingGroup(stack);
+                if (carried.isPresent()) {
+                    return carried.get();
+                }
+            }
+        }
+        if (groups != null && groups.carried() != null) {
+            return groups.carried();
+        }
+        return dev.distantstock.routing.DockGroupDirectory.DEFAULT_GROUP_ID;
     }
 
     private int computeHeight() {
@@ -651,7 +702,13 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         for (CartLine line : cart) {
             lines.add(new PlaceOrderC2S.Line(BuiltInRegistries.ITEM.getKey(line.stack.getItem()).toString(), line.count));
         }
-        PacketDistributor.sendToServer(new PlaceOrderC2S(lines));
+        // A name typed into the field and not confirmed with Enter is still what the player means,
+        // so the order commits it first and then reads the group. Both packets are handled in the
+        // order they were sent, and the order carries the group itself either way, so an order
+        // placed in the same breath as the name it was placed under still arrives under that name.
+        commitDockGroup(dev.distantstock.net.SetDockGroupC2S.SELECT);
+        java.util.UUID group = carriedGroupId();
+        PacketDistributor.sendToServer(new PlaceOrderC2S(lines, group));
         cart.clear();
         successTicks = 1;
     }

@@ -4,6 +4,7 @@ import com.simibubi.create.content.logistics.box.PackageItem;
 import dev.distantstock.routing.DockGroupDirectory;
 import dev.distantstock.routing.DockSelection;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -38,16 +39,49 @@ public final class LoadedDocks {
     public static List<UUID> watched() {
         List<UUID> out = new ArrayList<>();
         for (DockBlockEntity be : ALL) {
-            if (be.freq() != null) {
+            if (deliverable(be) && be.freq() != null) {
                 out.add(be.freq());
             }
         }
         for (GaugeBlockEntity be : GAUGES) {
-            if (be.freq() != null) {
+            if (deliverable(be) && be.freq() != null) {
                 out.add(be.freq());
             }
         }
         return out;
+    }
+
+    /**
+     * Whether this is a dock the server may hand a parcel to.
+     *
+     * <p>One definition, used by every path that picks a dock, because two of them had their own:
+     * the listing methods filtered the client half out and the delivery ones did not, and the
+     * client half is not a copy that can be ignored — it is a second {@code DockBlockEntity} for
+     * the same position, in the same JVM, in the same static set. A single-player client builds one
+     * for every loaded dock, it answers yes to every question the filter asks, and a parcel handed
+     * to it is written into client memory that the next server update overwrites. That is a parcel
+     * destroyed by being delivered, which is the one outcome this whole file exists to prevent.
+     */
+    private static boolean deliverable(DockBlockEntity be) {
+        return be != null && !be.isRemoved() && be.getLevel() != null && !be.getLevel().isClientSide;
+    }
+
+    /** The same question for a request desk, which is read by the stock scanner. */
+    private static boolean deliverable(GaugeBlockEntity be) {
+        return be != null && !be.isRemoved() && be.getLevel() != null && !be.getLevel().isClientSide;
+    }
+
+    /**
+     * Drops everything this level held, for the half of a session the game does not tell us about.
+     *
+     * <p>A server level unloads its block entities and every one of them deregisters itself. A
+     * client level does not: leaving a world sets the level aside without removing a single block
+     * entity, so its copies would stay in these sets holding the level alive, and the next world
+     * loaded in the same client would find them still answering yes.
+     */
+    public static void forget(Level level) {
+        ALL.removeIf(be -> be.getLevel() == level);
+        GAUGES.removeIf(be -> be.getLevel() == level);
     }
 
     public static DockBlockEntity importFor(ItemStack pkg) {
@@ -61,7 +95,7 @@ public final class LoadedDocks {
     public static DockBlockEntity importFor(ItemStack pkg, UUID groupId) {
         List<DockBlockEntity> matching = new ArrayList<>();
         for (DockBlockEntity be : ALL) {
-            if (!be.canReceive() || be.isRemoved() || !be.groupId().equals(groupId)) {
+            if (!deliverable(be) || !be.canReceive() || !be.groupId().equals(groupId)) {
                 continue;
             }
             String filter = be.address().isBlank() ? "*" : be.address();
@@ -91,7 +125,7 @@ public final class LoadedDocks {
 
     public static void noMatch(ItemStack pkg, UUID groupId) {
         for (DockBlockEntity be : ALL) {
-            if (!be.canReceive() || be.isRemoved() || !be.groupId().equals(groupId)) {
+            if (!deliverable(be) || !be.canReceive() || !be.groupId().equals(groupId)) {
                 continue;
             }
             String filter = be.address().isBlank() ? "*" : be.address();
@@ -160,7 +194,7 @@ public final class LoadedDocks {
 
     public static DockBlockEntity at(String dimension, long packedPos) {
         for (DockBlockEntity dock : ALL) {
-            if (dock.isRemoved() || dock.getLevel() == null) {
+            if (!deliverable(dock)) {
                 continue;
             }
             if (dock.getBlockPos().asLong() == packedPos

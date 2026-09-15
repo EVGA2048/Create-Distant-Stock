@@ -47,6 +47,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
         this.gaugePos = gaugePos;
         if (!inv.player.level().isClientSide) {
             refresh(inv.player);
+            // The desk has a group list of its own to offer: without this the dropdown stays empty
+            // and the field shows the display name of a system the server may not even hold.
+            sendGroupList(inv.player, device(inv.player));
         }
     }
 
@@ -121,12 +124,18 @@ public final class RequesterMenu extends AbstractContainerMenu {
      */
     public void writeDockGroup(Player player, String name, int action) {
         ItemStack stack = device(player);
-        if (stack.isEmpty() || name == null) {
+        if (name == null || (!isGauge() && stack.isEmpty())) {
             return;
         }
         String trimmed = name.trim();
+        // The client limits the field, a packet does not. Refusing here keeps a crafted name from
+        // reaching DockGroup, which throws on a name that is long or blank — an exception raised
+        // while handling a network packet, which is a far worse way to find out.
+        if (trimmed.length() > dev.distantstock.routing.DockGroup.MAX_NAME_LENGTH) {
+            return;
+        }
         if (trimmed.isEmpty()) {
-            RequesterData.setReceivingGroup(stack, null, null);
+            setCarriedGroup(player, stack, null);
             return;
         }
         if (player.level().getServer() == null) {
@@ -149,7 +158,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
                 }
                 dev.distantstock.routing.DockGroup renamed =
                         directory.rename(carried.get(), trimmed);
-                RequesterData.setReceivingGroup(stack, renamed.id(), renamed.name());
+                setCarriedGroup(player, stack, renamed);
                 sendGroupList(player, stack);
                 return;
             }
@@ -178,22 +187,53 @@ public final class RequesterMenu extends AbstractContainerMenu {
         // findByName above and createFor here both run on the server thread, so nothing can slip
         // between them. The duplicate check inside createFor is what keeps that an argument rather
         // than a hope.
-        RequesterData.setReceivingGroup(stack, group.id(), group.name());
+        setCarriedGroup(player, stack, group);
         // Push the list again: a system just made does not exist on the client until it is told,
         // and the one now carried has to stop being drawn as somebody else's.
         sendGroupList(player, stack);
     }
 
+    /**
+     * The group this requester is pointed at: the desk's own when opened from a desk, the held
+     * item's when opened from the hand.
+     *
+     * <p>One place answers this so the screen, the list it is sent and the group an order is filed
+     * under cannot disagree about where the goods come out.
+     */
+    public java.util.Optional<UUID> carriedGroup(Player player) {
+        GaugeBlockEntity be = gauge(player);
+        if (be != null) {
+            return java.util.Optional.of(be.receivingGroup());
+        }
+        return RequesterData.receivingGroup(device(player));
+    }
+
+    /** Writes a group to whichever of the two owns it. See {@link #carriedGroup}. */
+    private void setCarriedGroup(Player player, ItemStack stack, dev.distantstock.routing.DockGroup group) {
+        GaugeBlockEntity be = gauge(player);
+        if (be != null) {
+            be.setReceivingGroup(group == null
+                    ? dev.distantstock.routing.DockGroupDirectory.DEFAULT_GROUP_ID : group.id());
+            return;
+        }
+        RequesterData.setReceivingGroup(stack, group == null ? null : group.id(),
+                group == null ? null : group.name());
+    }
+
     /** Pushes the current list to whoever has this screen open. */
     public static void sendGroupList(Player player, ItemStack stack) {
-        if (player == null || player.level().getServer() == null) {
+        if (!(player instanceof net.minecraft.server.level.ServerPlayer serverPlayer)
+                || player.level().getServer() == null) {
+            // There is nothing to push to a player who is not on a server — a game test's mock
+            // player is the case that matters, and the write it is testing happens either way.
             return;
         }
         dev.distantstock.routing.DockGroupDirectory directory =
                 dev.distantstock.routing.DockGroupDirectory.get(player.level().getServer());
-        java.util.UUID carried = dev.distantstock.item.RequesterData.receivingGroup(stack).orElse(null);
-        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(
-                (net.minecraft.server.level.ServerPlayer) player,
+        java.util.UUID carried = player.containerMenu instanceof RequesterMenu menu
+                ? menu.carriedGroup(player).orElse(null)
+                : dev.distantstock.item.RequesterData.receivingGroup(stack).orElse(null);
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(serverPlayer,
                 dev.distantstock.net.DockGroupsS2C.of(directory, player.getUUID(), carried,
                         group -> dev.distantstock.block.LoadedDocks.allInGroup(group).size()));
     }

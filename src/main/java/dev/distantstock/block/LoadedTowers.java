@@ -70,6 +70,11 @@ public final class LoadedTowers {
         return null;
     }
 
+    /** Drops a level's towers. See {@link LoadedDocks#forget}: a client level never says goodbye. */
+    public static void forget(Level level) {
+        ALL.removeIf(be -> be.getLevel() == level);
+    }
+
     private LoadedTowers() {
     }
 }

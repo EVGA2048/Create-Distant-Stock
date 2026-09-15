@@ -150,9 +150,15 @@ public final class TowerDirectory extends SavedData {
             if (dimension.isBlank()) {
                 continue;
             }
+            // A missing key means the row predates the key, and the behaviour it had was
+            // Settings.DEFAULT: full tier radius, both switches on. Reading absent keys as their
+            // Java defaults would give radius 0 with both switches off, which is a tower that does
+            // nothing — the one outcome a file written before a field existed must not produce.
             directory.settings.put(new TowerSystem.TowerId(dimension, row.getLong("Base")),
-                    new Settings(row.getInt("Radius"), row.getBoolean("Loading"),
-                            row.getBoolean("Carrying")));
+                    new Settings(
+                            row.contains("Radius") ? row.getInt("Radius") : Settings.DEFAULT.radius(),
+                            !row.contains("Loading") || row.getBoolean("Loading"),
+                            !row.contains("Carrying") || row.getBoolean("Carrying")));
         }
         return directory;
     }

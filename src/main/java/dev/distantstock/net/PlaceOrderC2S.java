@@ -5,6 +5,8 @@ import dev.distantstock.block.GaugeBlockEntity;
 import dev.distantstock.link.LinkQueues;
 import dev.distantstock.link.OrderService;
 import dev.distantstock.menu.RequesterMenu;
+import dev.distantstock.routing.DockGroup;
+import dev.distantstock.routing.DockGroupDirectory;
 import dev.distantstock.routing.TowerActivation;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -45,6 +47,35 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
         return TYPE;
     }
 
+    /**
+     * The group an order may be delivered into, or null when the player may not reach the one asked
+     * for.
+     *
+     * <p>Three answers, because three things can be true of the id in the packet:
+     *
+     * <ul>
+     *   <li>It names a system and the player is in it — the order goes there.
+     *   <li>It names nothing at all. A requester made before the system was deleted still holds its
+     *       id, and an unconfigured requester holds none, so both fall back to the default system.
+     *       Nobody owns the default, so this is not a door being opened.
+     *   <li>It names a system the player is not in. That is the case a lock exists for, and it is
+     *       refused: a closed system is not a place to push goods into.
+     * </ul>
+     */
+    private static UUID resolveGroup(Player p, UUID asked) {
+        if (p == null || p.level().getServer() == null) {
+            return null;
+        }
+        if (asked == null || asked.equals(DockGroupDirectory.DEFAULT_GROUP_ID)) {
+            return DockGroupDirectory.DEFAULT_GROUP_ID;
+        }
+        DockGroup group = DockGroupDirectory.get(p.level().getServer()).find(asked).orElse(null);
+        if (group == null) {
+            return DockGroupDirectory.DEFAULT_GROUP_ID;
+        }
+        return group.admits(p.getUUID()) ? group.id() : null;
+    }
+
     public static void handle(PlaceOrderC2S msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             Player p = ctx.player();
@@ -69,6 +100,15 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
                 p.displayClientMessage(Component.translatable("gui.distantstock.uncharged"), true);
                 return;
             }
+            UUID group = resolveGroup(p, msg.receivingDockGroupId);
+            if (group == null) {
+                // The field on the screen and this packet can disagree: the screen only offers
+                // groups the player may reach, a packet offers whatever it was built with. The one
+                // that decides is this side, so an order naming a system the player is not in is
+                // refused rather than quietly turned into a delivery somewhere else.
+                p.displayClientMessage(Component.translatable("gui.distantstock.group.closed"), true);
+                return;
+            }
             UUID freq = menu.freq(p);
             String address = menu.address(p);
             List<LinkQueues.Line> items = new ArrayList<>();
@@ -79,7 +119,7 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
             }
             OrderService.Result result = p instanceof ServerPlayer serverPlayer
                     ? OrderService.place(serverPlayer.getServer(), menu.networkId(p), freq, address,
-                    msg.receivingDockGroupId, items)
+                    group, items)
                     : OrderService.Result.FAIL;
             GaugeBlockEntity be = menu.gauge(p);
             if (be != null) {

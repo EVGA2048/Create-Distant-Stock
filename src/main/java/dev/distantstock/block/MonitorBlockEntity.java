@@ -3,6 +3,7 @@ package dev.distantstock.block;
 import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.link.LinkSnapshot;
+import dev.distantstock.routing.TowerReadout;
 import dev.distantstock.net.LinkSnapshotS2C;
 import dev.distantstock.routing.RemoteNetworkId;
 import dev.distantstock.stock.CreateStock;
@@ -67,7 +68,11 @@ public final class MonitorBlockEntity extends BlockEntity implements IHaveGoggle
         if (level.getGameTime() % 20 != 0) {
             return;
         }
-        LinkSnapshot.View v = LinkSnapshot.view();
+        // With this monitor's own tower readout, not the bare link view. The overload that takes one
+        // existed from the start and had no callers, so the tower half of the screen was sent as
+        // TowerReadout.NONE every time and the page read "not on a tower" for ever. Nothing failed:
+        // the packet was well formed, it just carried the answer for a monitor standing nowhere.
+        LinkSnapshot.View v = LinkSnapshot.view(TowerReadout.survey(level, pos));
         be.localTps = v.localTps();
         be.localMspt = v.localMspt();
         be.peerUp = v.linkUp();

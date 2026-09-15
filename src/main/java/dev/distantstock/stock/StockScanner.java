@@ -18,6 +18,11 @@ public final class StockScanner {
         EXTRA.add(src);
     }
 
+    /** Removes every registered supplier, for the world that registered them going away. */
+    public static void clearExtra() {
+        EXTRA.clear();
+    }
+
     public static void scan(MinecraftServer server) {
         List<NetworkDirectory.Entry> local = CreateStock.openNetworks(
                 server, StockConfig.selfId(), TranserverBridge.nodeId());

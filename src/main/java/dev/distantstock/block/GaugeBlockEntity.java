@@ -24,6 +24,15 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
     private UUID freq;
     private RemoteNetworkId networkId;
     private String address = "";
+    /**
+     * Where a desk's orders come out, as a dock group id; null means the default group.
+     *
+     * <p>A desk had no group of its own, so the screen's group field wrote to whatever the player
+     * happened to be holding — an empty hand wrote nothing at all and the desk kept sending every
+     * order to the default system while the field showed something else. The group belongs to the
+     * machine that places the order.
+     */
+    private UUID receivingGroup;
     private OrderService.Result lastOrder;
     private int catalog;
     private boolean dataLocal;
@@ -54,6 +63,18 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
     public void setNetwork(RemoteNetworkId networkId) {
         this.networkId = networkId;
         this.freq = networkId == null ? null : networkId.createFrequency();
+        sync();
+    }
+
+    /** The group this desk's orders are addressed to; the default group when never chosen. */
+    public UUID receivingGroup() {
+        return receivingGroup == null
+                ? dev.distantstock.routing.DockGroupDirectory.DEFAULT_GROUP_ID : receivingGroup;
+    }
+
+    /** Points this desk at a group, or back at the default when given null. */
+    public void setReceivingGroup(UUID group) {
+        this.receivingGroup = group;
         sync();
     }
 
@@ -149,6 +170,9 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
             tag.put("RemoteNetwork", networkId.save());
         }
         tag.putString("Address", address);
+        if (receivingGroup != null) {
+            tag.putUUID("ReceivingGroup", receivingGroup);
+        }
         if (lastOrder != null) {
             tag.putString("LastOrder", lastOrder.name());
         }
@@ -164,6 +188,7 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
         networkId = tag.contains("RemoteNetwork")
                 ? RemoteNetworkId.read(tag.getCompound("RemoteNetwork")).orElse(null) : null;
         address = tag.getString("Address");
+        receivingGroup = tag.hasUUID("ReceivingGroup") ? tag.getUUID("ReceivingGroup") : null;
         if (tag.contains("LastOrder")) {
             try {
                 lastOrder = OrderService.Result.valueOf(tag.getString("LastOrder"));

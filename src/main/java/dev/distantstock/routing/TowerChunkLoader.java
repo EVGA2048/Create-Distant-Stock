@@ -61,7 +61,16 @@ public final class TowerChunkLoader {
      * ever load again. The wait is the price of being able to tell the difference; five seconds of
      * chunks that were going to be loaded anyway is cheaper than a tower that unloads itself.
      */
-    private static final int GRACE_TICKS = 100;
+    /**
+     * How long a ticket found in the level at startup waits for its tower to load before it is
+     * handed back: twenty seconds, not the five it was.
+     *
+     * <p>A large save with many towers loading at once can take longer than a hundred ticks to
+     * reach every one of them. Waiting costs nothing — those chunks are already forced — while
+     * being wrong costs a live tower every chunk it kept loaded, with no way back but a player
+     * walking past it. {@link #expirePending} is what this bounds, not how fast the server starts.
+     */
+    private static final int GRACE_TICKS = 400;
 
     private static final int RECONCILE_TICKS = 20;
 
@@ -268,15 +277,32 @@ public final class TowerChunkLoader {
         CONTROLLER.forceChunk(level, owner, ChunkPos.getX(chunk), ChunkPos.getZ(chunk), add, true);
     }
 
+    /**
+     * Hands back the chunks of towers that are gone.
+     *
+     * <p>A release whose level has no server left is put back rather than dropped. Dropping it
+     * would be silent and permanent: {@code forget} has already taken the tower out of the ledger
+     * that tracks its chunks, so nothing would ever ask for those chunks to be released again and
+     * they would stay forced for the rest of the save. They are collected and re-queued after the
+     * batch so that one unloaded level cannot hold up the releases of another.
+     */
     private static void releaseQueued() {
+        List<Release> deferred = null;
         for (int i = 0; i < UNLOADS_PER_TICK && !QUEUE.isEmpty(); i++) {
             Release release = QUEUE.poll();
             if (release.level().getServer() == null) {
+                if (deferred == null) {
+                    deferred = new ArrayList<>();
+                }
+                deferred.add(release);
                 continue;
             }
             for (LongIterator it = release.chunks().iterator(); it.hasNext(); ) {
                 force(release.level(), release.owner(), it.nextLong(), false);
             }
+        }
+        if (deferred != null) {
+            QUEUE.addAll(deferred);
         }
     }
 

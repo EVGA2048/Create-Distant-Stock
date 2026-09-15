@@ -25,6 +25,18 @@ public final class MonitorScreen extends Screen {
     private static final int BAD = 0xB65E57;
     /** Row pitch on the tower page: three lines of text and the button strip between them. */
     private static final int ROW_H = 36;
+    /** Where the member rows start, below the summary, the stress reading and the selection. */
+    private static final int TOWER_ROW_TOP = 68;
+    /** What a member tower's own tier allows it to load, as a square. */
+    private static int memberCeiling(TowerReadout.Member member) {
+        try {
+            return dev.distantstock.block.TowerTier.valueOf(member.tier()).chunkRadius();
+        } catch (IllegalArgumentException | NullPointerException gone) {
+            // A tower that is not in the world has no tier, and a tower with no tier pays for
+            // nothing: its radius buttons are shown at their floor rather than at a guess.
+            return 0;
+        }
+    }
     private static final ResourceLocation PANEL =
             ResourceLocation.fromNamespaceAndPath("distantstock", "textures/gui/monitor.png");
 
@@ -254,17 +266,27 @@ public final class MonitorScreen extends Screen {
 
         Component summary = Component.translatable("gui.distantstock.tower.summary",
                 tower.members().size(), tower.carried(), tower.limit());
-        g.drawString(font, summary, left + 14, top + 44, BRASS, false);
+        g.drawString(font, summary, left + 14, top + 42, BRASS, false);
         Component stress = Component.translatable("gui.distantstock.tower.stress",
                 (int) tower.stress(), (int) tower.speed());
-        g.drawString(font, stress, left + W - 14 - font.width(stress), top + 44,
+        g.drawString(font, stress, left + W - 14 - font.width(stress), top + 42,
                 tower.speed() <= 0 ? BAD : MUTED, false);
 
-        int y = top + 58;
+        // The square the system actually keeps loaded, against the largest one any of its members
+        // pays for. Both were already on the wire and neither was drawn, so the buttons below were
+        // the only sign a ceiling existed at all — and they stopped at it without saying why.
+        Component selection = tower.selectedSide() <= 0
+                ? Component.translatable("gui.distantstock.tower.selection.none", tower.maxSide())
+                : Component.translatable("gui.distantstock.tower.selection",
+                tower.selectedSide(), tower.maxSide());
+        g.drawString(font, selection, left + 14, top + 54,
+                tower.selectedSide() <= 0 ? MUTED : AETHER, false);
+
+        int y = TOWER_ROW_TOP;
         for (TowerReadout.Member member : tower.members()) {
             if (y + ROW_H > top + H - 4) {
                 Component more = Component.translatable("gui.distantstock.tower.more",
-                        tower.members().size() - (y - top - 58) / ROW_H);
+                        tower.members().size() - (y - top - TOWER_ROW_TOP) / ROW_H);
                 g.drawString(font, more, left + 14, y, MUTED, false);
                 return;
             }
@@ -277,28 +299,48 @@ public final class MonitorScreen extends Screen {
         BlockPos base = BlockPos.of(member.pos());
         String where = "#" + base.getX() + "," + base.getY() + "," + base.getZ();
         String tier = member.tier().isBlank() ? "—" : member.tier();
-        g.drawString(font, where + "  " + tier, left + 14, y + 1, INK, false);
+        String head = where + "  " + tier;
+        g.drawString(font, head, left + 14, y + 1, INK, false);
+
+        // What this tower reaches and what it is rated to carry, right after its tier: the reading
+        // an operator needs when a device near the edge of a system is not being served, and the
+        // answer to why the member rows and the summary do not add up to the same number.
+        int badgeX = left + 14;
+        if (!member.tier().isBlank()) {
+            Component reach = Component.translatable("gui.distantstock.tower.reach",
+                    member.radius(), member.devices());
+            badgeX += font.width(head) + 6;
+            g.drawString(font, reach, badgeX, y + 1, MUTED, false);
+            badgeX += font.width(reach) + 6;
+        } else {
+            badgeX = left + 110;
+        }
 
         // The one reading that explains all the others when it is set. Create reports a speed of
         // zero both for a stalled network and for a tower with no shaft at all; the flag is what
         // tells the operator which of the two they are looking at.
         if (member.overstressed()) {
             Component over = Component.translatable("gui.distantstock.tower.overstressed");
-            g.drawString(font, over, left + 110, y + 1, BAD, false);
+            g.drawString(font, over, badgeX, y + 1, BAD, false);
         } else if (!member.running()) {
             Component stopped = Component.translatable("gui.distantstock.tower.stopped");
-            g.drawString(font, stopped, left + 110, y + 1, WARN, false);
+            g.drawString(font, stopped, badgeX, y + 1, WARN, false);
         }
         Component speed = Component.translatable("gui.distantstock.tower.speed",
                 (int) Math.abs(member.speed()));
         g.drawString(font, speed, left + W - 14 - font.width(speed), y + 1, MUTED, false);
 
         int x = left + 14;
-        x = smallButton(g, x, y + 11, "−", member, member.chunkRadius() - 1);
+        // Both ends are bounded here rather than on the server. The server refuses a radius above
+        // the tier and stores a negative one as "the tier's own", so a button that stayed live past
+        // either end would look like a working control that puts the radius back where it started.
+        boolean canShrink = member.chunkRadius() > 0;
+        boolean canGrow = member.chunkRadius() < memberCeiling(member);
+        x = smallButton(g, x, y + 11, "−", member, member.chunkRadius() - 1, canShrink);
         Component radius = Component.translatable("gui.distantstock.tower.radius", member.chunkRadius());
         g.drawString(font, radius, x + 3, y + 13, INK, false);
         x += 3 + font.width(radius) + 3;
-        x = smallButton(g, x, y + 11, "+", member, member.chunkRadius() + 1);
+        x = smallButton(g, x, y + 11, "+", member, member.chunkRadius() + 1, canGrow);
         x += 6;
         x = switchButton(g, x, y + 11, "gui.distantstock.tower.loading", member.loading(), member,
                 !member.loading(), member.carrying());
@@ -315,12 +357,15 @@ public final class MonitorScreen extends Screen {
 
     /** A radius step. Sends the whole record, because the server stores what it is handed. */
     private int smallButton(GuiGraphics g, int x, int y, String glyph,
-                            TowerReadout.Member member, int radius) {
+                            TowerReadout.Member member, int radius, boolean live) {
         int w = 11;
-        g.fill(x, y, x + w, y + 11, 0xFF4A5F66);
-        g.fill(x + 1, y + 1, x + w - 1, y + 10, 0xFF2E444B);
-        g.drawString(font, glyph, x + (w - font.width(glyph)) / 2, y + 2, 0xFFD8EEEA, false);
-        hits.add(new Hit(x, y, w, 11, member, radius, member.loading(), member.carrying(), null));
+        g.fill(x, y, x + w, y + 11, live ? 0xFF4A5F66 : 0xFF39474C);
+        g.fill(x + 1, y + 1, x + w - 1, y + 10, live ? 0xFF2E444B : 0xFF232D31);
+        g.drawString(font, glyph, x + (w - font.width(glyph)) / 2, y + 2,
+                live ? 0xFFD8EEEA : 0xFF5C6B70, false);
+        if (live) {
+            hits.add(new Hit(x, y, w, 11, member, radius, member.loading(), member.carrying(), null));
+        }
         return x + w;
     }
 

@@ -3,6 +3,13 @@ package dev.distantstock;
 import dev.distantstock.routing.DockGroup;
 import dev.distantstock.routing.DockMode;
 import dev.distantstock.routing.DockGroupDirectory;
+import dev.distantstock.block.GaugeBlockEntity;
+import dev.distantstock.block.ModBlocks;
+import dev.distantstock.menu.RequesterMenu;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.GameType;
+import dev.distantstock.net.SetDockGroupC2S;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -61,6 +68,9 @@ public final class DockGroupGameTests {
 
     @GameTest(template = "empty", timeoutTicks = 20)
     public static void theDefaultGroupStaysOpen(GameTestHelper h) {
+        // A name nobody has used before. The test world is a save like any other and keeps its
+        // dock groups between runs: a fixed name here made a group owned by the previous run's
+        // player, and every run after that was silently refused entry to its own test fixture.
         DockGroupDirectory directory = DockGroupDirectory.get(h.getLevel().getServer());
         DockGroup fallback = directory.require(DockGroupDirectory.DEFAULT_GROUP_ID);
         h.assertTrue(fallback.admits(STRANGER),
@@ -119,6 +129,55 @@ public final class DockGroupGameTests {
             h.assertTrue(directory.findByName(name).orElseThrow().ownedBy(OWNER),
                     "the duplicate attempt disturbed the group that already had the name");
         }
+        h.succeed();
+    }
+
+    /**
+     * A request desk keeps the group it is pointed at, in the desk.
+     *
+     * <p>It used to keep it nowhere: the screen wrote the group to whatever the player was holding,
+     * so opening a desk with an empty hand showed a group field that silently did nothing and every
+     * order went to the default system. The desk is the machine that places the order, so the desk
+     * is what has to hold the answer.
+     */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void aDeskKeepsItsOwnReceivingGroup(GameTestHelper h) {
+        BlockPos pos = h.absolutePos(new BlockPos(1, 2, 1));
+        h.getLevel().setBlock(pos, ModBlocks.GAUGE.get().defaultBlockState(), 3);
+        GaugeBlockEntity desk = (GaugeBlockEntity) h.getLevel().getBlockEntity(pos);
+        h.assertTrue(desk != null, "the desk did not appear");
+
+        Player player = h.makeMockPlayer(GameType.SURVIVAL);
+        RequesterMenu menu = new RequesterMenu(0, player.getInventory(), pos);
+        h.assertTrue(DockGroupDirectory.DEFAULT_GROUP_ID.equals(desk.receivingGroup()),
+                "a fresh desk was pointed somewhere other than the default group");
+
+        // A name nobody has used before. The test world is a save like any other and keeps its dock
+        // groups between runs: a fixed name here made a group owned by the previous run's player,
+        // and every run after that was silently refused entry to its own fixture — the write went
+        // nowhere and the failure looked like a bug in the desk.
+        String name = "甲站收货-" + UUID.randomUUID();
+        DockGroupDirectory directory = DockGroupDirectory.get(h.getLevel().getServer());
+        menu.writeDockGroup(player, name, SetDockGroupC2S.SELECT);
+        DockGroup stored = directory.find(desk.receivingGroup()).orElse(null);
+        h.assertTrue(stored != null && stored.name().equals(name),
+                "the desk did not take the group it was given: " + desk.receivingGroup()
+                        + " isGauge=" + menu.isGauge()
+                        + " playerLevel=" + player.level().dimension().location()
+                        + " sameLevel=" + (player.level() == h.getLevel())
+                        + " beThere=" + (player.level().getBlockEntity(pos) != null));
+        h.assertTrue(menu.carriedGroup(player).orElse(null).equals(desk.receivingGroup()),
+                "the menu answered with a different group than the desk stored");
+
+        // A second desk given the same name points at the same group, rather than making a twin:
+        // two systems sharing a name would make every dock's readout ambiguous.
+        BlockPos other = h.absolutePos(new BlockPos(3, 2, 1));
+        h.getLevel().setBlock(other, ModBlocks.GAUGE.get().defaultBlockState(), 3);
+        GaugeBlockEntity second = (GaugeBlockEntity) h.getLevel().getBlockEntity(other);
+        new RequesterMenu(1, player.getInventory(), other)
+                .writeDockGroup(player, name, SetDockGroupC2S.SELECT);
+        h.assertTrue(second.receivingGroup().equals(desk.receivingGroup()),
+                "the same name made two groups");
         h.succeed();
     }
 }

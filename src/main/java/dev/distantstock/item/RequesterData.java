@@ -46,9 +46,13 @@ public final class RequesterData {
     }
 
     static void clearBindingTag(CompoundTag tag) {
+        // The name goes with the id. Leaving it behind made "a name with no id" a legal state, and
+        // the next dock click would write that stale name back onto the item alongside the default
+        // group's id — a label that looks like an answer and is not one.
         tag.remove(FREQ);
         tag.remove(NETWORK);
         tag.remove(RECEIVING_GROUP);
+        tag.remove(RECEIVING_GROUP_NAME);
     }
 
     public static void setAddress(ItemStack stack, String address) {

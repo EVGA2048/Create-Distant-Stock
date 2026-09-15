@@ -927,6 +927,12 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     @Override
     public void remove() {
         LoadedDocks.remove(this);
+        // The other way a dock leaves the world. Breaking it by hand goes through the block's
+        // playerWillDestroy first, but a wrench in sneak mode, an explosion, a piston and /setblock
+        // all remove the block without ever calling it — and every one of them takes the parcels in
+        // these three slots with it unless they are dropped here. The two together are safe to
+        // have: the first one empties the slots, so the second finds nothing and drops nothing.
+        spillContents();
         super.remove();
     }
 

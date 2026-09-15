@@ -81,6 +81,23 @@ public final class LinkQueues {
 
     public static final int CAP = 64;
 
+    /**
+     * Empties every queue. Called when the server stops.
+     *
+     * <p>These are static fields and nothing else empties them, so an order or a parcel left in
+     * flight at shutdown would be handed to the next world loaded in this client — where the
+     * default dock group has the same id, so it would be delivered there, to whoever is standing
+     * near a dock, as a parcel nobody sent.
+     */
+    public static void clear() {
+        IN_ORDERS.clear();
+        OUT_ORDERS.clear();
+        IN_PACK.clear();
+        OUT_PACK.clear();
+        IN_FLIGHT.set(0);
+        LAST_PACK.clear();
+    }
+
     public static boolean offerInboundOrder(Order order) {
         if (IN_ORDERS.size() >= CAP) {
             return false;

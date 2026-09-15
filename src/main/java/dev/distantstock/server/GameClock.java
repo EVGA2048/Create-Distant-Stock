@@ -3,6 +3,7 @@ package dev.distantstock.server;
 import dev.distantstock.DistantStock;
 import dev.distantstock.block.LoadedDocks;
 import dev.distantstock.config.StockConfig;
+import dev.distantstock.link.LinkQueues;
 import dev.distantstock.link.LinkServer;
 import dev.distantstock.link.LinkSnapshot;
 import dev.distantstock.link.OrderService;
@@ -75,7 +76,33 @@ public final class GameClock {
         // it points at, and the next world in the same client would inherit its ticket bookkeeping.
         TowerActivation.unpinDevices();
         TowerChunkLoader.reset();
+        // Legacy queues live in static fields and hold whole orders and parcels. A world left with
+        // entries still in them hands them to the next world opened in this client, where the
+        // default group has the same id and the parcel is delivered as if it had been sent there.
+        LinkQueues.clear();
+        // The scanner's suppliers are registered once per world start; without this they pile up,
+        // and every scan after the second world entry walks the same docks twice.
+        StockScanner.clearExtra();
         LOG.info("[DistantStock] transport stopped");
+    }
+
+    /**
+     * A level is going away: forget everything registered under it.
+     *
+     * <p>On the server this is belt and braces — a level being unloaded takes its block entities
+     * through {@code setRemoved} and each one deregisters itself. On the client it is the only
+     * chance there is: leaving a world does not unload a single chunk, so the client's own copies
+     * of every loaded dock, tower and monitor would otherwise stay in the static registries for the
+     * life of the process, holding their level and everything under it in memory, and answering the
+     * delivery paths of whatever save is opened next.
+     */
+    @SubscribeEvent
+    public static void unloaded(net.neoforged.neoforge.event.level.LevelEvent.Unload e) {
+        if (e.getLevel() instanceof net.minecraft.world.level.Level level) {
+            dev.distantstock.block.LoadedDocks.forget(level);
+            dev.distantstock.block.LoadedTowers.forget(level);
+            dev.distantstock.block.LoadedDevices.forget(level);
+        }
     }
 
     @SubscribeEvent

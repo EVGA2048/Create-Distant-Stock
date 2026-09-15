@@ -30,6 +30,13 @@ public final class ParcelReturnInbox extends SavedData {
     public record Record(UUID parcelId, String encodedPackage, String address, String destinationNode,
                          UUID receivingDockGroupId, String originDimension, long originPos, long createdAt,
                          long handedOffAt, String reason, String detail, int attempts, long lastAttemptAt) {
+        public Record {
+            // See ParcelEscrow.Record: this record is written out with putUUID, so a null group
+            // read back from a file would become an exception in the middle of a save.
+            receivingDockGroupId = receivingDockGroupId == null
+                    ? dev.distantstock.routing.DockGroupDirectory.DEFAULT_GROUP_ID : receivingDockGroupId;
+        }
+
         public Record withAttempt(long gameTime) {
             return new Record(parcelId, encodedPackage, address, destinationNode, receivingDockGroupId,
                     originDimension, originPos, createdAt, handedOffAt, reason, detail, attempts + 1, gameTime);
@@ -158,6 +165,9 @@ public final class ParcelReturnInbox extends SavedData {
             CompoundTag row = rows.getCompound(i);
             try {
                 UUID parcelId = row.getUUID("ParcelId");
+                if (parcelId == null) {
+                    continue;
+                }
                 Record record = new Record(parcelId, row.getString("Package"), row.getString("Address"),
                         row.getString("Destination"), row.getUUID("DockGroup"),
                         row.getString("OriginDimension"), row.getLong("OriginPos"), row.getLong("CreatedAt"),
