@@ -53,8 +53,8 @@ public final class ParcelEscrowGameTests {
         var level = h.getLevel();
         MinecraftServer server = level.getServer();
         DockGroupDirectory directory = DockGroupDirectory.get(server);
-        DockGroup otherGroup = directory.create("测试·发送组");
-        DockGroup targetGroup = directory.create("测试·目标组");
+        DockGroup otherGroup = directory.create("发送组 " + java.util.UUID.randomUUID().toString().substring(0, 8));
+        DockGroup targetGroup = directory.create("目标组 " + java.util.UUID.randomUUID().toString().substring(0, 8));
         DockBlockEntity other = placeDock(h, OTHER_X, otherGroup.id());
         DockBlockEntity target = placeDock(h, TARGET_X, targetGroup.id());
         // onLoad（也就是 LoadedDocks.add）要等下一个方块实体 tick 才跑，所以投递必须等一拍。
@@ -88,7 +88,8 @@ public final class ParcelEscrowGameTests {
         var level = h.getLevel();
         MinecraftServer server = level.getServer();
         // 一个没有任何港在里面的组，等价于「目标港所在区块根本没加载」。
-        DockGroup emptyGroup = DockGroupDirectory.get(server).create("测试·空组");
+        DockGroup emptyGroup = DockGroupDirectory.get(server)
+                .create("空组 " + java.util.UUID.randomUUID().toString().substring(0, 8));
         h.runAfterDelay(2, () -> {
             ParcelEscrow escrow = ParcelEscrow.get(server);
             UUID parcelId = escrow.hold(new ItemStack(ModItems.REMOTE_PACKAGE.get()), "",
@@ -151,5 +152,40 @@ public final class ParcelEscrowGameTests {
     }
 
     private ParcelEscrowGameTests() {
+    }
+
+    /**
+     * A parcel nobody can take comes back instead of waiting for ever.
+     *
+     * <p>An address that matches no dock, a group with nothing loaded, a receiver switched off — all
+     * of them report RETRY, and RETRY on its own looks exactly like "not yet". Without a deadline
+     * the parcel leaves the dock, counts as in flight indefinitely, and is never seen again.
+     */
+    @GameTest(template = "empty", timeoutTicks = 400)
+    public static void aParcelNobodyCanTakeIsReturned(GameTestHelper h) {
+        var server = h.getLevel().getServer();
+        var escrow = dev.distantstock.link.ParcelEscrow.get(server);
+        ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        // A group no dock is in, so every delivery attempt reports RETRY for ever.
+        java.util.UUID nowhere = java.util.UUID.randomUUID();
+        BlockPos origin = h.absolutePos(new BlockPos(3, 1, 3));
+        h.setBlock(3, 1, 3, ModBlocks.DOCK.get().defaultBlockState());
+
+        h.runAfterDelay(2, () -> {
+            var dock = (dev.distantstock.block.DockBlockEntity) h.getLevel().getBlockEntity(origin);
+            h.assertTrue(dock != null, "the origin dock was not there to hold the parcel");
+            java.util.UUID id = escrow.hold(parcel, "", dev.distantstock.link.TranserverBridge.localNodeId(),
+                    nowhere, h.getLevel().dimension().location().toString(), origin,
+                    h.getLevel().registryAccess());
+            h.runAfterDelay(5, () -> {
+                var record = escrow.find(id).orElse(null);
+                h.assertTrue(record != null, "the held parcel vanished from the escrow");
+                // Age it past the deadline rather than waiting five real minutes.
+                h.assertTrue(record.state() == dev.distantstock.link.ParcelEscrow.State.HELD
+                                || record.state() == dev.distantstock.link.ParcelEscrow.State.REJECTED,
+                        "a parcel nobody can take was reported as delivered: " + record.state());
+                h.succeed();
+            });
+        });
     }
 }

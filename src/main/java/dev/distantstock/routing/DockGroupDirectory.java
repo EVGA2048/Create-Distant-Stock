@@ -53,6 +53,15 @@ public final class DockGroupDirectory extends SavedData {
 
     public DockGroup create(String name, UUID owner, boolean open) {
         DockGroup group = new DockGroup(UUID.randomUUID(), name, owner, open);
+        // Refused rather than added. Two groups sharing a name are two groups no lookup, readout
+        // or command can tell apart, and the failure would be silent and permanent — the file would
+        // hold both and every later lookup would return whichever came first.
+        //
+        // Thrown, not quietly returned as the existing one: a create that returns somebody else's
+        // group is how a player ends up adding their docks to a stranger's warehouse.
+        if (findByName(group.name()).isPresent()) {
+            throw new IllegalArgumentException("Dock group already exists: " + group.name());
+        }
         groups.put(group.id(), group);
         setDirty();
         return group;

@@ -35,6 +35,21 @@ public final class ParcelEscrowPump {
     private static final long RETURN_RETRY_TICKS = 100;
     /** How often one parcel may be stripped and re-sent before it is handed back to the player. */
     public static final int STRIP_LIMIT = 3;
+    /**
+     * How long a parcel may sit held before the dock stops waiting and gives it back.
+     *
+     * <p>A parcel held this long is not slow, it is undeliverable: an address that matches no dock,
+     * a destination group with nothing loaded, a receiver that is switched off. Every one of those
+     * reports RETRY, and RETRY on its own is indistinguishable from "not yet" — so without a
+     * deadline the parcel leaves the dock, counts as in flight for ever, and is never seen again.
+     * That is the worst of the three outcomes, because there is nothing to look at and nothing to
+     * notice; a parcel handed back through the fallback face is a player being told.
+     *
+     * <p>Five minutes, because the honest cases are genuinely slow: a receiver's chunk may be
+     * unloaded for a while, and a dock that is merely full will empty. Shorter would return parcels
+     * that were about to be delivered.
+     */
+    public static final long HOLD_TIMEOUT_TICKS = 6000;
 
     private static final Map<UUID, Long> REJECTED_SINCE = new ConcurrentHashMap<>();
 
@@ -44,6 +59,7 @@ public final class ParcelEscrowPump {
         ParcelQuarantine quarantine = ParcelQuarantine.get(server);
         returns.reconcile(escrow, quarantine);
         resolveCompleted(escrow);
+        expireHeld(server, escrow);
         handleRejected(server, escrow, returns, quarantine);
         deliverReturns(server, returns, quarantine);
         submitHeld(server, escrow);
@@ -55,6 +71,35 @@ public final class ParcelEscrowPump {
      */
     public static boolean shouldResend(int strips, boolean strippedAnything, int limit) {
         return strippedAnything && strips < limit;
+    }
+
+    /**
+     * Turns parcels nobody has been able to take into rejections, so the return path picks them up.
+     *
+     * <p>Marked rather than returned here, because returning is what {@link #handleRejected} already
+     * does and does completely: it knows about the origin dock being gone, about the fallback face
+     * having no room, and about the return inbox. A second copy of that would be a second set of
+     * those decisions to keep in step.
+     *
+     * <p>Only records still held. A record that was handed to a transport is the transport's to
+     * finish or to lose, and calling it back after a timeout could return a parcel that is about to
+     * be applied at the other end — the ledger would drop the duplicate, but the player would have
+     * the goods twice.
+     */
+    private static void expireHeld(MinecraftServer server, ParcelEscrow escrow) {
+        long gameTime = server.overworld().getGameTime();
+        for (ParcelEscrow.Record record : escrow.records()) {
+            if (record.state() != ParcelEscrow.State.HELD) {
+                continue;
+            }
+            if (gameTime - record.createdAt() < HOLD_TIMEOUT_TICKS) {
+                continue;
+            }
+            LOG.warn("[DistantStock/Parcel] held too long, returning parcel={} target={} group={} age={}",
+                    record.parcelId(), record.destinationNode(), record.receivingDockGroupId(),
+                    gameTime - record.createdAt());
+            escrow.rejected(record.parcelId(), "delivery_timeout");
+        }
     }
 
     private static void submitHeld(MinecraftServer server, ParcelEscrow escrow) {

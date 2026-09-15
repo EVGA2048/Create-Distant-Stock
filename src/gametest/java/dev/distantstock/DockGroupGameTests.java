@@ -72,7 +72,7 @@ public final class DockGroupGameTests {
     @GameTest(template = "empty", timeoutTicks = 20)
     public static void aPlayersGroupStartsClosedAndCanBeOpened(GameTestHelper h) {
         DockGroupDirectory directory = DockGroupDirectory.get(h.getLevel().getServer());
-        DockGroup made = directory.createFor("a player's system", OWNER);
+        DockGroup made = directory.createFor("mine " + UUID.randomUUID().toString().substring(0, 8), OWNER);
         h.assertFalse(made.open(), "a group made by a player started open");
         h.assertTrue(made.ownedBy(OWNER), "a group made by a player was not theirs");
         h.assertFalse(made.admits(STRANGER), "a freshly made group let a stranger in");
@@ -89,12 +89,13 @@ public final class DockGroupGameTests {
     @GameTest(template = "empty", timeoutTicks = 20)
     public static void aGroupIsFoundByItsName(GameTestHelper h) {
         DockGroupDirectory directory = DockGroupDirectory.get(h.getLevel().getServer());
-        DockGroup made = directory.createFor("Found By Name", OWNER);
-        h.assertTrue(directory.findByName("found by name").isPresent(),
+        String name = "Found By Name " + UUID.randomUUID().toString().substring(0, 8);
+        DockGroup made = directory.createFor(name, OWNER);
+        h.assertTrue(directory.findByName(name.toLowerCase(java.util.Locale.ROOT)).isPresent(),
                 "looking a group up ignoring case did not find it");
-        h.assertTrue(directory.findByName("Found By Name").orElseThrow().id().equals(made.id()),
+        h.assertTrue(directory.findByName(name).orElseThrow().id().equals(made.id()),
                 "a name found the wrong group");
-        h.assertTrue(directory.findByName("  Found By Name  ").isPresent(),
+        h.assertTrue(directory.findByName("  " + name + "  ").isPresent(),
                 "a name with padding around it did not find the group");
         h.assertTrue(directory.findByName("nobody called it this").isEmpty(),
                 "an unused name found a group");
@@ -103,5 +104,21 @@ public final class DockGroupGameTests {
     }
 
     private DockGroupGameTests() {
+    }
+
+    /** Two groups may not share a name; a lookup could not tell them apart. */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void twoGroupsMayNotShareAName(GameTestHelper h) {
+        DockGroupDirectory directory = DockGroupDirectory.get(h.getLevel().getServer());
+        String name = "Twice " + UUID.randomUUID().toString().substring(0, 8);
+        directory.createFor(name, OWNER);
+        try {
+            directory.createFor(name, STRANGER);
+            h.fail("a second group was made with a name that was already taken");
+        } catch (IllegalArgumentException expected) {
+            h.assertTrue(directory.findByName(name).orElseThrow().ownedBy(OWNER),
+                    "the duplicate attempt disturbed the group that already had the name");
+        }
+        h.succeed();
     }
 }

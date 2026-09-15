@@ -175,6 +175,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
         // DockGroupDirectory.createFor for why the default is the quiet one.
         dev.distantstock.routing.DockGroup group = existing != null
                 ? existing : directory.createFor(trimmed, who);
+        // findByName above and createFor here both run on the server thread, so nothing can slip
+        // between them. The duplicate check inside createFor is what keeps that an argument rather
+        // than a hope.
         RequesterData.setReceivingGroup(stack, group.id(), group.name());
         // Push the list again: a system just made does not exist on the client until it is told,
         // and the one now carried has to stop being drawn as somebody else's.

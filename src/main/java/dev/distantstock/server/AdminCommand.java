@@ -339,9 +339,10 @@ public final class AdminCommand {
         final DockGroup created;
         try {
             created = DockGroupDirectory.get(server).create(name);
-        } catch (IllegalArgumentException invalid) {
-            // DockGroup 只拒绝空名和超长名，原因直接回给管理员比一句「创建失败」有用。
-            return failure(ctx, "组名不合法：" + invalid.getMessage());
+        } catch (IllegalArgumentException refused) {
+            // Rejected for a blank name, one that is too long, or one already taken. The message
+            // says which, because an admin staring at 创建失败 learns nothing from it.
+            return failure(ctx, "建组被拒：" + refused.getMessage());
         }
         ctx.getSource().sendSuccess(() -> Component.literal("已创建港组「" + created.name() + "」· ")
                 .append(clickableId(created.id())), false);
