@@ -145,6 +145,16 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 return carried.get();
             }
         }
+        // A requester made before names were stored carries an id and nothing else. The list the
+        // server just sent has the name for that id, so the field can show the truth rather than
+        // the default group's name, which would be a different system entirely.
+        if (groups != null && groups.carried() != null) {
+            for (var entry : groups.groups()) {
+                if (entry.id().equals(groups.carried())) {
+                    return entry.name();
+                }
+            }
+        }
         return net.minecraft.network.chat.Component
                 .translatable("gui.distantstock.group.default").getString();
     }

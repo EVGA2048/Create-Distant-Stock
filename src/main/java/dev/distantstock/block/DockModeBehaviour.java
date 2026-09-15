@@ -26,10 +26,10 @@ import java.util.List;
 final class DockModeBehaviour extends BlockEntityBehaviour implements ValueSettingsBehaviour {
     static final BehaviourType<DockModeBehaviour> TYPE = new BehaviourType<>("distant_dock_mode");
 
-    private static final List<Component> OPTIONS = List.of(
-            Component.translatable("goggle.distantstock.mode.export"),
-            Component.translatable("goggle.distantstock.mode.import"),
-            Component.translatable("goggle.distantstock.mode.bidirectional"));
+    // Derived from the enum, not written out beside it. See DockMode.translationKey.
+    private static final List<Component> OPTIONS = java.util.Arrays.stream(DockMode.values())
+            .map(mode -> (Component) Component.translatable(mode.translationKey()))
+            .toList();
 
     private final ValueBoxTransform slot = new DockValueBox(true);
 
@@ -83,6 +83,7 @@ final class DockModeBehaviour extends BlockEntityBehaviour implements ValueSetti
 
     @Override
     public ValueSettings getValueSettings() {
+        // The enum's own order is the panel's order, which is what makes the derived list safe.
         return new ValueSettings(clamp(dock().mode().ordinal()), 0);
     }
 

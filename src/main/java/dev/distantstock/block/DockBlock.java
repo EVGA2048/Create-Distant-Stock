@@ -154,8 +154,15 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                     // "this dock belongs here", plain to say "this dock sends there".
                     java.util.UUID carried = RequesterData.receivingGroup(stack)
                             .orElse(DockGroupDirectory.DEFAULT_GROUP_ID);
+                    // The real name, looked up, not the default's. An older requester carries an id
+                    // with no name on it, and falling back to the default group's name would write
+                    // that wrong name back onto the item — a label that is worse than none, because
+                    // it looks like an answer.
                     String carriedName = RequesterData.receivingGroupName(stack)
-                            .orElse(DockGroupDirectory.DEFAULT_GROUP_NAME);
+                            .orElseGet(() -> level.getServer() == null ? DockGroupDirectory.DEFAULT_GROUP_NAME
+                                    : DockGroupDirectory.get(level.getServer()).find(carried)
+                                            .map(dev.distantstock.routing.DockGroup::name)
+                                            .orElse(DockGroupDirectory.DEFAULT_GROUP_NAME));
                     // The node is this one unless a network is bound, which is what makes an
                     // in-save pair of systems work with no Transerver anywhere: the destination is
                     // (my node, that group), and the node delivers it to itself.
@@ -192,11 +199,10 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
         if (isWrench(stack)) {
             if (!level.isClientSide && !player.isShiftKeyDown()) {
                 be.clearFault();
-                // The wrench cycles the mode. Without this there is no gesture for BIDIRECTIONAL at
-                // all: a fresh dock receives, the requester's plain click forces sending, and a dock
-                // asked to do both cannot be built — even though the two buffers being separate is
-                // what the routing design rests on.
-                be.setMode(be.mode().next());
+                // Reports only. The mode itself is set in the value settings panel, which holding
+                // the wrench opens — adding a click gesture here as well would be a second writer
+                // for one piece of state, and the two would disagree: the panel marks the current
+                // row, and a click would move it without the panel knowing.
                 player.displayClientMessage(be.modeMessage(), true);
             }
             // Never consume the wrench: Create removes blocks with sneak-right-click and opens the value

@@ -102,27 +102,6 @@ public final class DockGroupGameTests {
         h.succeed();
     }
 
-    /**
-     * The wrench's cycle has to reach every mode and come back.
-     *
-     * <p>BIDIRECTIONAL was unreachable before this existed — a fresh dock receives, the requester's
-     * click forces sending, and nothing offered the third — so a test that only checked one step
-     * would not have caught it.
-     */
-    @GameTest(template = "empty", timeoutTicks = 20)
-    public static void theModeCycleReachesEveryMode(GameTestHelper h) {
-        DockMode mode = DockMode.RECEIVE;
-        java.util.EnumSet<DockMode> seen = java.util.EnumSet.noneOf(DockMode.class);
-        for (int i = 0; i < DockMode.values().length; i++) {
-            seen.add(mode);
-            mode = mode.next();
-        }
-        h.assertTrue(seen.size() == DockMode.values().length,
-                "cycling the dock mode did not reach every mode: " + seen);
-        h.assertTrue(mode == DockMode.RECEIVE, "the mode cycle did not come back to where it started");
-        h.succeed();
-    }
-
     private DockGroupGameTests() {
     }
 }

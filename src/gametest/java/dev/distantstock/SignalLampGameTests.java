@@ -73,7 +73,7 @@ public final class SignalLampGameTests {
         var requester = new ItemStack(ModItems.REQUESTER.get());
         RequesterData.setFreq(requester, UUID.randomUUID());
         RequesterData.setAddress(requester, "收货点");
-        RequesterData.setReceivingGroup(requester, UUID.randomUUID());
+        RequesterData.setReceivingGroup(requester, UUID.randomUUID(), "甲站");
         player.setItemInHand(InteractionHand.OFF_HAND, requester);
         player.setShiftKeyDown(true);
         requester.getItem().use(level, player, InteractionHand.OFF_HAND);

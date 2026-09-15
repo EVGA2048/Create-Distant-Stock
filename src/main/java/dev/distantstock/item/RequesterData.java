@@ -86,10 +86,6 @@ public final class RequesterData {
         return name.isBlank() ? Optional.empty() : Optional.of(name);
     }
 
-    public static void setReceivingGroup(ItemStack stack, UUID groupId) {
-        setReceivingGroup(stack, groupId, null);
-    }
-
     public static void setReceivingGroup(ItemStack stack, UUID groupId, String name) {
         update(stack, tag -> {
             if (groupId == null) {
