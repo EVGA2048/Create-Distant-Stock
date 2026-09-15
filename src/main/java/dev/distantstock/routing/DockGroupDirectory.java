@@ -26,15 +26,33 @@ public final class DockGroupDirectory extends SavedData {
     private final Map<UUID, DockGroup> groups = new LinkedHashMap<>();
 
     public DockGroupDirectory() {
-        groups.put(DEFAULT_GROUP_ID, new DockGroup(DEFAULT_GROUP_ID, DEFAULT_GROUP_NAME));
+        // The default group belongs to nobody, because it is the one every dock starts in. It has
+        // to stay open or an existing save would lock itself out the moment this shipped.
+        groups.put(DEFAULT_GROUP_ID, new DockGroup(DEFAULT_GROUP_ID, DEFAULT_GROUP_NAME, null, true));
     }
 
     public static DockGroupDirectory get(MinecraftServer server) {
         return server.overworld().getDataStorage().computeIfAbsent(FACTORY, DATA_NAME);
     }
 
+    /** A group made by the server, open to everyone. What the admin command makes. */
     public DockGroup create(String name) {
-        DockGroup group = new DockGroup(UUID.randomUUID(), name);
+        return create(name, null, true);
+    }
+
+    /**
+     * A group made by a player, closed by default.
+     *
+     * <p>Closed rather than open because of what a group is for: it decides whose dock the parcels
+     * come out of. Anyone who wants their dock shared can say so afterwards; the other default
+     * would hand a stranger's parcels to a player who did not know they were building a warehouse.
+     */
+    public DockGroup createFor(String name, UUID owner) {
+        return create(name, owner, false);
+    }
+
+    public DockGroup create(String name, UUID owner, boolean open) {
+        DockGroup group = new DockGroup(UUID.randomUUID(), name, owner, open);
         groups.put(group.id(), group);
         setDirty();
         return group;
@@ -86,6 +104,18 @@ public final class DockGroupDirectory extends SavedData {
         return List.copyOf(result);
     }
 
+    /** Records a group's openness. Guarded by the caller; this only writes. */
+    public DockGroup setOpen(UUID id, boolean open) {
+        DockGroup current = groups.get(id);
+        if (current == null) {
+            throw new IllegalArgumentException("Unknown dock group: " + id);
+        }
+        DockGroup next = current.withOpen(open);
+        groups.put(id, next);
+        setDirty();
+        return next;
+    }
+
     @Override
     public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
         ListTag entries = new ListTag();
@@ -93,6 +123,12 @@ public final class DockGroupDirectory extends SavedData {
             CompoundTag entry = new CompoundTag();
             entry.putUUID("Id", group.id());
             entry.putString("Name", group.name());
+            // Written only when there is something to write, so a file made before groups had
+            // owners loads back as the same open, ownerless groups it was saved as.
+            if (group.owner() != null) {
+                entry.putUUID("Owner", group.owner());
+            }
+            entry.putBoolean("Open", group.open());
             entries.add(entry);
         }
         tag.put("Groups", entries);
@@ -108,7 +144,12 @@ public final class DockGroupDirectory extends SavedData {
                 continue;
             }
             try {
-                DockGroup group = new DockGroup(entry.getUUID("Id"), entry.getString("Name"));
+                UUID owner = entry.hasUUID("Owner") ? entry.getUUID("Owner") : null;
+                // A missing flag means the file predates ownership, and every group in it was
+                // open. Defaulting the other way would lock players out of their own docks on the
+                // first load after an update.
+                boolean open = !entry.contains("Open") || entry.getBoolean("Open");
+                DockGroup group = new DockGroup(entry.getUUID("Id"), entry.getString("Name"), owner, open);
                 directory.groups.put(group.id(), group);
             } catch (IllegalArgumentException ignored) {
             }

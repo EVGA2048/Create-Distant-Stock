@@ -700,7 +700,17 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                 // Legacy peers without Transerver resolve the other side by address themselves, but
                 // only when the parcel actually carries one. Handing a parcel with neither route nor
                 // address to the queue would drop it, so it has to stay here and report instead.
-                if (dev.distantstock.link.TranserverBridge.attachedApi() == null && !destinationAddress.isBlank()) {
+                //
+                // The legacy link has to actually be running, and that is not the same question as
+                // whether a parcel has an address. A packager's parcel always has one, so on the
+                // default transport mode — Transerver, no HTTP link — this branch used to take a
+                // parcel that had nowhere to go, remove it from the dock and post it into a queue
+                // nothing drains. The parcel was gone and the dock was empty, which reads exactly
+                // like being sent into the void, because that is what it was.
+                if (dev.distantstock.link.TranserverBridge.attachedApi() == null
+                        && dev.distantstock.config.StockConfig.useLegacy()
+                        && dev.distantstock.config.StockConfig.hasPeer()
+                        && !destinationAddress.isBlank()) {
                     // Pay before the queue takes the parcel: once it is in there, there is no way to
                     // take it back, and a parcel that leaves without paying is the one outcome the
                     // billing rules do not allow. Nothing between the two calls can fail but the
