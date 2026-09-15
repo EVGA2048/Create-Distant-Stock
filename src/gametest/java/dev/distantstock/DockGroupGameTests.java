@@ -3,6 +3,7 @@ package dev.distantstock;
 import dev.distantstock.routing.DockGroup;
 import dev.distantstock.routing.DockMode;
 import dev.distantstock.routing.DockGroupDirectory;
+import dev.distantstock.routing.RemoteGaugeOrders;
 import dev.distantstock.block.GaugeBlockEntity;
 import dev.distantstock.block.ModBlocks;
 import dev.distantstock.menu.RequesterMenu;
@@ -178,6 +179,33 @@ public final class DockGroupGameTests {
                 .writeDockGroup(player, name, SetDockGroupC2S.SELECT);
         h.assertTrue(second.receivingGroup().equals(desk.receivingGroup()),
                 "the same name made two groups");
+        h.succeed();
+    }
+
+    /**
+     * The remote gauge's order arithmetic, which is the whole of when a board spends.
+     *
+     * <p>Four answers have to hold, and each of them is a way the feature fails loudly in play: a
+     * satisfied panel that ordered anyway would spend on every beat forever; a short one that
+     * ordered nothing would be a display; one that ignored the cap would pull a warehouse's whole
+     * stock in a single parcel; and one that ordered again while an order was outstanding would
+     * file the same order every second until the goods arrived.
+     */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void aRemoteGaugeOrdersTheGapAndNothingElse(GameTestHelper h) {
+        int stack = 64;
+        h.assertTrue(RemoteGaugeOrders.target(3, true, stack) == 3,
+                "a target set in items was read as stacks");
+        h.assertTrue(RemoteGaugeOrders.target(3, false, stack) == 192,
+                "a target set in stacks ignored the stack size");
+
+        h.assertTrue(RemoteGaugeOrders.plan(192, 192, 0, 64) == 0, "a full panel ordered anyway");
+        h.assertTrue(RemoteGaugeOrders.plan(192, 200, 0, 64) == 0, "a panel above its target ordered");
+        h.assertTrue(RemoteGaugeOrders.plan(192, 100, 0, 64) == 64, "the gap was not capped");
+        h.assertTrue(RemoteGaugeOrders.plan(192, 172, 0, 64) == 20, "the gap below the cap was not used");
+        h.assertTrue(RemoteGaugeOrders.plan(192, 0, 64, 64) == 0,
+                "a panel with an order outstanding filed a second one");
+        h.assertTrue(RemoteGaugeOrders.plan(10, 0, 0, 0) == 0, "a cap of nothing still ordered");
         h.succeed();
     }
 }

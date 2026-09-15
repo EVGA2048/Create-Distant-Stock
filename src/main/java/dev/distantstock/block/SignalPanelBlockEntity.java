@@ -42,6 +42,8 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
     private int lampSignal;
     private boolean panelDataReady;
     private final EnumSet<FactoryPanelBlock.PanelSlot> remoteGauges = EnumSet.noneOf(FactoryPanelBlock.PanelSlot.class);
+    /** The remote gauge panels on this board, and the orders they file. See {@link RemoteOrderBook}. */
+    private final RemoteOrderBook orders = new RemoteOrderBook(this);
 
     public SignalPanelBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.SIGNAL_PANEL.get(), pos, state);
@@ -68,6 +70,9 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
         }
         if (!level.isClientSide) {
             sampleLampNetworks();
+            // The remote gauge panels on this board order from the same beat the lamps are sampled
+            // on; the pace that matters is decided inside the order book.
+            orders.tickOrders();
         }
         int next = level.getBestNeighborSignal(worldPosition);
         if (next == lampSignal) {
@@ -299,8 +304,36 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
     public void setRemoteGauge(FactoryPanelBlock.PanelSlot slot, boolean remote) {
         if (remote) remoteGauges.add(slot);
         else remoteGauges.remove(slot);
+        if (!remote) {
+            // The slot is a lamp or a plain gauge now, so whatever it was pointed at goes with it.
+            orders.forget(slot);
+        }
         redraw = true;
         sendData();
+    }
+
+    /** This panel's warehouse, or null when it is only a gauge. */
+    public RemoteOrderBook.Binding binding(FactoryPanelBlock.PanelSlot slot) {
+        return orders.binding(slot);
+    }
+
+    public boolean bind(FactoryPanelBlock.PanelSlot slot, dev.distantstock.routing.RemoteNetworkId network,
+                        java.util.UUID receivingGroup, String address) {
+        orders.bind(slot, network, receivingGroup, address);
+        return true;
+    }
+
+    public void unbind(FactoryPanelBlock.PanelSlot slot) {
+        orders.unbind(slot);
+    }
+
+    public int outstanding(FactoryPanelBlock.PanelSlot slot) {
+        return orders.outstanding(slot);
+    }
+
+    /** The ordering beat, run from the block's ticker alongside the lamp sampling. */
+    public void tickOrders() {
+        orders.tickOrders();
     }
 
     public ItemStack panelItem(FactoryPanelBlock.PanelSlot slot) {
@@ -328,6 +361,7 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
 
     @Override
     public boolean addToGoggleTooltip(List<Component> tip, boolean sneaking) {
+        orders.goggleLines().forEach(tip::add);
         boolean found = false;
         for (FactoryPanelBlock.PanelSlot slot : FactoryPanelBlock.PanelSlot.values()) {
             ItemStack lamp = lampStack(slot);
@@ -517,11 +551,13 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
             watches.put(entry.getKey().name(), row);
         }
         tag.put("LampWatches", watches);
+        orders.write(tag);
     }
 
     @Override
     protected void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.read(tag, registries, clientPacket);
+        orders.read(tag, registries, clientPacket);
         lampSignal = tag.getInt("LampSignal");
         remoteGauges.clear();
         CompoundTag kinds = tag.getCompound("RemoteGaugeSlots");

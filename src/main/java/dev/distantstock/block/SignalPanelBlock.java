@@ -74,6 +74,29 @@ public final class SignalPanelBlock extends FactoryPanelBlock implements IWrench
     protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
                                               Player player, InteractionHand hand, BlockHitResult hit) {
         FactoryPanelBlock.PanelSlot slot = FactoryPanelBlock.getTargetedSlot(pos, state, hit.getLocation());
+        if (level.getBlockEntity(pos) instanceof SignalPanelBlockEntity be
+                && be.isRemoteGauge(slot)
+                && stack.getItem() instanceof RequesterItem
+                && RequesterData.network(stack).isPresent()) {
+            // A remote gauge panel on this board orders from another server, so it is pointed at a
+            // warehouse the same way the dedicated board's panels are: hold a tuned requester and
+            // click the panel. Sneak clears it.
+            if (!level.isClientSide) {
+                if (player.isShiftKeyDown()) {
+                    be.unbind(slot);
+                    player.displayClientMessage(
+                            Component.translatable("gui.distantstock.remote_gauge.unbound"), true);
+                } else {
+                    var network = RequesterData.network(stack).get();
+                    be.bind(slot, network, RequesterData.receivingGroup(stack).orElse(null),
+                            RequesterData.address(stack));
+                    player.displayClientMessage(
+                            Component.translatable("gui.distantstock.remote_gauge.bound",
+                                    network.shortLabel()), true);
+                }
+            }
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        }
         if (level.getBlockEntity(pos) instanceof SignalPanelBlockEntity be && be.isLamp(slot)) {
             UUID network = lampBinding(stack);
             if (network != null) {

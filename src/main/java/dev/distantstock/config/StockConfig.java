@@ -29,6 +29,7 @@ public final class StockConfig {
     public static final ModConfigSpec.BooleanValue TOWER_CHARGE_PARCELS;
     public static final ModConfigSpec.IntValue TOWER_PARCEL_COST;
     public static final ModConfigSpec.IntValue TOWER_MAX_SELECTED_CHUNKS;
+    public static final ModConfigSpec.IntValue REMOTE_GAUGE_ORDER_STACKS;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -72,6 +73,12 @@ public final class StockConfig {
                         "each tower already keeps around its own base. A selection that does not fit is",
                         "refused whole and the previous one stays. 0 turns the selector off.")
                 .defineInRange("tower.maxSelectedChunks", 512, 0, 100000);
+        REMOTE_GAUGE_ORDER_STACKS = b.comment(
+                        "How many stacks one remote gauge panel may ask for in a single order.",
+                        "A bound panel orders the shortfall up to this much each time it is short,",
+                        "so a panel pointed at a target of thousands refills in instalments instead",
+                        "of pulling the far warehouse's whole stock in one parcel.")
+                .defineInRange("remoteGauge.orderStacks", 1, 1, 27);
         SPEC = b.build();
     }
 
@@ -121,6 +128,15 @@ public final class StockConfig {
             return TOWER_MAX_SELECTED_CHUNKS.get();
         } catch (IllegalStateException notLoaded) {
             return 512;
+        }
+    }
+
+    /** Stacks one remote gauge order may carry. See {@link #towerChargeParcels()} for the pattern. */
+    public static int remoteGaugeOrderStacks() {
+        try {
+            return REMOTE_GAUGE_ORDER_STACKS.get();
+        } catch (IllegalStateException notLoaded) {
+            return 1;
         }
     }
 

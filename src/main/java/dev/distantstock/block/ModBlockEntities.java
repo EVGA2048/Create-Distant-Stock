@@ -20,14 +20,19 @@ public final class ModBlockEntities {
     }
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<GaugeBlockEntity>> GAUGE =
             BES.register("gauge", () -> BlockEntityType.Builder.of(GaugeBlockEntity::new, ModBlocks.GAUGE.get()).build(null));
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockEntity>> REMOTE_GAUGE =
-            BES.register("remote_gauge", () -> BlockEntityType.Builder.of(ModBlockEntities::remoteGaugeEntity,
+    /**
+     * The remote gauge board is ours rather than Create's panel entity: each of its panels can be
+     * bound to a warehouse on another server and will order from it, which needs state Create has no
+     * place to keep.
+     *
+     * <p>The registry id is unchanged, so a board placed before this was a
+     * {@code FactoryPanelBlockEntity} loads into this class and keeps every panel, filter and
+     * setting it had: the id is what a saved block entity is looked up by, and the panels' data is
+     * read by the superclass either way.
+     */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RemoteGaugeBlockEntity>> REMOTE_GAUGE =
+            BES.register("remote_gauge", () -> BlockEntityType.Builder.of(RemoteGaugeBlockEntity::new,
                     ModBlocks.REMOTE_GAUGE.get()).build(null));
-
-    private static com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockEntity remoteGaugeEntity(
-            net.minecraft.core.BlockPos pos, net.minecraft.world.level.block.state.BlockState state) {
-        return new com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockEntity(REMOTE_GAUGE.get(), pos, state);
-    }
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MonitorBlockEntity>> MONITOR =
             BES.register("monitor", () -> BlockEntityType.Builder.of(MonitorBlockEntity::new, ModBlocks.MONITOR.get()).build(null));
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RemotePackagerBlockEntity>> REMOTE_PACKAGER =
