@@ -100,7 +100,13 @@ public final class ParcelEscrowPump {
             if (record.state() != ParcelEscrow.State.HELD) {
                 continue;
             }
-            if (gameTime - record.createdAt() < HOLD_TIMEOUT_TICKS) {
+            if (record.createdAt() > gameTime) {
+                // Stamped by a version that wrote a wall clock here, so there is no age to compare.
+                // Left alone rather than re-stamped: the record is either already delivered or about
+                // to be, and starting its clock again would only delay the one outcome it can have.
+                continue;
+            }
+            if (!pastDeadline(gameTime, record.createdAt())) {
                 continue;
             }
             LOG.warn("[DistantStock/Parcel] held too long, returning parcel={} target={} group={} age={}",
@@ -108,6 +114,19 @@ public final class ParcelEscrowPump {
                     gameTime - record.createdAt());
             escrow.rejected(record.parcelId(), "delivery_timeout");
         }
+    }
+
+    /**
+     * Whether a parcel held at {@code createdAt} has been waiting longer than the window.
+     *
+     * <p>A named function rather than an inline subtraction because it is the one part of the
+     * deadline that can be checked without waiting: the rest needs a level, a running clock and half
+     * an hour. It is also where a wrong clock would show up — comparing a level's game time against
+     * a wall clock makes this false for every parcel, which is a bug that looks exactly like an
+     * empty deadline.
+     */
+    public static boolean pastDeadline(long gameTime, long createdAt) {
+        return gameTime - createdAt >= HOLD_TIMEOUT_TICKS;
     }
 
     private static void submitHeld(MinecraftServer server, ParcelEscrow escrow) {

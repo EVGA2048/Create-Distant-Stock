@@ -65,7 +65,7 @@ public final class ParcelEscrowGameTests {
             UUID parcelId = escrow.hold(new ItemStack(ModItems.REMOTE_PACKAGE.get()), "",
                     TranserverBridge.localNodeId(), targetGroup.id(),
                     level.dimension().location().toString(), h.absolutePos(new BlockPos(OTHER_X, Y, Z)),
-                    level.registryAccess());
+                    level.getGameTime(), level.registryAccess());
             ParcelEscrowPump.tick(server);
 
             h.assertTrue(target.displayedStack().is(ModItems.REMOTE_PACKAGE.get()),
@@ -95,7 +95,7 @@ public final class ParcelEscrowGameTests {
             UUID parcelId = escrow.hold(new ItemStack(ModItems.REMOTE_PACKAGE.get()), "",
                     TranserverBridge.localNodeId(), emptyGroup.id(),
                     level.dimension().location().toString(), h.absolutePos(new BlockPos(OTHER_X, Y, Z)),
-                    level.registryAccess());
+                    level.getGameTime(), level.registryAccess());
             ParcelEscrowPump.tick(server);
 
             ParcelEscrow.Record record = escrow.find(parcelId).orElse(null);
@@ -155,38 +155,54 @@ public final class ParcelEscrowGameTests {
     }
 
     /**
-     * A parcel nobody can take comes back instead of waiting for ever.
+     * A held parcel is stamped on the level's clock, not on a wall clock.
      *
-     * <p>An address that matches no dock, a group with nothing loaded, a receiver switched off — all
-     * of them report RETRY, and RETRY on its own looks exactly like "not yet". Without a deadline
-     * the parcel leaves the dock, counts as in flight indefinitely, and is never seen again.
+     * <p>This replaces a test that accepted either outcome and so could not fail. The escrow used to
+     * stamp parcels with {@code System.currentTimeMillis()} while the deadline compared that stamp
+     * against game time — eleven orders of magnitude apart, so every parcel looked brand new and
+     * none was ever given back. Asserting the stamp is on the same clock as the deadline is the
+     * part of that which can be checked in a second.
      */
-    @GameTest(template = "empty", timeoutTicks = 400)
-    public static void aParcelNobodyCanTakeIsReturned(GameTestHelper h) {
-        var server = h.getLevel().getServer();
-        var escrow = dev.distantstock.link.ParcelEscrow.get(server);
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void aHeldParcelIsStampedOnTheLevelClock(GameTestHelper h) {
+        var escrow = dev.distantstock.link.ParcelEscrow.get(h.getLevel().getServer());
+        var level = h.getLevel();
+        long before = level.getGameTime();
         ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
-        // A group no dock is in, so every delivery attempt reports RETRY for ever.
-        java.util.UUID nowhere = java.util.UUID.randomUUID();
-        BlockPos origin = h.absolutePos(new BlockPos(3, 1, 3));
-        h.setBlock(3, 1, 3, ModBlocks.DOCK.get().defaultBlockState());
+        java.util.UUID id = escrow.hold(parcel, "", dev.distantstock.link.TranserverBridge.localNodeId(),
+                java.util.UUID.randomUUID(), level.dimension().location().toString(),
+                h.absolutePos(new BlockPos(1, 1, 1)), before, level.registryAccess());
 
-        h.runAfterDelay(2, () -> {
-            var dock = (dev.distantstock.block.DockBlockEntity) h.getLevel().getBlockEntity(origin);
-            h.assertTrue(dock != null, "the origin dock was not there to hold the parcel");
-            java.util.UUID id = escrow.hold(parcel, "", dev.distantstock.link.TranserverBridge.localNodeId(),
-                    nowhere, h.getLevel().dimension().location().toString(), origin,
-                    h.getLevel().registryAccess());
-            h.runAfterDelay(5, () -> {
-                var record = escrow.find(id).orElse(null);
-                h.assertTrue(record != null, "the held parcel vanished from the escrow");
-                // Age it past the deadline rather than waiting five real minutes.
-                h.assertTrue(record.state() == dev.distantstock.link.ParcelEscrow.State.HELD
-                                || record.state() == dev.distantstock.link.ParcelEscrow.State.REJECTED,
-                        "a parcel nobody can take was reported as delivered: " + record.state());
-                h.succeed();
-            });
-        });
+        var record = escrow.find(id).orElse(null);
+        h.assertTrue(record != null, "a held parcel was not recorded at all");
+        long stamp = record.createdAt();
+        h.assertTrue(stamp >= before, "a parcel was stamped before it was held: " + stamp);
+        h.assertTrue(stamp <= level.getGameTime() + 1,
+                "a parcel was stamped in the future, so the deadline can never reach it: " + stamp);
+        // A wall clock is around 1.7e12; game time is nowhere near it. This is the shape of the bug.
+        h.assertTrue(stamp < 1_000_000_000L,
+                "a parcel was stamped with something that is not a game time: " + stamp);
+        h.succeed();
+    }
+
+    /**
+     * The deadline's two sides, without waiting half an hour for one of them.
+     *
+     * <p>The test above proves the stamp is on the right clock; this proves the comparison on that
+     * clock is the one we mean. Between them nothing is left that could be wrong and still pass.
+     */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void theHoldDeadlineFiresOnlyAfterItsWindow(GameTestHelper h) {
+        long window = dev.distantstock.link.ParcelEscrowPump.HOLD_TIMEOUT_TICKS;
+        h.assertFalse(dev.distantstock.link.ParcelEscrowPump.pastDeadline(1000L, 1000L),
+                "a parcel that was just held was already past the deadline");
+        h.assertFalse(dev.distantstock.link.ParcelEscrowPump.pastDeadline(1000L, 1000L - window + 1),
+                "a parcel still inside its window was past the deadline");
+        h.assertTrue(dev.distantstock.link.ParcelEscrowPump.pastDeadline(1000L, 1000L - window),
+                "a parcel exactly at the deadline was not past it");
+        h.assertTrue(dev.distantstock.link.ParcelEscrowPump.pastDeadline(1000L, 1000L - window - 1),
+                "a parcel past its window was not past the deadline");
+        h.succeed();
     }
 
 }

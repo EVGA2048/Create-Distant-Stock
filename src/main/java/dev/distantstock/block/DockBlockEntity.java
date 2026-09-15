@@ -768,7 +768,8 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                     ParcelEscrow.get(level.getServer()).hold(
                             stack, destinationAddress, route.get().destinationNodeId().toString(),
                             route.get().receivingDockGroupId(),
-                            level.dimension().location().toString(), worldPosition, level.registryAccess());
+                            level.dimension().location().toString(), worldPosition,
+                            level.getGameTime(), level.registryAccess());
                     outboundInv.extractItem(slot, 1, false);
                     noteTraffic(level);
                     // Route consumed: the escrow now owns the parcel and its destination.

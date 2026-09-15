@@ -44,23 +44,33 @@ public final class ParcelEscrow extends SavedData {
     }
 
     public UUID hold(ItemStack parcel, String address, String destinationNode, UUID groupId,
-                     String originDimension, BlockPos originPos, HolderLookup.Provider registries) {
+                     String originDimension, BlockPos originPos, long gameTime,
+                     HolderLookup.Provider registries) {
         String encoded = PackageCodec.encode(parcel, registries);
         if (encoded.isBlank()) {
             throw new IllegalArgumentException("Parcel cannot be encoded for escrow");
         }
-        return holdEncoded(encoded, address, destinationNode, groupId, originDimension, originPos);
+        return holdEncoded(encoded, address, destinationNode, groupId, originDimension, originPos,
+                gameTime);
     }
 
-    /** Stores an already encoded parcel, so custody rules can be exercised without a running server. */
+    /**
+     * Stores an already encoded parcel, so custody rules can be exercised without a running server.
+     *
+     * @param gameTime the level's own clock, and it has to be that clock rather than
+     *                 {@code System.currentTimeMillis()}: the only thing that reads it is the
+     *                 escrow's hold deadline, which compares it against the level's game time.
+     *                 Stamping a wall clock here made every parcel look younger than the deadline
+     *                 for ever — the timeout ran, found nothing due, and returned, silently.
+     */
     public UUID holdEncoded(String encodedPackage, String address, String destinationNode, UUID groupId,
-                            String originDimension, BlockPos originPos) {
+                            String originDimension, BlockPos originPos, long gameTime) {
         if (encodedPackage == null || encodedPackage.isBlank()) {
             throw new IllegalArgumentException("Parcel cannot be encoded for escrow");
         }
         UUID parcelId = UUID.randomUUID();
         records.put(parcelId, new Record(parcelId, encodedPackage, address, destinationNode, groupId,
-                originDimension, originPos.asLong(), System.currentTimeMillis(), State.HELD, null, "",
+                originDimension, originPos.asLong(), gameTime, State.HELD, null, "",
                 List.of(), 0));
         setDirty();
         return parcelId;
