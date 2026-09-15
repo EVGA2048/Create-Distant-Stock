@@ -101,27 +101,6 @@ public final class TowerSelection {
     }
 
     /**
-     * A radius the tower's tier pays for, with the other two fields left alone.
-     *
-     * <p>The screen edits one dial at a time, so the whole record is rebuilt here rather than the
-     * radius being written on its own: a radius change must not reset the two switches, and turning
-     * a switch must not reset the radius.
-     */
-    public static Result setRadius(Level level, BlockPos monitor, TowerSystem.TowerId tower, int radius) {
-        TowerDirectory.Settings current = TowerDirectory.get(level.getServer()).settings(tower);
-        return apply(level, monitor, tower,
-                new TowerDirectory.Settings(radius, current.loading(), current.carrying()));
-    }
-
-    /** Turns one of a tower's two switches, leaving its radius and the other switch as they are. */
-    public static Result setSwitches(Level level, BlockPos monitor, TowerSystem.TowerId tower,
-                                     boolean loading, boolean carrying) {
-        TowerDirectory.Settings current = TowerDirectory.get(level.getServer()).settings(tower);
-        return apply(level, monitor, tower,
-                new TowerDirectory.Settings(current.radius(), loading, carrying));
-    }
-
-    /**
      * The tier a member reported, or null for one the world no longer holds.
      *
      * <p>A member with no tier has a ceiling of nothing, so only a radius of zero is accepted for

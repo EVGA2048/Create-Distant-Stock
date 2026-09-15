@@ -288,5 +288,6 @@
   "gui.distantstock.manual.p6": "塔是远仓设备工作的前提。有塔在转的维度里，没被任何塔罩住的远仓设备会停，护目镜上会红字写明。建法：用远仓机壳在中央的互通塔底座周围围出 3×3 裙板，底座正下方接一根竖直传动轴——底面是它唯一接受旋转的接面。往上堆至少五段耦合器，顶上盖一台以太谐振器。高度就是等级：五段是 I 级，十七段是 VII 级，每升一级都能带载更多设备、够到更远、常驻加载更大的区块范围。塔从下方那根轴吃应力，等级越高吃得越多。塔顶的光柱就是它的状态：没在转是暗灰，在转是青色，有包裹经过时变成更深的蓝色并自己发亮。",
   "gui.distantstock.manual.h7": "A dock group is one system: it decides which docks a parcel comes out of. On the requester, open the Receiving Group field to see the systems you may use, or type a name nobody has taken to make a new one. Sneak-click a dock to make it belong to the carried system; plain click to make it send there. A system you make is yours and starts closed — only you can add docks to it or send into it. The lock at the right of your own system in the list opens it to everyone, and closes it again. A monitor on a tower shows every tower in its system and lets you set each one on its own: how far it keeps chunks loaded, and whether it loads chunks and carries devices at all.",
   "gui.distantstock.manual.p7": "一个港组就是一套系统：它决定包裹从哪些港出来。在请求器上点开「收货港组」那一栏，会列出你可以用的系统；打一个没人用过的名字就会新建一个。潜行右键一个港，它属于当前选中的系统；直接右键，它就发往那个系统。你自己建的系统归你，而且默认关闭——只有你能往里加港、也只有你能往里发货。列表里你自己那个系统右边有个锁，点它开放给别人，再点一次收回。塔上的远仓监视器会列出所属系统里的每一座塔，并且允许你逐座单独设置：常驻加载多远、要不要加载区块、要不要带载设备。",
-  "gui.distantstock.group.rename": "改名"
+  "gui.distantstock.group.rename": "改名",
+  "goggle.distantstock.group": "系统：%s"
 }

@@ -477,6 +477,25 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         return canSend() && !occupied() && pkg.getCount() == 1 && insertInto(outboundInv, pkg);
     }
 
+    /**
+     * A dock group's name, or a short form rather than nothing when the file cannot be read.
+     *
+     * <p>Read from the directory every time the goggles are drawn. That is a map lookup on a file
+     * that is already in memory, and the name it returns is the one the player recognises.
+     */
+    private String groupName(java.util.UUID group) {
+        if (group == null) {
+            return "—";
+        }
+        if (level == null || level.getServer() == null) {
+            return RequesterData.shortFreq(group);
+        }
+        return dev.distantstock.routing.DockGroupDirectory.get(level.getServer())
+                .find(group)
+                .map(dev.distantstock.routing.DockGroup::name)
+                .orElse(RequesterData.shortFreq(group));
+    }
+
     /** Hands an item or parcel to the fallback face. False when the buffer is already full. */
     public boolean offerFallback(ItemStack stack) {
         if (stack.isEmpty()) {
@@ -816,6 +835,9 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             case BIDIRECTIONAL -> "goggle.distantstock.mode.bidirectional";
         });
         GoggleText.line(tip, "goggle.distantstock.status." + status().getSerializedName());
+        // Which system this dock belongs to, by name. Two systems on one server are two names in a
+        // list, and without this line the only way to tell which one a dock is in is to remember.
+        GoggleText.line(tip, "goggle.distantstock.group", groupName(groupId));
         if (canSend() && freq != null) {
             GoggleText.line(tip, "goggle.distantstock.freq", RequesterData.shortFreq(freq));
             GoggleText.line(tip, "goggle.distantstock.backlog", backlogOrders, inFlight);
@@ -833,9 +855,11 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             if (defaultDestinationNode == null) {
                 GoggleText.line(tip, "goggle.distantstock.target.none");
             } else {
+                // The system by name, not by a uuid prefix: a player typed a name to choose it and
+                // has no way to map a prefix back to one.
                 GoggleText.line(tip, "goggle.distantstock.target",
                         RequesterData.shortFreq(defaultDestinationNode),
-                        RequesterData.shortFreq(defaultReceivingGroupId));
+                        groupName(defaultReceivingGroupId));
             }
             GoggleText.line(tip, "goggle.distantstock.outbound", outboundSlots(), SLOTS);
         }

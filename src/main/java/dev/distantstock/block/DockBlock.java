@@ -159,6 +159,17 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                     // The node is this one unless a network is bound, which is what makes an
                     // in-save pair of systems work with no Transerver anywhere: the destination is
                     // (my node, that group), and the node delivers it to itself.
+                    //
+                    // This used to be written twice — once here and once inside a network check
+                    // below that always paired the network's node with the *default* group. A
+                    // player who picked a system and then bound a network got the system silently
+                    // replaced, which is the sort of thing that reads as "groups do not work".
+                    //
+                    // 旧写法还有一处更早的错：.filter(network -> !network.nodeId().equals(nodeId()))
+                    // 想「不要把包裹发给本机」。TranserverBridge.nodeId() 在装了 Transerver 却没接上
+                    // API 时返回 null（单机存档就是这种情况），而 equals(null) 恒为 false，过滤器等于
+                    // 失效；而且就算它返回真实节点 id，「发到本机」本身也不非法——同一个存档里的两个
+                    // 港组就是两套系统，服内互传靠的就是它。
                     java.util.UUID node = RequesterData.network(stack)
                             .map(dev.distantstock.routing.RemoteNetworkId::nodeId)
                             .orElseGet(() -> java.util.UUID.fromString(TranserverBridge.localNodeId()));
@@ -172,25 +183,6 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                     }
                     be.setDefaultDestination(node, carried);
                     RequesterData.setReceivingGroup(stack, carried, carriedName);
-                    RequesterData.network(stack).ifPresent(network -> {
-                        // 旧写法是 .filter(network -> !network.nodeId().equals(TranserverBridge.nodeId()))，
-                        // 想「不要把包裹发给本机」，但它是错的：TranserverBridge.nodeId() 在装了 Transerver
-                        // 却没接上 API 时返回 null（单机存档就是这种情况），而 equals(null) 恒为 false，
-                        // 过滤器等于失效——本机网络照样被写成默认目的地。而且就算它返回了真实节点 id，
-                        // 「发到本机」本身并不非法：同一个存档里的两个港组就是两套系统，服内互传靠的就是它。
-                        // The old filter was meant to skip "send this to myself" but failed at both ends: it
-                        // never fired when nodeId() was null (equals(null) is always false), and a parcel to
-                        // another group on the same node is a legitimate destination, not a mistake.
-                        //
-                        // 新判断：本机节点是合法目的地，只跳过「目的地就是本机 且 组也与本港相同」这种真正
-                        // 无意义的自环——那只会让包裹绕一圈回到自己的收货槽。其余交给 LoadedDocks.importFor
-                        // 按组和地址选港，选不到就 RETRY。
-                        boolean selfLoop = TranserverBridge.isLocal(network.nodeId().toString())
-                                && DockGroupDirectory.DEFAULT_GROUP_ID.equals(be.groupId());
-                        if (!selfLoop) {
-                            be.setDefaultDestination(network.nodeId(), DockGroupDirectory.DEFAULT_GROUP_ID);
-                        }
-                    });
                 }
                 be.clearFault();
                 player.displayClientMessage(be.modeMessage(), true);
@@ -200,6 +192,11 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
         if (isWrench(stack)) {
             if (!level.isClientSide && !player.isShiftKeyDown()) {
                 be.clearFault();
+                // The wrench cycles the mode. Without this there is no gesture for BIDIRECTIONAL at
+                // all: a fresh dock receives, the requester's plain click forces sending, and a dock
+                // asked to do both cannot be built — even though the two buffers being separate is
+                // what the routing design rests on.
+                be.setMode(be.mode().next());
                 player.displayClientMessage(be.modeMessage(), true);
             }
             // Never consume the wrench: Create removes blocks with sneak-right-click and opens the value
