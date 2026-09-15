@@ -37,6 +37,7 @@ HANDOFF = ROOT / "docs/design/tower-art-handoff-2026-09-15"
 ASSETS = ROOT / "src/main/resources/assets/distantstock"
 TEX_OUT = ASSETS / "textures/block/tower"
 MODEL_OUT = ASSETS / "models/block/tower"
+ITEM_OUT = ASSETS / "models/item"
 
 # Vanilla's FaceInfo vertex order, as unit-box corners. A face is named after the direction it
 # points, and the four corners come in the order the baker emits them.
@@ -175,7 +176,7 @@ def build_model(quads: list, textures: dict, render_type: str = "minecraft:cutou
         if quad["material"] not in refs:
             raise SystemExit(f"mesh names a material with no texture: {quad['material']}")
         elements.append(quad_to_element(quad, refs))
-    return {
+    model = {
         "credit": "Tower art by Distant Stock; crystal and reflective glass drawn in-house. "
                   "Create andesite, brass and gearbox textures are Create's.",
         "parent": "minecraft:block/block",
@@ -184,6 +185,8 @@ def build_model(quads: list, textures: dict, render_type: str = "minecraft:cutou
         "textures": textures,
         "elements": elements,
     }
+    deconflict(model)
+    return model
 
 
 def defaultdict_textures(textures: dict) -> dict:
@@ -248,6 +251,15 @@ def seam_crossframe():
         moved = json.loads(json.dumps(quad))
         for point in moved["points"]:
             point[1] = round(point[1] - 32.0, 4)
+            # The handoff draws this frame flush with the tower's skin, which is free in a preview
+            # renderer and is a fight in the game: the block below and the block above each draw
+            # their own face on exactly this plane. Lifting the skin a step proud settles it, and
+            # a frame that stands a hair off the surface it wraps is what it wants to look like.
+            for axis in (0, 2):
+                if abs(point[axis]) < 1e-3:
+                    point[axis] = -COINCIDENT_STEP
+                elif abs(point[axis] - 16.0) < 1e-3:
+                    point[axis] = 16.0 + COINCIDENT_STEP
         out.append(moved)
     if not out:
         raise SystemExit("no cross-frame found at the y=32 seam")
@@ -281,6 +293,163 @@ def write(name: str, quads, textures, render_type="minecraft:cutout"):
     return model
 
 
+def turned(model: dict, dy: float = 0.0, turn: float = 0.0) -> dict:
+    """A copy of a model lifted and spun about its own centre, for stacking or for icons."""
+    out = json.loads(json.dumps(model))
+    for element in out["elements"]:
+        for point in (element["from"], element["to"]):
+            point[1] = round(point[1] + dy, 4)
+            if turn:
+                x, z = point[0] - 8, point[2] - 8
+                angle = math.radians(turn)
+                point[0] = round(8 + x * math.cos(angle) - z * math.sin(angle), 4)
+                point[2] = round(8 + x * math.sin(angle) + z * math.cos(angle), 4)
+    return out
+
+
+def merged(*models: dict) -> dict:
+    out = {"textures": {}, "elements": []}
+    for model in models:
+        out["textures"].update(model["textures"])
+        out["elements"] += model["elements"]
+    return out
+
+
+def write_casing():
+    """The casing is the one piece that is not from a mesh: a plain cube on its own texture.
+
+    Stage two replaces the texture with a connected-texture selection, but the geometry — a full
+    block — does not change, so this model outlives the swap.
+    """
+    texture = "distantstock:block/tower/casing_inactive"
+    model = {
+        "parent": "minecraft:block/block",
+        "textures": {"all": texture, "particle": texture},
+        "elements": [{
+            "from": [0, 0, 0], "to": [16, 16, 16],
+            "faces": {face: {"texture": "#all"} for face in
+                      ("down", "up", "north", "south", "west", "east")},
+        }],
+    }
+    MODEL_OUT.mkdir(parents=True, exist_ok=True)
+    (MODEL_OUT / "tower_casing.json").write_text(json.dumps(model, indent=2) + "\n")
+    print(f"  {'tower_casing':26s}   1 elements")
+
+
+def write_item_models():
+    """Inventory icons.
+
+    A plain parent of the block model is enough for most of them — the mesh models inherit
+    `minecraft:block/block` and so already carry the GUI transforms. The resonator is the
+    exception: its arms are a second model that only a block entity renderer would draw in the
+    world, so the icon merges them in by hand or the item is a bare mast.
+    """
+    ITEM_OUT.mkdir(parents=True, exist_ok=True)
+    icon = merged(
+        json.loads((MODEL_OUT / "ether_resonator.json").read_text()),
+        turned(json.loads((MODEL_OUT / "ether_resonator_rotor.json").read_text()), turn=25),
+    )
+    icon["parent"] = "minecraft:block/block"
+    icon["render_type"] = "minecraft:cutout"
+    (ITEM_OUT / "ether_resonator.json").write_text(json.dumps(icon, indent=2) + "\n")
+
+    for name in ("tower_casing", "tower_core", "tower_coupler"):
+        parent = f"distantstock:block/tower/{name}"
+        (ITEM_OUT / f"{name}.json").write_text(
+            json.dumps({"parent": parent}, indent=2) + "\n")
+    print(f"  item icons -> {ITEM_OUT.relative_to(ROOT)}")
+
+
+FACE_AXIS = {"west": 0, "east": 0, "down": 1, "up": 1, "north": 2, "south": 2}
+FACE_SIGN = {"west": -1, "east": 1, "down": -1, "up": 1, "north": -1, "south": 1}
+# How far a face is pushed off one it was drawn on top of, in model units. Sixteen units to the
+# block, so this is under two thousandths of a block: enough to settle a depth test, far too
+# little to see, and it does not move the face on screen.
+COINCIDENT_STEP = 0.02
+
+
+def flat_faces(model: dict):
+    """Every face as (face, axis, sign, position along that axis, in-plane extent, element)."""
+    for element in model["elements"]:
+        for face in element["faces"]:
+            axis = FACE_AXIS[face]
+            span = [sorted((element["from"][i], element["to"][i]))
+                    for i in range(3) if i != axis]
+            yield face, axis, FACE_SIGN[face], element["from"][axis], span, element
+
+
+def overlapping(span_a, span_b) -> bool:
+    return all(min(a[1], b[1]) - max(a[0], b[0]) > 1e-3 for a, b in zip(span_a, span_b))
+
+
+def deconflict(model: dict) -> int:
+    """Push each face off any earlier face it was drawn on top of.
+
+    These meshes were authored for the handoff's own preview renderer, which paints in list order
+    and has no depth buffer: laying a brass detail plate directly on the base's top plate is free
+    there, and the plate wins because it comes later. In the game both faces land on the same
+    plane facing the same way and fight for every pixel of the overlap.
+
+    Only same-facing pairs are touched. Two coplanar faces looking opposite ways are the two sides
+    of one plate, and backface culling means only ever one of them is drawn.
+    """
+    moved = 0
+    seen = []
+    for face, axis, sign, at, span, element in flat_faces(model):
+        collisions = sum(1 for other in seen
+                         if other[0] == axis and other[1] == sign
+                         and abs(other[2] - at) < 1e-3
+                         and overlapping(span, other[3]))
+        if collisions:
+            shift = COINCIDENT_STEP * collisions * sign
+            element["from"][axis] = round(element["from"][axis] + shift, 4)
+            element["to"][axis] = round(element["to"][axis] + shift, 4)
+            at = round(at + shift, 4)
+            moved += 1
+        seen.append((axis, sign, at, span))
+    return moved
+
+
+def coplanar_overlaps(model: dict) -> list[str]:
+    """Faces that share a plane and cover the same ground on it.
+
+    Two of those drawn together is z-fighting at best and the shredded-antenna look at worst,
+    and it is the specific failure the coupler is built to avoid: a stack would otherwise put a
+    cap from each block on the same seam. Checking it here rather than trusting the composition
+    is the whole point of dropping those caps.
+    """
+    plates = [(face, axis, sign, round(at, 4), span)
+              for face, axis, sign, at, span, _ in flat_faces(model)]
+    clashes = []
+    for i, (face_a, axis_a, sign_a, at_a, span_a) in enumerate(plates):
+        for face_b, axis_b, sign_b, at_b, span_b in plates[i + 1:]:
+            if axis_a != axis_b or sign_a != sign_b or abs(at_a - at_b) > 1e-3:
+                continue
+            if overlapping(span_a, span_b):
+                clashes.append(f"{face_a}@{at_a} vs {face_b}@{at_b} on axis {axis_a}")
+    return clashes
+
+
+def inset_crystal_stub(model: dict) -> None:
+    """Pull the core's crystal tip inside the coupler's crystal column.
+
+    A bare core shows a two-unit crystal above its top plate, and a coupler draws that same
+    crystal as a full-height column straight through where the tip stands. Stacked, the tip is
+    entirely inside the column — every one of its six faces coincides with the column's, and the
+    two fight along the bottom two units of the tower's crystal. Neither block can see the
+    other's model, so the tip is inset instead: inside a tower it is hidden completely, and on a
+    lone core it is a fiftieth of a block smaller, which is not a thing anyone can see.
+    """
+    for element in model["elements"]:
+        if next(iter(element["faces"].values())).get("texture") != "#crystal":
+            continue
+        if element["from"][1] < 16.0:
+            continue                      # the crystal through the base, not the tip
+        for axis in range(3):
+            element["from"][axis] = round(element["from"][axis] + COINCIDENT_STEP, 4)
+            element["to"][axis] = round(element["to"][axis] - COINCIDENT_STEP, 4)
+
+
 def verify_against_handoff():
     """Rebuild the handoff's own tower out of the converted models and compare renders.
 
@@ -297,25 +466,9 @@ def verify_against_handoff():
         return json.loads((MODEL_OUT / f"{name}.json").read_text())
 
     def placed(name, dy, turn=0.0):
-        out = json.loads(json.dumps(model(name)))
-        for element in out["elements"]:
-            for point in (element["from"], element["to"]):
-                point[1] = round(point[1] + dy, 4)
-                if turn:
-                    x, z = point[0] - 8, point[2] - 8
-                    angle = math.radians(turn)
-                    point[0] = round(8 + x * math.cos(angle) - z * math.sin(angle), 4)
-                    point[2] = round(8 + x * math.sin(angle) + z * math.cos(angle), 4)
-        return out
+        return turned(model(name), dy, turn)
 
-    def merge(*models):
-        merged = {"textures": {}, "elements": []}
-        for m in models:
-            merged["textures"].update(m["textures"])
-            merged["elements"] += m["elements"]
-        return merged
-
-    tower = merge(
+    tower = merged(
         placed("tower_core", 0),
         placed("tower_coupler_top", 16),
         placed("tower_coupler_middle", 32),
@@ -323,6 +476,12 @@ def verify_against_handoff():
         placed("ether_resonator", 64),
         placed("ether_resonator_rotor", 64, turn=25),
     )
+    clashes = coplanar_overlaps(tower)
+    if clashes:
+        for clash in clashes:
+            print(f"  COPLANAR OVERLAP: {clash}")
+        raise SystemExit(f"{len(clashes)} coincident faces in the assembled tower")
+    print(f"  no coincident faces across {len(tower['elements'])} elements")
     # preview_block_art's renderer takes a pivot, which matters here: the tower stands 86 units
     # tall and pivoting about the block centre pushes the resonator off the top of the frame.
     bake.model = lambda name, _m=tower: _m
@@ -342,7 +501,10 @@ def main():
     core = load(HANDOFF / "tower/core_mesh.json")
     core_textures = {name: f"distantstock:block/tower/{name}"
                      for name in sorted({q["material"] for q in core})}
-    write("tower_core", core, core_textures)
+    core_model = write("tower_core", core, core_textures)
+    inset_crystal_stub(core_model)
+    (MODEL_OUT / "tower_core.json").write_text(json.dumps(core_model, indent=2) + "\n")
+    write_casing()
 
     for name, (quads, textures) in coupler_models().items():
         write(name, quads, textures)
@@ -350,6 +512,7 @@ def main():
     for name, (quads, textures) in resonator_models().items():
         write(name, quads, textures)
 
+    write_item_models()
     verify_against_handoff()
 
 

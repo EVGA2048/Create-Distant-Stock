@@ -37,6 +37,15 @@ public final class ModBlockEntities {
             BES.register("signal_panel", () -> BlockEntityType.Builder.of(SignalPanelBlockEntity::new,
                     ModBlocks.SIGNAL_PANEL.get()).build(null));
 
+    /**
+     * The resonator's arms turn about the block's centre and sweep past its sides, so they are drawn
+     * by a renderer rather than baked into the model. Nothing else about the tower needs a block
+     * entity yet — the casing, core and couplers are all stateless.
+     */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ResonatorBlockEntity>> ETHER_RESONATOR =
+            BES.register("ether_resonator", () -> BlockEntityType.Builder.of(ResonatorBlockEntity::new,
+                    ModBlocks.ETHER_RESONATOR.get()).build(null));
+
     private ModBlockEntities() {
     }
 }

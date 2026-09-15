@@ -34,6 +34,27 @@ public final class ModBlocks {
     public static final DeferredHolder<net.minecraft.world.level.block.Block, IndicatorLampBlock> WHITE_INDICATOR_LAMP = lamp("white_indicator_lamp");
     public static final DeferredHolder<net.minecraft.world.level.block.Block, IndicatorLampBlock> BRASS_INDICATOR_LAMP = lamp("brass_indicator_lamp");
 
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, TowerCasingBlock> TOWER_CASING =
+            BLOCKS.register("tower_casing", () -> new TowerCasingBlock(tower()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, TowerCouplerBlock> TOWER_COUPLER =
+            BLOCKS.register("tower_coupler", () -> new TowerCouplerBlock(tower().noOcclusion()));
+    /**
+     * The core is a plain block until the tower assembly lands, when it becomes a kinetic block
+     * taking rotation from the shaft below it. Its model is the 3x3 base's centre, so it keeps the
+     * tower's own material and sound rather than the generic machine ones.
+     */
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, net.minecraft.world.level.block.Block> TOWER_CORE =
+            BLOCKS.register("tower_core", () -> new net.minecraft.world.level.block.Block(tower().noOcclusion()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, ResonatorBlock> ETHER_RESONATOR =
+            BLOCKS.register("ether_resonator", () -> new ResonatorBlock(tower().noOcclusion()));
+
+    private static BlockBehaviour.Properties tower() {
+        return BlockBehaviour.Properties.of()
+                .mapColor(MapColor.COLOR_GRAY)
+                .strength(3.0f, 6.0f)
+                .sound(SoundType.COPPER);
+    }
+
     private static DeferredHolder<net.minecraft.world.level.block.Block, IndicatorLampBlock> lamp(String name) {
         return BLOCKS.register(name, () -> new IndicatorLampBlock(panel()
                 .lightLevel(state -> state.getValue(IndicatorLampBlock.LIT) ? 10 : 0)));

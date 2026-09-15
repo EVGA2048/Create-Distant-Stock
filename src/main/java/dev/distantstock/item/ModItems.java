@@ -38,6 +38,10 @@ public final class ModItems {
             () -> new SignalLampPanelItem(ModBlocks.BRASS_INDICATOR_LAMP.get(), new Item.Properties(),
                     SignalLampPanelItem.Material.BRASS,
                     SignalLampPanelItem.Color.WHITE));
+    public static final DeferredHolder<Item, BlockItem> TOWER_CASING = block("tower_casing", ModBlocks.TOWER_CASING);
+    public static final DeferredHolder<Item, BlockItem> TOWER_CORE = block("tower_core", ModBlocks.TOWER_CORE);
+    public static final DeferredHolder<Item, BlockItem> TOWER_COUPLER = block("tower_coupler", ModBlocks.TOWER_COUPLER);
+    public static final DeferredHolder<Item, BlockItem> ETHER_RESONATOR = block("ether_resonator", ModBlocks.ETHER_RESONATOR);
     public static final DeferredHolder<Item, RemotePackageItem> REMOTE_PACKAGE = ITEMS.register("remote_package",
             () -> new RemotePackageItem(new Item.Properties()));
     public static final DeferredHolder<Item, Item> MANUAL = ITEMS.register("manual",
@@ -85,6 +89,10 @@ public final class ModItems {
                 out.accept(GREEN_INDICATOR_LAMP.get());
                 out.accept(WHITE_INDICATOR_LAMP.get());
                 out.accept(BRASS_SIGNAL_LAMP.get());
+                out.accept(TOWER_CASING.get());
+                out.accept(TOWER_CORE.get());
+                out.accept(TOWER_COUPLER.get());
+                out.accept(ETHER_RESONATOR.get());
                 out.accept(REMOTE_PACKAGE.get());
                 out.accept(ENDER_DUST.get());
                 out.accept(ETHER_QUARTZ.get());

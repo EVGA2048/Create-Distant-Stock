@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "above=false,below=false": { "model": "distantstock:block/tower/tower_coupler" },
+    "above=true,below=false":  { "model": "distantstock:block/tower/tower_coupler_top" },
+    "above=false,below=true":  { "model": "distantstock:block/tower/tower_coupler_bottom" },
+    "above=true,below=true":   { "model": "distantstock:block/tower/tower_coupler_middle" }
+  }
+}

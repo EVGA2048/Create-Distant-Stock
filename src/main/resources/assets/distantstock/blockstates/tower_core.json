@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "distantstock:block/tower/tower_core" }
+  }
+}

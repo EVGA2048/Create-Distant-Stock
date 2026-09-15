@@ -74,6 +74,14 @@ public final class SignalLampClientSmoke {
                 }
             }
             expected.add(ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "block/dock_cap"));
+            // The tower's models are generated from the art handoff, so a texture renamed or dropped
+            // there reaches the game as a page of checkerboard with nothing upstream to catch it.
+            for (String tower : new String[]{"andesite", "axis", "axis_top", "bearing", "bearing_top",
+                    "brass", "cap", "casing", "casing_active", "casing_inactive", "core", "crystal",
+                    "ct_active", "ct_inactive", "fluid", "fluid_port_a", "frame", "gearbox", "iron",
+                    "polished", "shell"}) {
+                expected.add(ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "block/tower/" + tower));
+            }
             int sprites = 0;
             for (var name : expected) {
                 if (atlas.getSprite(name).contents().name().equals(missing)) {

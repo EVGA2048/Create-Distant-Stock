@@ -105,6 +105,7 @@ public final class ClientSetup {
             e.registerBlockEntityRenderer(ModBlockEntities.REMOTE_PACKAGER.get(), PackagerRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.DOCK.get(), DockParcelRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.SIGNAL_PANEL.get(), SignalPanelRenderer::new);
+            e.registerBlockEntityRenderer(ModBlockEntities.ETHER_RESONATOR.get(), ResonatorRenderer::new);
         }
 
         @SubscribeEvent
