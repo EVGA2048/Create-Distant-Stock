@@ -5,6 +5,7 @@ import dev.distantstock.block.GaugeBlockEntity;
 import dev.distantstock.link.LinkQueues;
 import dev.distantstock.link.OrderService;
 import dev.distantstock.menu.RequesterMenu;
+import dev.distantstock.routing.TowerActivation;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -56,6 +57,16 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
             }
             if (msg.lines == null || msg.lines.isEmpty()) {
                 p.displayClientMessage(Component.translatable("gui.distantstock.need_item"), true);
+                return;
+            }
+            GaugeBlockEntity desk = menu.gauge(p);
+            if (desk != null && !TowerActivation.active(desk.getLevel(), desk.getBlockPos())) {
+                // Read-only gate: a request desk no tower carries still opens, still shows the
+                // stock it can see, and still lets its address be read — it just will not place an
+                // order. Blinding the readout as well would leave a player with a dark machine and
+                // nothing to compare it against, and the desk is the one place in the field where
+                // the reason is legible.
+                p.displayClientMessage(Component.translatable("gui.distantstock.uncharged"), true);
                 return;
             }
             UUID freq = menu.freq(p);

@@ -247,5 +247,12 @@
   "goggle.distantstock.tower.capped": "已封顶：比等级表更高",
   "goggle.distantstock.tower.radius": "带载 %s 格内的设备",
   "goggle.distantstock.tower.devices": "最多 %s 台设备",
-  "goggle.distantstock.tower.stalled": "停转 —— 没转，或应力过载"
+  "goggle.distantstock.tower.stalled": "停转 —— 没转，或应力过载",
+  "goggle.distantstock.tower.carrying": "正在带载 %s / %s 台设备",
+  "goggle.distantstock.tower.carrying.idle": "未带载 —— 转起来后可带 %s 台",
+  "goggle.distantstock.tower.chunks": "常驻加载 %sx%s 区块",
+  "goggle.distantstock.tower.ether": "以太 %s / %s mB —— 每个邮包 %s mB",
+  "goggle.distantstock.tower.ether.off": "以太：未启用（tower.chargeParcels 为关）",
+  "goggle.distantstock.send.no_ether": "已滞留：塔付不起这个邮包",
+  "gui.distantstock.uncharged": "没有塔带载这台请求台 —— 可以看，不能下单"
 }

@@ -247,5 +247,12 @@
   "goggle.distantstock.tower.capped": "Capped: taller than the table covers",
   "goggle.distantstock.tower.radius": "Carries devices within %s blocks",
   "goggle.distantstock.tower.devices": "Up to %s devices",
-  "goggle.distantstock.tower.stalled": "Stalled — not turning, or overstressed"
+  "goggle.distantstock.tower.stalled": "Stalled — not turning, or overstressed",
+  "goggle.distantstock.tower.carrying": "Carrying %s of %s devices",
+  "goggle.distantstock.tower.carrying.idle": "Carrying nothing — %s devices when it turns",
+  "goggle.distantstock.tower.chunks": "Keeps a %sx%s chunk area loaded",
+  "goggle.distantstock.tower.ether": "Ether %s / %s mB — %s mB per parcel",
+  "goggle.distantstock.tower.ether.off": "Ether: not billed (tower.chargeParcels is off)",
+  "goggle.distantstock.send.no_ether": "Held: the tower cannot pay for this parcel",
+  "gui.distantstock.uncharged": "No tower carries this desk — it can be read, not ordered from"
 }

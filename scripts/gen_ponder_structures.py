@@ -154,9 +154,12 @@ def write_structure(path: Path, size, palette, blocks):
 class Scene:
     """A checkerboard floor plus whatever is placed on it."""
 
-    def __init__(self, width, depth):
+    def __init__(self, width, depth, height=4):
         self.width = width
         self.depth = depth
+        # 场景的高度就是结构的包围盒，Ponder 按它取景。四格够平放的机器用，立起来的塔不够：
+        # 塔顶要九格，镜头才不会把谐振器切在画面外。
+        self.height = height
         self.palette = [{"Name": "minecraft:white_concrete"}, {"Name": "minecraft:snow_block"}]
         self.blocks = []
 
@@ -178,10 +181,10 @@ class Scene:
         self.palette.append(entry)
         return len(self.palette) - 1
 
-    def save(self, name, height=4):
+    def save(self, name):
         floor = [{"pos": [x, 0, z], "state": (x + z) % 2}
                  for z in range(self.depth) for x in range(self.width)]
-        write_structure(PONDER / name, [self.width, height, self.depth],
+        write_structure(PONDER / name, [self.width, self.height, self.depth],
                         self.palette, floor + self.blocks)
 
 
@@ -324,6 +327,53 @@ def status_scene():
     return scene
 
 
+def tower_scene():
+    """互通塔：立轴、3x3 底座、五段耦合器、谐振器，外加裙板角上的一只拉杆。
+
+    桅杆只堆到五段（I 级的第一档）。十七段会把塔顶顶出画面，而「越高越强」本来就讲不完，交给
+    文案；场景只负责把结构讲到没有歧义。
+
+    所有摆出来的方块都必须是真的能这么搭的：立轴正对底座下方，耦合器上下相接，谐振器盖在桅杆
+    顶上，拉杆压在裙板顶面。少一样、错一格，玩家照着学就会得到一座不成立的塔。
+    """
+    scene = Scene(8, 6, height=9)
+
+    # 动力从底面进。底座只认底面，侧面接不进轴，所以立轴必须正对它的下方；32 转/分是中等转速，
+    # 刚好满足底座要求的最低档，塔本来的开销在应力上。
+    scene.place((4, 1, 3), "create:shaft", {"axis": "y"},
+                {"id": "create:simple_kinetic", "Speed": 32.0,
+                 "Source": {"X": 4, "Y": 1, "Z": 3}})
+
+    # 底座正中央。方块实体里写的是服务器本来会同步过来的那几个数——桅杆有几段、到了哪一级、轴
+    # 转多快。塔顶的光柱读的就是它们，不写的话场景里立着的会是一座「还没成塔」的塔。
+    scene.place((4, 2, 3), "distantstock:tower_core", None,
+                {"id": "distantstock:tower_core", "Speed": 32.0,
+                 "Source": {"X": 4, "Y": 1, "Z": 3}, "Couplers": 5, "Tier": "I"})
+
+    # 3x3 的裙板，底座收在正中央（中心那格是底座本身，不是机壳）。
+    for x in range(3, 6):
+        for z in range(2, 5):
+            if (x, z) != (4, 3):
+                scene.place((x, 2, z), "distantstock:tower_casing", {"powered": "false"})
+
+    # 桅杆。above/below 描述的是邻居而不是这块方块：接口上下各有各的模型，五段里只有最下一段
+    # 的 below 和最上一段的 above 是 false。
+    for y in range(3, 8):
+        scene.place((4, y, 3), "distantstock:tower_coupler",
+                    {"above": "true" if y < 7 else "false",
+                     "below": "true" if y > 3 else "false"})
+
+    # 塔顶。1 是「塔在转、没有包裹经过」的那一档光——场景里立着的就是一座建成并且通着动力的塔。
+    scene.place((4, 8, 3), "distantstock:ether_resonator", None,
+                {"id": "distantstock:ether_resonator", "Beam": 1})
+
+    # 裙板角上的拉杆：floor 朝向的拉杆压在机壳顶面，红石信号由这块机壳进入裙板，正好用来演示
+    # 观察窗。位置在 (3,3,3)，即 (3,2,3) 那块机壳的正上方。
+    scene.place((3, 3, 3), "minecraft:lever",
+                {"face": "floor", "facing": "north", "powered": "false"})
+    return scene
+
+
 def known_states(block_id):
     """The property sets a block accepts, read from its blockstate file.
 
@@ -367,7 +417,8 @@ def verify(scene, name):
 
 def main():
     for name, build in (("export", export_scene), ("import", import_scene),
-                        ("tune", tune_scene), ("status", status_scene)):
+                        ("tune", tune_scene), ("status", status_scene),
+                        ("tower", tower_scene)):
         scene = build()
         verify(scene, name)
         scene.save(f"{name}.nbt")

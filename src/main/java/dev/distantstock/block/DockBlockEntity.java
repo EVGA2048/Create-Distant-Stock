@@ -12,6 +12,8 @@ import dev.distantstock.link.PackageCodec;
 import dev.distantstock.routing.RemoteRouteData;
 import dev.distantstock.link.ParcelEscrow;
 import dev.distantstock.routing.DockGroupDirectory;
+import dev.distantstock.routing.TowerActivation;
+import dev.distantstock.routing.TowerBilling;
 import dev.distantstock.routing.DockMode;
 import dev.distantstock.routing.OrderRouteDirectory;
 import dev.distantstock.routing.RemoteRoute;
@@ -47,6 +49,16 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     private static final long BLOCKED_LINGER_TICKS = 200;
     /** How often a jammed dock reminds the player with a sound. */
     private static final long BLOCKED_ALARM_TICKS = 120;
+    /** The reason a parcel is held when its tower cannot pay for it. */
+    private static final String ETHER_ERROR = "goggle.distantstock.send.no_ether";
+    /**
+     * How long a failed payment keeps reporting itself before the dock tries again.
+     *
+     * <p>Without it the dock would either retry twenty times a second or, like the no-route case,
+     * wait for a player to touch its inventory. The first is noise; the second is worse, because
+     * the tower being refilled is a reason to send, not a reason to keep holding.
+     */
+    private static final long ETHER_RETRY_TICKS = 200;
 
     private final ItemStackHandler receivedInv = inventory(this::contentsChanged);
     private final ItemStackHandler outboundInv = inventory(this::contentsChanged);
@@ -181,6 +193,8 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     private boolean fallbackRefused;
     private long lastAlarmAt = Long.MIN_VALUE / 2;
     private boolean pushStalled;
+    /** When the tower last failed to pay for a parcel, for the retry window. */
+    private long etherRefusedAt = Long.MIN_VALUE / 2;
 
     public DockBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -257,11 +271,28 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         sync();
     }
 
+    /**
+     * Whether this dock may send, which now also means "a tower carries it".
+     *
+     * <p>The gate lives here because this is where every path already asks: shipping, pulling a
+     * parcel from a neighbour, handing one over, and the selection that picks a dock for an
+     * incoming parcel all read one of these two methods. It is deliberately cheap — the answer is
+     * a hash lookup in a snapshot, rebuilt once a second, not a search.
+     *
+     * <p>A world without towers answers yes for everything, which is the promise: adding towers to
+     * a save must not stop the docks that were already there.
+     */
     public boolean canSend() {
-        return mode == DockMode.SEND || mode == DockMode.BIDIRECTIONAL;
+        return (mode == DockMode.SEND || mode == DockMode.BIDIRECTIONAL)
+                && TowerActivation.active(level, worldPosition);
     }
 
     public boolean canReceive() {
+        return receivingMode() && TowerActivation.active(level, worldPosition);
+    }
+
+    /** The tuned direction alone, without the tower gate. */
+    private boolean receivingMode() {
         return mode == DockMode.RECEIVE || mode == DockMode.BIDIRECTIONAL;
     }
 
@@ -352,9 +383,16 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         sync();
     }
 
-    /** Transfers one received parcel only after the player's inventory can accept it whole. */
+    /**
+     * Transfers one received parcel only after the player's inventory can accept it whole.
+     *
+     * <p>Deliberately does not ask {@link #canReceive()}. The gate is about what the machine does
+     * on the network, and a dock standing outside its tower's reach still has to be able to hand a
+     * parcel back by hand — otherwise the only way at it is to break the block, and a tower going
+     * dark would be a way to lose goods rather than a way to pause a factory.
+     */
     public boolean takeReceived(net.minecraft.world.entity.player.Player player) {
-        if (player == null || !canReceive() || receiving()) return false;
+        if (player == null || !receivingMode() || receiving()) return false;
         for (int slot = 0; slot < receivedInv.getSlots(); slot++) {
             ItemStack parcel = receivedInv.getStackInSlot(slot);
             if (parcel.isEmpty() || !canFit(player, parcel)) continue;
@@ -527,6 +565,12 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             be.receiveStartedAt = -1;
             be.sync();
         }
+        if (ETHER_ERROR.equals(be.sendError)
+                && level.getGameTime() - be.etherRefusedAt >= ETHER_RETRY_TICKS) {
+            // The tower was empty, not wrong: try again now that it has had time to be refilled.
+            be.sendError = "";
+            be.sync();
+        }
         if (level.getGameTime() % 10 == 0) {
             LinkSnapshot.View snapshot = LinkSnapshot.view();
             be.linkUp = snapshot.linkUp() || (!snapshot.transerverAttached()
@@ -648,10 +692,21 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                 // only when the parcel actually carries one. Handing a parcel with neither route nor
                 // address to the queue would drop it, so it has to stay here and report instead.
                 if (dev.distantstock.link.TranserverBridge.attachedApi() == null && !destinationAddress.isBlank()) {
+                    // Pay before the queue takes the parcel: once it is in there, there is no way to
+                    // take it back, and a parcel that leaves without paying is the one outcome the
+                    // billing rules do not allow. Nothing between the two calls can fail but the
+                    // queue being full, and that case is the refund below.
+                    if (!TowerBilling.charge(level, worldPosition)) {
+                        noteEtherRefused(level);
+                        break;
+                    }
                     if (LinkQueues.offerOutboundPackage(new LinkQueues.Parcel(
                             nbt, destinationAddress, "", DockGroupDirectory.DEFAULT_GROUP_ID))) {
                         outboundInv.extractItem(slot, 1, false);
+                        noteTraffic(level);
                         dev.distantstock.link.LinkClient.wake();
+                    } else {
+                        TowerBilling.refund(level, worldPosition);
                     }
                     break;
                 }
@@ -667,22 +722,54 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                 }
             }
             if (level.getServer() != null) {
+                if (!TowerBilling.charge(level, worldPosition)) {
+                    noteEtherRefused(level);
+                    break;
+                }
                 try {
                     ParcelEscrow.get(level.getServer()).hold(
                             stack, destinationAddress, route.get().destinationNodeId().toString(),
                             route.get().receivingDockGroupId(),
                             level.dimension().location().toString(), worldPosition, level.registryAccess());
                     outboundInv.extractItem(slot, 1, false);
+                    noteTraffic(level);
                     // Route consumed: the escrow now owns the parcel and its destination.
                     if (PackageItem.hasOrderData(stack)) {
                         OrderRouteDirectory.get(level.getServer()).consume(PackageItem.getOrderId(stack));
                     }
                     sendError = "";
                 } catch (IllegalArgumentException ignored) {
+                    // The escrow refused the parcel, so it never left. The ether goes back with it.
+                    TowerBilling.refund(level, worldPosition);
                 }
             }
             break;
         }
+    }
+
+    /**
+     * Tells the tower above this dock that something is crossing it.
+     *
+     * <p>Only at the two points where the parcel has actually left the dock. Pinging on the way in
+     * would light the tower for a parcel that is still sitting in the slot, and the light is
+     * supposed to mean "in flight", not "busy".
+     */
+    private void noteTraffic(Level level) {
+        dev.distantstock.routing.TowerSystem.TowerId carrier =
+                TowerActivation.carrier(level, worldPosition);
+        if (carrier != null) {
+            TowerBeacon.ping(level, BlockPos.of(carrier.packedPos()));
+        }
+    }
+
+    /**
+     * Holds the parcel and says why, in the two places a player looks: the goggle readout and the
+     * lamp, which reports a send error as blocked. Neither the parcel nor the ether moves.
+     */
+    private void noteEtherRefused(Level level) {
+        etherRefusedAt = level.getGameTime();
+        sendError = ETHER_ERROR;
+        sync();
     }
 
     @Override

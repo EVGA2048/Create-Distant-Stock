@@ -14,6 +14,8 @@ import dev.distantstock.link.TranserverPackageService;
 import dev.distantstock.link.TranserverOrderService;
 import dev.distantstock.menu.RequesterMenu;
 import dev.distantstock.net.StockSyncS2C;
+import dev.distantstock.routing.TowerActivation;
+import dev.distantstock.routing.TowerChunkLoader;
 import dev.distantstock.stock.StockScanner;
 import dev.distantstock.routing.WorldIdentity;
 import dev.distantstock.link.NetworkAnnouncementService;
@@ -69,6 +71,10 @@ public final class GameClock {
         if (legacyActive) {
             LinkServer.stop();
         }
+        // The tower state is per-world: a level reference left behind here would outlive the world
+        // it points at, and the next world in the same client would inherit its ticket bookkeeping.
+        TowerActivation.unpinDevices();
+        TowerChunkLoader.reset();
         LOG.info("[DistantStock] transport stopped");
     }
 
@@ -76,6 +82,11 @@ public final class GameClock {
     public static void tick(ServerTickEvent.Post e) {
         ticks++;
         LinkSnapshot.tickLocal(e.getServer());
+        // 塔的地基：激活快照每秒重算一次（港每 tick 都要读），区块票每 tick 处理队列、每 20 tick 对齐。
+        // The activation snapshot is what canSend/canReceive read, and the ticket queue is drained
+        // every tick so a broken tower releases its chunks promptly rather than at the next beat.
+        TowerActivation.tick(e.getServer());
+        TowerChunkLoader.tick(e.getServer());
 
         if (transerverActive) {
             TranserverBridge.tick();

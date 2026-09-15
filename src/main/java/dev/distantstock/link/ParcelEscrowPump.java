@@ -73,6 +73,11 @@ public final class ParcelEscrowPump {
                         record.parcelId(), record.receivingDockGroupId(), record.address(),
                         PayloadManifest.fromPackage(parcel), record.encodedPackage());
                 if (TranserverBridge.isLocal(record.destinationNode())) {
+                    // 计费不在这里：这是同一次传输的下半段，邮包离开港时就由塔付过费了（DockBlockEntity.ship）。
+                    // 在这里再收一次等于对同一段路收两遍，所以本机投递只是把已经付费的包裹送到目的地。
+                    // Billing is not repeated here. A parcel reaches this branch only after leaving a
+                    // dock, and the tower that carries that dock has already paid for it — charging
+                    // again would bill one transfer twice.
                     // 目的地就是本机：没有 Transerver 也要送到，所以直接在同一条服务器线程上跑接收侧校验。
                     // The destination is this very node, so there is no transport to hand the parcel to.
                     // Without this branch an unattached bridge makes TranserverBridge.send return null and

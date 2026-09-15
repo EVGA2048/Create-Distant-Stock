@@ -15,6 +15,11 @@ public final class ModCapabilities {
                 (be, side) -> side == Direction.DOWN ? be.bottomFace : be.automation);
         e.registerBlockEntity(Capabilities.ItemHandler.BLOCK, ModBlockEntities.REMOTE_PACKAGER.get(),
                 (be, side) -> be.inventory);
+        // The tank is reachable from every face except the bottom, which already carries the shaft
+        // the tower is driven from: a pipe and a driveshaft cannot share a face, and the shaft has
+        // the stronger claim on the one it already has.
+        e.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ModBlockEntities.TOWER_CORE.get(),
+                (be, side) -> side == Direction.DOWN ? null : be.tank());
     }
 
     private ModCapabilities() {

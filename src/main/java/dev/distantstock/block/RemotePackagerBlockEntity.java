@@ -7,6 +7,7 @@ import com.simibubi.create.content.logistics.packager.PackagingRequest;
 import dev.distantstock.item.ModItems;
 import dev.distantstock.routing.OrderRouteDirectory;
 import dev.distantstock.routing.RemoteRouteData;
+import dev.distantstock.routing.TowerActivation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -28,8 +29,20 @@ public final class RemotePackagerBlockEntity extends PackagerBlockEntity {
         super(type, pos, state);
     }
 
+    /**
+     * A packager outside its tower's reach does not pack.
+     *
+     * <p>Nothing is consumed and no box is made — the requests stay outstanding, and Create's
+     * factory panels re-issue what they are still waiting for on their own interval, so an order
+     * placed at a dark machine waits instead of disappearing. The alternative, letting it pack and
+     * trusting the dock to hold the result, would put boxes in a tray nobody can see and leave the
+     * panel reporting a fulfilled order.
+     */
     @Override
     public void attemptToSend(List<PackagingRequest> requests) {
+        if (!TowerActivation.active(level, worldPosition)) {
+            return;
+        }
         super.attemptToSend(requests);
         boolean changed = false;
         if (!heldBox.isEmpty()) {
@@ -64,5 +77,29 @@ public final class RemotePackagerBlockEntity extends PackagerBlockEntity {
         }
         OrderRouteDirectory.get(level.getServer()).find(PackageItem.getOrderId(stack))
                 .ifPresent(route -> RemoteRouteData.write(stack, route));
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        LoadedDevices.add(this);
+    }
+
+    @Override
+    public void onChunkUnloaded() {
+        LoadedDevices.remove(this);
+        super.onChunkUnloaded();
+    }
+
+    @Override
+    public void destroy() {
+        LoadedDevices.remove(this);
+        super.destroy();
+    }
+
+    @Override
+    public void remove() {
+        LoadedDevices.remove(this);
+        super.remove();
     }
 }

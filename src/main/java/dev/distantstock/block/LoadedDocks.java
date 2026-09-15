@@ -124,6 +124,40 @@ public final class LoadedDocks {
         return List.copyOf(matching);
     }
 
+    /**
+     * Every loaded dock, server side, sorted by dimension and position.
+     *
+     * <p>Added for the tower system, which has to look at all of them at once to decide which ones
+     * a tower carries. The selection helpers above deliberately never do that: a delivery only ever
+     * considers one group.
+     */
+    public static List<DockBlockEntity> allDocks() {
+        List<DockBlockEntity> matching = new ArrayList<>();
+        for (DockBlockEntity be : ALL) {
+            if (!be.isRemoved() && be.getLevel() != null && !be.getLevel().isClientSide) {
+                matching.add(be);
+            }
+        }
+        matching.sort(Comparator
+                .comparing((DockBlockEntity be) -> be.getLevel().dimension().location().toString())
+                .thenComparingLong(be -> be.getBlockPos().asLong()));
+        return List.copyOf(matching);
+    }
+
+    /** Every loaded request desk, server side, sorted the same way as {@link #allDocks()}. */
+    public static List<GaugeBlockEntity> allGauges() {
+        List<GaugeBlockEntity> matching = new ArrayList<>();
+        for (GaugeBlockEntity be : GAUGES) {
+            if (!be.isRemoved() && be.getLevel() != null && !be.getLevel().isClientSide) {
+                matching.add(be);
+            }
+        }
+        matching.sort(Comparator
+                .comparing((GaugeBlockEntity be) -> be.getLevel().dimension().location().toString())
+                .thenComparingLong(be -> be.getBlockPos().asLong()));
+        return List.copyOf(matching);
+    }
+
     public static DockBlockEntity at(String dimension, long packedPos) {
         for (DockBlockEntity dock : ALL) {
             if (dock.isRemoved() || dock.getLevel() == null) {

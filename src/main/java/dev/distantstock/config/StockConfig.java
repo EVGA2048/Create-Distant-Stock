@@ -26,6 +26,8 @@ public final class StockConfig {
     public static final ModConfigSpec.BooleanValue DEMO_STOCK;
     public static final ModConfigSpec.BooleanValue GIVE_MANUAL;
     public static final ModConfigSpec.IntValue CASING_REDSTONE_RANGE;
+    public static final ModConfigSpec.BooleanValue TOWER_CHARGE_PARCELS;
+    public static final ModConfigSpec.IntValue TOWER_PARCEL_COST;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -55,6 +57,15 @@ public final class StockConfig {
                         "before the window stops opening. Bounds a search per casing, so a large build",
                         "does not hitch when a lever is flipped.")
                 .defineInRange("casing.redstoneRange", 32, 1, 64);
+        TOWER_CHARGE_PARCELS = b.comment(
+                        "Charge the tower ether for every parcel that leaves a dock it carries.",
+                        "Off by default: the tower system is still being tested, and a server that",
+                        "turned this on by accident would drain its towers before the price is settled.")
+                .define("tower.chargeParcels", false);
+        TOWER_PARCEL_COST = b.comment(
+                        "Millibuckets of ether one parcel costs while tower.chargeParcels is on.",
+                        "A parcel that cannot pay stays in its dock; it is never sent unbilled.")
+                .defineInRange("tower.parcelCost", 250, 1, 1000000);
         SPEC = b.build();
     }
 
@@ -68,6 +79,28 @@ public final class StockConfig {
             return CASING_REDSTONE_RANGE.get();
         } catch (IllegalStateException notLoaded) {
             return 32;
+        }
+    }
+
+    /**
+     * Whether a tower pays for the parcels its docks send. Read here rather than through
+     * {@link dev.distantstock.routing.TowerBilling}, which adds the switch a game test needs to
+     * exercise both answers without editing a config file mid-run.
+     */
+    public static boolean towerChargeParcels() {
+        try {
+            return TOWER_CHARGE_PARCELS.get();
+        } catch (IllegalStateException notLoaded) {
+            return false;
+        }
+    }
+
+    /** Millibuckets one parcel costs. See {@link #towerChargeParcels()}. */
+    public static int towerParcelCost() {
+        try {
+            return TOWER_PARCEL_COST.get();
+        } catch (IllegalStateException notLoaded) {
+            return 250;
         }
     }
 

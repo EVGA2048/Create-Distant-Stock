@@ -3,13 +3,22 @@ package dev.distantstock.block;
 import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
 import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
+import dev.distantstock.fluid.ModFluids;
+import dev.distantstock.routing.TowerActivation;
+import dev.distantstock.routing.TowerBilling;
+import dev.distantstock.routing.TowerChunkLoader;
+import dev.distantstock.routing.TowerSystem;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 
 import java.util.List;
 
@@ -29,8 +38,22 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
     /** Four times a second, the same beat the docks use. */
     private static final int RESCAN_TICKS = 20;
 
+    /**
+     * How much ether the base holds: four buckets, sixteen parcels.
+     *
+     * <p>Flat across the tiers on purpose — the tower's size buys reach, devices and stress draw,
+     * and the tank is the part that has to be piped to. Sixteen parcels is enough that an operator
+     * is not standing over the pipe while a line runs, and small enough that a tower nobody is
+     * feeding stops instead of quietly hoarding a chest's worth of ether. A larger tank would only
+     * move the number where the mechanic becomes invisible.
+     */
+    public static final int ETHER_CAPACITY = 4000;
+
     private int couplers;
     private TowerTier tier;
+
+    private final FluidTank tank = new FluidTank(ETHER_CAPACITY,
+            stack -> stack.getFluid() == ModFluids.ETHER.get());
 
     public TowerCoreBlockEntity(BlockPos pos, BlockState state) {
         this(ModBlockEntities.TOWER_CORE.get(), pos, state);
@@ -42,6 +65,45 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
 
     @Override
     public void addBehaviours(List<BlockEntityBehaviour> behaviours) {
+    }
+
+    /** The base's tank, for the capability that lets pipes fill it. */
+    public IFluidHandler tank() {
+        return tank;
+    }
+
+    public int ether() {
+        return tank.getFluidAmount();
+    }
+
+    /**
+     * Takes ether out for one parcel. Returns what actually left, which is less than asked for when
+     * the tower is nearly empty.
+     *
+     * <p>Not clamped to the request: the caller has to see the shortfall to know the parcel must
+     * stay where it is, and a tower that pays part of a parcel would be paying for a transfer it
+     * cannot complete.
+     */
+    public int drawEther(int amount) {
+        if (amount <= 0) {
+            return 0;
+        }
+        FluidStack drained = tank.drain(amount, IFluidHandler.FluidAction.EXECUTE);
+        if (!drained.isEmpty()) {
+            setChanged();
+        }
+        return drained.getAmount();
+    }
+
+    /** Puts ether back, for a charge whose parcel then turned out not to leave. */
+    public void storeEther(int amount) {
+        if (amount <= 0) {
+            return;
+        }
+        int stored = tank.fill(new FluidStack(ModFluids.ETHER.get(), amount), IFluidHandler.FluidAction.EXECUTE);
+        if (stored > 0) {
+            setChanged();
+        }
     }
 
     @Override
@@ -69,6 +131,10 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
         // The stress this block draws just changed, and the network only recomputes when told to.
         // Without this the tower reports its old draw until something else disturbs the network.
         networkDirty = true;
+        // What the tower carries just changed too, and the snapshot that answers "is this device
+        // on" is only rebuilt on its own beat. Waiting for that beat would mean up to a second of
+        // docks believing they are carried by a mast that is no longer there.
+        TowerActivation.markDirty();
         setChanged();
         notifyUpdate();
     }
@@ -107,6 +173,11 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
         return tier;
     }
 
+    /** This tower's place in the systems, for the readout and for the ownership of tickets. */
+    public TowerSystem.TowerId id() {
+        return level == null ? null : TowerSystem.TowerId.of(level.dimension(), worldPosition);
+    }
+
     @Override
     public boolean addToGoggleTooltip(List<Component> tip, boolean sneaking) {
         GoggleText.title(tip, "block.distantstock.tower_core");
@@ -120,11 +191,77 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
         }
         GoggleText.line(tip, "goggle.distantstock.tower.radius", tier.radius());
         GoggleText.line(tip, "goggle.distantstock.tower.devices", tier.devices());
+        TowerSystem.TowerId id = id();
+        TowerActivation.Usage usage = id == null ? null : TowerActivation.usage(id);
+        if (usage != null) {
+            GoggleText.line(tip, "goggle.distantstock.tower.carrying", usage.carried(), usage.limit());
+        } else if (isRunning()) {
+            // Standing and turning, but in no system: the sum is the tower's own budget, since it
+            // has no neighbour to share a system with.
+            GoggleText.line(tip, "goggle.distantstock.tower.carrying", 0, tier.devices());
+        } else {
+            GoggleText.line(tip, "goggle.distantstock.tower.carrying.idle", tier.devices());
+        }
+        GoggleText.line(tip, "goggle.distantstock.tower.chunks", tier.chunkSide(), tier.chunkSide());
+        if (TowerBilling.enabled()) {
+            GoggleText.line(tip, "goggle.distantstock.tower.ether",
+                    tank.getFluidAmount(), ETHER_CAPACITY, TowerBilling.parcelCost());
+        } else {
+            // The switch is off, so an amount on this line would only invite the question of what it
+            // is being spent on. The tank is still there and still fillable; it just is not a bill.
+            GoggleText.line(tip, "goggle.distantstock.tower.ether.off");
+        }
         if (!isRunning()) {
             GoggleText.value(tip, "goggle.distantstock.tower.stalled", ChatFormatting.RED);
         }
         addStressImpactStats(tip, getSpeed());
         return true;
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        LoadedTowers.add(this);
+        // A mast that grew while the chunk was unloaded is only visible now, and the snapshot has
+        // been deciding without it in the meantime.
+        TowerActivation.markDirty();
+    }
+
+    /**
+     * The tower is still standing in the world — only its chunk went away.
+     *
+     * <p>{@code remove()} is deliberately not called from here. Create's own lifecycle already
+     * separates the two cases, and this half must keep the tower's chunk tickets: they exist
+     * precisely so the tower's own chunk comes back without a player walking past it.
+     */
+    @Override
+    public void onChunkUnloaded() {
+        LoadedTowers.remove(this);
+        TowerActivation.markDirty();
+        super.onChunkUnloaded();
+    }
+
+    /**
+     * The block is gone for good: this is the one place the tower's chunks are released.
+     *
+     * <p>Create calls {@code remove()} from {@code setRemoved()} only when the chunk did not unload,
+     * so a tower that merely left memory does not release anything.
+     */
+    @Override
+    public void remove() {
+        LoadedTowers.remove(this);
+        if (level instanceof ServerLevel serverLevel) {
+            TowerChunkLoader.forget(serverLevel, worldPosition);
+        }
+        TowerActivation.markDirty();
+        super.remove();
+    }
+
+    @Override
+    public void destroy() {
+        LoadedTowers.remove(this);
+        TowerActivation.markDirty();
+        super.destroy();
     }
 
     @Override
@@ -134,6 +271,7 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
         if (tier != null) {
             tag.putString("Tier", tier.name());
         }
+        tag.put("Tank", tank.writeToNBT(registries, new CompoundTag()));
     }
 
     @Override
@@ -147,6 +285,9 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
             } catch (IllegalArgumentException unknown) {
                 // A tier this build does not have: leave it null and let the next rescan settle it.
             }
+        }
+        if (tag.contains("Tank")) {
+            tank.readFromNBT(registries, tag.getCompound("Tank"));
         }
     }
 }

@@ -117,6 +117,24 @@ public final class MonitorBlockEntity extends BlockEntity implements IHaveGoggle
     }
 
     @Override
+    public void onLoad() {
+        super.onLoad();
+        LoadedDevices.add(this);
+    }
+
+    @Override
+    public void onChunkUnloaded() {
+        LoadedDevices.remove(this);
+        super.onChunkUnloaded();
+    }
+
+    @Override
+    public void setRemoved() {
+        LoadedDevices.remove(this);
+        super.setRemoved();
+    }
+
+    @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider regs) {
         super.saveAdditional(tag, regs);
         tag.putDouble("Tps", localTps);
