@@ -1,9 +1,17 @@
 package dev.distantstock.block;
 
+import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock;
+import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockEntity;
 import com.simibubi.create.content.logistics.box.PackageItem;
 import dev.distantstock.DistantStock;
+import dev.distantstock.item.RequesterData;
 import dev.distantstock.item.RequesterItem;
+import dev.distantstock.item.SignalLampPanelItem;
+import dev.distantstock.routing.RemoteNetworkId;
+import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -61,6 +69,9 @@ public final class DockInteractionEvents {
 
         BlockState state = event.getLevel().getBlockState(event.getPos());
         if (!isDistantDevice(state)) {
+            if (terminal && state.getBlock() instanceof FactoryPanelBlock) {
+                offerTerminalToPanel(event);
+            }
             return;
         }
         ItemInteractionResult result = state.useItemOn(event.getItemStack(), event.getLevel(),
@@ -69,6 +80,60 @@ public final class DockInteractionEvents {
             event.setCancellationResult(result.result());
             event.setCanceled(true);
         }
+    }
+
+    /**
+     * Binds a remote gauge that lives on a board which is not ours.
+     *
+     * <p>Our own boards read this click themselves. A remote gauge on somebody else's board cannot:
+     * the block that receives the click is theirs, and it has never heard of a warehouse across
+     * servers. So the gesture is answered here, on the same rule as everywhere else — a tuned
+     * terminal binds the panel under the crosshair, and sneaking clears it.
+     *
+     * <p>This only runs with Create: Deployer installed, which is the only way a panel of ours is on
+     * another mod's board in the first place.
+     */
+    private static void offerTerminalToPanel(PlayerInteractEvent.RightClickBlock event) {
+        if (!net.neoforged.fml.ModList.get().isLoaded("deployer")) {
+            return;
+        }
+        var level = event.getLevel();
+        ItemStack stack = event.getItemStack();
+        RemoteNetworkId network = RemoteGaugeBlock.networkFromStack(stack);
+        if (network == null) {
+            return;
+        }
+        BlockPos pos = SignalLampPanelItem.panelUnder(level, event.getPos(),
+                event.getHitVec().getDirection());
+        if (pos == null || !(level.getBlockEntity(pos) instanceof FactoryPanelBlockEntity board)) {
+            return;
+        }
+        BlockState panelState = level.getBlockState(pos);
+        var slot = FactoryPanelBlock.getTargetedSlot(pos, panelState, event.getHitVec().getLocation());
+        if (slot == null || !board.panels.get(slot).isActive()
+                || !dev.distantstock.panel.DeployerPanels.holdsRemoteGauge(board, slot)) {
+            // Not one of ours: another mod's panel, or an empty slot. Either way the board's own
+            // click logic is what should answer.
+            return;
+        }
+        if (level.isClientSide) {
+            event.setCancellationResult(ItemInteractionResult.sidedSuccess(true).result());
+            event.setCanceled(true);
+            return;
+        }
+        var player = event.getEntity();
+        if (player.isShiftKeyDown()) {
+            dev.distantstock.panel.DeployerPanels.unbind(board, slot);
+            player.displayClientMessage(
+                    Component.translatable("gui.distantstock.remote_gauge.unbound"), true);
+        } else {
+            dev.distantstock.panel.DeployerPanels.bind(board, slot, network,
+                    RequesterData.receivingGroup(stack).orElse(null), RequesterData.address(stack));
+            player.displayClientMessage(Component.translatable("gui.distantstock.remote_gauge.bound",
+                    network.shortLabel()), true);
+        }
+        event.setCancellationResult(ItemInteractionResult.sidedSuccess(false).result());
+        event.setCanceled(true);
     }
 
     /**

@@ -127,7 +127,7 @@ public final class RemoteGaugeBlock extends FactoryPanelBlock {
     }
 
     /** The warehouse a stack names, or null for anything that cannot name one across servers. */
-    private static RemoteNetworkId networkFromStack(ItemStack stack) {
+    static RemoteNetworkId networkFromStack(ItemStack stack) {
         if (stack.getItem() instanceof RequesterItem && RequesterData.tuned(stack)) {
             return RequesterData.network(stack).orElse(null);
         }

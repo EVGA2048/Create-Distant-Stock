@@ -151,9 +151,9 @@ public final class DistantStockScenes {
 
         scene.world().showSection(util.select().position(1, 1, 3), Direction.DOWN);
         scene.overlay().showText(90)
-                .text("Right-click a dock with a tuned Requester to make it a destination for goods, "
-                        + "and sneak-click to give it a delivery address. The desk reports what it "
-                        + "did in the line above your hotbar.")
+                .text("Sneak-click a dock with a tuned terminal and it joins the system you have "
+                        + "selected; click it plainly and it sends to that system. The desk reports "
+                        + "what it did in the line above your hotbar.")
                 .pointAt(util.vector().centerOf(1, 1, 3))
                 .placeNearTarget()
                 .attachKeyFrame();

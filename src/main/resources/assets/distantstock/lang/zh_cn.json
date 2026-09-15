@@ -245,7 +245,7 @@
   "distantstock.ponder.distant_import.text_3": "最末端是一只普通的箱子。这里不知道货物在对面服务器价值几何，对面也不知道它们在此处的去向；真正完成旅程的，只有那枚包裹。",
   "distantstock.ponder.distant_tune.header": "调谐与下单",
   "distantstock.ponder.distant_tune.text_1": "远仓请求台是远仓终端的家具形态，携带同一套网络与同一个地址。因此在这里写下的订单，打包产线读得懂。",
-  "distantstock.ponder.distant_tune.text_2": "手持已调谐的远仓终端右键远仓港，可将它设为收货方；潜行右键则写入收货地址。操作结果会显示在快捷栏上方。",
+  "distantstock.ponder.distant_tune.text_2": "手持已调谐的远仓终端潜行右键远仓港，它加入你当前选中的系统；直接右键则发往该系统。操作结果会显示在快捷栏上方。",
   "distantstock.ponder.distant_tune.text_3": "请求台是给人站着填写订单的地方，不是产线上的机器。请单独给它一个位置，免得日后的传送带还要绕开它布线。",
   "distantstock.ponder.distant_status.header": "读取链路状态",
   "distantstock.ponder.distant_status.text_1": "顶部的玻璃罩就是链路指示灯。对面不可达时它是暗的，两端互相找到时才会亮起——隔着房间看一眼，就能知道这条线通不通。",
@@ -315,5 +315,7 @@
   "distantstock.ponder.distant_replenish.text_6": "没有塔带载时它们什么都不发——先把塔立起来。",
   "message.distantstock.casing.port.open": "这一面已开成以太接口",
   "message.distantstock.casing.port.closed": "已经把这个接口关上",
-  "goggle.distantstock.tower.no_shaft": "  底座下方没有传动轴（只接受底面输入）"
+  "goggle.distantstock.tower.no_shaft": "  底座下方没有传动轴（只接受底面输入）",
+  "gui.distantstock.manual.h9": "两个系统怎么互传",
+  "gui.distantstock.manual.p9": "两座塔、两个港组之间互传，只需要三步。一、两边都要有正在转的塔：塔带载是远仓设备工作的前提，转不动的塔什么都不带，设备会停（护目镜上有红字）。二、给每个港指定归属：手持已调谐的终端潜行右键一个港，它加入你当前选中的那个系统。三、给发送港指定目的地：普通右键（不潜行）它，它就发往你当前选中的系统，同时自己切成发送模式。包裹从侧面或背面喂进发送港（传送带、漏斗都行），到达时落在对方系统的某个港里，从侧面抽走即可；底面是回退面，留给被拒收和堵塞的货，记得在下面放容器。港组只管「从哪些港出来」，和塔的等级无关：同一个系统里的港可以分散在多座塔的范围内。"
 }

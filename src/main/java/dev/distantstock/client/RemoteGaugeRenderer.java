@@ -9,19 +9,15 @@ import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelRenderer;
 import com.simibubi.create.content.redstone.link.LinkRenderer;
 import com.simibubi.create.foundation.blockEntity.behaviour.filtering.FilteringRenderer;
 import com.simibubi.create.foundation.render.RenderTypes;
-import dev.distantstock.DistantStock;
+import dev.distantstock.block.RemoteGaugeModels;
 import dev.engine_room.flywheel.lib.model.baked.PartialModel;
 import net.createmod.catnip.render.CachedBuffers;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.core.Direction;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.state.BlockState;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Draws the remote gauge with its own panel art.
@@ -32,32 +28,18 @@ import java.util.Map;
  * and only swap the texture, so the shapes stay identical.
  */
 public final class RemoteGaugeRenderer extends FactoryPanelRenderer {
-    private static final String[] PARTS = {
-            "panel", "panel_with_bulb", "panel_restocker", "panel_restocker_with_bulb",
-            "bulb_light", "bulb_red"
-    };
-    private static final Map<String, PartialModel> MODELS = new HashMap<>();
-
-    static {
-        for (String part : PARTS) {
-            MODELS.put(part, PartialModel.of(ResourceLocation.fromNamespaceAndPath(
-                    DistantStock.MODID, "block/remote_gauge/" + part)));
-        }
-    }
-
     public RemoteGaugeRenderer(BlockEntityRendererProvider.Context context) {
         super(context);
     }
 
     /** Force partial registration before the first model bake, not on renderer construction. */
     public static void registerModels() {
+        RemoteGaugeModels.init();
     }
 
     /** The housing for one slot. Create picks the passive/active variant from the configured amount. */
     static PartialModel panelModel(boolean restocker, boolean active) {
-        return MODELS.get(restocker
-                ? (active ? "panel_restocker_with_bulb" : "panel_restocker")
-                : (active ? "panel_with_bulb" : "panel"));
+        return RemoteGaugeModels.panel(restocker, active);
     }
 
     @Override
@@ -104,8 +86,8 @@ public final class RemoteGaugeRenderer extends FactoryPanelRenderer {
         float xRot = FactoryPanelBlock.getXRot(state) + (float) (Math.PI / 2);
         float yRot = FactoryPanelBlock.getYRot(state);
         float glow = behaviour.bulb.getValue(partialTicks);
-        PartialModel partial = MODELS.get(!behaviour.redstonePowered && !behaviour.isMissingAddress()
-                ? "bulb_light" : "bulb_red");
+        PartialModel partial = RemoteGaugeModels.bulb(
+                !behaviour.redstonePowered && !behaviour.isMissingAddress());
         CachedBuffers.partial(partial, state)
                 .rotateCentered(yRot, Direction.UP)
                 .rotateCentered(xRot, Direction.EAST)

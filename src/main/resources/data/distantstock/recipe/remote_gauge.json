@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": {
+    "A": {
+      "item": "create:andesite_alloy"
+    },
+    "P": {
+      "item": "distantstock:polished_ether_quartz"
+    },
+    "G": {
+      "item": "create:factory_gauge"
+    }
+  },
+  "pattern": [
+    "APA",
+    "PGP",
+    "APA"
+  ],
+  "result": {
+    "count": 1,
+    "id": "distantstock:remote_gauge"
+  }
+}

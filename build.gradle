@@ -99,10 +99,23 @@ tasks.named('jar', Jar).configure {
     destinationDirectory = file('build')
 }
 
-def createJar = file("${System.getProperty('user.home')}/Documents/minecraft_launcher/.minecraft/versions/ES2_Firmament_1.21.1_9th_9.3.2_SunlightSignal/mods/create-1.21.1-6.0.10.jar")
+def modpackMods = file("${System.getProperty('user.home')}/Documents/minecraft_launcher/.minecraft/versions/ES2_Firmament_1.21.1_9th_9.3.2_SunlightSignal/mods")
+def createJar = new File(modpackMods, 'create-1.21.1-6.0.10.jar')
 def ponderJar = file("libs/ponder-neoforge-1.0.82+mc1.21.1.jar")
 def flywheelJar = file("libs/flywheel-neoforge-1.21.1-1.0.6.jar")
 def transerverJar = file("../Transerver/build/libs/Transerver-0.1.0-SNAPSHOT.jar")
+
+/*
+ * Create: Deployer API and Extra Gauges, from the same pack Create comes from.
+ *
+ * Deployer turns Create's factory panel into a board that can host panel types it does not know
+ * about, and Extra Gauges registers eight of them. Distant Stock's gauges and lamps are panels of
+ * the same kind, so the compatibility work has to be written against these two and checked with
+ * them loaded. Both are compile-only and optional at runtime: everything that touches them sits
+ * behind a ModList check, so a player with neither mod gets the fallback path rather than a crash.
+ */
+def deployerJar = new File(modpackMods, 'deployer-0.1.2.jar')
+def extraGaugesJar = new File(modpackMods, 'extra_gauges-2.1.2.jar')
 
 tasks.register('extractPonder') {
     onlyIf { !ponderJar.exists() }
@@ -141,6 +154,14 @@ dependencies {
     compileOnly files(flywheelJar)
     compileOnly files(transerverJar)
     runtimeOnly files(transerverJar)
+    if (deployerJar.exists()) {
+        compileOnly files(deployerJar)
+        runtimeOnly files(deployerJar)
+    }
+    if (extraGaugesJar.exists()) {
+        compileOnly files(extraGaugesJar)
+        runtimeOnly files(extraGaugesJar)
+    }
 }
 
 // The protocol and custody checks live in the test source set and need the game classes to build NBT tags.
