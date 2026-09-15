@@ -45,11 +45,19 @@ public final class ParcelEscrowPump {
      * That is the worst of the three outcomes, because there is nothing to look at and nothing to
      * notice; a parcel handed back through the fallback face is a player being told.
      *
-     * <p>Five minutes, because the honest cases are genuinely slow: a receiver's chunk may be
-     * unloaded for a while, and a dock that is merely full will empty. Shorter would return parcels
-     * that were about to be delivered.
+     * <p>The routing design says a group that is temporarily full reports RETRY and its parcel
+     * waits, and a group whose docks are merely unloaded is the same kind of temporary. Neither can
+     * be told apart from "will never arrive" with what the server knows: {@link
+     * dev.distantstock.block.LoadedDocks} holds only docks that are loaded, so a group with no docks
+     * and a group whose docks are all unloaded look identical from here. An earlier attempt to
+     * answer at once by asking the group directly got that wrong — it returned parcels that were
+     * waiting for a chunk to load.
+     *
+     * <p>So there is one deadline and it has to serve both. Thirty minutes, because "temporarily
+     * full" has to be allowed to mean something: a parcel held that long is not waiting for a dock
+     * to empty, and handing it back is worth more than holding it where nobody can find it.
      */
-    public static final long HOLD_TIMEOUT_TICKS = 6000;
+    public static final long HOLD_TIMEOUT_TICKS = 36000;
 
     private static final Map<UUID, Long> REJECTED_SINCE = new ConcurrentHashMap<>();
 
