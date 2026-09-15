@@ -30,7 +30,8 @@ import java.util.Set;
  * being driven directly". It is derived, never set by redstone itself — a casing can be lit with
  * nothing attached to it.
  */
-public final class TowerCasingBlock extends Block {
+public final class TowerCasingBlock extends Block
+        implements com.simibubi.create.api.equipment.goggles.IProxyHoveringInformation {
     public static final MapCodec<TowerCasingBlock> CODEC = simpleCodec(TowerCasingBlock::new);
     public static final BooleanProperty POWERED = BooleanProperty.create("powered");
     /**
@@ -89,6 +90,25 @@ public final class TowerCasingBlock extends Block {
                             : "message.distantstock.casing.port.closed"), true);
         }
         return net.minecraft.world.ItemInteractionResult.sidedSuccess(level.isClientSide);
+    }
+
+    /**
+     * A casing in a tower's skirt reports the tower, not itself.
+     *
+     * <p>Nine blocks of skirt is eight blocks of wall between a player and the one block that knows
+     * anything: the base answers questions about tier, reach and ether, and every square around it
+     * is a casing that would otherwise say nothing at all. Create resolves this before it collects
+     * the tooltip, so pointing at the base costs no block entity and no mixin — the overlay simply
+     * asks the square the player is looking at where its information lives.
+     *
+     * <p>Deliberately not gated on the skirt being complete. A ring closed on three sides is a base
+     * somebody is still building, and that is exactly when its numbers are worth reading; the only
+     * thing required is that there is a base to read, which is what {@link #coreFor} looks for.
+     */
+    @Override
+    public net.minecraft.core.BlockPos getInformationSource(Level level, BlockPos pos, BlockState state) {
+        TowerCoreBlockEntity core = coreFor(level, pos);
+        return core == null ? pos : core.getBlockPos();
     }
 
     /**

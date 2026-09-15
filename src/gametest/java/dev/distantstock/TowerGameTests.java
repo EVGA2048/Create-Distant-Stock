@@ -225,4 +225,34 @@ public final class TowerGameTests {
                 "the ether did not arrive in the tower: " + core.ether() + " mB");
         h.succeed();
     }
+
+    /**
+     * A casing in the skirt hands the goggles the base's information instead of its own.
+     *
+     * <p>The base is the only block of a tower that knows anything, and eight casings stand between
+     * a player and it. Pointed at a casing, the overlay has to end up at the base — and pointed at a
+     * casing that is in no tower at all, at that casing, which is how "no tower here" stays
+     * distinguishable from "the tower failed to load".
+     */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void aSkirtCasingShowsTheBasesReadout(GameTestHelper h) {
+        h.setBlock(X, 0, Z, ModBlocks.TOWER_CORE.get().defaultBlockState());
+        h.setBlock(X + 1, 0, Z, ModBlocks.TOWER_CASING.get().defaultBlockState());
+        BlockPos core = h.absolutePos(new BlockPos(X, 0, Z));
+        BlockPos skirt = h.absolutePos(new BlockPos(X + 1, 0, Z));
+
+        var casing = ModBlocks.TOWER_CASING.get();
+        h.assertTrue(casing.getInformationSource(h.getLevel(), skirt,
+                        h.getLevel().getBlockState(skirt)).equals(core),
+                "a skirt casing did not report the base");
+
+        // A casing on its own, with a base two squares away rather than next to it, reports itself:
+        // the ring is the eight squares around the base and nothing else.
+        h.setBlock(X + 3, 0, Z, ModBlocks.TOWER_CASING.get().defaultBlockState());
+        BlockPos stray = h.absolutePos(new BlockPos(X + 3, 0, Z));
+        h.assertTrue(casing.getInformationSource(h.getLevel(), stray,
+                        h.getLevel().getBlockState(stray)).equals(stray),
+                "a casing in no tower claimed to be part of one");
+        h.succeed();
+    }
 }
