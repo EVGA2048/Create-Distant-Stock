@@ -8,6 +8,7 @@ import dev.distantstock.block.GaugeBlockEntity;
 import dev.distantstock.block.ModBlocks;
 import dev.distantstock.menu.RequesterMenu;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameType;
 import dev.distantstock.net.SetDockGroupC2S;
@@ -207,5 +208,58 @@ public final class DockGroupGameTests {
                 "a panel with an order outstanding filed a second one");
         h.assertTrue(RemoteGaugeOrders.plan(10, 0, 0, 0) == 0, "a cap of nothing still ordered");
         h.succeed();
+    }
+
+    /**
+     * A board with no binding does not order, however short it looks.
+     *
+     * <p>This is the promise the whole feature rests on. Every remote gauge board placed before the
+     * feature existed has no binding, and a panel on one of them reads its network exactly as a
+     * panel with a binding does — on a server with no logistics network it reads zero against a
+     * target of sixty-four, which is precisely the shape of a panel that should order. If the
+     * binding check ever stopped being the first thing the beat does, every factory gauge in every
+     * world would start buying from a warehouse nobody pointed it at.
+     *
+     * <p>The counter is the transport's own order queue rather than the board's state: what the test
+     * has to catch is an order that left, wherever it went.
+     */
+    @GameTest(template = "empty", timeoutTicks = 120)
+    public static void anUnboundGaugeNeverOrders(GameTestHelper h) {
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        h.getLevel().setBlock(pos, ModBlocks.REMOTE_GAUGE.get().defaultBlockState(), 3);
+        dev.distantstock.block.RemoteGaugeBlockEntity board = (dev.distantstock.block.RemoteGaugeBlockEntity) h.getLevel().getBlockEntity(pos);
+        h.assertTrue(board != null, "the board did not appear");
+
+        // A panel with an item on it and a target it is nowhere near.
+        var slot = com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock.PanelSlot.TOP_LEFT;
+        board.addPanel(slot, java.util.UUID.randomUUID());
+        var panel = board.panels.get(slot);
+        h.assertTrue(panel.isActive(), "the panel did not become active");
+        panel.setFilter(new ItemStack(dev.distantstock.item.ModItems.REMOTE_PACKAGE.get()));
+        panel.count = 64;
+        h.assertTrue(panel.getLevelInStorage() == 0, "a board with no network read a stock level");
+
+        int before = dev.distantstock.link.LinkQueues.orderDepth();
+        h.runAfterDelay(40, () -> {
+            h.assertTrue(dev.distantstock.link.LinkQueues.orderDepth() == before,
+                    "an unbound gauge filed an order");
+
+            // Now bind it to a warehouse that cannot be reached: this test world has no transport
+            // and no network, so the order is refused. The panel must not count a refused order as
+            // outstanding — a board that went quiet for two minutes over an order that never
+            // existed would be a board that stopped working for no reason the operator could see.
+            board.bind(slot, new dev.distantstock.routing.RemoteNetworkId(
+                            dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA,
+                            java.util.UUID.randomUUID(), java.util.UUID.randomUUID(),
+                            "minecraft:overworld", java.util.UUID.randomUUID()),
+                    java.util.UUID.randomUUID(), "");
+            h.runAfterDelay(60, () -> {
+                h.assertTrue(board.outstanding(slot) == 0,
+                        "a refused order was counted as in flight");
+                h.assertTrue(dev.distantstock.link.LinkQueues.orderDepth() == before,
+                        "a bound gauge with no transport still got an order out");
+                h.succeed();
+            });
+        });
     }
 }

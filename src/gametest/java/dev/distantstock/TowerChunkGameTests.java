@@ -76,6 +76,7 @@ public final class TowerChunkGameTests {
         ServerLevel level = h.getLevel();
         BlockPos core = h.absolutePos(new BlockPos(X, 0, Z));
         ChunkPos chunk = new ChunkPos(core);
+        SERVER_LEVEL.set(level);
         int before = ownersForcing(level, chunk);
 
         build(h, 5);
@@ -84,7 +85,8 @@ public final class TowerChunkGameTests {
         h.runAfterDelay(80, () -> {
             int loaded = ownersForcing(level, chunk);
             h.assertTrue(loaded == before + 1,
-                    "a tier I tower forced " + (loaded - before) + " owners on its own chunk instead of one");
+                    "a tier I tower forced " + (loaded - before) + " owners on its own chunk instead of one"
+                            + " (" + ownersIn(chunk, true) + " ticking, " + ownersIn(chunk, false) + " plain)");
 
             // Taking the mast down is not the same as taking the block away: the tower is gone, so
             // its chunk is released.
@@ -92,7 +94,8 @@ public final class TowerChunkGameTests {
             h.runAfterDelay(80, () -> {
                 int left = ownersForcing(level, chunk);
                 h.assertTrue(left == before,
-                        "the ticket outlived the tower: " + (left - before) + " owners still hold the chunk");
+                        "the ticket outlived the tower: " + (left - before) + " owners still hold the chunk"
+                                + " (" + ownersIn(chunk, true) + " ticking, " + ownersIn(chunk, false) + " plain)");
                 h.succeed();
             });
         });
@@ -107,16 +110,37 @@ public final class TowerChunkGameTests {
      * arena itself, and that must not be mistaken for a tower's ticket.
      */
     private static int ownersForcing(ServerLevel level, ChunkPos chunk) {
+        return ownersIn(chunk, false) + ownersIn(chunk, true);
+    }
+
+    /**
+     * How many owners hold this chunk, split by which of the two sets they are in.
+     *
+     * <p>Split rather than summed because the two mean different things and a count of two has two
+     * very different causes: a tower takes a ticking ticket, so a second owner in the ticking set is
+     * two towers or a tower that forced twice, while an owner in the plain set is a leftover that
+     * nothing will ever release. A failure that names the sets says which one happened.
+     */
+    private static int ownersIn(ChunkPos chunk, boolean ticking) {
+        ServerLevel level = SERVER_LEVEL.get();
+        if (level == null) {
+            return 0;
+        }
         ForcedChunksSavedData data = level.getDataStorage().get(ForcedChunksSavedData.factory(), "chunks");
         if (data == null) {
             return 0;
         }
         long packed = chunk.toLong();
-        return ownersIn(data.getBlockForcedChunks().getChunks(), packed)
-                + ownersIn(data.getBlockForcedChunks().getTickingChunks(), packed);
+        var held = ticking ? data.getBlockForcedChunks().getTickingChunks()
+                : data.getBlockForcedChunks().getChunks();
+        return countOwners(held, packed);
     }
 
-    private static int ownersIn(Map<?, ?> byOwner, long chunk) {
+    /** The level the running case is in, so the two counters above can share one signature. */
+    private static final java.util.concurrent.atomic.AtomicReference<ServerLevel> SERVER_LEVEL =
+            new java.util.concurrent.atomic.AtomicReference<>();
+
+    private static int countOwners(Map<?, ?> byOwner, long chunk) {
         int owners = 0;
         for (Object held : byOwner.values()) {
             if (held instanceof LongSet chunks && chunks.contains(chunk)) {
