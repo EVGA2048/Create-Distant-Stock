@@ -150,6 +150,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
                 dev.distantstock.routing.DockGroup renamed =
                         directory.rename(carried.get(), trimmed);
                 RequesterData.setReceivingGroup(stack, renamed.id(), renamed.name());
+                sendGroupList(player, stack);
                 return;
             }
         }
@@ -175,6 +176,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
         dev.distantstock.routing.DockGroup group = existing != null
                 ? existing : directory.createFor(trimmed, who);
         RequesterData.setReceivingGroup(stack, group.id(), group.name());
+        // Push the list again: a system just made does not exist on the client until it is told,
+        // and the one now carried has to stop being drawn as somebody else's.
+        sendGroupList(player, stack);
     }
 
     /** Pushes the current list to whoever has this screen open. */

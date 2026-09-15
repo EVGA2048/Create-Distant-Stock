@@ -9,7 +9,7 @@ import java.util.List;
 
 /** 远仓说明书。独立工业面板，点窗内左右翻页。 */
 public final class ManualScreen extends Screen {
-    private static final int PAGES = 5;
+    private static final int PAGES = 7;
     private static final int W = 240;
     private static final int H = 176;
 

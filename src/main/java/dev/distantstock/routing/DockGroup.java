@@ -46,10 +46,6 @@ public record DockGroup(UUID id, String name, UUID owner, boolean open) {
         return new DockGroup(id, name, owner, nextOpen);
     }
 
-    public DockGroup withOwner(UUID nextOwner) {
-        return new DockGroup(id, name, nextOwner, open);
-    }
-
     private static String normalizeName(String value) {
         String normalized = value == null ? "" : value.trim();
         if (normalized.isEmpty()) {

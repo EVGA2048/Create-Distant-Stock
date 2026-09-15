@@ -47,6 +47,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private EditBox address;
     private EditBox localAddress;
     private EditBox receivingGroup;
+    private net.minecraft.client.gui.components.Button renameButton;
     private final List<CartLine> cart = new ArrayList<>();
     /** The last name sent to the server, so closing a screen the player did not edit sends nothing. */
     private String committedGroup = "";
@@ -109,6 +110,13 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         // used makes that system; typing one that exists points at it. One field for both, because
         // the design has the player never see a UUID and there is nothing else to type.
         receivingGroup.setMaxLength(dev.distantstock.routing.DockGroup.MAX_NAME_LENGTH);
+        // Renaming needs a gesture of its own. Typing a new name and pressing Enter means "point at
+        // this", and pointing at a name nobody has used makes a new system — so without a button,
+        // renaming one is not reachable at all: it would quietly make a second system instead.
+        renameButton = addRenderableWidget(net.minecraft.client.gui.components.Button
+                .builder(net.minecraft.network.chat.Component.translatable("gui.distantstock.group.rename"),
+                        b -> commitDockGroup(dev.distantstock.net.SetDockGroupC2S.RENAME))
+                .bounds(leftPos + 198, topPos + this.imageHeight - 89, 26, 14).build());
         receivingGroup.setValue(keepGroup);
         receivingGroup.setResponder(ignore -> {
         });
@@ -305,6 +313,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         address.setVisible(tuned);
         localAddress.setVisible(tuned);
         receivingGroup.setVisible(tuned);
+        if (renameButton != null) {
+            renameButton.visible = tuned;
+        }
         renderBackground(g, mouseX, mouseY, partial);
         super.render(g, mouseX, mouseY, partial);
         // After everything, because a dropdown that the widgets behind it paint over is not one.

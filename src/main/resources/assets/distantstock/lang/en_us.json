@@ -283,5 +283,10 @@
   "gui.distantstock.tower.off": "off",
   "gui.distantstock.group.default": "Default receiving group",
   "gui.distantstock.route.group.hint": "Type a system name; a new one is made if it does not exist",
-  "gui.distantstock.group.closed": "That system is closed to you"
+  "gui.distantstock.group.closed": "That system is closed to you",
+  "gui.distantstock.manual.h6": "Interlink towers",
+  "gui.distantstock.manual.p6": "互通塔",
+  "gui.distantstock.manual.h7": "Systems, and keeping one to yourself",
+  "gui.distantstock.manual.p7": "系统，以及怎么把系统留给自己",
+  "gui.distantstock.group.rename": "Rename"
 }
