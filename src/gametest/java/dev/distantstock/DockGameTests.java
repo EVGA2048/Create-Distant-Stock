@@ -5,6 +5,7 @@ import dev.distantstock.block.DockStatus;
 import dev.distantstock.block.ModBlocks;
 import dev.distantstock.item.ModItems;
 import net.minecraft.core.BlockPos;
+import dev.distantstock.routing.TowerActivation;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -71,4 +72,75 @@ public final class DockGameTests {
 
     private DockGameTests() {
     }
+
+    /**
+     * Two systems, two towers, one parcel: a dock in one group sends it and a dock in the other
+     * receives it.
+     *
+     * <p>This is the whole of "two towers can hand goods to each other", end to end and in one save:
+     * the sending dock is on a tower, the receiving dock is on another one, the two are in different
+     * dock groups, and the parcel travels on the destination the sender carries rather than on
+     * anything either tower knows about the other. Every step between those two is the real one —
+     * the ship window, the local branch of the transport, the group lookup, the receiving dock's own
+     * insert.
+     *
+     * <p>Both docks are pinned as carried rather than having real towers built over them. A tower
+     * that is really turning claims its whole dimension and switches off every other distant device
+     * in it, which in a level shared with the rest of the suite means this case would take half the
+     * tests down with it. The pin is the same seam the activation cases use, and it answers exactly
+     * the question the gates ask.
+     */
+    @GameTest(template = "empty", timeoutTicks = 300)
+    public static void aParcelCrossesFromOneTowerToAnother(GameTestHelper h) {
+        net.minecraft.server.level.ServerLevel level = h.getLevel();
+        java.util.UUID node = java.util.UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId());
+
+        BlockPos senderPos = h.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos receiverPos = h.absolutePos(new BlockPos(6, 2, 2));
+        level.setBlock(senderPos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        level.setBlock(receiverPos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        DockBlockEntity sender = (DockBlockEntity) level.getBlockEntity(senderPos);
+        DockBlockEntity receiver = (DockBlockEntity) level.getBlockEntity(receiverPos);
+        h.assertTrue(sender != null && receiver != null, "the docks did not appear");
+
+        // Two systems with two names, so neither dock can be receiving by accident.
+        var directory = dev.distantstock.routing.DockGroupDirectory.get(level.getServer());
+        String stamp = java.util.UUID.randomUUID().toString().substring(0, 8);
+        dev.distantstock.routing.DockGroup from = directory.createFor("tower-a-" + stamp, null);
+        dev.distantstock.routing.DockGroup to = directory.createFor("tower-b-" + stamp, null);
+        sender.setGroupId(from.id());
+        receiver.setGroupId(to.id());
+
+        // Each on its own tower, and the sender pointed at the other system.
+        TowerActivation.pinDevice(dev.distantstock.routing.TowerSystem.TowerId.of(level.dimension(), senderPos),
+                true, dev.distantstock.routing.TowerSystem.TowerId.of(level.dimension(),
+                        h.absolutePos(new BlockPos(2, 0, 2))));
+        TowerActivation.pinDevice(dev.distantstock.routing.TowerSystem.TowerId.of(level.dimension(), receiverPos),
+                true, dev.distantstock.routing.TowerSystem.TowerId.of(level.dimension(),
+                        h.absolutePos(new BlockPos(6, 0, 2))));
+        try {
+            sender.setExport(java.util.UUID.randomUUID());
+            sender.setDefaultDestination(node, to.id());
+            h.assertTrue(sender.canSend(), "the sending dock is not in a state to send");
+
+            var handler = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
+                    senderPos, net.minecraft.core.Direction.UP);
+            h.assertTrue(handler != null && handler
+                            .insertItem(0, new ItemStack(ModItems.REMOTE_PACKAGE.get()), false).isEmpty(),
+                    "the parcel did not enter the sending dock");
+
+            // Long enough for the dock's transmit window to open, close, and the transport to hand
+            // the parcel over on its own beat.
+            h.runAfterDelay(160, () -> {
+                h.assertTrue(!receiver.displayedStack().isEmpty(),
+                        "the parcel never reached the receiving tower's dock");
+                h.assertTrue(sender.displayedStack().isEmpty(),
+                        "the parcel is in both docks");
+                h.succeed();
+            });
+        } finally {
+            h.runAfterDelay(240, TowerActivation::unpinDevices);
+        }
+    }
+
 }
