@@ -25,6 +25,10 @@ public final class ModItems {
             () -> new BlockItem(ModBlocks.GAUGE.get(), new Item.Properties()));
     public static final DeferredHolder<Item, com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockItem> REMOTE_GAUGE = ITEMS.register("remote_gauge",
             () -> new com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockItem(ModBlocks.REMOTE_GAUGE.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlockItem> REMOTE_REDSTONE_REQUESTER =
+            ITEMS.register("remote_redstone_requester",
+                    () -> new com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlockItem(
+                            ModBlocks.REMOTE_REDSTONE_REQUESTER.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> MONITOR = ITEMS.register("monitor",
             () -> new BlockItem(ModBlocks.MONITOR.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> REMOTE_PACKAGER = ITEMS.register("remote_packager",
@@ -81,6 +85,7 @@ public final class ModItems {
                 out.accept(DOCK.get());
                 out.accept(GAUGE.get());
                 out.accept(REMOTE_GAUGE.get());
+                out.accept(REMOTE_REDSTONE_REQUESTER.get());
                 out.accept(MONITOR.get());
                 out.accept(REMOTE_PACKAGER.get());
                 out.accept(CYAN_INDICATOR_LAMP.get());

@@ -25,6 +25,10 @@ public final class ModBlocks {
                     BlockBehaviour.Properties.ofFullCopy(net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
                             net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", "packager")))
                             .noOcclusion()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, RemoteRedstoneRequesterBlock> REMOTE_REDSTONE_REQUESTER =
+            BLOCKS.register("remote_redstone_requester", () -> new RemoteRedstoneRequesterBlock(
+                    BlockBehaviour.Properties.ofFullCopy(net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
+                            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", "redstone_requester")))));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, SignalPanelBlock> SIGNAL_PANEL =
             BLOCKS.register("signal_panel", () -> new SignalPanelBlock(panel()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, IndicatorLampBlock> CYAN_INDICATOR_LAMP = lamp("cyan_indicator_lamp");

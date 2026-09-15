@@ -24,6 +24,7 @@
   "gui.distantstock.remote_gauge.slot.top_right": "右上",
   "gui.distantstock.remote_gauge.slot.top_left": "左上",
   "block.distantstock.remote_gauge": "远仓仪表",
+  "block.distantstock.remote_redstone_requester": "远仓红石请求器",
   "block.distantstock.monitor": "远仓监视器",
   "block.distantstock.remote_packager": "远仓打包机",
   "block.distantstock.tower_casing": "远仓机壳",

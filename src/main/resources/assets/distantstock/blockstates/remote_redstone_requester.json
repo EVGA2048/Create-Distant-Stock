@@ -1,0 +1,18 @@
+{
+  "variants": {
+    "axis=x,powered=false": {
+      "model": "distantstock:block/remote_redstone_requester",
+      "y": 90
+    },
+    "axis=x,powered=true": {
+      "model": "distantstock:block/remote_redstone_requester_powered",
+      "y": 90
+    },
+    "axis=z,powered=false": {
+      "model": "distantstock:block/remote_redstone_requester"
+    },
+    "axis=z,powered=true": {
+      "model": "distantstock:block/remote_redstone_requester_powered"
+    }
+  }
+}

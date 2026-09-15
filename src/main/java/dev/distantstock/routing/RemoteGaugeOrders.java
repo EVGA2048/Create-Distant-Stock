@@ -77,12 +77,26 @@ public final class RemoteGaugeOrders {
      */
     public static boolean order(MinecraftServer server, RemoteNetworkId network, String address,
                                 java.util.UUID receivingGroup, ItemStack item, int count) {
-        if (server == null || network == null || item.isEmpty() || count <= 0) {
+        if (item.isEmpty() || count <= 0) {
             return false;
         }
         String id = BuiltInRegistries.ITEM.getKey(item.getItem()).toString();
+        return orderAll(server, network, address, receivingGroup, List.of(new LinkQueues.Line(id, count)));
+    }
+
+    /**
+     * Files one order for everything in the list.
+     *
+     * <p>One order rather than one per line: the far side packs it as a single request with a single
+     * correlation, and a redstone requester configured with nine items is one shipment, not nine.
+     */
+    public static boolean orderAll(MinecraftServer server, RemoteNetworkId network, String address,
+                                   java.util.UUID receivingGroup, List<LinkQueues.Line> lines) {
+        if (server == null || network == null || lines == null || lines.isEmpty()) {
+            return false;
+        }
         OrderService.Result result = OrderService.place(server, network, network.createFrequency(),
-                address == null ? "" : address, receivingGroup, List.of(new LinkQueues.Line(id, count)));
+                address == null ? "" : address, receivingGroup, List.copyOf(lines));
         return result == OrderService.Result.QUEUED;
     }
 }

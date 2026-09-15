@@ -42,6 +42,11 @@ public final class ModBlockEntities {
             BES.register("signal_panel", () -> BlockEntityType.Builder.of(SignalPanelBlockEntity::new,
                     ModBlocks.SIGNAL_PANEL.get()).build(null));
 
+    /** Same registry id as Create's would be, so nothing about the block is shared with it. */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RemoteRedstoneRequesterBlockEntity>> REMOTE_REDSTONE_REQUESTER =
+            BES.register("remote_redstone_requester", () -> BlockEntityType.Builder.of(
+                    RemoteRedstoneRequesterBlockEntity::new, ModBlocks.REMOTE_REDSTONE_REQUESTER.get()).build(null));
+
     /**
      * The core is a kinetic block entity because it is the tower's only rotating part, and the tier
      * lives here too: the table a tower has reached follows from the mast above it, which this walks.

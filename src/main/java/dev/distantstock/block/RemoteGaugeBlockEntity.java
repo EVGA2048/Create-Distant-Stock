@@ -46,7 +46,7 @@ public final class RemoteGaugeBlockEntity extends FactoryPanelBlockEntity implem
     }
 
     /** This panel's binding, or null when it is an ordinary factory gauge. */
-    public RemoteOrderBook.Binding binding(FactoryPanelBlock.PanelSlot slot) {
+    public RemoteBinding binding(FactoryPanelBlock.PanelSlot slot) {
         return orders.binding(slot);
     }
 

@@ -36,16 +36,12 @@ import java.util.UUID;
  * panel block entity, and Java has one parent.
  */
 final class RemoteOrderBook {
-    /** Where one panel's goods come from. */
-    record Binding(RemoteNetworkId network, UUID receivingGroup, String address) {
-    }
-
     /** What one panel asked for and when, so a slow delivery is not ordered twice. */
     private record Outstanding(int count, long since) {
     }
 
     private final FactoryPanelBlockEntity board;
-    private final Map<FactoryPanelBlock.PanelSlot, Binding> bindings =
+    private final Map<FactoryPanelBlock.PanelSlot, RemoteBinding> bindings =
             new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
     private final Map<FactoryPanelBlock.PanelSlot, Outstanding> outstanding =
             new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
@@ -58,11 +54,11 @@ final class RemoteOrderBook {
         return bindings.isEmpty();
     }
 
-    Binding binding(FactoryPanelBlock.PanelSlot slot) {
+    RemoteBinding binding(FactoryPanelBlock.PanelSlot slot) {
         return bindings.get(slot);
     }
 
-    Map<FactoryPanelBlock.PanelSlot, Binding> bindings() {
+    Map<FactoryPanelBlock.PanelSlot, RemoteBinding> bindings() {
         return Map.copyOf(bindings);
     }
 
@@ -77,7 +73,7 @@ final class RemoteOrderBook {
         if (network == null || slot == null) {
             return;
         }
-        bindings.put(slot, new Binding(network, receivingGroup, address == null ? "" : address));
+        bindings.put(slot, new RemoteBinding(network, receivingGroup, address));
         // Whatever the panel had outstanding was for a different warehouse and must not silence
         // this one.
         outstanding.remove(slot);
@@ -135,7 +131,7 @@ final class RemoteOrderBook {
             return;
         }
         for (FactoryPanelBlock.PanelSlot slot : FactoryPanelBlock.PanelSlot.values()) {
-            Binding binding = bindings.get(slot);
+            RemoteBinding binding = bindings.get(slot);
             if (binding == null) {
                 continue;
             }
@@ -194,13 +190,7 @@ final class RemoteOrderBook {
     void write(CompoundTag tag) {
         CompoundTag bound = new CompoundTag();
         for (var entry : bindings.entrySet()) {
-            CompoundTag row = new CompoundTag();
-            row.put("Network", entry.getValue().network().save());
-            if (entry.getValue().receivingGroup() != null) {
-                row.putUUID("Group", entry.getValue().receivingGroup());
-            }
-            row.putString("Address", entry.getValue().address());
-            bound.put(entry.getKey().name(), row);
+            bound.put(entry.getKey().name(), entry.getValue().save());
         }
         tag.put("RemoteBindings", bound);
         CompoundTag pending = new CompoundTag();
@@ -220,13 +210,10 @@ final class RemoteOrderBook {
             if (!bound.contains(slot.name())) {
                 continue;
             }
-            CompoundTag row = bound.getCompound(slot.name());
-            RemoteNetworkId network = RemoteNetworkId.read(row.getCompound("Network")).orElse(null);
-            if (network == null) {
-                continue;
+            RemoteBinding binding = RemoteBinding.read(bound.getCompound(slot.name()));
+            if (binding != null) {
+                bindings.put(slot, binding);
             }
-            bindings.put(slot, new Binding(network,
-                    row.hasUUID("Group") ? row.getUUID("Group") : null, row.getString("Address")));
         }
         outstanding.clear();
         // The count is server state, told to the client so the goggle line can show it. A client
@@ -256,7 +243,7 @@ final class RemoteOrderBook {
         for (var entry : bindings.entrySet()) {
             String slot = Component.translatable("gui.distantstock.remote_gauge.slot."
                     + entry.getKey().name().toLowerCase(java.util.Locale.ROOT)).getString();
-            Binding binding = entry.getValue();
+            RemoteBinding binding = entry.getValue();
             GoggleText.line(tip, "goggle.distantstock.remote_gauge.source", slot,
                     binding.network().shortLabel());
             GoggleText.line(tip, "goggle.distantstock.remote_gauge.group",

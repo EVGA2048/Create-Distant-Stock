@@ -3,6 +3,7 @@
   "item.distantstock.requester.unbind_hint": "Sneak + use in air: unbind network (keep address)",
   "item.distantstock.requester.unbound": "Network binding cleared; select a network again",
   "block.distantstock.remote_gauge": "Remote Factory Gauge",
+  "block.distantstock.remote_redstone_requester": "Distant Redstone Requester",
   "gui.distantstock.route.local": "Local",
   "gui.distantstock.route.group": "Port group",
   "gui.distantstock.route.remote": "Remote address",

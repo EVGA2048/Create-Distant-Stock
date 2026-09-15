@@ -313,7 +313,7 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
     }
 
     /** This panel's warehouse, or null when it is only a gauge. */
-    public RemoteOrderBook.Binding binding(FactoryPanelBlock.PanelSlot slot) {
+    public RemoteBinding binding(FactoryPanelBlock.PanelSlot slot) {
         return orders.binding(slot);
     }
 
