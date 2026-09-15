@@ -267,20 +267,55 @@ def seam_crossframe():
 
 
 def resonator_models():
-    """Fixed body and rotating arms, as two models: the rotor is turned by a block entity."""
+    """The resonator, as three models.
+
+    The body and the arms are split because the arms turn and a block model cannot. The light
+    column comes off the body for a different reason: it is the one piece of the tower that has
+    to change colour while the game is running, and a baked block model has one appearance for
+    every instance of it. Drawn by the renderer instead, the same four quads can be dim, bright
+    or deep depending on what the tower is doing.
+    """
     fixed = load(HANDOFF / "tower/fixed_mesh.json")
     rotor = load(HANDOFF / "tower/rotor_mesh.json")
+    beam = [q for q in fixed if q["material"] == "crystal"]
+    body = [q for q in fixed if q["material"] != "crystal"]
+    if not beam:
+        raise SystemExit("fixed_mesh has no crystal column; the beam model would be empty")
     textures = {name: f"distantstock:block/tower/{name}"
                 for name in sorted({q["material"] for q in fixed} | {q["material"] for q in rotor})}
-    return {"ether_resonator": (fixed, textures), "ether_resonator_rotor": (rotor, textures)}
+    return {
+        "ether_resonator": (body, textures),
+        "ether_resonator_beam": (beam, textures),
+        "ether_resonator_rotor": (rotor, textures),
+    }
+
+
+# Textures whose alpha has to go, and why each one is on the list.
+#
+# The handoff's preview renderer composites over a background and ignores alpha entirely, so a
+# texture drawn half-transparent looks soft there and does something else here. A block model
+# renders cutout, which discards anything below alpha 128 outright: crystal.png is 92..185 on
+# every one of its 256 pixels, so 220 of them would be holes and the tower's crystal column would
+# come out as lace. The console's dish had exactly this, and was fixed the same way.
+#
+# Not on the list, deliberately: axis/axis_top/frame have binary alpha and are shapes rather than
+# shading, so their holes are meant; cap is a flat 140, above the cutout threshold, and only loses
+# a softness nothing was going to render anyway.
+FORCE_OPAQUE = {"crystal"}
 
 
 def copy_textures():
     TEX_OUT.mkdir(parents=True, exist_ok=True)
-    for source in sorted((HANDOFF / "tower/textures").glob("*.png")):
-        shutil.copyfile(source, TEX_OUT / source.name)
-    for source in sorted((HANDOFF / "casing/textures").glob("*.png")):
-        shutil.copyfile(source, TEX_OUT / source.name)
+    sources = sorted((HANDOFF / "tower/textures").glob("*.png")) \
+        + sorted((HANDOFF / "casing/textures").glob("*.png"))
+    for source in sources:
+        out = TEX_OUT / source.name
+        shutil.copyfile(source, out)
+        if source.stem in FORCE_OPAQUE:
+            from PIL import Image
+            image = Image.open(out).convert("RGBA")
+            image.putalpha(255)
+            image.save(out)
     print(f"textures -> {TEX_OUT.relative_to(ROOT)}")
 
 
@@ -316,24 +351,33 @@ def merged(*models: dict) -> dict:
 
 
 def write_casing():
-    """The casing is the one piece that is not from a mesh: a plain cube on its own texture.
+    """The casing is the one piece that is not from a mesh: a plain cube, twice.
 
-    Stage two replaces the texture with a connected-texture selection, but the geometry — a full
-    block — does not change, so this model outlives the swap.
+    Twice because the two states need different render layers, and a render layer belongs to the
+    model. The window is a sheet of blue-white glass whose middle is mostly transparent; on the
+    solid layer alpha is ignored and the glass would come out as flat paint. So the powered state
+    gets its own model on the translucent layer, and the block state picks between them.
+
+    Both name the same base texture on purpose. Create only rewrites a quad whose sprite is the
+    shift's own original, and both casing shifts are cut from `casing_inactive` — the model never
+    shows it, the connected-texture pass replaces it before anything is drawn.
     """
     texture = "distantstock:block/tower/casing_inactive"
-    model = {
-        "parent": "minecraft:block/block",
-        "textures": {"all": texture, "particle": texture},
-        "elements": [{
-            "from": [0, 0, 0], "to": [16, 16, 16],
-            "faces": {face: {"texture": "#all"} for face in
-                      ("down", "up", "north", "south", "west", "east")},
-        }],
-    }
     MODEL_OUT.mkdir(parents=True, exist_ok=True)
-    (MODEL_OUT / "tower_casing.json").write_text(json.dumps(model, indent=2) + "\n")
-    print(f"  {'tower_casing':26s}   1 elements")
+    for name, render_type in (("tower_casing", None), ("tower_casing_active", "minecraft:translucent")):
+        model = {
+            "parent": "minecraft:block/block",
+            "textures": {"all": texture, "particle": texture},
+            "elements": [{
+                "from": [0, 0, 0], "to": [16, 16, 16],
+                "faces": {face: {"texture": "#all"} for face in
+                          ("down", "up", "north", "south", "west", "east")},
+            }],
+        }
+        if render_type:
+            model["render_type"] = render_type
+        (MODEL_OUT / f"{name}.json").write_text(json.dumps(model, indent=2) + "\n")
+    print(f"  {'tower_casing':26s}   1 elements (+ active variant)")
 
 
 def write_item_models():
@@ -347,6 +391,9 @@ def write_item_models():
     ITEM_OUT.mkdir(parents=True, exist_ok=True)
     icon = merged(
         json.loads((MODEL_OUT / "ether_resonator.json").read_text()),
+        # The beam is a renderer model in the world, so the icon has to carry it itself or the
+        # item is a ring with a hole where the light should be.
+        json.loads((MODEL_OUT / "ether_resonator_beam.json").read_text()),
         turned(json.loads((MODEL_OUT / "ether_resonator_rotor.json").read_text()), turn=25),
     )
     icon["parent"] = "minecraft:block/block"
@@ -474,6 +521,7 @@ def verify_against_handoff():
         placed("tower_coupler_middle", 32),
         placed("tower_coupler_middle", 48),
         placed("ether_resonator", 64),
+        placed("ether_resonator_beam", 64),
         placed("ether_resonator_rotor", 64, turn=25),
     )
     clashes = coplanar_overlaps(tower)

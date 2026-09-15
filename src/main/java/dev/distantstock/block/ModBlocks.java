@@ -34,8 +34,13 @@ public final class ModBlocks {
     public static final DeferredHolder<net.minecraft.world.level.block.Block, IndicatorLampBlock> WHITE_INDICATOR_LAMP = lamp("white_indicator_lamp");
     public static final DeferredHolder<net.minecraft.world.level.block.Block, IndicatorLampBlock> BRASS_INDICATOR_LAMP = lamp("brass_indicator_lamp");
 
+    /**
+     * Non-occluding because half of its job is to be seen through. A full-cube occlusion shape
+     * culls whatever is directly behind the block, so a window in a casing wall would look through
+     * the culled face of the core it is wrapped around and out the other side of the world.
+     */
     public static final DeferredHolder<net.minecraft.world.level.block.Block, TowerCasingBlock> TOWER_CASING =
-            BLOCKS.register("tower_casing", () -> new TowerCasingBlock(tower()));
+            BLOCKS.register("tower_casing", () -> new TowerCasingBlock(tower().noOcclusion()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, TowerCouplerBlock> TOWER_COUPLER =
             BLOCKS.register("tower_coupler", () -> new TowerCouplerBlock(tower().noOcclusion()));
     /** The 3x3 base's centre: the one part of a tower that takes rotation, from the shaft below. */

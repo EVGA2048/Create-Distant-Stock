@@ -29,8 +29,23 @@ import net.minecraft.world.level.block.state.BlockState;
 public final class ResonatorRenderer extends SmartBlockEntityRenderer<ResonatorBlockEntity> {
     private static final PartialModel ROTOR = PartialModel.of(ResourceLocation.fromNamespaceAndPath(
             DistantStock.MODID, "block/tower/ether_resonator_rotor"));
+    private static final PartialModel BEAM = PartialModel.of(ResourceLocation.fromNamespaceAndPath(
+            DistantStock.MODID, "block/tower/ether_resonator_beam"));
     /** Degrees per tick. Slow enough to read as idle machinery rather than a fan. */
     private static final float SPEED = 1.5f;
+
+    /**
+     * What each state does to the light column, as a multiplier over the authored texture.
+     *
+     * <p>These are tints, not textures: the column is one sprite at three brightnesses rather than
+     * three sprites, so a change of state costs a colour and nothing else. A tower that is not
+     * turning goes grey and flat, one that is working shows the cyan it was drawn in, and one with
+     * a parcel crossing it goes a deeper, more saturated blue and lights itself — the difference
+     * has to be readable from the ground at the base of a tower thirty blocks tall.
+     */
+    private static final int[] BEAM_TINT = {0x6E7A85, 0xFFFFFF, 0x9FC4FF};
+    /** And how solid it is. A dormant column is nearly a ghost; a working one is nearly glass. */
+    private static final int[] BEAM_ALPHA = {150, 210, 255};
 
     public ResonatorRenderer(BlockEntityRendererProvider.Context context) {
         super(context);
@@ -39,15 +54,42 @@ public final class ResonatorRenderer extends SmartBlockEntityRenderer<ResonatorB
     @Override
     protected void renderSafe(ResonatorBlockEntity be, float partialTick, PoseStack pose,
                               MultiBufferSource buffers, int light, int overlay) {
-        if (be.getLevel() == null || !TowerStructure.assembled(be.getLevel(), be.getBlockPos())) {
+        if (be.getLevel() == null) {
             return;
         }
         BlockState state = be.getBlockState();
+        ResonatorBlockEntity.Beam beam = be.beam();
+        drawBeam(state, beam, pose, buffers, light, overlay);
+        if (!TowerStructure.assembled(be.getLevel(), be.getBlockPos())) {
+            return;
+        }
         float angle = ((be.getLevel().getGameTime() + partialTick) * SPEED) % 360.0f;
         CachedBuffers.partial(ROTOR, state)
                 .rotateCentered(angle, Direction.UP)
                 .light(light)
                 .overlay(overlay)
                 .renderInto(pose, buffers.getBuffer(RenderType.cutout()));
+    }
+
+    /**
+     * The light column, drawn whatever the tower is doing.
+     *
+     * <p>A dark column standing over a half-built mast is how a player finds out the tower is not
+     * finished, so this is deliberately not conditional on the tower being assembled.
+     */
+    private static void drawBeam(BlockState state, ResonatorBlockEntity.Beam beam,
+                                 PoseStack pose, MultiBufferSource buffers, int light, int overlay) {
+        int tint = BEAM_TINT[beam.ordinal()];
+        // A lit beam ignores the world's light: it is meant to read as a source, not a surface.
+        int beamLight = beam == ResonatorBlockEntity.Beam.ACTIVE ? 0xF000F0 : light;
+        CachedBuffers.partial(BEAM, state)
+                .light(beamLight)
+                .color((tint >> 16) & 0xFF, (tint >> 8) & 0xFF, tint & 0xFF,
+                        BEAM_ALPHA[beam.ordinal()])
+                // Translucent, and it has to be: the column is a light, not a surface. The layer
+                // blends and does not write depth, so it still hides behind the tower's solid parts
+                // while letting the world show through it — which cutout cannot do at all, since it
+                // would throw away the texture's own shading and leave a painted tube.
+                .renderInto(pose, buffers.getBuffer(RenderType.translucent()));
     }
 }
