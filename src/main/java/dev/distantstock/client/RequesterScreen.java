@@ -230,6 +230,13 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private dev.distantstock.net.DockGroupsS2C groups;
     /** The other half of the same list: destinations on servers this one has been let into. */
     private dev.distantstock.net.RemoteGroupsS2C remotes;
+    /**
+     * The system whose row is asking to be deleted, or null.
+     *
+     * <p>Held on the client and nowhere else: it is a question, not a state the server has any use
+     * for, and a row that stopped asking when the screen closed is the behaviour wanted.
+     */
+    private String pendingDelete;
 
     public void applyRemoteGroups(dev.distantstock.net.RemoteGroupsS2C next) {
         remotes = next;
@@ -313,13 +320,24 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 g.drawString(font, trim(label, w - 6), x + 3, rowY + 1, 0xFFD8C8F0, false);
             } else if (i < local) {
                 var entry = groups.groups().get(i);
-                g.fill(x, rowY, x + w, rowY + 10, over ? 0xFF3E5A61 : 0xFF2E444B);
+                boolean doomed = entry.name().equals(pendingDelete);
+                g.fill(x, rowY, x + w, rowY + 10,
+                        doomed ? 0xFF6B2A2A : over ? 0xFF3E5A61 : 0xFF2E444B);
                 // The carried one is marked so the field's value and the list agree at a glance.
                 boolean here = groups.carried() != null && groups.carried().equals(entry.id());
-                g.drawString(font, trim(entry.name(), w - 30), x + 3, rowY + 1,
-                        here ? 0xFF9BE0C4 : INK, false);
+                String left = doomed
+                        ? Component.translatable("gui.distantstock.group.delete_confirm").getString()
+                        : entry.name();
+                g.drawString(font, trim(left, w - (entry.mine() ? 40 : 30)), x + 3, rowY + 1,
+                        doomed ? 0xFFFFD0D0 : here ? 0xFF9BE0C4 : INK, false);
+                if (entry.mine()) {
+                    // The owner's two dials, at the end of their own row: the lock, and the way to
+                    // be rid of it. Both are only drawn on a row this player owns — there is
+                    // nothing to open or delete on somebody else's system.
+                    g.drawString(font, "×", x + w - 8, rowY + 1, doomed ? 0xFFFFD0D0 : 0xFFC0A090, false);
+                }
                 String tail = entry.docks() + (entry.open() ? "  ○" : "  ●");
-                g.drawString(font, tail, x + w - 2 - font.width(tail), rowY + 1,
+                g.drawString(font, tail, x + w - 12 - font.width(tail), rowY + 1,
                         entry.open() ? HINT : 0xFFC0A090, false);
             } else {
                 // A destination on another server, drawn in the same list because it is chosen the
@@ -385,8 +403,23 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 return true;
             }
             var entry = groups.groups().get(i);
-            // The right-hand end of the row is the lock, and only on a system this player owns.
-            if (mx >= x + w - 18 && entry.mine()) {
+            // The two dials an owner has on their own row. The delete is the one action on this
+            // screen that loses something, so it takes two clicks: the first turns the row red and
+            // asks, the second does it. The command has asked the same question since it shipped;
+            // this is the same question in the place the player actually is.
+            if (entry.mine() && mx >= x + w - 10) {
+                if (entry.name().equals(pendingDelete)) {
+                    pendingDelete = null;
+                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                            new dev.distantstock.net.SetDockGroupC2S(entry.name(),
+                                    dev.distantstock.net.SetDockGroupC2S.DELETE));
+                } else {
+                    pendingDelete = entry.name();
+                }
+                return true;
+            }
+            pendingDelete = null;
+            if (entry.mine() && mx >= x + w - 28) {
                 net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                         new dev.distantstock.net.SetDockGroupC2S(entry.name(),
                                 dev.distantstock.net.SetDockGroupC2S.TOGGLE_OPEN));

@@ -336,5 +336,6 @@
   "gui.distantstock.pair.no_answer": "No server recognised pairing code %s: it may have expired, been spent, or the other side is not linked.",
   "gui.distantstock.pair.refused": "The other server refused pairing code %s: expired or already spent.",
   "gui.distantstock.pair.paired": "Paired: destination \"%s\" is now available (from %s).",
-  "gui.distantstock.pair.remote_no_rename": "A remote dock group's name belongs to whoever owns it there."
+  "gui.distantstock.pair.remote_no_rename": "A remote dock group's name belongs to whoever owns it there.",
+  "gui.distantstock.group.delete_confirm": "Delete?"
 }

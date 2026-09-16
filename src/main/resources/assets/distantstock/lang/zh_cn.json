@@ -336,5 +336,6 @@
   "gui.distantstock.pair.no_answer": "没有服务器认领配对码「%s」：可能已过期、已被兑换，或对面没连上。",
   "gui.distantstock.pair.refused": "对面服务器拒绝了配对码「%s」：已过期或已被兑换。",
   "gui.distantstock.pair.paired": "配对成功：目的地「%s」已可用（来自 %s）。",
-  "gui.distantstock.pair.remote_no_rename": "远端港组的名字由对面服务器的主人决定，这里改不了。"
+  "gui.distantstock.pair.remote_no_rename": "远端港组的名字由对面服务器的主人决定，这里改不了。",
+  "gui.distantstock.group.delete_confirm": "确认删除？"
 }
