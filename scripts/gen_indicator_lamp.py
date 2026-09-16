@@ -36,6 +36,17 @@ COLORS = {
 }
 
 
+def _glow(colour):
+    """A lit version of one palette colour: brighter, same hue, still saturated."""
+    import colorsys
+    r, g, b = (c / 255.0 for c in colour)
+    h, sat, value = colorsys.rgb_to_hsv(r, g, b)
+    value = min(1.0, value * 1.45 + 0.10)
+    sat = sat * 0.85
+    r, g, b = colorsys.hsv_to_rgb(h, sat, value)
+    return (round(r * 255), round(g * 255), round(b * 255))
+
+
 def save_texture(name, image):
     TEXTURES.mkdir(parents=True, exist_ok=True)
     image.save(TEXTURES / f"{name}.png")
@@ -56,12 +67,13 @@ def make_textures():
             palette = palettes["on" if powered else "off"]
             alpha = 204 if powered else 190
             if powered:
-                # 亮着的灯要看着像在发光，而不是「颜色深一点的同一块塑料」：整条色阶往白里提，
-                # 并给足不透明度。配合方块光等级 14，才有一圈能照到旁边方块的光。
-                palette = tuple(
-                    tuple(min(255, int(c + (255 - c) * 0.25)) for c in colour)
-                    for colour in palette
-                )
+                # 亮着的灯要看着像在发光，而不是「颜色深一点的同一块塑料」。
+                #
+                # 往白里混是错的做法：混得少没效果（0.25 那次，用户说看不出亮），混得多就发白
+                # （0.62 那次，红灯变粉）。发光是**明度上去、饱和度基本留着**，所以走 HSV：
+                # 明度抬到接近满、饱和度略降，色相一点不动。配合方块光等级 14，才有一圈能照到
+                # 旁边方块的光，而不是一块更浅的塑料。
+                palette = tuple(_glow(colour) for colour in palette)
                 alpha = 255
             # Dedicated 5x5 atlas patch: one texture pixel per model unit,
             # like the tiny bulb on Create's factory gauge.

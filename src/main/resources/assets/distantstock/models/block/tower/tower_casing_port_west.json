@@ -19,16 +19,20 @@
       ],
       "faces": {
         "down": {
-          "texture": "#all"
+          "texture": "#all",
+          "cullface": "down"
         },
         "up": {
-          "texture": "#all"
+          "texture": "#all",
+          "cullface": "up"
         },
         "north": {
-          "texture": "#all"
+          "texture": "#all",
+          "cullface": "north"
         },
         "south": {
-          "texture": "#all"
+          "texture": "#all",
+          "cullface": "south"
         },
         "west": {
           "texture": "#port",
@@ -41,7 +45,8 @@
           "cullface": "west"
         },
         "east": {
-          "texture": "#all"
+          "texture": "#all",
+          "cullface": "east"
         }
       }
     }

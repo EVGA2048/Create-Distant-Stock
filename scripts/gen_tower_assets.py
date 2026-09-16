@@ -421,7 +421,13 @@ def write_casing():
             "textures": {"all": texture, "particle": texture},
             "elements": [{
                 "from": [0, 0, 0], "to": [16, 16, 16],
-                "faces": {face: {"texture": "#all"} for face in
+                # cullface on every face, and not for the usual reason: it is what makes NeoForge
+                # ask this block's neighbours whether they want their facing side drawn at all.
+                # `hidesNeighborFace` — the hook that stops two casings drawing the wall between
+                # them — is only consulted for quads that declare a cullface, so a casing model
+                # without one silently keeps showing the back of the block next to it through the
+                # window. See TowerCasingBlock.
+                "faces": {face: {"texture": "#all", "cullface": face} for face in
                           ("down", "up", "north", "south", "west", "east")},
             }],
         }
