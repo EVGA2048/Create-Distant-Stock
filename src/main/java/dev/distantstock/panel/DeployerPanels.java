@@ -164,6 +164,39 @@ public final class DeployerPanels {
         return true;
     }
 
+    /**
+     * Re-points an existing binding at a different destination and address, keeping its warehouse.
+     *
+     * <p>The warehouse is the one thing a player cannot type: it is a Create logistics network on
+     * some node, and the only way to name it is to stand in front of it with a tuned terminal. So
+     * the gesture keeps that job and the screen takes the other two — which is the pair a player
+     * actually changes, and the pair nobody could reach before.
+     *
+     * @return false when this slot holds no bound remote gauge, so the caller can say why
+     */
+    public static boolean rebind(FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot,
+                                 java.util.UUID receivingGroup, String address) {
+        if (!(board.panels.get(slot) instanceof RemoteGaugePanelBehaviour remote)) {
+            return false;
+        }
+        dev.distantstock.block.RemoteBinding current = remote.orders().binding();
+        if (current == null) {
+            return false;
+        }
+        remote.orders().bind(new dev.distantstock.block.RemoteBinding(
+                current.network(), receivingGroup, address));
+        return true;
+    }
+
+    /** The address this panel's goods carry, or an empty string when it has no binding. */
+    public static String addressOf(FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot) {
+        if (!(board.panels.get(slot) instanceof RemoteGaugePanelBehaviour remote)) {
+            return "";
+        }
+        dev.distantstock.block.RemoteBinding binding = remote.orders().binding();
+        return binding == null ? "" : binding.address();
+    }
+
     /** Unbinds the remote gauge in this slot, leaving it an ordinary factory gauge. */
     public static boolean unbind(FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot) {
         if (!(board.panels.get(slot) instanceof RemoteGaugePanelBehaviour remote)) {

@@ -81,6 +81,21 @@ public class RemoteGaugePanelBehaviour extends AbstractPanelBehaviour {
                 state == FactoryPanelBlock.PanelState.ACTIVE);
     }
 
+    /**
+     * Opens the panel's own screen: Create's, with the two cross-server fields added below it.
+     *
+     * <p>Without this a remote gauge opens exactly what a factory gauge opens, and its cross-server
+     * half is reachable only by a gesture and visible only through goggles — which is why it read as
+     * "just an ordinary factory gauge with no options".
+     *
+     * <p>Client only, like Create's own: {@code ScreenOpener} does not exist on a server, so the
+     * class that names it is loaded only on the client.
+     */
+    @Override
+    public void displayScreen(net.minecraft.world.entity.player.Player player) {
+        dev.distantstock.client.RemoteGaugeScreen.open(this);
+    }
+
     @Override
     public void tick() {
         super.tick();

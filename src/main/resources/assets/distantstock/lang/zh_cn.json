@@ -318,5 +318,7 @@
   "goggle.distantstock.tower.no_shaft": "  底座下方没有传动轴（只接受底面输入）",
   "gui.distantstock.manual.h9": "两个系统怎么互传",
   "gui.distantstock.manual.p9": "两座塔、两个港组之间互传，只需要三步。一、两边都要有正在转的塔：塔带载是远仓设备工作的前提，转不动的塔什么都不带，设备会停（护目镜上有红字）。二、给每个港指定归属：手持已调谐的终端潜行右键一个港，它加入你当前选中的那个系统。三、给发送港指定目的地：普通右键（不潜行）它，它就发往你当前选中的系统，同时自己切成发送模式。包裹从侧面或背面喂进发送港（传送带、漏斗都行），到达时落在对方系统的某个港里，从侧面抽走即可；底面是回退面，留给被拒收和堵塞的货，记得在下面放容器。港组只管「从哪些港出来」，和塔的等级无关：同一个系统里的港可以分散在多座塔的范围内。",
-  "gui.distantstock.dock_bind_no_network": "这里没有可抓取的物流网络"
+  "gui.distantstock.dock_bind_no_network": "这里没有可抓取的物流网络",
+  "gui.distantstock.remote_gauge.no_destination": "请填一个目的地",
+  "gui.distantstock.remote_gauge.needs_terminal": "这一格还没有仓库——先用已调谐的终端点它一下"
 }
