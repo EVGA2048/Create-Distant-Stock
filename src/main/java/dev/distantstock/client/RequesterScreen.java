@@ -617,6 +617,17 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         }
 
         renderRouteRow(g, imageHeight - 98, "gui.distantstock.route.group");
+        // The group field has no border of its own — it is drawn straight onto the brass plate so it
+        // reads as one line of a label — and the player who needed it most walked straight past it:
+        // "I did not notice there was a receiving group in the terminal". A sunken strip and an
+        // underline cost nothing and say "this part is editable".
+        int fieldX = receivingGroup.getX();
+        int fieldY = receivingGroup.getY();
+        g.fill(fieldX - 3, fieldY - 2, fieldX + receivingGroup.getWidth() + 3,
+                fieldY + receivingGroup.getHeight() + 2, receivingGroup.isFocused() ? 0x66FFFFFF : 0x33000000);
+        g.fill(fieldX - 3, fieldY + receivingGroup.getHeight() + 2,
+                fieldX + receivingGroup.getWidth() + 3, fieldY + receivingGroup.getHeight() + 3,
+                receivingGroup.isFocused() ? 0xFFFFFFFF : 0xAA8A7250);
 
         if (address.getValue().isBlank() && !address.isFocused()) {
             g.drawString(font, Component.translatable("gui.distantstock.route.remote")

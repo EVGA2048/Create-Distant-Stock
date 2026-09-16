@@ -347,5 +347,7 @@
   "goggle.distantstock.tower.ether_full": "Ether: full",
   "goggle.distantstock.peer_silent": "Peer: no readings yet (link up)",
   "gui.distantstock.networks.more": "showing %s of %s · scroll for more",
-  "message.distantstock.casing.port.no_tower": "This casing is not part of a tower: the port reaches nothing"
+  "message.distantstock.casing.port.no_tower": "This casing is not part of a tower: the port reaches nothing",
+  "message.distantstock.dock.target": "Receiving group set: %s (server: %s)",
+  "message.distantstock.dock.target.no_group": "The terminal carries no receiving group: this dock is now aimed at \"%s\", which accepts anything — cross-server parcels will stay here. Pick a group in the terminal's 接收港组 field first."
 }

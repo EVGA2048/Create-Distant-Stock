@@ -347,5 +347,7 @@
   "goggle.distantstock.tower.ether_full": "以太：已满",
   "goggle.distantstock.peer_silent": "对端：暂无比值（链路在线）",
   "gui.distantstock.networks.more": "显示 %s / %s · 滚轮翻页",
-  "message.distantstock.casing.port.no_tower": "这块机壳不属于任何塔：这个口通向空处"
+  "message.distantstock.casing.port.no_tower": "这块机壳不属于任何塔：这个口通向空处",
+  "message.distantstock.dock.target": "已设置收货港组：%s（服务器：%s）",
+  "message.distantstock.dock.target.no_group": "终端没有设收货港组：本港现在指向「%s」（谁都收），跨服包裹会被留在港内 —— 先在终端的「接收港组」里选一个组再点。"
 }

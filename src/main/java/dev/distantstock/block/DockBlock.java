@@ -195,9 +195,25 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                     }
                     be.setDefaultDestination(node, carried);
                     RequesterData.setReceivingGroup(stack, carried, carriedName);
+                    // Say what was just written, in the bar rather than only on the goggles. The
+                    // gesture's whole effect is a line of text on a block the player is not looking
+                    // at while they hold a terminal, and the failure it used to have — a terminal
+                    // holding no group silently aiming the dock at the wildcard group — is
+                    // indistinguishable from success without being told which group it was.
+                    boolean noGroup = RequesterData.receivingGroup(stack).isEmpty();
+                    if (noGroup && !dev.distantstock.link.TranserverBridge.isLocal(node.toString())) {
+                        // The one combination that cannot work, said before the player walks away:
+                        // a terminal holding no group aims a dock at the wildcard group, and a
+                        // parcel leaving this node towards it is refused at the dock. Better to
+                        // say so now than to leave them watching a parcel that will not go.
+                        player.displayClientMessage(Component.translatable(
+                                "message.distantstock.dock.target.no_group", carriedName), true);
+                    } else {
+                        player.displayClientMessage(Component.translatable(
+                                "message.distantstock.dock.target",
+                                carriedName, nodeLabel(level, node)), true);
+                    }
                 }
-                be.clearFault();
-                player.displayClientMessage(be.modeMessage(), true);
             }
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
@@ -265,6 +281,23 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
      * that joins it receives into it, and a dock that sends to it fills it. Both make machinery work
      * for a group the player does not own, and a lock that allowed half of that would not be one.
      */
+    /**
+     * How to name the node a dock is aimed at: "this server", or the other server's short label.
+     *
+     * <p>Read from the remote destinations this server has been let into, which is where the label
+     * the player saw in the list came from — the same name for the same thing, rather than a UUID.
+     */
+    private static String nodeLabel(Level level, java.util.UUID node) {
+        if (level.getServer() == null || dev.distantstock.link.TranserverBridge.isLocal(node.toString())) {
+            return Component.translatable("gui.distantstock.local").getString();
+        }
+        return dev.distantstock.routing.RemoteGroups.get(level.getServer()).all().stream()
+                .filter(entry -> entry.node().equals(node))
+                .map(entry -> entry.display().split("·")[0])
+                .findFirst()
+                .orElse(node.toString().substring(0, 8));
+    }
+
     private static boolean admits(Level level, java.util.UUID group, Player player) {
         if (level.getServer() == null) {
             return false;
