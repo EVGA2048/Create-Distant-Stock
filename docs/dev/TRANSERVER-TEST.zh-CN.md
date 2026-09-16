@@ -28,7 +28,7 @@ Distant Stock 的 bridge 挂上、Router 带两个节点监听。
 ```bash
 # 1. Router 先起，节点后起最省事（节点会自己重试，但先起 Router 日志更干净）
 java -jar ~/Documents/git_repository/Transerver/build/libs/Transerver-0.1.0-SNAPSHOT.jar \
-     build/transerver-router/router.properties
+     ~/Documents/git_repository/DistantStock/devtest/transerver/router.properties
 
 # 2. 两台服务器（两个终端）
 ./gradlew runServer
@@ -66,7 +66,7 @@ Transerver node started: 远仓A (BWWRD1M5-JH08S0D3) via http://127.0.0.1:8765/
    普通右键点港，把这个港指向 **B 端的那个组**。
 4. A 端塞一个包裹进发送港，盯三处：
    - A 端 `/distantstock status` 的出站队列是否清空；
-   - Router 的 `build/transerver-router/data/` 是否出现消息文件；
+   - B 的 `transerver/messages/` 是否出现消息文件（`sent-receipts/` 里那条最终应落到对端 `completed/`）；
    - B 端的港是否吐出包裹。
 5. **断网重试**：把 Router 杀掉，再塞一个包裹 → 消息应留在 A 的 outbox 里；
    把 Router 起回来 → 应该自动补投，且**不重复**（同 `messageId` 幂等）。
