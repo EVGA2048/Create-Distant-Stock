@@ -244,6 +244,14 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
         }
         GoggleText.line(tip, "goggle.distantstock.tower.radius", tier.radius());
         GoggleText.line(tip, "goggle.distantstock.tower.devices", tier.devices());
+        // Said before the carrying count, because a tower that is not turning carries nothing and
+        // "0 / 0 台设备" on its own reads as "your docks were not counted" rather than "this tower
+        // is not working". Reported from play exactly that way, twice.
+        if (getSpeed() == 0) {
+            GoggleText.line(tip, "goggle.distantstock.tower.not_turning");
+        } else if (!isRunning()) {
+            GoggleText.line(tip, "goggle.distantstock.tower.too_slow", getSpeed());
+        }
         TowerSystem.TowerId id = id();
         TowerActivation.Usage usage = id == null ? null : TowerActivation.usage(id);
         if (usage != null) {

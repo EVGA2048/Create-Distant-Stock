@@ -321,5 +321,7 @@
   "gui.distantstock.dock_bind_no_network": "这里没有可抓取的物流网络",
   "gui.distantstock.remote_gauge.no_destination": "请填一个目的地",
   "gui.distantstock.remote_gauge.needs_terminal": "这一格还没有仓库——先用已调谐的终端点它一下",
-  "gui.distantstock.group.default_fixed": "默认系统不能改名或删除"
+  "gui.distantstock.group.default_fixed": "默认系统不能改名或删除",
+  "goggle.distantstock.tower.not_turning": "  未接通应力——塔不转，不带载任何设备",
+  "goggle.distantstock.tower.too_slow": "  转速不足（%s rpm），达不到工作要求"
 }

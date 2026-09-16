@@ -321,5 +321,7 @@
   "gui.distantstock.dock_bind_no_network": "Nothing here carries a logistics network to copy",
   "gui.distantstock.remote_gauge.no_destination": "Give it a destination",
   "gui.distantstock.remote_gauge.needs_terminal": "This panel has no warehouse yet — point a tuned terminal at it first",
-  "gui.distantstock.group.default_fixed": "The default system cannot be renamed or removed"
+  "gui.distantstock.group.default_fixed": "The default system cannot be renamed or removed",
+  "goggle.distantstock.tower.not_turning": "  No rotation — a tower that is not turning carries nothing",
+  "goggle.distantstock.tower.too_slow": "  Turning too slowly (%s rpm) to carry anything"
 }
