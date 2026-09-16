@@ -131,7 +131,7 @@ public final class ClientSetup {
             // of ours is involved, which is the point — a board that looks like a display board
             // because it is one.
             e.registerBlockEntityRenderer(ModBlockEntities.MONITOR.get(),
-                    com.simibubi.create.content.trains.display.FlapDisplayRenderer::new);
+                    MonitorFlapRenderer::new);
         }
 
         @SubscribeEvent

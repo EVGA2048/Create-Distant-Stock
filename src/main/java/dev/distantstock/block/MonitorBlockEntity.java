@@ -126,6 +126,24 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
         return text.length() <= 4 ? text : text.substring(0, 4);
     }
 
+    /**
+     * Which of the four link states this moment is.
+     *
+     * <p>Waiting and broken are told apart on purpose: a peer announces every forty-five seconds, so
+     * a monitor that has not heard from one yet is the ordinary state of a link that was just
+     * plugged in, and showing the fault colour for it would send an operator looking for a fault
+     * that is not there. A failure the transport actually reported is a different thing.
+     */
+    private static MonitorBlock.Link linkState(LinkSnapshot.View v) {
+        if (!v.linkUp()) {
+            return MonitorBlock.Link.OFF;
+        }
+        if (v.peerFresh()) {
+            return MonitorBlock.Link.ONLINE;
+        }
+        return v.peerFails() > 0 ? MonitorBlock.Link.FAULT : MonitorBlock.Link.SYNCING;
+    }
+
     /** Turns the board to the reading this moment calls for, if it is not already showing it. */
     private void showPage(long gameTime) {
         java.util.List<String[]> pages = pages();
@@ -195,8 +213,11 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
         // The board turns to the next reading on its own beat, which is slower than this one.
         showPage(level.getGameTime());
         MonitorBlock.Status status = MonitorBlock.Status.fromTps(localTps);
-        if (state.getValue(MonitorBlock.STATUS) != status) {
-            level.setBlock(worldPosition, state.setValue(MonitorBlock.STATUS, status), 3);
+        MonitorBlock.Link link = linkState(v);
+        if (state.getValue(MonitorBlock.STATUS) != status
+                || state.getValue(MonitorBlock.LINK) != link) {
+            level.setBlock(worldPosition,
+                    state.setValue(MonitorBlock.STATUS, status).setValue(MonitorBlock.LINK, link), 3);
         }
         setChanged();
         BlockState current = getBlockState();

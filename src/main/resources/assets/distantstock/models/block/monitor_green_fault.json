@@ -166,54 +166,54 @@
         "north": {
           "texture": "#bulb",
           "uv": [
-            4,
+            8,
             0,
-            6,
+            10,
             2
           ]
         },
         "south": {
           "texture": "#bulb",
           "uv": [
-            4,
+            8,
             0,
-            6,
+            10,
             2
           ]
         },
         "west": {
           "texture": "#bulb",
           "uv": [
-            4,
+            8,
             0,
-            6,
+            10,
             2
           ]
         },
         "east": {
           "texture": "#bulb",
           "uv": [
-            4,
+            8,
             0,
-            6,
+            10,
             2
           ]
         },
         "up": {
           "texture": "#bulb",
           "uv": [
-            4,
+            8,
             0,
-            6,
+            10,
             2
           ]
         },
         "down": {
           "texture": "#bulb",
           "uv": [
-            4,
+            8,
             0,
-            6,
+            10,
             2
           ]
         }

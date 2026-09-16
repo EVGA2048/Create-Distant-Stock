@@ -96,54 +96,54 @@
         "north": {
           "texture": "#bulb",
           "uv": [
-            2,
+            6,
             0,
-            4,
+            8,
             2
           ]
         },
         "south": {
           "texture": "#bulb",
           "uv": [
-            2,
+            6,
             0,
-            4,
+            8,
             2
           ]
         },
         "west": {
           "texture": "#bulb",
           "uv": [
-            2,
+            6,
             0,
-            4,
+            8,
             2
           ]
         },
         "east": {
           "texture": "#bulb",
           "uv": [
-            2,
+            6,
             0,
-            4,
+            8,
             2
           ]
         },
         "up": {
           "texture": "#bulb",
           "uv": [
-            2,
+            6,
             0,
-            4,
+            8,
             2
           ]
         },
         "down": {
           "texture": "#bulb",
           "uv": [
-            2,
+            6,
             0,
-            4,
+            8,
             2
           ]
         }
@@ -166,54 +166,54 @@
         "north": {
           "texture": "#bulb",
           "uv": [
-            4,
-            0,
             6,
+            0,
+            8,
             2
           ]
         },
         "south": {
           "texture": "#bulb",
           "uv": [
-            4,
-            0,
             6,
+            0,
+            8,
             2
           ]
         },
         "west": {
           "texture": "#bulb",
           "uv": [
-            4,
-            0,
             6,
+            0,
+            8,
             2
           ]
         },
         "east": {
           "texture": "#bulb",
           "uv": [
-            4,
-            0,
             6,
+            0,
+            8,
             2
           ]
         },
         "up": {
           "texture": "#bulb",
           "uv": [
-            4,
-            0,
             6,
+            0,
+            8,
             2
           ]
         },
         "down": {
           "texture": "#bulb",
           "uv": [
-            4,
-            0,
             6,
+            0,
+            8,
             2
           ]
         }

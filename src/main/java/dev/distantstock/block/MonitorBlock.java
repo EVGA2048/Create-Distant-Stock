@@ -45,10 +45,19 @@ public final class MonitorBlock extends WallPanelBlock implements IWrenchable,
     }
     public static final MapCodec<MonitorBlock> CODEC = simpleCodec(MonitorBlock::new);
     public static final EnumProperty<Status> STATUS = EnumProperty.create("status", Status.class);
+    /**
+     * What the second bulb shows: the state of the link, not of this server.
+     *
+     * <p>A separate property from {@link #STATUS} because the two lamps say different things and a
+     * monitor is read at a glance — the left bulb is this server's own tick rate, the right one is
+     * whether the other end is answering. See {@code scripts/gen_monitor_face.py} for how the two
+     * colours are picked out of one bulb texture.
+     */
+    public static final EnumProperty<Link> LINK = EnumProperty.create("link", Link.class);
 
     public MonitorBlock(Properties props) {
         super(props);
-        registerDefaultState(defaultBlockState().setValue(STATUS, Status.GREEN));
+        registerDefaultState(defaultBlockState().setValue(STATUS, Status.GREEN).setValue(LINK, Link.OFF));
     }
 
     @Override
@@ -60,6 +69,7 @@ public final class MonitorBlock extends WallPanelBlock implements IWrenchable,
     protected void createBlockStateDefinition(StateDefinition.Builder<net.minecraft.world.level.block.Block, BlockState> b) {
         super.createBlockStateDefinition(b);
         b.add(STATUS);
+        b.add(LINK);
     }
 
     public enum Status implements StringRepresentable {
@@ -86,6 +96,29 @@ public final class MonitorBlock extends WallPanelBlock implements IWrenchable,
                 return ORANGE;
             }
             return RED;
+        }
+    }
+
+    /** The link lamp's four states, in the order the bulb texture lists its colours. */
+    public enum Link implements StringRepresentable {
+        /** Nothing attached, or the transport is down: the other end is not being talked to. */
+        OFF("off"),
+        /** The link answers and the other server has said how it is doing. */
+        ONLINE("online"),
+        /** The link answers but nothing has come back yet — waiting, not broken. */
+        SYNCING("syncing"),
+        /** The link answers and the last attempt to use it failed. */
+        FAULT("fault");
+
+        private final String name;
+
+        Link(String name) {
+            this.name = name;
+        }
+
+        @Override
+        public String getSerializedName() {
+            return name;
         }
     }
 
