@@ -111,3 +111,27 @@ public record PairingCode(String code, UUID group, UUID issuer,
 
 每条都要跑全套：`runGameTestServer`（判据是日志里的 `N GAME TESTS COMPLETE`）+
 `runClientSmoke`（界面改动必须跑），然后装机。
+
+---
+
+## 6. bug：监视器的「开关自锁」（用户 2026-09-16 报）
+
+> 「在监视器里面关掉开关以后监视器就显示『未接入塔』了 —— 相当于我在吊扇上面装了一个开关，
+> 转起来了我就碰不到他了。」
+
+**根因**：监视器的塔页要求它**正在被带载**才画得出来。
+
+- `TowerReadout.describe(carrier, facts, usage, side)`：`facts` 为空就 `return NONE`（＝未接入塔）；
+- `carrier` 来自激活快照里「谁在带载这个位置」，也就是**被带载集合**；
+- 于是：关掉监视器自己的开关（带载/区块开关）→ 它不再被带载 → 没有 carrier → 塔页整个不画 →
+  **那个能把它打开的开关也就没地方可按了**。自锁。
+
+**修法**：监视器「我在哪座塔下」必须**按几何算**，与是否被带载无关。
+
+1. 加 `TowerActivation.towerAt(level, pos)`：返回激活半径**包含**这个位置的塔（多座取最近），
+   完全不看带载集合；
+2. 快照构建时：`carriedBy(pos)` 有就用它，没有就退到 `towerAt(pos)`；
+3. `attached = false` 只在**真的没有任何塔的半径覆盖我**时出现 —— 那才是「未接入塔」的本意。
+
+被带载数、预算、上限这些**照旧**（它们本来就该反映真实带载），只是「页面能不能画出来」
+不再依赖它。
