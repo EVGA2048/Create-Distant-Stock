@@ -984,9 +984,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             request();
             return true;
         }
-        // The field gets the key before the screen does, for every field — the first version of this
-        // only offered it to the search box, so Backspace and the arrow keys were swallowed by the
-        // "typing swallows everything" rule below and the name could not be edited at all.
+        // The field gets the key before the screen does, for every field — an earlier version of
+        // this only offered it to the search box, so Backspace and the arrow keys were swallowed by
+        // the "while typing" rule below and the name could not be edited at all.
         if (receivingGroup != null && receivingGroup.isFocused()
                 && receivingGroup.keyPressed(key, scan, mods)) {
             return true;
@@ -997,17 +997,22 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (search != null && search.isFocused() && search.keyPressed(key, scan, mods)) {
             return true;
         }
-        if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE && groupPickerOpen) {
-            groupPickerOpen = false;
-            return true;
+        if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+            // Escape closes the list first and the screen second, and it always does one of them.
+            // The rule below used to swallow it along with every other key, which left a focused
+            // field as a room with no door: the player's report was "escape does not work either".
+            if (groupPickerOpen) {
+                groupPickerOpen = false;
+                return true;
+            }
+            return super.keyPressed(key, scan, mods);
         }
         // While one of our fields has focus, every other key is the field's.
         //
         // Vanilla closes a container screen on the inventory key, and letters reach a text field
         // through charTyped rather than keyPressed — so typing an "e" into the search box or the
         // system field closed the screen instead of typing an "e". Vanilla's creative-inventory
-        // search box has the same problem and answers it the same way. Escape is the one key that
-        // must keep working, or a focused field would be a room with no door.
+        // search box has the same problem and answers it the same way.
         if (typing()) {
             return true;
         }
