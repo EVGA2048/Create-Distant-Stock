@@ -93,7 +93,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         addRenderableWidget(address);
 
 
-        receivingGroup = new EditBox(font, leftPos + 82, topPos + imageHeight - 87, 112, 10,
+        receivingGroup = new EditBox(font, leftPos + 82, topPos + imageHeight - 87,
+                Math.max(60, imageWidth - 116), 10,
                 Component.translatable("gui.distantstock.route.group"));
         receivingGroup.setBordered(false);
         receivingGroup.setTextColor(INK);
@@ -107,7 +108,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         renameButton = addRenderableWidget(net.minecraft.client.gui.components.Button
                 .builder(net.minecraft.network.chat.Component.translatable("gui.distantstock.group.rename"),
                         b -> commitDockGroup(dev.distantstock.net.SetDockGroupC2S.RENAME))
-                .bounds(leftPos + 198, topPos + this.imageHeight - 89, 26, 14).build());
+                .bounds(leftPos + imageWidth - 30, topPos + this.imageHeight - 89, 26, 14).build());
         receivingGroup.setValue(keepGroup);
         // Remember what was put in the box, so closing an untouched screen sends nothing. Without
         // this the field's contents were compared against an empty string, so every close looked

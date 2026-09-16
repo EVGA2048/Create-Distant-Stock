@@ -149,6 +149,17 @@ public final class RequesterMenu extends AbstractContainerMenu {
             // otherwise the button would appear to do nothing at all on a fresh requester.
             java.util.Optional<java.util.UUID> carried =
                     dev.distantstock.item.RequesterData.receivingGroup(stack);
+            if (carried.isPresent()
+                    && carried.get().equals(directory.DEFAULT_GROUP_ID)) {
+                // The default system is the fallback for every lookup that misses, and its name is
+                // in the language file. Renaming it would leave the one group every dock starts in
+                // wearing a name nothing recognises — a player reported being able to do exactly
+                // this from the box the name is shown in.
+                player.displayClientMessage(
+                        net.minecraft.network.chat.Component.translatable("gui.distantstock.group.default_fixed"), true);
+                sendGroupList(player, stack);
+                return;
+            }
             if (carried.isPresent()) {
                 dev.distantstock.routing.DockGroup existing = directory.findByName(trimmed).orElse(null);
                 if (existing != null && !existing.id().equals(carried.get())) {

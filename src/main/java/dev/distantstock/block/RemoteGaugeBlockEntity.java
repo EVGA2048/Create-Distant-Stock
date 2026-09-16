@@ -9,6 +9,9 @@ import dev.distantstock.routing.RemoteGaugeOrders;
 import dev.distantstock.routing.RemoteNetworkId;
 import dev.distantstock.routing.TowerActivation;
 import dev.distantstock.stock.StockCache;
+import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
+import com.simibubi.create.foundation.advancement.AdvancementBehaviour;
+import com.simibubi.create.foundation.advancement.AllAdvancements;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -18,6 +21,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -43,6 +47,40 @@ public final class RemoteGaugeBlockEntity extends FactoryPanelBlockEntity implem
 
     public RemoteGaugeBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.REMOTE_GAUGE.get(), pos, state);
+    }
+
+    /**
+     * The board's four panels, each of which opens the distant gauge's own screen.
+     *
+     * <p>Create's default builds plain factory gauge panels, and a plain panel opens Create's plain
+     * screen — which is exactly what a player reported: the remote gauge's screen had the filter and
+     * the amount and nothing else, because the panel underneath was never ours to open. The screen
+     * is the only place the destination and the address are visible at all, so without this the
+     * cross-server half of a remote gauge is back to being a secret gesture.
+     */
+    @Override
+    public void addBehaviours(List<BlockEntityBehaviour> behaviours) {
+        panels = new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
+        redraw = true;
+        for (FactoryPanelBlock.PanelSlot slot : FactoryPanelBlock.PanelSlot.values()) {
+            FactoryPanelBehaviour panel = new RemotePanelBehaviour(this, slot);
+            panels.put(slot, panel);
+            behaviours.add(panel);
+        }
+        behaviours.add(advancements = new AdvancementBehaviour(this,
+                AllAdvancements.FACTORY_GAUGE));
+    }
+
+    /** A panel that knows it is a distant gauge, so its screen can say so. */
+    private static final class RemotePanelBehaviour extends FactoryPanelBehaviour {
+        private RemotePanelBehaviour(FactoryPanelBlockEntity be, FactoryPanelBlock.PanelSlot slot) {
+            super(be, slot);
+        }
+
+        @Override
+        public void displayScreen(net.minecraft.world.entity.player.Player player) {
+            dev.distantstock.client.RemoteGaugeScreen.open(this);
+        }
     }
 
     /** This panel's binding, or null when it is an ordinary factory gauge. */

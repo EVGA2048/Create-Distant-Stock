@@ -320,5 +320,6 @@
   "gui.distantstock.manual.p9": "Two towers, two dock groups, three steps. One: both sides need a tower that is turning — a tower carrying its devices is the premise of every distant machine, and one that is not turning carries nothing, so its devices stop and say so in red on the goggles. Two: give each dock its system. Sneak-click a dock with a tuned terminal and it joins the system you have selected. Three: give the sending dock its destination. Click it plainly (no sneak) and it sends to the system you have selected, and switches itself to send. Feed parcels in through a side or the back — belts and hoppers both work. They land in a dock of the other system and come out of a side; the underside is the return face for refused and jammed goods, so leave a container under it. A group decides which docks goods come out of and nothing else; it has no relation to tower tier, and the docks of one system may sit under several towers.",
   "gui.distantstock.dock_bind_no_network": "Nothing here carries a logistics network to copy",
   "gui.distantstock.remote_gauge.no_destination": "Give it a destination",
-  "gui.distantstock.remote_gauge.needs_terminal": "This panel has no warehouse yet — point a tuned terminal at it first"
+  "gui.distantstock.remote_gauge.needs_terminal": "This panel has no warehouse yet — point a tuned terminal at it first",
+  "gui.distantstock.group.default_fixed": "The default system cannot be renamed or removed"
 }

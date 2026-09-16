@@ -64,7 +64,9 @@ public final class StockConfig {
                         "Charge the tower ether for every parcel that leaves a dock it carries.",
                         "Off by default: the tower system is still being tested, and a server that",
                         "turned this on by accident would drain its towers before the price is settled.")
-                .define("tower.chargeParcels", false);
+                // 默认开：塔是远仓的核心玩法，默认关着等于玩家搭好了塔却发现「以太：未启用」。
+                // 关掉它仍然是一个配置项，给不想管以太的存档用。
+                .define("tower.chargeParcels", true);
         TOWER_PARCEL_COST = b.comment(
                         "Millibuckets of ether one parcel costs while tower.chargeParcels is on.",
                         "A parcel that cannot pay stays in its dock; it is never sent unbilled.")
