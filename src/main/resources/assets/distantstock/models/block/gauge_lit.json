@@ -1,6 +1,700 @@
 {
-  "parent": "distantstock:block/gauge",
+  "credit": "Antenna from Create: Mobile Packages (MIT, Tim Heidler). Girder beam textures derived from Create: Diesel Generators (MIT, George VI). Console body and andesite palette by Distant Stock.",
+  "parent": "minecraft:block/block",
+  "ambientocclusion": true,
+  "render_type": "minecraft:cutout",
   "textures": {
-    "face": "distantstock:block/gauge_face_lit"
+    "shell": "distantstock:block/requester_console/shell",
+    "control": "distantstock:block/requester_console/control",
+    "clipboard": "distantstock:block/requester_console/clipboard",
+    "board_edge": "distantstock:block/requester_console/board_edge",
+    "iron": "distantstock:block/requester_console/iron",
+    "glass": "distantstock:block/requester_console/glass_lit",
+    "bulb_core": "distantstock:block/requester_console/bulb_core",
+    "base_andesite": "distantstock:block/requester_console/base_andesite",
+    "andesite_girder": "distantstock:block/requester_console/andesite_girder",
+    "girder_front": "distantstock:block/requester_console/girder_front",
+    "antenna": "distantstock:block/requester_console/antenna",
+    "particle": "distantstock:block/requester_console/base_andesite"
+  },
+  "elements": [
+    {
+      "name": "foot",
+      "from": [
+        1,
+        0,
+        2
+      ],
+      "to": [
+        15,
+        2,
+        15
+      ],
+      "faces": {
+        "north": {
+          "texture": "#base_andesite",
+          "uv": [
+            14,
+            0,
+            0,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#base_andesite",
+          "uv": [
+            14,
+            0,
+            0,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#base_andesite",
+          "uv": [
+            13,
+            0,
+            0,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#base_andesite",
+          "uv": [
+            13,
+            0,
+            0,
+            2
+          ]
+        },
+        "up": {
+          "texture": "#base_andesite",
+          "uv": [
+            14,
+            0,
+            0,
+            13
+          ]
+        },
+        "down": {
+          "texture": "#base_andesite",
+          "uv": [
+            14,
+            0,
+            0,
+            13
+          ]
+        }
+      }
+    },
+    {
+      "name": "pedestal",
+      "from": [
+        3,
+        2,
+        6
+      ],
+      "to": [
+        13,
+        12,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#girder_front",
+          "uv": [
+            10,
+            0,
+            0,
+            10
+          ]
+        },
+        "south": {
+          "texture": "#girder_front",
+          "uv": [
+            10,
+            0,
+            0,
+            10
+          ]
+        },
+        "east": {
+          "texture": "#andesite_girder",
+          "uv": [
+            8,
+            0,
+            0,
+            10
+          ]
+        },
+        "west": {
+          "texture": "#andesite_girder",
+          "uv": [
+            8,
+            0,
+            0,
+            10
+          ]
+        },
+        "up": {
+          "texture": "#iron",
+          "uv": [
+            10,
+            0,
+            0,
+            8
+          ]
+        },
+        "down": {
+          "texture": "#iron",
+          "uv": [
+            10,
+            0,
+            0,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "name": "control_head",
+      "from": [
+        0,
+        12,
+        0
+      ],
+      "to": [
+        16,
+        14,
+        16
+      ],
+      "faces": {
+        "north": {
+          "texture": "#shell",
+          "uv": [
+            16,
+            0,
+            0,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#shell",
+          "uv": [
+            16,
+            0,
+            0,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#shell",
+          "uv": [
+            16,
+            0,
+            0,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#shell",
+          "uv": [
+            16,
+            0,
+            0,
+            2
+          ]
+        },
+        "up": {
+          "texture": "#control",
+          "uv": [
+            16,
+            16,
+            0,
+            0
+          ]
+        },
+        "down": {
+          "texture": "#shell",
+          "uv": [
+            16,
+            0,
+            0,
+            16
+          ]
+        }
+      },
+      "rotation": {
+        "origin": [
+          8,
+          13,
+          8
+        ],
+        "axis": "x",
+        "angle": -22.5
+      }
+    },
+    {
+      "name": "raised_clipboard",
+      "from": [
+        9,
+        14,
+        2
+      ],
+      "to": [
+        15,
+        15,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#board_edge",
+          "uv": [
+            6,
+            0,
+            0,
+            1
+          ]
+        },
+        "south": {
+          "texture": "#board_edge",
+          "uv": [
+            6,
+            0,
+            0,
+            1
+          ]
+        },
+        "east": {
+          "texture": "#board_edge",
+          "uv": [
+            11,
+            0,
+            0,
+            1
+          ]
+        },
+        "west": {
+          "texture": "#board_edge",
+          "uv": [
+            11,
+            0,
+            0,
+            1
+          ]
+        },
+        "up": {
+          "texture": "#clipboard",
+          "uv": [
+            6,
+            11,
+            0,
+            0
+          ]
+        },
+        "down": {
+          "texture": "#board_edge",
+          "uv": [
+            6,
+            0,
+            0,
+            11
+          ]
+        }
+      },
+      "rotation": {
+        "origin": [
+          8,
+          13,
+          8
+        ],
+        "axis": "x",
+        "angle": -22.5
+      }
+    },
+    {
+      "name": "lamp_socket",
+      "from": [
+        1,
+        14,
+        1
+      ],
+      "to": [
+        3,
+        15,
+        3
+      ],
+      "faces": {
+        "north": {
+          "texture": "#iron",
+          "uv": [
+            2,
+            0,
+            0,
+            1
+          ]
+        },
+        "south": {
+          "texture": "#iron",
+          "uv": [
+            2,
+            0,
+            0,
+            1
+          ]
+        },
+        "east": {
+          "texture": "#iron",
+          "uv": [
+            2,
+            0,
+            0,
+            1
+          ]
+        },
+        "west": {
+          "texture": "#iron",
+          "uv": [
+            2,
+            0,
+            0,
+            1
+          ]
+        },
+        "up": {
+          "texture": "#iron",
+          "uv": [
+            2,
+            0,
+            0,
+            2
+          ]
+        },
+        "down": {
+          "texture": "#iron",
+          "uv": [
+            2,
+            0,
+            0,
+            2
+          ]
+        }
+      },
+      "rotation": {
+        "origin": [
+          8,
+          13,
+          8
+        ],
+        "axis": "x",
+        "angle": -22.5
+      }
+    },
+    {
+      "name": "corner_lamp",
+      "from": [
+        1,
+        15,
+        1
+      ],
+      "to": [
+        3,
+        17,
+        3
+      ],
+      "faces": {
+        "north": {
+          "texture": "#glass",
+          "uv": [
+            16,
+            0,
+            0,
+            16
+          ]
+        },
+        "south": {
+          "texture": "#glass",
+          "uv": [
+            16,
+            0,
+            0,
+            16
+          ]
+        },
+        "east": {
+          "texture": "#glass",
+          "uv": [
+            16,
+            0,
+            0,
+            16
+          ]
+        },
+        "west": {
+          "texture": "#glass",
+          "uv": [
+            16,
+            0,
+            0,
+            16
+          ]
+        },
+        "up": {
+          "texture": "#glass",
+          "uv": [
+            16,
+            0,
+            0,
+            16
+          ]
+        },
+        "down": {
+          "texture": "#glass",
+          "uv": [
+            16,
+            0,
+            0,
+            16
+          ]
+        }
+      },
+      "rotation": {
+        "origin": [
+          8,
+          13,
+          8
+        ],
+        "axis": "x",
+        "angle": -22.5
+      }
+    },
+    {
+      "name": "aerial_socket",
+      "from": [
+        3,
+        16,
+        12
+      ],
+      "to": [
+        6,
+        17,
+        15
+      ],
+      "faces": {
+        "north": {
+          "texture": "#iron",
+          "uv": [
+            3,
+            0,
+            0,
+            1
+          ]
+        },
+        "south": {
+          "texture": "#iron",
+          "uv": [
+            3,
+            0,
+            0,
+            1
+          ]
+        },
+        "east": {
+          "texture": "#iron",
+          "uv": [
+            3,
+            0,
+            0,
+            1
+          ]
+        },
+        "west": {
+          "texture": "#iron",
+          "uv": [
+            3,
+            0,
+            0,
+            1
+          ]
+        },
+        "up": {
+          "texture": "#iron",
+          "uv": [
+            3,
+            0,
+            0,
+            3
+          ]
+        },
+        "down": {
+          "texture": "#iron",
+          "uv": [
+            3,
+            0,
+            0,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        4.0,
+        15,
+        13.0
+      ],
+      "to": [
+        5.0,
+        25,
+        14.0
+      ],
+      "faces": {
+        "north": {
+          "texture": "#antenna",
+          "uv": [
+            1.5,
+            7,
+            0,
+            12
+          ],
+          "rotation": 180
+        },
+        "south": {
+          "texture": "#antenna",
+          "uv": [
+            0,
+            12,
+            1.5,
+            7
+          ]
+        },
+        "down": {
+          "texture": "#antenna",
+          "uv": [
+            3,
+            9.5,
+            1.5,
+            10
+          ]
+        },
+        "west": {
+          "texture": "#antenna",
+          "uv": [
+            6.5,
+            7,
+            1.5,
+            8.5
+          ],
+          "rotation": 90
+        },
+        "east": {
+          "texture": "#antenna",
+          "uv": [
+            6.5,
+            7,
+            1.5,
+            8.5
+          ],
+          "rotation": 90
+        },
+        "up": {
+          "texture": "#antenna",
+          "uv": [
+            4,
+            9.5,
+            3.5,
+            10
+          ],
+          "rotation": 180
+        }
+      },
+      "name": "antenna_mast"
+    },
+    {
+      "from": [
+        2.0,
+        20.75,
+        11.0
+      ],
+      "to": [
+        7.0,
+        21.25,
+        16.0
+      ],
+      "faces": {
+        "up": {
+          "texture": "#antenna",
+          "uv": [
+            9,
+            8,
+            6.5,
+            10.5
+          ],
+          "rotation": 180
+        },
+        "down": {
+          "texture": "#antenna",
+          "uv": [
+            9,
+            8,
+            6.5,
+            10.5
+          ]
+        }
+      }
+    }
+  ],
+  "display": {
+    "gui": {
+      "rotation": [
+        30,
+        225,
+        0
+      ],
+      "translation": [
+        0,
+        -2.0,
+        0
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "ground": {
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        3,
+        0
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "fixed": {
+      "rotation": [
+        0,
+        180,
+        0
+      ],
+      "translation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    }
   }
 }

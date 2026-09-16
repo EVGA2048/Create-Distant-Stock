@@ -287,6 +287,18 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
      * has room for one. It is also where the player is already looking when they are choosing a
      * destination, which is exactly when "my friend's server is not in this list" is the question.
      */
+    /**
+     * Where the open list starts, which is above the field rather than below it.
+     *
+     * <p>Below is where it used to be, and that is exactly where the address box lives — the list
+     * covered the field the player had just filled in, which reads as the screen losing its own
+     * contents. Above it the list covers the item grid instead, which is what a dropdown is
+     * supposed to do.
+     */
+    private int dropdownY(int rows) {
+        return topPos + this.imageHeight - 89 - rows * 10;
+    }
+
     private int dropdownRows() {
         return Math.min(groupRows(), 6) + 1;
     }
@@ -342,7 +354,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             return;
         }
         int x = leftPos + 82;
-        int y = topPos + this.imageHeight - 76;
+        int y = dropdownY(dropdownRows());
         int w = 112;
         int rows = dropdownRows();
         if (rows == 0) {
@@ -420,7 +432,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             return false;
         }
         int x = leftPos + 82;
-        int y = topPos + this.imageHeight - 76;
+        int y = dropdownY(dropdownRows());
         int w = 112;
         int rows = dropdownRows();
         int destinations = rows - 1;
@@ -940,7 +952,17 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             request();
             return true;
         }
-        if (search.isFocused() && search.keyPressed(key, scan, mods)) {
+        // The field gets the key before the screen does, for every field — the first version of this
+        // only offered it to the search box, so Backspace and the arrow keys were swallowed by the
+        // "typing swallows everything" rule below and the name could not be edited at all.
+        if (receivingGroup != null && receivingGroup.isFocused()
+                && receivingGroup.keyPressed(key, scan, mods)) {
+            return true;
+        }
+        if (address != null && address.isFocused() && address.keyPressed(key, scan, mods)) {
+            return true;
+        }
+        if (search != null && search.isFocused() && search.keyPressed(key, scan, mods)) {
             return true;
         }
         if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE && groupPickerOpen) {

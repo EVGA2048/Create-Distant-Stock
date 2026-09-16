@@ -4,6 +4,7 @@ import dev.distantstock.routing.RemoteNetworkId;
 import dev.distantstock.routing.RoutingChannels;
 import dev.distantstock.routing.WorldIdentity;
 import dev.distantstock.stock.CreateStock;
+import dev.distantstock.stock.NetworkDirectory;
 import dev.distantstock.stock.StockCache;
 import dev.transerver.api.DeliveryResult;
 import dev.transerver.api.ReceivedMessage;
@@ -136,8 +137,20 @@ public final class TranserverStockService {
         if (!WorldIdentity.get(level).equals(network.worldId())) {
             return DeliveryResult.REJECTED;
         }
-        return CreateStock.hasNetwork(network.createFrequency())
-                ? DeliveryResult.APPLIED : DeliveryResult.RETRY;
+        if (CreateStock.hasNetwork(network.createFrequency())) {
+            return DeliveryResult.APPLIED;
+        }
+        // Not loaded right now: is it a network of ours that simply has nothing to report, or a
+        // network that does not exist here at all?
+        //
+        // This used to answer RETRY in both cases, and the second one is not retryable — the
+        // transport retried it until it gave up, and gave up three hundred and seventy-nine times
+        // in ten minutes: a monitor on the other server was still watching a network from a world
+        // that no longer exists, and every attempt became a dead letter. A network this node never
+        // announced is not ours to answer for, and saying so permanently is the honest answer.
+        boolean ours = NetworkDirectory.local().stream()
+                .anyMatch(entry -> network.createFrequency().equals(entry.freq()));
+        return ours ? DeliveryResult.RETRY : DeliveryResult.REJECTED;
     }
 
     private static void acknowledgeCompleted() {
@@ -151,6 +164,10 @@ public final class TranserverStockService {
                     StockWireCodec.Query query = StockWireCodec.decodeQuery(completed.payload());
                     if (completed.state() == dev.transerver.api.DeliveryState.REJECTED) {
                         OUTSTANDING.remove(query.networkId(), query.queryId());
+                        // And stop asking: a rejection means the other end does not have this
+                        // network, and asking again every five seconds for ever is how one dead
+                        // network filled the queue with hundreds of dead letters.
+                        StockCache.unwatch(query.networkId());
                     }
                 } catch (IOException ignored) {
                 }

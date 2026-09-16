@@ -414,6 +414,48 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         return false;
     }
 
+    /**
+     * Takes a parcel back out of a dock that cannot send it.
+     *
+     * <p>The way out of a jammed dock. A parcel that is refused — no receiving group, no route, a
+     * blocked fallback face — stays in the dock for ever otherwise, and the only other way to get it
+     * back is to break the block. The player asked for exactly this: sneaking with an empty hand did
+     * nothing, so the parcel was stuck with no way to reach it.
+     *
+     * <p>Not while a send is in flight, though. During the transmit window the parcel belongs to the
+     * transport, and pulling it out mid-handover is how a parcel gets duplicated.
+     */
+    public boolean takeStuck(net.minecraft.world.entity.player.Player player) {
+        if (player == null || !transmittingStack().isEmpty()) {
+            return false;
+        }
+        if (status() != DockStatus.BLOCKED && status() != DockStatus.FAULT) {
+            return false;
+        }
+        return handOver(outboundInv, player) || handOver(fallbackInv, player);
+    }
+
+    /** One slot's worth, into the player's inventory, or nothing if it does not fit. */
+    private static boolean handOver(ItemStackHandler inventory,
+                                    net.minecraft.world.entity.player.Player player) {
+        for (int slot = 0; slot < inventory.getSlots(); slot++) {
+            ItemStack parcel = inventory.getStackInSlot(slot);
+            if (parcel.isEmpty() || !canFit(player, parcel)) {
+                continue;
+            }
+            ItemStack taken = inventory.extractItem(slot, 1, false);
+            if (taken.isEmpty()) {
+                return false;
+            }
+            if (player.getInventory().add(taken)) {
+                return true;
+            }
+            inventory.setStackInSlot(slot, taken);
+            return false;
+        }
+        return false;
+    }
+
     private static boolean canFit(net.minecraft.world.entity.player.Player player, ItemStack stack) {
         int remaining = stack.getCount();
         for (int slot = 0; slot < player.getInventory().getContainerSize(); slot++) {

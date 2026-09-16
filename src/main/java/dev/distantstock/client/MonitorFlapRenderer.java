@@ -23,14 +23,23 @@ import net.minecraft.core.Direction;
  * faces by {@link #PUSH} — measured from where Create puts it to half a pixel in front of our own
  * face, which is where the window is.
  *
- * <p>Both numbers are tied to {@code scripts/gen_monitor_face.py}: it carves the window at the
- * rectangle this transform puts the text in. Change one and the other has to follow.
+ * <p>{@link #SCALE} is chosen so the glyph block lands on the flip area painted in the middle of
+ * the face — the painted louvres stay, which is the texture the player asked for, and the text
+ * covers them the way a real board's flaps cover its front plate.
  */
 public final class MonitorFlapRenderer extends FlapDisplayRenderer {
-    /** 0.65 of Create's size: four characters span about ten of the face's sixteen pixels. */
-    private static final float SCALE = 0.65f;
-    /** Where the glyph plane has to sit, measured from Create's own plane, along the panel's normal. */
-    private static final float PUSH = 0.40f;
+    /** 0.8 of Create's size: the glyph block covers the flip area painted on the face, no more. */
+    private static final float SCALE = 0.8f;
+    /**
+     * How far the glyph plane is pushed back, in blocks, measured from Create's own plane.
+     *
+     * <p>Applied <em>before</em> the scale, and that order is the whole of the second attempt: a
+     * translate after a scale is measured in the scaled frame, so the first version's 0.40 arrived
+     * as 0.40 × 0.65 = 0.26 and left the text floating two and a half pixels in front of the panel.
+     * In block units, 0.54 puts the plane at 12.5/16 — half a pixel in front of the face, which is
+     * where a real display board keeps its flaps.
+     */
+    private static final float PUSH = 0.54f;
 
     public MonitorFlapRenderer(BlockEntityRendererProvider.Context context) {
         super(context);
@@ -42,10 +51,10 @@ public final class MonitorFlapRenderer extends FlapDisplayRenderer {
         // The way the panel faces, in Create's sense: from the front, into the block.
         Direction back = be.getDirection();
         ms.pushPose();
+        ms.translate(back.getStepX() * PUSH, 0, back.getStepZ() * PUSH);
         ms.translate(0.5f, 0.5f, 0.5f);
         ms.scale(SCALE, SCALE, SCALE);
         ms.translate(-0.5f, -0.5f, -0.5f);
-        ms.translate(back.getStepX() * PUSH, 0, back.getStepZ() * PUSH);
         super.renderSafe(be, partialTicks, ms, buffer, light, overlay);
         ms.popPose();
     }

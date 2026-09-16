@@ -117,6 +117,22 @@ public final class StockCache {
         }
     }
 
+    /**
+     * Stops watching a network, for one that has answered that it is not there.
+     *
+     * <p>Dropping the watch is what ends the asking. Without it a network on the other server that
+     * has gone away — a world replaced, a warehouse broken — is polled on every pass for ever, and
+     * every poll comes back rejected: the player's server answered three hundred and seventy-nine
+     * dead letters in ten minutes for one network that no longer existed. A network is watched
+     * again the moment somebody points a gauge at it, which is the only thing that should start
+     * the asking.
+     */
+    public static void unwatch(RemoteNetworkId networkId) {
+        if (networkId != null) {
+            NETWORK_WATCHED.remove(networkId);
+        }
+    }
+
     public static List<RemoteNetworkId> watchedNetworks(long maxAgeMs) {
         long now = System.currentTimeMillis();
         List<RemoteNetworkId> out = new ArrayList<>();

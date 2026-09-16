@@ -262,7 +262,11 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                 player.displayClientMessage(Component.translatable("gui.distantstock.dock_unbound"), true);
                 return ItemInteractionResult.sidedSuccess(false);
             }
-            if (!level.isClientSide && !player.isShiftKeyDown() && be.takeReceived(player)) {
+            // An empty hand takes whatever is in the dock: what arrived, or what is stuck in it and
+            // cannot leave. The second half was missing, which left a refused parcel with no way out
+            // short of breaking the block.
+            if (!level.isClientSide && !player.isShiftKeyDown()
+                    && (be.takeReceived(player) || be.takeStuck(player))) {
                 return ItemInteractionResult.sidedSuccess(false);
             }
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;

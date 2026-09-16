@@ -28,11 +28,6 @@ MODELS = ROOT / "src/main/resources/assets/distantstock/models/block"
 STATES = ROOT / "src/main/resources/assets/distantstock/blockstates"
 
 # 正面贴图里那条百叶窗的矩形，也是翻牌窗开在哪。
-WINDOW = (2, 3, 13, 12)
-
-INK = (14, 17, 21)          # 窗里的底色，够深才衬得亮色字形
-LIP = (58, 66, 74)          # 窗的上/左内沿，做出「凹进去」的感觉
-SHADE = (96, 110, 118)      # 下/右内沿
 
 # 灯泡色块：名字 -> 贴图里的 u 偏移。顺序就是那一排。
 BULB_UV = {"grey": 0, "green": 2, "cyan": 4, "orange": 6, "red": 8}
@@ -40,19 +35,15 @@ TPS_BULB = {"green": "green", "orange": "orange", "red": "red"}
 LINK_BULB = {"off": "grey", "online": "cyan", "syncing": "orange", "fault": "red"}
 
 
-def carve_window():
-    """把原设计中间那条百叶窗改成一块凹陷的翻牌窗，其余一个像素都不动。"""
-    path = TEXTURES / "monitor_face.png"
-    im = Image.open(path).convert("RGBA")
-    d = ImageDraw.Draw(im)
-    x0, y0, x1, y1 = WINDOW
-    d.rectangle((x0, y0, x1, y1), fill=INK)
-    d.line((x0, y0, x1, y0), fill=LIP)
-    d.line((x0, y0, x0, y1), fill=LIP)
-    d.line((x0, y1, x1, y1), fill=SHADE)
-    d.line((x1, y0, x1, y1), fill=SHADE)
-    im.save(path)
-    print(f"  monitor_face              window carved at {WINDOW}")
+def keep_the_face():
+    """The face is the original artwork and stays that way.
+
+    <p>An earlier version of this script painted a recess over the louvres so the flap glyphs would
+    have a dark backing. The player's answer was immediate: that is the texture I wanted, put it
+    back. The glyphs are drawn in front of it, which is how Create's own board works — its front
+    plate is painted too, and the flaps sit behind a window in it.
+    """
+    print("  monitor_face              left as painted")
 
 
 def bulb_element(name, lo, hi, swatch):
@@ -130,7 +121,7 @@ def write_blockstate(names):
 
 
 def main():
-    carve_window()
+    keep_the_face()
     names = write_models()
     print(f"  monitor_{{status}}_{{link}}  {len(names)} models")
     write_blockstate(names)
