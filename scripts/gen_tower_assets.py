@@ -548,6 +548,100 @@ def inset_crystal_stub(model: dict) -> None:
             element["to"][axis] = round(element["to"][axis] - COINCIDENT_STEP, 4)
 
 
+# The axle the base takes from below: four units across, dead centre. The same four units Create's
+# shaft draws in the block underneath, which is the whole point — the two have to meet.
+AXLE_LOW, AXLE_HIGH = 6.0, 10.0
+# How far above the underside plane the axle's end sits. The same nudge the coincident faces get:
+# enough that the driving shaft's own end cap, which lands on the plane itself, is never coplanar
+# with ours, and far too little to see — at a quarter of a unit the rim of the hole showed it.
+AXLE_LIP = COINCIDENT_STEP
+
+# The point order that makes `quad_normal` come out facing this way. The handoff renderer draws a
+# quad's back, so every winding here is the reverse of the one that reads as counter-clockwise from
+# outside; `wound` checks each one rather than trusting the table.
+FACE_POINTS = {
+    "down": lambda x0, x1, y0, y1, z0, z1: [(x0, y0, z1), (x1, y0, z1), (x1, y0, z0), (x0, y0, z0)],
+    "up": lambda x0, x1, y0, y1, z0, z1: [(x0, y1, z0), (x1, y1, z0), (x1, y1, z1), (x0, y1, z1)],
+    "north": lambda x0, x1, y0, y1, z0, z1: [(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0)],
+    "south": lambda x0, x1, y0, y1, z0, z1: [(x0, y1, z1), (x1, y1, z1), (x1, y0, z1), (x0, y0, z1)],
+    "west": lambda x0, x1, y0, y1, z0, z1: [(x0, y0, z1), (x0, y0, z0), (x0, y1, z0), (x0, y1, z1)],
+    "east": lambda x0, x1, y0, y1, z0, z1: [(x1, y0, z0), (x1, y0, z1), (x1, y1, z1), (x1, y1, z0)],
+}
+FACE_NORMAL = {"down": (0, -1, 0), "up": (0, 1, 0), "north": (0, 0, -1),
+               "south": (0, 0, 1), "west": (-1, 0, 0), "east": (1, 0, 0)}
+
+
+def wound(face: str, points, uv, material: str) -> dict:
+    """One quad, with its winding checked against the face it claims to be."""
+    quad = {"material": material, "uv": uv, "points": points, "group": "fixed"}
+    if quad_normal(quad) != FACE_NORMAL[face]:
+        raise SystemExit(f"{face} quad wound the wrong way: {points}")
+    return quad
+
+
+def underside_axle(model: dict) -> None:
+    """Open the base's underside hole and stand an axle in it.
+
+    The bottom plate is one quad with a shaft hole painted on it — a black square, because the
+    handoff drew it for a renderer that has no depth buffer and nothing was ever meant to be
+    behind it. In the world that reads as a void, and the one thing a player checks before
+    building a tower is the one thing the model did not show: whether the power down there
+    actually reaches the base.
+
+    So the plate becomes a ring with a real four-unit hole in it, and the axle stands inside from
+    the hole to the top plate — invisible from anywhere but the hole, and the thing you see when
+    you look up into it. With a shaft underneath, that shaft's own axle shows through instead and
+    the two read as one piece; without one, the base still shows the axle it is built around
+    rather than a painted black square.
+
+    The axle stops AXLE_LIP short of the underside. The driving shaft's end cap lands on the plane
+    itself, and two caps on one plane is the z-fighting the couplers are built to avoid.
+    """
+    plate = [q for q in model["elements"]
+             if q["faces"].get("down", {}).get("texture") == "#gearbox"]
+    if len(plate) != 1:
+        raise SystemExit(f"expected one gearbox underside quad, found {len(plate)}")
+    ring, axle = [], []
+
+    # The plate as four strips around the hole, each keeping the texture it had. The mapping is the
+    # one the plate was drawn with: u across x, v up the model's -z.
+    def strip(x0, x1, z0, z1):
+        points = [(x0, 0.0, z1), (x1, 0.0, z1), (x1, 0.0, z0), (x0, 0.0, z0)]
+        uv = [(x0, 16 - z1), (x1, 16 - z1), (x1, 16 - z0), (x0, 16 - z0)]
+        return wound("down", points, uv, "gearbox")
+
+    ring.append(strip(0.0, 16.0, 0.0, AXLE_LOW))
+    ring.append(strip(0.0, 16.0, AXLE_HIGH, 16.0))
+    ring.append(strip(0.0, AXLE_LOW, AXLE_LOW, AXLE_HIGH))
+    ring.append(strip(AXLE_HIGH, 16.0, AXLE_LOW, AXLE_HIGH))
+
+    def side(face, points, horizontal):
+        # `axis` is a stripe: four opaque texels at 6..10 and nothing else. Every side sample is
+        # taken from inside the stripe, one texel per model unit.
+        uv = [(6.0 + (h - AXLE_LOW), 16.0 - y) for h, y in horizontal]
+        return wound(face, points, uv, "axis")
+
+    x0, x1, z0, z1 = AXLE_LOW, AXLE_HIGH, AXLE_LOW, AXLE_HIGH
+    y0, y1 = AXLE_LIP, 16.0
+    # The end cap is the one face not taken from the stripe: `axis_top` carries the sawn-off end,
+    # in the same 6..10 square the plate's own mapping lands on.
+    axle.append(wound("down", FACE_POINTS["down"](x0, x1, y0, y1, z0, z1),
+                      [(x0, 16 - z1), (x1, 16 - z1), (x1, 16 - z0), (x0, 16 - z0)], "axis_top"))
+    axle.append(side("north", FACE_POINTS["north"](x0, x1, y0, y1, z0, z1),
+                     [(x0, y1), (x1, y1), (x1, y0), (x0, y0)]))
+    axle.append(side("south", FACE_POINTS["south"](x0, x1, y0, y1, z0, z1),
+                     [(x0, y1), (x1, y1), (x1, y0), (x0, y0)]))
+    axle.append(side("west", FACE_POINTS["west"](x0, x1, y0, y1, z0, z1),
+                     [(z1, y1), (z0, y1), (z0, y0), (z1, y0)]))
+    axle.append(side("east", FACE_POINTS["east"](x0, x1, y0, y1, z0, z1),
+                     [(z0, y1), (z1, y1), (z1, y0), (z0, y0)]))
+
+    added = [quad_to_element(q, model["textures"]) for q in ring + axle]
+    model["elements"] = [q for q in model["elements"] if q is not plate[0]] + added
+    model["textures"]["axis"] = "distantstock:block/tower/axis"
+    model["textures"]["axis_top"] = "distantstock:block/tower/axis_top"
+
+
 def verify_against_handoff():
     """Rebuild the handoff's own tower out of the converted models and compare renders.
 
@@ -602,6 +696,7 @@ def main():
                      for name in sorted({q["material"] for q in core})}
     core_model = write("tower_core", core, core_textures)
     inset_crystal_stub(core_model)
+    underside_axle(core_model)
     (MODEL_OUT / "tower_core.json").write_text(json.dumps(core_model, indent=2) + "\n")
     write_casing()
 

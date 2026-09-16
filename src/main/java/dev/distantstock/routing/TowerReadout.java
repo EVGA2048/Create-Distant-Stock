@@ -160,7 +160,18 @@ public record TowerReadout(
         }
         TowerSystem.TowerId carrier = TowerActivation.carrier(level, monitor);
         if (carrier == null) {
-            return NONE;
+            // Not carried is not the same as standing under no tower, and a monitor is the device
+            // where the difference decides whether its own controls exist. A tower that is stopped,
+            // or one whose device switch is off, carries nothing at all — this monitor included,
+            // and that switch is drawn on the very page this call feeds. Asking only "who carries
+            // me" would answer nothing and drop the page, taking with it both the switch that
+            // turned it off and the line that would have said why. Fall back to the tower standing
+            // over the monitor; the numbers below still report the truth, which is that nothing is
+            // carried.
+            carrier = TowerActivation.towerAt(level, monitor);
+            if (carrier == null) {
+                return NONE;
+            }
         }
         MinecraftServer server = level.getServer();
         if (server == null) {

@@ -152,6 +152,7 @@ public final class TowerActivation {
             return found == null ? null : found.get(pos.asLong());
         }
 
+
         /**
          * The towers that share a system with this one, or an empty list for a tower in none.
          *
@@ -222,6 +223,52 @@ public final class TowerActivation {
             }
         }
         return current.carrier(level.dimension(), pos);
+    }
+
+    /**
+     * The tower standing over this position, or null when none reaches it.
+     *
+     * <p>Every other question here is asked of the snapshot, which is built out of towers that are
+     * <em>running</em> and answers with the devices they <em>carry</em>. This one is neither, on
+     * purpose. "Which tower am I under" does not stop being true because a shaft came off or a
+     * switch was flipped, and the two devices that ask it — a monitor and its tower page — are
+     * exactly where those two facts are shown and where the switches that cause them live. Answer
+     * it from the snapshot and the page that says "not turning" vanishes the moment the tower
+     * stops turning, and the switch that was switched off takes its own page with it.
+     *
+     * <p>Read from the loaded tower blocks instead: a built tower has a base and a radius whether
+     * or not anything is turning it. Deliberately not run through the pinned seam either — a pin
+     * overrides what a device is told about itself, and this is a fact about the world.
+     */
+    public static TowerSystem.TowerId towerAt(Level level, BlockPos pos) {
+        if (level == null || level.isClientSide) {
+            return null;
+        }
+        ResourceKey<Level> dimension = level.dimension();
+        TowerSystem.TowerId nearest = null;
+        long bestDistance = Long.MAX_VALUE;
+        for (TowerCoreBlockEntity tower : LoadedTowers.all()) {
+            TowerTier tier = tower.tier();
+            if (tier == null || tower.getLevel() == null
+                    || !tower.getLevel().dimension().equals(dimension)) {
+                continue;
+            }
+            BlockPos base = tower.getBlockPos();
+            long distance = distanceSq(base, pos);
+            if (distance <= (long) tier.radius() * tier.radius() && distance < bestDistance) {
+                nearest = TowerSystem.TowerId.of(dimension, base);
+                bestDistance = distance;
+            }
+        }
+        return nearest;
+    }
+
+    /** Squared distance, in the same integer arithmetic the merge uses to decide a reach. */
+    private static long distanceSq(BlockPos first, BlockPos second) {
+        long dx = (long) first.getX() - second.getX();
+        long dy = (long) first.getY() - second.getY();
+        long dz = (long) first.getZ() - second.getZ();
+        return dx * dx + dy * dy + dz * dz;
     }
 
     /** What the system this tower belongs to carries, or null when it is in no system. */

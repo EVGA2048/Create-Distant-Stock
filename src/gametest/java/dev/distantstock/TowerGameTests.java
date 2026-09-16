@@ -282,31 +282,80 @@ public final class TowerGameTests {
      * device registry that never marks the snapshot dirty leaves a monitor standing in plain sight
      * reporting that it is nowhere.
      *
-     * <p>The tower is pinned rather than driven, and that is not a shortcut: a tower that is really
-     * turning claims its whole dimension and switches off every distant device outside its reach,
-     * which is the mod working as designed and would leave the dock cases running beside this one
-     * with their devices dark. The pin is the same seam the activation cases use for the same
-     * reason.
+     * <p>Nothing is pinned here, and the tower is left standing without a motor, which is the one
+     * arrangement the shared level allows: a tower that is really turning claims its whole
+     * dimension and switches off every distant device outside its reach — the mod working as
+     * designed — and would leave the dock cases running beside this one with their devices dark.
+     * This case used to pin the carrier in to get around that; the monitor finds its tower by the
+     * geometry now, so the world alone answers.
      */
     @GameTest(template = "empty", timeoutTicks = 200)
     public static void aMonitorBesideATowerAttachesToIt(GameTestHelper h) {
         build(h, TowerTier.I.couplers(), true);
         BlockPos tower = h.absolutePos(new BlockPos(X, 0, Z));
-        BlockPos monitor = h.absolutePos(new BlockPos(X + 6, 1, Z));
+        BlockPos monitor = h.absolutePos(new BlockPos(X + 4, 1, Z + 4));
+        h.getLevel().setBlock(monitor, ModBlocks.MONITOR.get().defaultBlockState(), 3);
+
+        h.runAfterDelay(60, () -> {
+            h.assertTrue(((dev.distantstock.block.TowerCoreBlockEntity)
+                            h.getLevel().getBlockEntity(tower)).tier() != null,
+                    "the tower never recognised itself");
+            dev.distantstock.routing.TowerReadout readout =
+                    dev.distantstock.routing.TowerReadout.survey(h.getLevel(), monitor);
+            h.assertTrue(readout.attached(),
+                    "a monitor five blocks from a tower reported that nothing carries it");
+            h.assertTrue(readout.members().size() == 1,
+                    "the readout saw " + readout.members().size() + " towers instead of one");
+            h.succeed();
+        });
+    }
+
+    /**
+     * The self-lock: a monitor a tower carries nothing to still gets that tower's page.
+     *
+     * <p>A monitor's whole tower half is drawn on the answer to "who carries me", and every switch
+     * that can take that answer away is drawn on the page itself. Switch the tower's device switch
+     * off and nothing in its reach is carried any more — this monitor included — so the page folds
+     * up and takes with it the switch that would unfold it. The operator is left with a monitor
+     * that says there is no tower over it while standing under one, and no way back.
+     *
+     * <p>The state is pinned rather than switched, because the shared level will not take a tower
+     * that is actually turning (see the case above): with the pin the monitor reads exactly as it
+     * does under a tower whose switch is off — un-carried and not activated — while the tower
+     * standing over it is real iron. The geometry is what has to answer, and it is deliberately
+     * outside the pinned seam.
+     */
+    @GameTest(template = "empty", timeoutTicks = 200)
+    public static void aMonitorNotCarriedStillGetsItsTowersPage(GameTestHelper h) {
+        build(h, TowerTier.I.couplers(), true);
+        BlockPos tower = h.absolutePos(new BlockPos(X, 0, Z));
+        BlockPos monitor = h.absolutePos(new BlockPos(X + 4, 1, Z + 4));
         h.getLevel().setBlock(monitor, ModBlocks.MONITOR.get().defaultBlockState(), 3);
 
         dev.distantstock.routing.TowerActivation.pinDevice(
                 dev.distantstock.routing.TowerSystem.TowerId.of(h.getLevel().dimension(), monitor),
-                true,
-                dev.distantstock.routing.TowerSystem.TowerId.of(h.getLevel().dimension(), tower));
+                false, null);
         try {
             h.runAfterDelay(60, () -> {
+                h.assertTrue(!dev.distantstock.routing.TowerActivation.active(h.getLevel(), monitor),
+                        "the switch did not take: the monitor still reads as activated");
+                h.assertTrue(dev.distantstock.routing.TowerActivation.carrier(h.getLevel(), monitor) == null,
+                        "the switch did not take: something still carries the monitor");
+
                 dev.distantstock.routing.TowerReadout readout =
                         dev.distantstock.routing.TowerReadout.survey(h.getLevel(), monitor);
                 h.assertTrue(readout.attached(),
-                        "a monitor six blocks from a tower reported that nothing carries it");
+                        "a switched-off monitor under a tower lost its tower page");
                 h.assertTrue(readout.members().size() == 1,
-                        "the readout saw " + readout.members().size() + " towers instead of one");
+                        "the page came back with " + readout.members().size() + " towers instead of one");
+                h.assertTrue(readout.members().getFirst().tier().equals(TowerTier.I.name()),
+                        "the page came back with tier " + readout.members().getFirst().tier());
+
+                // The other half of the promise, and the reason the fix cannot be "always attached":
+                // a monitor with no tower near it still says so.
+                dev.distantstock.routing.TowerReadout far = dev.distantstock.routing.TowerReadout
+                        .survey(h.getLevel(), monitor.offset(4096, 0, 0));
+                h.assertTrue(!far.attached(), "a monitor four thousand blocks from any tower claimed one");
                 h.succeed();
             });
         } finally {

@@ -130,8 +130,20 @@ public record PairingCode(String code, UUID group, UUID issuer,
 
 1. 加 `TowerActivation.towerAt(level, pos)`：返回激活半径**包含**这个位置的塔（多座取最近），
    完全不看带载集合；
-2. 快照构建时：`carriedBy(pos)` 有就用它，没有就退到 `towerAt(pos)`；
+2. `TowerReadout.survey` 里：`carrier(pos)` 有就用它，没有就退到 `towerAt(pos)`；
 3. `attached = false` 只在**真的没有任何塔的半径覆盖我**时出现 —— 那才是「未接入塔」的本意。
 
 被带载数、预算、上限这些**照旧**（它们本来就该反映真实带载），只是「页面能不能画出来」
 不再依赖它。
+
+**2026-09-16 实施（与上面的草稿有一处改动）**：`towerAt` 不读激活快照，**直接读已加载的塔方块**
+（`LoadedTowers` + `tier().radius()`）。快照里的系统只由**正在转动**的塔构成 —— 从快照取
+「我头上是哪座塔」，会让暂停的塔也把页面收走，而「转速不足」恰恰是那一页要显示的东西。
+按方块读还额外解决一件事：`survey` 里本来就有「被带载但不在任何系统里」（`members.isEmpty()`）
+那条分支，塔停转时正好落进去，页面照画、读数显示 `stopped` + 转速 0。
+
+**为什么不用「真转起来的塔」写端到端测试**：`TowerActivationGameTests` 的类注释写着 ——
+gamethub 的竞技场只隔 13 格，而塔的半径是 32，一座真转的塔会把同批次所有别的用例的设备关掉。
+所以该用例用 `pinDevice(..., active=false, carrier=null)` 把「被关掉且没被带载」这个**状态**钉住，
+塔本身是真的（只是没通轴），几何查找故意**不过** pin 层。两条用例在 `TowerGameTests`：
+`aMonitorBesideATowerAttachesToIt`（不再需要 pin）与 `aMonitorNotCarriedStillGetsItsTowersPage`。
