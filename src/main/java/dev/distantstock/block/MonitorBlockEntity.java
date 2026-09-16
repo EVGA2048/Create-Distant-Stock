@@ -1,7 +1,6 @@
 package dev.distantstock.block;
 
 import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
-import com.simibubi.create.content.trains.display.FlapDisplayBlockEntity;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.link.LinkSnapshot;
 import dev.distantstock.routing.TowerReadout;
@@ -25,27 +24,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * A link monitor whose face is a real Create flap display.
- *
- * <p>It used to be a plain block entity with a picture of a flip board painted on its front. The
- * picture never changed, and a monitor showing the same frozen numbers while the link underneath
- * them moved was the complaint. So the furniture became the real thing: this extends Create's own
- * flap display, which is what gives the board its glyphs, its flip animation and the click of the
- * segments at no cost — the animation is Create's, driven on the client from the text the server
- * sends, exactly as a display board's is.
- *
- * <p>Two things had to be arranged. Create only lets its <em>own</em> display block be a controller
- * ({@code updateControllerStatus} gives up on anything that is not a {@code FlapDisplayBlock}), so
- * the size is declared here instead. And the board is not driven by a shaft: a block that is not
- * {@code IRotate} answers "speed requirement fulfilled" with true, which is what lets the flaps
- * turn while {@code updateSpeed} keeps rotation propagation away from us entirely.
- *
- * <p>What it shows is one reading at a time, two lines, turning over every few seconds — see
- * {@link #pages()}. A single block of flap display is four characters wide and two lines tall, so
- * "TPS" over "20.0" is the shape everything is cut to.
- */
-public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements IHaveGoggleInformation {
+public final class MonitorBlockEntity extends BlockEntity implements IHaveGoggleInformation {
     private double localTps = 20;
     private double localMspt = 50;
     private boolean peerUp;
@@ -61,83 +40,8 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
     private RemoteNetworkId networkId;
     private int deviceCount;
 
-    /** How long one reading stays up before the board turns to the next. */
-    private static final int PAGE_TICKS = 100;
-    /** Which reading is on the board, so the text is only pushed when it actually changes. */
-    private int shownPage = -1;
-
     public MonitorBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.MONITOR.get(), pos, state);
-        // Nothing turns this block, and nothing should try: without this Create's rotation
-        // propagator would look for a shaft to attach to on every load.
-        updateSpeed = false;
-    }
-
-    /**
-     * Declares the board's size, which Create would otherwise read off its own display block.
-     *
-     * <p>Called by the base class every ten ticks. The size is what the layout is built from: one
-     * block, so one character cell wide and two lines tall, which is where the four-character lines
-     * come from.
-     */
-    @Override
-    public void updateControllerStatus() {
-        isController = true;
-        xSize = 1;
-        ySize = 1;
-        if (lines == null) {
-            initDefaultSections();
-        }
-    }
-
-    /**
-     * Which way the board faces, in Create's sense — the direction its front looks away from.
-     *
-     * <p>Overridden because Create reads the direction from a property of its own display block,
-     * which our block does not carry. The renderer turns the glyph plane by this.
-     */
-    @Override
-    public net.minecraft.core.Direction getDirection() {
-        BlockState state = getBlockState();
-        return state.hasProperty(MonitorBlock.FACING)
-                ? state.getValue(MonitorBlock.FACING).getOpposite() : net.minecraft.core.Direction.NORTH;
-    }
-
-    /**
-     * The readings the board turns through, label over value.
-     *
-     * <p>Four characters a line is the whole budget: a single block of flap display is that wide, and
-     * anything longer would overflow the face rather than be clipped. So each page is one reading,
-     * named on the top line and given on the bottom, and the board cycles instead of cramming.
-     */
-    private java.util.List<String[]> pages() {
-        return java.util.List.of(
-                new String[]{"TPS", short3(localTps)},
-                new String[]{"MSPT", short3(localMspt)},
-                new String[]{"PING", rtt < 0 ? "----" : Integer.toString(Math.min(rtt, 9999))},
-                new String[]{"BACK", Integer.toString(Math.min(backlog, 9999))},
-                new String[]{"PEER", peerUp && peerFresh ? short3(peerTps) : "----"},
-                new String[]{"DEV", Integer.toString(Math.min(deviceCount, 9999))});
-    }
-
-    /** A reading in at most four characters, which is one line of the board. */
-    private static String short3(double value) {
-        String text = String.format(Locale.ROOT, "%.1f", value);
-        return text.length() <= 4 ? text : text.substring(0, 4);
-    }
-
-    /** Turns the board to the reading this moment calls for, if it is not already showing it. */
-    private void showPage(long gameTime) {
-        java.util.List<String[]> pages = pages();
-        int page = (int) ((gameTime / PAGE_TICKS) % pages.size());
-        if (page == shownPage) {
-            return;
-        }
-        shownPage = page;
-        // Only on change: pushing the same text again would replay the flip and the click for
-        // nothing, once a tick, for ever.
-        applyTextManually(0, Component.literal(pages.get(page)[0]));
-        applyTextManually(1, Component.literal(pages.get(page)[1]));
     }
 
     public RemoteNetworkId networkId() {
@@ -162,48 +66,36 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
         }
     }
 
-    /**
-     * The monitor's own beat. The flap animation is Create's and runs in {@code super.tick()}, on
-     * both sides; everything below is the server's half — the numbers, the lamp and the screen.
-     */
-    @Override
-    public void tick() {
-        super.tick();
-        if (level == null || level.isClientSide) {
-            return;
-        }
+    public static void serverTick(Level level, BlockPos pos, BlockState state, MonitorBlockEntity be) {
         if (level.getGameTime() % 20 != 0) {
             return;
         }
-        BlockState state = getBlockState();
         // With this monitor's own tower readout, not the bare link view. The overload that takes one
         // existed from the start and had no callers, so the tower half of the screen was sent as
         // TowerReadout.NONE every time and the page read "not on a tower" for ever. Nothing failed:
         // the packet was well formed, it just carried the answer for a monitor standing nowhere.
-        LinkSnapshot.View v = LinkSnapshot.view(TowerReadout.survey(level, worldPosition));
-        localTps = v.localTps();
-        localMspt = v.localMspt();
-        peerUp = v.linkUp();
-        peerTps = v.peerTps();
-        peerFresh = v.peerFresh();
-        backlog = v.orderDepth() + v.packageDepth();
-        rtt = (int) v.peerRttMs();
-        role = v.selfId();
-        fails = v.peerFails();
-        inFlight = v.inFlight();
-        deviceCount = freq == null ? 0 : CreateStock.deviceCount(freq);
-        // The board turns to the next reading on its own beat, which is slower than this one.
-        showPage(level.getGameTime());
-        MonitorBlock.Status status = MonitorBlock.Status.fromTps(localTps);
+        LinkSnapshot.View v = LinkSnapshot.view(TowerReadout.survey(level, pos));
+        be.localTps = v.localTps();
+        be.localMspt = v.localMspt();
+        be.peerUp = v.linkUp();
+        be.peerTps = v.peerTps();
+        be.peerFresh = v.peerFresh();
+        be.backlog = v.orderDepth() + v.packageDepth();
+        be.rtt = (int) v.peerRttMs();
+        be.role = v.selfId();
+        be.fails = v.peerFails();
+        be.inFlight = v.inFlight();
+        be.deviceCount = be.freq == null ? 0 : CreateStock.deviceCount(be.freq);
+        MonitorBlock.Status status = MonitorBlock.Status.fromTps(be.localTps);
         if (state.getValue(MonitorBlock.STATUS) != status) {
-            level.setBlock(worldPosition, state.setValue(MonitorBlock.STATUS, status), 3);
+            level.setBlock(pos, state.setValue(MonitorBlock.STATUS, status), 3);
         }
-        setChanged();
-        BlockState current = getBlockState();
-        level.sendBlockUpdated(worldPosition, current, current, 3);
-        LinkSnapshotS2C update = new LinkSnapshotS2C(worldPosition, v);
+        be.setChanged();
+        BlockState current = be.getBlockState();
+        level.sendBlockUpdated(pos, current, current, 3);
+        LinkSnapshotS2C update = new LinkSnapshotS2C(pos, v);
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
-            if (player.level() == level && player.distanceToSqr(worldPosition.getX() + 0.5, worldPosition.getY() + 0.5, worldPosition.getZ() + 0.5) <= 32 * 32) {
+            if (player.level() == level && player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) <= 32 * 32) {
                 PacketDistributor.sendToPlayer(player, update);
             }
         }
@@ -254,30 +146,15 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
         super.onChunkUnloaded();
     }
 
-    /**
-     * Create's half of leaving the world, because {@code setRemoved} is final on this base class.
-     *
-     * <p>{@code invalidate} is called from the same place and is what Create itself overrides, so
-     * this is the hook that is actually reachable — and it is called on every path a block entity
-     * can leave by, which is what the device list needs.
-     */
     @Override
-    public void invalidate() {
+    public void setRemoved() {
         LoadedDevices.remove(this);
-        super.invalidate();
+        super.setRemoved();
     }
 
-    /**
-     * Persistence through Create's hooks rather than the vanilla ones.
-     *
-     * <p>{@code SmartBlockEntity} makes {@code saveAdditional} final and routes it here, so this is
-     * the only place a subclass may add its own keys; the flap text and layout are written by
-     * {@code super} either way. The keys below are the ones this block has always used, so a
-     * monitor placed before any of this keeps what it knew.
-     */
     @Override
-    protected void write(CompoundTag tag, HolderLookup.Provider regs, boolean clientPacket) {
-        super.write(tag, regs, clientPacket);
+    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider regs) {
+        super.saveAdditional(tag, regs);
         tag.putDouble("Tps", localTps);
         tag.putDouble("Mspt", localMspt);
         tag.putBoolean("PeerUp", peerUp);
@@ -297,8 +174,8 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
     }
 
     @Override
-    protected void read(CompoundTag tag, HolderLookup.Provider regs, boolean clientPacket) {
-        super.read(tag, regs, clientPacket);
+    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider regs) {
+        super.loadAdditional(tag, regs);
         localTps = tag.getDouble("Tps");
         localMspt = tag.getDouble("Mspt");
         peerUp = tag.getBoolean("PeerUp");
@@ -315,20 +192,12 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
     }
 
     @Override
-    public void initialize() {
-        super.initialize();
-        // The base class calls this from its lazy tick too, but the board has to know its size
-        // before the first render rather than ten ticks into the world.
-        updateControllerStatus();
-    }
-
-    @Override
     public CompoundTag getUpdateTag(HolderLookup.Provider regs) {
         return saveWithoutMetadata(regs);
     }
 
     @Override
-    public net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket getUpdatePacket() {
-        return net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(this);
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 }

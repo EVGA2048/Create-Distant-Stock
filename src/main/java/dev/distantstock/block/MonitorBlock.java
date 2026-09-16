@@ -27,15 +27,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * The link monitor's block.
- *
- * <p>It hands its ticking to Create, which is not how it used to be: the flap display that fills
- * this block's face animates on the client, so the ticker has to run on both sides. {@code IBE}
- * gives exactly that, and Create's smart ticker is what calls the block entity's own {@code tick}.
- */
-public final class MonitorBlock extends WallPanelBlock implements IWrenchable,
-        com.simibubi.create.foundation.block.IBE<MonitorBlockEntity> {
+public final class MonitorBlock extends WallPanelBlock implements IWrenchable {
 
     /** Rotation would silently move the cabin or the panel slots, so a wrench click only reports state. */
     @Override
@@ -95,14 +87,10 @@ public final class MonitorBlock extends WallPanelBlock implements IWrenchable,
         return new MonitorBlockEntity(pos, state);
     }
 
+    @Nullable
     @Override
-    public Class<MonitorBlockEntity> getBlockEntityClass() {
-        return MonitorBlockEntity.class;
-    }
-
-    @Override
-    public BlockEntityType<? extends MonitorBlockEntity> getBlockEntityType() {
-        return ModBlockEntities.MONITOR.get();
+    public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
+        return level.isClientSide ? null : createTickerHelper(type, ModBlockEntities.MONITOR.get(), MonitorBlockEntity::serverTick);
     }
 
     @Override

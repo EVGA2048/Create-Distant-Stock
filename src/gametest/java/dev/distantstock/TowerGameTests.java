@@ -142,39 +142,6 @@ public final class TowerGameTests {
                 net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", path));
     }
 
-    /**
-     * The board on the monitor's face turns through its readings by itself.
-     *
-     * <p>The board is a real Create flap display now, and what it shows is pushed in from the
-     * server as two lines of text. Both halves are easy to get silently wrong: {@code
-     * applyTextManually} on a board whose layout was never built does nothing at all, and a line
-     * longer than the board's four characters overflows the face instead of being clipped. Neither
-     * raises anything, so both are checked here.
-     */
-    @GameTest(template = "empty", timeoutTicks = 200)
-    public static void theMonitorBoardTurnsItsPages(GameTestHelper h) {
-        h.setBlock(X, 1, Z, ModBlocks.MONITOR.get().defaultBlockState());
-        BlockPos pos = h.absolutePos(new BlockPos(X, 1, Z));
-        h.assertTrue(h.getLevel().getBlockEntity(pos) instanceof dev.distantstock.block.MonitorBlockEntity,
-                "the monitor block has no monitor in it");
-        dev.distantstock.block.MonitorBlockEntity be =
-                (dev.distantstock.block.MonitorBlockEntity) h.getLevel().getBlockEntity(pos);
-        h.runAfterDelay(60, () -> {
-            java.util.List<com.simibubi.create.content.trains.display.FlapDisplayLayout> lines = be.getLines();
-            h.assertTrue(lines != null && lines.size() >= 2,
-                    "the board built " + (lines == null ? "no" : lines.size()) + " lines");
-            String label = lines.get(0).getSections().getFirst().getText().getString();
-            String value = lines.get(1).getSections().getFirst().getText().getString();
-            h.assertTrue(!label.isBlank(), "the board's top line is empty");
-            h.assertTrue(!value.isBlank(), "the board's second line is empty");
-            h.assertTrue(label.length() <= 4 && value.length() <= 4,
-                    "the board was given \"" + label + "\" / \"" + value + "\", which does not fit");
-            h.assertTrue(java.util.List.of("TPS", "MSPT", "PING", "BACK", "PEER", "DEV").contains(label),
-                    "the board is showing \"" + label + "\", which is not one of its readings");
-            h.succeed();
-        });
-    }
-
     private TowerGameTests() {
     }
 
