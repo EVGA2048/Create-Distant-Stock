@@ -80,6 +80,48 @@ public final class ParcelEscrowGameTests {
     }
 
     /**
+     * 按地址投递：同一个组里的两个港，包裹只该落在地址对上的那一个。
+     *
+     * <p>组决定「从哪些港出来」，地址决定「具体是哪一个」—— 一个组里有好几个港时，
+     * 后者才是玩家真正在用的那件事。这条链的最后一跳是 {@code PackageItem.matchAddress}，
+     * 港没写地址时当作 {@code *}（谁都收）。
+     */
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void aParcelLandsInTheDockItsAddressNames(GameTestHelper h) {
+        var level = h.getLevel();
+        MinecraftServer server = level.getServer();
+        DockGroup group = DockGroupDirectory.get(server)
+                .create("地址组 " + java.util.UUID.randomUUID().toString().substring(0, 8));
+        DockBlockEntity named = placeDock(h, TARGET_X, group.id());
+        DockBlockEntity open = placeDock(h, OTHER_X, group.id());
+        // 两个都写死地址，而且不同：只写一个的话另一个就成了 `*`（谁都收），
+        // 两个港都会匹配上，选中哪个都是对的，这条用例就什么都证明不了。
+        named.setImport("甲站");
+        open.setImport("乙站");
+
+        h.runAfterDelay(2, () -> {
+            ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+            com.simibubi.create.content.logistics.box.PackageItem.addAddress(parcel, "甲站");
+            h.assertTrue("甲站".equals(com.simibubi.create.content.logistics.box.PackageItem
+                            .getAddress(parcel)),
+                    "包裹地址没写进去，后面的断言就没有意义了");
+
+            ParcelEscrow escrow = ParcelEscrow.get(server);
+            escrow.hold(parcel, "甲站", TranserverBridge.localNodeId(), group.id(),
+                    level.dimension().location().toString(),
+                    h.absolutePos(new BlockPos(OTHER_X, Y, Z)), level.getGameTime(),
+                    level.registryAccess());
+            ParcelEscrowPump.tick(server);
+
+            h.assertTrue(named.displayedStack().is(ModItems.REMOTE_PACKAGE.get()),
+                    "包裹没有落进地址对上的那个港");
+            h.assertTrue(open.displayedStack().isEmpty(),
+                    "包裹落进了同组里地址不对的那个港（乙站）");
+            h.succeed();
+        });
+    }
+
+    /**
      * 没匹配的港时记录必须留在 HELD。区块没加载、港满了、地址对不上都只是「现在不行」，
      * 丢记录才是不可接受的那一种。
      */
