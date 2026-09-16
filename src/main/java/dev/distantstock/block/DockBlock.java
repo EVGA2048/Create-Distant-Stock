@@ -142,6 +142,13 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                         // ignored reads as a broken item, not as a locked door.
                         if (admits(level, group, player)) {
                             be.setGroupId(group);
+                            // Same reason as the plain click: the whole effect of the gesture is a
+                            // line on a block, and saying nothing leaves the player unsure whether
+                            // the group was written at all.
+                            player.displayClientMessage(Component.translatable(
+                                    "message.distantstock.dock.joined",
+                                    RequesterData.receivingGroupName(stack)
+                                            .orElse(group.toString().substring(0, 8))), true);
                         } else {
                             player.displayClientMessage(
                                     Component.translatable("gui.distantstock.group.closed"), true);
