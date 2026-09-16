@@ -125,6 +125,27 @@ public final class DockGroupDirectory extends SavedData {
         return next;
     }
 
+    /**
+     * Removes a group for good, sending the docks that were in it back to the default one.
+     *
+     * <p>The docks are not touched beyond their group: deleting a system must never break a machine.
+     * A dock that was receiving for a group nobody can address any more would otherwise sit there
+     * looking busy forever, so it goes back to the group every dock starts in.
+     *
+     * <p>The default group cannot be deleted. Every dock starts in it and it is the fallback for
+     * every lookup that misses, so removing it would leave those lookups with nothing to return.
+     */
+    public boolean delete(UUID id) {
+        if (id == null || id.equals(DEFAULT_GROUP_ID)) {
+            return false;
+        }
+        if (groups.remove(id) == null) {
+            return false;
+        }
+        setDirty();
+        return true;
+    }
+
     @Override
     public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
         ListTag entries = new ListTag();

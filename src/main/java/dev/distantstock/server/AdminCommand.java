@@ -110,12 +110,19 @@ public final class AdminCommand {
                                 .then(Commands.argument("id", StringArgumentType.word())
                                         .suggests((ctx, builder) -> suggestQuarantineIds(ctx, builder))
                                         .executes(AdminCommand::quarantineDiscard))))
+                .then(Commands.literal("help").executes(AdminCommand::help))
                 .then(Commands.literal("group")
                         .executes(AdminCommand::groupList)
                         .then(Commands.literal("list").executes(AdminCommand::groupList))
                         .then(Commands.literal("create")
                                 .then(Commands.argument("name", StringArgumentType.string())
-                                        .executes(AdminCommand::groupCreate))))
+                                        .executes(AdminCommand::groupCreate)))
+                        .then(Commands.literal("delete")
+                                .then(Commands.argument("name", StringArgumentType.string())
+                                        .suggests((ctx, builder) -> suggestGroupNames(ctx, builder))
+                                        .executes(ctx -> groupDelete(ctx, false))
+                                        .then(Commands.literal("confirm")
+                                                .executes(ctx -> groupDelete(ctx, true))))))
                 .then(Commands.literal("dock")
                         .then(Commands.literal("group")
                                 .then(Commands.argument("group", StringArgumentType.string())
@@ -125,6 +132,65 @@ public final class AdminCommand {
                                 .then(Commands.argument("group", StringArgumentType.string())
                                         .suggests((ctx, builder) -> suggestGroupNames(ctx, builder))
                                         .executes(AdminCommand::dockSendTo)))));
+    }
+
+    /**
+     * Every subcommand, in one page.
+     *
+     * <p>Nothing here is the only way to do something: the same operations are in the terminal's
+     * screen, and this exists for administrators and for scripted setups. It says so, because a
+     * player who finds the commands first would otherwise assume the interface is the hard way
+     * around.
+     */
+    private static int help(CommandContext<CommandSourceStack> ctx) {
+        ctx.getSource().sendSuccess(() -> Component.literal(String.join("\n", List.of(
+                "远仓指令（所有操作在终端界面里也能做，指令只是快捷方式）：",
+                "  /distantstock status                传输模式与队列",
+                "  /distantstock help                  这一页",
+                "  /distantstock group list            列出所有系统（港组）",
+                "  /distantstock group create <名字>    新建一个系统",
+                "  /distantstock group delete <名字>    删除（要再输一次 confirm）",
+                "  /distantstock dock group <名字>      把脚下的港加入系统",
+                "  /distantstock dock send-to <名字>    让脚下的港发往那个系统",
+                "  /distantstock returns list|restore|give|export   被退回的包裹",
+                "  /distantstock quarantine list|give|export|discard 隔离的包裹"
+        ))), false);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Removes a system, and only ever on the second ask.
+     *
+     * <p>Typing the name once prints what would be lost and does nothing; adding {@code confirm}
+     * does it. The docks that were in it go back to the default system rather than being broken,
+     * which is the part that makes this safe to offer at all.
+     */
+    private static int groupDelete(CommandContext<CommandSourceStack> ctx, boolean confirmed) {
+        String name = StringArgumentType.getString(ctx, "name");
+        var directory = DockGroupDirectory.get(ctx.getSource().getServer());
+        var group = directory.findByName(name).orElse(null);
+        if (group == null) {
+            ctx.getSource().sendFailure(Component.literal("没有这个系统：" + name));
+            return 0;
+        }
+        if (group.id().equals(DockGroupDirectory.DEFAULT_GROUP_ID)) {
+            ctx.getSource().sendFailure(Component.literal("默认系统不能删除。"));
+            return 0;
+        }
+        if (!confirmed) {
+            int docks = LoadedDocks.allInGroup(group.id()).size();
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "将删除系统「" + group.name() + "」，其中 " + docks
+                            + " 个已加载的港会退回默认系统。确认请再执行一次："
+                            + "/distantstock group delete " + group.name() + " confirm"), false);
+            return Command.SINGLE_SUCCESS;
+        }
+        for (var dock : LoadedDocks.allInGroup(group.id())) {
+            dock.setGroupId(DockGroupDirectory.DEFAULT_GROUP_ID);
+        }
+        directory.delete(group.id());
+        ctx.getSource().sendSuccess(() -> Component.literal("已删除系统「" + name + "」。"), true);
+        return Command.SINGLE_SUCCESS;
     }
 
     private static int status(CommandContext<CommandSourceStack> ctx) {

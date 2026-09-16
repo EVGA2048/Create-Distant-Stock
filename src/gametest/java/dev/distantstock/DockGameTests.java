@@ -143,4 +143,25 @@ public final class DockGameTests {
         }
     }
 
+    /**
+     * 绑了网络的港在物品栏里要看得出来。
+     *
+     * <p>Create 的每一个已链接物品都带附魔光效，它是「这个港已经知道自己在哪张网上」在放下之前
+     * 唯一的迹象。少了它，绑过的港和空白的港在快捷栏里长得一模一样，只能放下才知道。
+     */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void aBoundDockGlintsInTheInventory(GameTestHelper h) {
+        ItemStack blank = new ItemStack(ModItems.DOCK.get());
+        h.assertTrue(!blank.hasFoil(), "空白的港不该发光");
+
+        ItemStack bound = new ItemStack(ModItems.DOCK.get());
+        dev.distantstock.item.RequesterData.setNetwork(bound,
+                new dev.distantstock.routing.RemoteNetworkId(
+                        dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA,
+                        java.util.UUID.randomUUID(), java.util.UUID.randomUUID(),
+                        "minecraft:overworld", java.util.UUID.randomUUID()));
+        h.assertTrue(bound.hasFoil(), "绑了网络的港必须发光，否则分不出绑没绑");
+        h.succeed();
+    }
+
 }

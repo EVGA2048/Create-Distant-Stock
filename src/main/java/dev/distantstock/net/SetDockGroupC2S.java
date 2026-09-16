@@ -29,6 +29,8 @@ public record SetDockGroupC2S(String name, int action) implements CustomPacketPa
     public static final int RENAME = 1;
     /** Flip whether the named system lets anyone but its owner in. */
     public static final int TOGGLE_OPEN = 2;
+    /** Remove the named system. The player has already confirmed; the screen asks first. */
+    public static final int DELETE = 3;
 
     public static final Type<SetDockGroupC2S> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "set_dock_group"));

@@ -174,6 +174,27 @@ public final class RequesterMenu extends AbstractContainerMenu {
             sendGroupList(player, stack);
             return;
         }
+        if (action == dev.distantstock.net.SetDockGroupC2S.DELETE) {
+            // Only the owner may remove their own system. The two-click confirmation lives in the
+            // screen and is a courtesy, not a lock: a modified client can send this straight away,
+            // and the thing it can do is delete a group it already owns. What must not happen is
+            // somebody else's group disappearing, and that is what this check is for.
+            dev.distantstock.routing.DockGroup target = directory.findByName(trimmed).orElse(null);
+            if (target != null && target.ownedBy(who) && directory.delete(target.id())) {
+                // The docks that were in it go back to the group every dock starts in. A dock left
+                // pointing at a system nobody can address any more would sit there looking busy
+                // forever.
+                for (dev.distantstock.block.DockBlockEntity dock
+                        : dev.distantstock.block.LoadedDocks.allInGroup(target.id())) {
+                    dock.setGroupId(directory.DEFAULT_GROUP_ID);
+                }
+                if (dev.distantstock.item.RequesterData.receivingGroup(stack).filter(target.id()::equals).isPresent()) {
+                    setCarriedGroup(player, stack, directory.require(directory.DEFAULT_GROUP_ID));
+                }
+            }
+            sendGroupList(player, stack);
+            return;
+        }
         dev.distantstock.routing.DockGroup existing = directory.findByName(trimmed).orElse(null);
         if (existing != null && !existing.admits(who)) {
             // Selecting a closed group would only fail later, at the dock. Refusing here is the one

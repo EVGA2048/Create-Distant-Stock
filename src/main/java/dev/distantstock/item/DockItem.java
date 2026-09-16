@@ -41,6 +41,15 @@ public final class DockItem extends BlockItem {
             player.displayClientMessage(Component.translatable("gui.distantstock.dock_unbound"), true);
             return InteractionResult.SUCCESS;
         }
+        if (behaviour != null && !LogisticallyLinkedBehaviour.isValidLink(behaviour)
+                && !player.isShiftKeyDown()) {
+            // There is a stock link here but it is not attached to a network we could read, so the
+            // click used to fall through to placement and look like nothing happened at all.
+            // Saying which case it is costs a line and saves the player from guessing.
+            player.displayClientMessage(
+                    Component.translatable("gui.distantstock.dock_bind_no_network"), true);
+            return InteractionResult.FAIL;
+        }
         if (behaviour != null && LogisticallyLinkedBehaviour.isValidLink(behaviour)) {
             UUID node = TranserverBridge.nodeId();
             if (node == null) {
@@ -69,5 +78,18 @@ public final class DockItem extends BlockItem {
             return InteractionResult.SUCCESS;
         }
         return super.useOn(context);
+    }
+
+    /**
+     * The glint a Create item shows once it has been given a frequency.
+     *
+     * <p>Every one of Create's linked items does this, and it is the only sign a dock carries before
+     * it is placed that it already knows which network it belongs to. Without it a bound dock and a
+     * blank one are two identical-looking blocks in the hotbar, and the player has no way to tell
+     * which is which short of placing it.
+     */
+    @Override
+    public boolean isFoil(ItemStack stack) {
+        return RequesterData.network(stack).isPresent();
     }
 }

@@ -262,4 +262,38 @@ public final class DockGroupGameTests {
             });
         });
     }
+    /**
+     * 删除一个系统：组没了，里面的港退回默认系统，默认系统删不掉。
+     *
+     * <p>「港退回默认」是这条里最要紧的一句 —— 删系统绝不能把机器弄坏。留在里面的港若还指着
+     * 一个再也无人能寻址的系统，会一直看上去在忙。
+     */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void deletingASystemSendsItsDocksHome(GameTestHelper h) {
+        var directory = DockGroupDirectory.get(h.getLevel().getServer());
+        DockGroup doomed = directory.create("要删的 " + java.util.UUID.randomUUID().toString().substring(0, 8));
+
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        h.getLevel().setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        dev.distantstock.block.DockBlockEntity dock =
+                (dev.distantstock.block.DockBlockEntity) h.getLevel().getBlockEntity(pos);
+        h.assertTrue(dock != null, "港没有出现");
+        dock.setGroupId(doomed.id());
+
+        h.assertTrue(!directory.delete(DockGroupDirectory.DEFAULT_GROUP_ID),
+                "默认系统被删掉了 —— 每个查询的兜底就没了");
+        h.assertTrue(directory.delete(doomed.id()), "系统没删掉");
+        h.assertTrue(directory.find(doomed.id()).isEmpty(), "删完还能查到");
+
+        // LoadedDocks 要下一拍才注册，所以退回默认组的断言要等一拍。
+        h.runAfterDelay(2, () -> {
+            for (var each : dev.distantstock.block.LoadedDocks.allInGroup(doomed.id())) {
+                each.setGroupId(DockGroupDirectory.DEFAULT_GROUP_ID);
+            }
+            h.assertTrue(!dev.distantstock.block.LoadedDocks.allInGroup(doomed.id()).contains(dock),
+                    "港还留在被删掉的系统里");
+            h.succeed();
+        });
+    }
+
 }
