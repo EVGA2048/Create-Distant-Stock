@@ -8,6 +8,7 @@ import dev.distantstock.block.GaugeBlockEntity;
 import dev.distantstock.block.ModBlocks;
 import dev.distantstock.menu.RequesterMenu;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameType;
@@ -112,6 +113,74 @@ public final class DockGroupGameTests {
         h.assertTrue(directory.findByName("nobody called it this").isEmpty(),
                 "an unused name found a group");
         h.assertTrue(directory.findByName("").isEmpty(), "a blank name found a group");
+        h.succeed();
+    }
+
+    /**
+     * A name on the list is a key to a locked group, and nothing more.
+     *
+     * <p>Two halves, and both are the point: the member is let in without the group being opened,
+     * and being let in does not make them the owner. A member who could rename it, delete it or
+     * name somebody else would be an owner with fewer words — and the "×" on their row is the
+     * owner's, which only means anything if the row after it is really gone.
+     */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void aNamedMemberMayUseAClosedGroupAndNothingElse(GameTestHelper h) {
+        DockGroupDirectory directory = DockGroupDirectory.get(h.getLevel().getServer());
+        DockGroup group = directory.createFor("members " + UUID.randomUUID().toString().substring(0, 8), OWNER);
+        h.assertFalse(group.admits(STRANGER), "the new group started open");
+
+        directory.addMember(group.id(), STRANGER, "张三");
+        DockGroup named = directory.require(group.id());
+        h.assertTrue(named.admits(STRANGER), "a named member was still refused");
+        h.assertTrue(named.hasMember(STRANGER), "the member was not on the list");
+        h.assertTrue("张三".equals(named.memberName(STRANGER)), "the member's name was not kept");
+        h.assertFalse(named.ownedBy(STRANGER), "being named made the member an owner");
+        h.assertFalse(named.open(), "naming somebody opened the group to everyone");
+
+        // Somebody else, who nobody named, is still outside.
+        h.assertFalse(named.admits(UUID.randomUUID()), "an unnamed player was let into a locked group");
+
+        directory.removeMember(group.id(), STRANGER);
+        h.assertFalse(directory.require(group.id()).admits(STRANGER),
+                "taking the name back out left the member in");
+        h.succeed();
+    }
+
+    /** The owner is in by definition: naming them is a no-op, not a row that can be removed. */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void theOwnerIsNotAMemberRow(GameTestHelper h) {
+        DockGroupDirectory directory = DockGroupDirectory.get(h.getLevel().getServer());
+        DockGroup group = directory.createFor("ownerrow " + UUID.randomUUID().toString().substring(0, 8), OWNER);
+        directory.addMember(group.id(), OWNER, "owner");
+        h.assertTrue(directory.require(group.id()).members().isEmpty(),
+                "the owner was written into the member list as a row that could be crossed out");
+        h.succeed();
+    }
+
+    /**
+     * The list is a small file, and it has to come back the way it went in.
+     *
+     * <p>Names are the whole of what a player reads on that screen, so a round trip that kept the
+     * ids and dropped the names would leave a list of blanks — and one that lost the names
+     * altogether would take the keys to a locked warehouse with it.
+     */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void theMemberListSurvivesItsFile(GameTestHelper h) {
+        DockGroupDirectory directory = new DockGroupDirectory();
+        DockGroup group = directory.createFor("存档 " + UUID.randomUUID().toString().substring(0, 8), OWNER);
+        directory.addMember(group.id(), STRANGER, "李四");
+        UUID third = UUID.randomUUID();
+        directory.addMember(group.id(), third, "王五");
+
+        DockGroupDirectory loaded = DockGroupDirectory.load(directory.save(new CompoundTag(), null), null);
+        DockGroup back = loaded.find(group.id()).orElse(null);
+        h.assertTrue(back != null, "the group did not survive its own file");
+        h.assertTrue(back.members().size() == 2, "the member list lost rows on the way through the file");
+        h.assertTrue("李四".equals(back.memberName(STRANGER)), "a member's name was lost");
+        h.assertTrue("王五".equals(back.memberName(third)), "the second member's name was lost");
+        h.assertTrue(back.admits(STRANGER) && back.admits(third), "a reloaded member is refused");
+        h.assertFalse(back.ownedBy(STRANGER), "a reloaded member became the owner");
         h.succeed();
     }
 

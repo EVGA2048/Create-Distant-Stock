@@ -20,6 +20,7 @@ public final class ModNet {
         r.playToServer(SetDockGroupC2S.TYPE, SetDockGroupC2S.STREAM_CODEC, SetDockGroupC2S::handle);
         r.playToServer(BindGaugePanelC2S.TYPE, BindGaugePanelC2S.STREAM_CODEC, BindGaugePanelC2S::handle);
         r.playToServer(PairCodeC2S.TYPE, PairCodeC2S.STREAM_CODEC, PairCodeC2S::handle);
+        r.playToServer(GroupMemberC2S.TYPE, GroupMemberC2S.STREAM_CODEC, GroupMemberC2S::handle);
         r.playToClient(RemoteGroupsS2C.TYPE, RemoteGroupsS2C.STREAM_CODEC, RemoteGroupsS2C::handle);
         r.playToClient(OpenMonitorS2C.TYPE, OpenMonitorS2C.STREAM_CODEC, OpenMonitorS2C::handle);
         r.playToClient(LinkSnapshotS2C.TYPE, LinkSnapshotS2C.STREAM_CODEC, LinkSnapshotS2C::handle);

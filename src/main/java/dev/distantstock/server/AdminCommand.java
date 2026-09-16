@@ -22,6 +22,7 @@ import dev.distantstock.net.AdminConfigS2C;
 import dev.distantstock.routing.DockGroup;
 import dev.distantstock.routing.DockGroupDirectory;
 import dev.distantstock.routing.PairingCodes;
+import dev.distantstock.routing.PlayerNames;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -124,7 +125,23 @@ public final class AdminCommand {
                                         .suggests((ctx, builder) -> suggestGroupNames(ctx, builder))
                                         .executes(ctx -> groupDelete(ctx, false))
                                         .then(Commands.literal("confirm")
-                                                .executes(ctx -> groupDelete(ctx, true))))))
+                                                .executes(ctx -> groupDelete(ctx, true)))))
+                        // 成员名单：被点名的玩家能用这个锁着的组，改不了它。
+                        .then(Commands.literal("member")
+                                .then(Commands.literal("list")
+                                        .then(Commands.argument("group", StringArgumentType.string())
+                                                .suggests((ctx, builder) -> suggestGroupNames(ctx, builder))
+                                                .executes(AdminCommand::memberList)))
+                                .then(Commands.literal("add")
+                                        .then(Commands.argument("group", StringArgumentType.string())
+                                                .suggests((ctx, builder) -> suggestGroupNames(ctx, builder))
+                                                .then(Commands.argument("player", StringArgumentType.word())
+                                                        .executes(ctx -> groupMember(ctx, true)))))
+                                .then(Commands.literal("remove")
+                                        .then(Commands.argument("group", StringArgumentType.string())
+                                                .suggests((ctx, builder) -> suggestGroupNames(ctx, builder))
+                                                .then(Commands.argument("player", StringArgumentType.word())
+                                                        .executes(ctx -> groupMember(ctx, false)))))))
                 .then(Commands.literal("pair")
                         .executes(AdminCommand::pairList)
                         .then(Commands.literal("list").executes(AdminCommand::pairList))
@@ -173,6 +190,9 @@ public final class AdminCommand {
                 "  /distantstock group list            列出所有系统（港组）",
                 "  /distantstock group create <名字>    新建一个系统",
                 "  /distantstock group delete <名字>    删除（要再输一次 confirm）",
+                "  /distantstock group member list <组名>          谁能用这个锁着的组",
+                "  /distantstock group member add <组名> <玩家名>   把一个人放进来（只有组主能改）",
+                "  /distantstock group member remove <组名> <玩家名> 把他请出去",
                 "  /distantstock pair create <组名>     给别的服务器发一个配对码（默认 10 分钟）",
                 "  /distantstock pair redeem <码>       兑换别的服务器的配对码",
                 "  /distantstock pair list              本服发出的码 + 已认识的远端港组",
@@ -416,14 +436,110 @@ public final class AdminCommand {
      * 所以这条命令是管理员第一次能看到「组」这个对象长什么样。
      */
     private static int groupList(CommandContext<CommandSourceStack> ctx) {
-        List<DockGroup> groups = DockGroupDirectory.get(ctx.getSource().getServer()).all();
+        MinecraftServer server = ctx.getSource().getServer();
+        List<DockGroup> groups = DockGroupDirectory.get(server).all();
         ctx.getSource().sendSuccess(() -> Component.literal("远仓港组：" + groups.size()
-                + "（/distantstock dock group|send-to <组名> 把准星前的港加进组或指向组；点 uuid 可复制）"), false);
+                + "（/distantstock dock group|send-to <组名> 把准星前的港加进组或指向组；成员见 group member；点 uuid 可复制）"), false);
         for (DockGroup group : groups) {
             int loaded = LoadedDocks.allInGroup(group.id()).size();
+            // 组主写成名字：列表是给人看的，一串 uuid 前八位谁也认不出是谁。
+            String owner = group.owner() == null ? "（无主，对所有人开放）"
+                    : PlayerNames.display(server, group.owner())
+                    + (group.open() ? "（开放）" : "（已锁定）");
+            String members = group.members().isEmpty() ? ""
+                    : " · 成员 " + group.members().size();
             ctx.getSource().sendSuccess(() -> Component.literal("· " + group.name()
-                    + " · 已加载的港 " + loaded + " · ").append(clickableId(group.id())), false);
+                    + " · 已加载的港 " + loaded + " · 组主 " + owner + members + " · ")
+                    .append(clickableId(group.id())), false);
         }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** 把某个玩家加进组 / 移出组。ownership 在界面上是硬检查，这里同样。 */
+    private static int groupMember(CommandContext<CommandSourceStack> ctx, boolean add)
+            throws CommandSyntaxException {
+        MinecraftServer server = ctx.getSource().getServer();
+        DockGroupDirectory directory = DockGroupDirectory.get(server);
+        String name = StringArgumentType.getString(ctx, "group");
+        DockGroup group = directory.findByName(name).orElse(null);
+        if (group == null) {
+            return failure(ctx, "没有这个港组：" + name);
+        }
+        ServerPlayer player = ctx.getSource().getPlayer();
+        boolean owner = player != null && group.ownedBy(player.getUUID());
+        if (!owner && !ctx.getSource().hasPermission(2)) {
+            return failure(ctx, "只有组主能改成员名单：" + group.name());
+        }
+        String typed = StringArgumentType.getString(ctx, "player");
+        if (add) {
+            var account = PlayerNames.lookup(server, typed);
+            if (account.isEmpty()) {
+                return failure(ctx, "这个服务器不认识玩家「" + typed + "」：名字要跟他进服时的名字完全一样");
+            }
+            if (group.ownedBy(account.get().getId())) {
+                return failure(ctx, account.get().getName() + " 是这个组的主人，本来就能用");
+            }
+            if (group.hasMember(account.get().getId())) {
+                directory.addMember(group.id(), account.get().getId(), account.get().getName());
+                ctx.getSource().sendSuccess(() -> Component.literal(
+                        account.get().getName() + " 已经在名单里（名字已刷新）"), false);
+                return Command.SINGLE_SUCCESS;
+            }
+            if (group.members().size() >= DockGroup.MAX_MEMBERS) {
+                return failure(ctx, "成员名单满了（上限 " + DockGroup.MAX_MEMBERS + " 人）");
+            }
+            directory.addMember(group.id(), account.get().getId(), account.get().getName());
+            ctx.getSource().sendSuccess(() -> Component.literal("已把 " + account.get().getName()
+                    + " 加入港组「" + group.name() + "」：他现在能用这个组，改不了它"), false);
+            return Command.SINGLE_SUCCESS;
+        }
+        UUID id = null;
+        String label = typed;
+        for (var row : group.members().entrySet()) {
+            if (row.getValue() != null && row.getValue().equalsIgnoreCase(typed)) {
+                id = row.getKey();
+                label = row.getValue();
+                break;
+            }
+        }
+        if (id == null) {
+            var account = PlayerNames.lookup(server, typed).orElse(null);
+            if (account != null && group.hasMember(account.getId())) {
+                id = account.getId();
+                label = account.getName();
+            }
+        }
+        if (id == null) {
+            return failure(ctx, "「" + typed + "」不在这个组的名单里");
+        }
+        String member = label;
+        directory.removeMember(group.id(), id);
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "已把 " + member + " 移出港组「" + group.name() + "」"), false);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int memberList(CommandContext<CommandSourceStack> ctx) {
+        MinecraftServer server = ctx.getSource().getServer();
+        String name = StringArgumentType.getString(ctx, "group");
+        DockGroup group = DockGroupDirectory.get(server).findByName(name).orElse(null);
+        if (group == null) {
+            return failure(ctx, "没有这个港组：" + name);
+        }
+        ctx.getSource().sendSuccess(() -> Component.literal("港组「" + group.name() + "」· 组主 "
+                + (group.owner() == null ? "无（服务器建的，对所有人开放）"
+                        : PlayerNames.display(server, group.owner()))
+                + " · " + (group.open() ? "开放：谁都能用" : "已锁定：只有组主和成员能用")), false);
+        // 名单为空也要说出来，中间那条横线就是「没人」和「命令没输出」的区别。
+        if (group.members().isEmpty()) {
+            ctx.getSource().sendSuccess(() -> Component.literal("  ·（名单是空的）"), false);
+        }
+        for (var row : group.members().entrySet()) {
+            ctx.getSource().sendSuccess(() -> Component.literal("  · " + row.getValue()
+                    + " · ").append(clickableId(row.getKey())), false);
+        }
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "  成员只能用这个组（往组里加港、往组里下单），改不了它；名单只在这个服务器内有效，跨服不生效"), false);
         return Command.SINGLE_SUCCESS;
     }
 

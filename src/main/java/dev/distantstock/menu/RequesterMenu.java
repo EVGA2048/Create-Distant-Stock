@@ -301,7 +301,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
                 : dev.distantstock.item.RequesterData.receivingGroup(stack).orElse(null);
         net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(serverPlayer,
                 dev.distantstock.net.DockGroupsS2C.of(directory, player.getUUID(), carried,
-                        group -> dev.distantstock.block.LoadedDocks.allInGroup(group).size()));
+                        group -> dev.distantstock.block.LoadedDocks.allInGroup(group).size(),
+                        owner -> dev.distantstock.routing.PlayerNames.display(
+                                player.level().getServer(), owner)));
         // The other half of the same list. Sent together because the screen draws one list: a
         // destination from another server is chosen the same way and differs only in what the far
         // end does with it.

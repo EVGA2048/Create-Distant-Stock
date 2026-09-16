@@ -133,6 +133,19 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         });
         addRenderableWidget(receivingGroup);
 
+        // The member panel's field, hidden until a row's 「成员」 is clicked. Created here with the
+        // rest of them because a screen's widgets are its own: one made later would survive a
+        // resize as a stray.
+        memberInput = new EditBox(font, leftPos, topPos, MEMBER_W - 30, 10,
+                Component.translatable("gui.distantstock.member.hint_name"));
+        memberInput.setBordered(false);
+        memberInput.setTextColor(INK);
+        memberInput.setMaxLength(16);
+        // Still open across a resize: the widgets were rebuilt, the panel was not closed.
+        memberInput.setVisible(membersFor != null);
+        memberInput.setFocused(membersFor != null);
+        addRenderableWidget(memberInput);
+
         if (!opened) {
             opened = true;
             uiSound(SoundEvents.WOOD_HIT, 0.5f, 1.5f);
@@ -275,6 +288,18 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
      */
     private boolean groupPickerOpen;
 
+    /**
+     * The group whose member list is open over the system list, or null.
+     *
+     * <p>An overlay rather than a page: it is opened from a row of the list, and the answer to "who
+     * else may use this" is usually wanted while still choosing a destination. The field at its
+     * bottom is where a name is typed — a name, because that is what the owner knows about the
+     * person they are letting in and a uuid is not something anybody types.
+     */
+    private java.util.UUID membersFor;
+    private String membersName = "";
+    private net.minecraft.client.gui.components.EditBox memberInput;
+
     public void applyRemoteGroups(dev.distantstock.net.RemoteGroupsS2C next) {
         remotes = next;
     }
@@ -362,7 +387,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         // never clicked into it, and so never saw that the list of systems existed at all —
         // "I don't know what systems there are" was the report, about a list that was already
         // there and already showed every one of them.
-        if (groups == null || receivingGroup == null
+        if (groups == null || receivingGroup == null || membersFor != null
                 || !(receivingGroup.isFocused() || groupPickerOpen)) {
             return;
         }
@@ -412,20 +437,30 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                         doomed ? 0xFF6B2A2A : over ? 0xFF3E5A61 : 0xFF2E444B);
                 // The carried one is marked so the field's value and the list agree at a glance.
                 boolean here = groups.carried() != null && groups.carried().equals(entry.id());
+                // 组主写在名字后面。名单上原本只有一个组名，玩家看到一排「仓库」根本认不出哪一个
+                // 是自己的、哪一个是别人的 —— 「到现在了我还是不知道谁是谁」说的就是这一行。
                 String left = doomed
                         ? Component.translatable("gui.distantstock.group.delete_confirm").getString()
-                        : entry.name();
-                g.drawString(font, trim(left, w - (entry.mine() ? 40 : 30)), x + 3, rowY + 1,
+                        : entry.mine() || entry.owner().isEmpty()
+                                ? entry.name()
+                                : entry.name() + " · " + entry.owner();
+                g.drawString(font, trim(left, w - (entry.mine() ? 56 : 34)), x + 3, rowY + 1,
                         doomed ? 0xFFFFD0D0 : here ? 0xFF9BE0C4 : INK, false);
                 if (entry.mine()) {
-                    // The owner's two dials, at the end of their own row: the lock, and the way to
-                    // be rid of it. Both are only drawn on a row this player owns — there is
-                    // nothing to open or delete on somebody else's system.
+                    // The owner's three dials, at the end of their own row: who is let in, the
+                    // lock, and the way to be rid of it. All three are only drawn on a row this
+                    // player owns — there is nothing to open, share or delete on somebody else's.
+                    g.drawString(font, "成员", x + w - 45, rowY + 1, 0xFF9BC8D8, false);
+                    g.drawString(font, entry.open() ? "○" : "●", x + w - 20, rowY + 1,
+                            entry.open() ? HINT : 0xFFC0A090, false);
                     g.drawString(font, "×", x + w - 8, rowY + 1, doomed ? 0xFFFFD0D0 : 0xFFC0A090, false);
+                    String count = Integer.toString(entry.docks());
+                    g.drawString(font, count, x + w - 52 - font.width(count), rowY + 1, HINT, false);
+                } else {
+                    String tail = entry.docks() + (entry.open() ? "  ○" : "  ●");
+                    g.drawString(font, tail, x + w - 12 - font.width(tail), rowY + 1,
+                            entry.open() ? HINT : 0xFFC0A090, false);
                 }
-                String tail = entry.docks() + (entry.open() ? "  ○" : "  ●");
-                g.drawString(font, tail, x + w - 12 - font.width(tail), rowY + 1,
-                        entry.open() ? HINT : 0xFFC0A090, false);
             } else {
                 // A destination on another server, drawn in the same list because it is chosen the
                 // same way. The label is what the player has to identify it by: the group's name is
@@ -459,7 +494,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     }
 
     private boolean groupListClick(double mx, double my) {
-        if (groups == null || receivingGroup == null
+        if (groups == null || receivingGroup == null || membersFor != null
                 || !(receivingGroup.isFocused() || groupPickerOpen)) {
             return false;
         }
@@ -531,10 +566,14 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             }
             pendingDelete = null;
             pendingForget = null;
-            if (entry.mine() && mx >= x + w - 28) {
+            if (entry.mine() && mx >= x + w - 24 && mx < x + w - 10) {
                 net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                         new dev.distantstock.net.SetDockGroupC2S(entry.name(),
                                 dev.distantstock.net.SetDockGroupC2S.TOGGLE_OPEN));
+                return true;
+            }
+            if (entry.mine() && mx >= x + w - 48 && mx < x + w - 24) {
+                openMembers(entry);
                 return true;
             }
             receivingGroup.setValue(entry.name());
@@ -546,6 +585,210 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             return true;
         }
         return false;
+    }
+
+    /** Opens the member list of a group this player owns, over the system list. */
+    private void openMembers(dev.distantstock.net.DockGroupsS2C.Entry entry) {
+        membersFor = entry.id();
+        membersName = entry.name();
+        groupPickerOpen = false;
+        pendingDelete = null;
+        if (receivingGroup != null) {
+            receivingGroup.setFocused(false);
+        }
+        if (memberInput != null) {
+            memberInput.setValue("");
+            memberInput.setVisible(true);
+            // Positioned here as well as in the render pass so the first frame is not drawn with the
+            // field still sitting wherever the last panel left it.
+            memberInput.setX(memberPanelX() + 4);
+            memberInput.setY(memberPanelY() + memberPanelH() - 24);
+            memberInput.setWidth(MEMBER_W - 30);
+            memberInput.setFocused(true);
+        }
+    }
+
+    private void closeMembers() {
+        membersFor = null;
+        if (memberInput != null) {
+            memberInput.setValue("");
+            memberInput.setFocused(false);
+            memberInput.setVisible(false);
+        }
+    }
+
+    /** The row this panel is about, or null once the group is gone. */
+    private dev.distantstock.net.DockGroupsS2C.Entry memberRow() {
+        if (membersFor == null || groups == null) {
+            return null;
+        }
+        for (var entry : groups.groups()) {
+            if (entry.id().equals(membersFor)) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    private static final int MEMBER_W = 136;
+    /** How many names fit before the list has to say how many it is not showing. */
+    private static final int MEMBER_ROWS = 5;
+
+    private int memberPanelX() {
+        return leftPos + 82;
+    }
+
+    private int memberPanelY() {
+        return dropdownY(dropdownRows());
+    }
+
+    private int memberPanelH() {
+        return 12 + MEMBER_ROWS * 10 + 30;
+    }
+
+    /**
+     * The member list: who may use this locked system, and the field that lets somebody else in.
+     *
+     * <p>Drawn over the system list rather than beside it — the window has no second column, and the
+     * list it was opened from is not wanted while it is open.
+     */
+    private void drawMemberPanel(GuiGraphics g, int mouseX, int mouseY) {
+        var entry = memberRow();
+        if (entry == null) {
+            // Closed on the server side while it was open — deleted, most likely. Leaving the panel
+            // up would draw a list of members of a system that no longer exists.
+            closeMembers();
+            return;
+        }
+        int x = memberPanelX();
+        int y = memberPanelY();
+        int h = memberPanelH();
+        g.fill(x - 2, y - 2, x + MEMBER_W + 2, y + h + 2, 0xFF1B282C);
+        g.fill(x - 1, y - 1, x + MEMBER_W + 1, y + h + 1, 0xFF24343A);
+        String title = trim(Component.translatable("gui.distantstock.member.title", entry.name()).getString(),
+                MEMBER_W - 8);
+        g.drawString(font, title, x + 4, y + 2, 0xFFCFE6EC, false);
+        g.fill(x + 3, y + 11, x + MEMBER_W - 3, y + 12, 0xFF3E5A61);
+
+        int rowY = y + 13;
+        // The owner first, and without a "×": the person who made the system cannot be taken out of
+        // it, and a button that did nothing would be read as one that failed.
+        g.drawString(font, trim(entry.owner().isEmpty()
+                        ? Component.translatable("gui.distantstock.member.nobody").getString()
+                        : entry.owner(), MEMBER_W - 42),
+                x + 4, rowY + 1, 0xFF9BE0C4, false);
+        g.drawString(font, Component.translatable("gui.distantstock.member.owner_tag").getString(),
+                x + MEMBER_W - 26, rowY + 1, HINT, false);
+        rowY += 10;
+
+        List<String> members = entry.members();
+        int shown = Math.min(members.size(), MEMBER_ROWS);
+        for (int i = 0; i < shown; i++) {
+            String name = members.get(i);
+            boolean over = mouseX >= x && mouseX < x + MEMBER_W
+                    && mouseY >= rowY && mouseY < rowY + 10;
+            g.drawString(font, trim(name, MEMBER_W - 20), x + 4, rowY + 1, INK, false);
+            g.drawString(font, "×", x + MEMBER_W - 12, rowY + 1,
+                    over ? 0xFFFFD0D0 : 0xFFC0A090, false);
+            rowY += 10;
+        }
+        if (members.size() > shown) {
+            g.drawString(font, Component.translatable("gui.distantstock.member.more",
+                    members.size() - shown).getString(), x + 4, rowY + 1, HINT, false);
+            rowY += 10;
+        } else if (members.isEmpty()) {
+            g.drawString(font, Component.translatable("gui.distantstock.member.empty").getString(),
+                    x + 4, rowY + 1, HINT, false);
+            rowY += 10;
+        }
+
+        int fieldY = y + h - 24;
+        memberInput.setX(x + 4);
+        memberInput.setY(fieldY);
+        memberInput.setWidth(MEMBER_W - 30);
+        g.fill(x + 2, fieldY - 2, x + MEMBER_W - 24, fieldY + 11,
+                memberInput.isFocused() ? 0x66FFFFFF : 0x33000000);
+        if (memberInput.getValue().isEmpty()) {
+            g.drawString(font, Component.translatable("gui.distantstock.member.hint_name")
+                    .withStyle(ChatFormatting.ITALIC), x + 5, fieldY + 1, HINT, false);
+        }
+        // The add button, at the end of the field. Drawn rather than a widget because it lives and
+        // dies with this panel, and a widget that hides itself is one more thing to keep in step.
+        boolean overAdd = mouseX >= x + MEMBER_W - 22 && mouseX < x + MEMBER_W - 2
+                && mouseY >= fieldY - 2 && mouseY < fieldY + 11;
+        g.fill(x + MEMBER_W - 22, fieldY - 2, x + MEMBER_W - 2, fieldY + 11,
+                overAdd ? 0xFF5A7A82 : 0xFF3E5A61);
+        g.drawString(font, Component.translatable("gui.distantstock.member.add").getString(),
+                x + MEMBER_W - 19, fieldY + 1, 0xFFEAF6F8, false);
+        g.drawString(font, trim(Component.translatable("gui.distantstock.member.hint").getString(),
+                        MEMBER_W - 8), x + 4, y + h - 11, HINT, false);
+        // Where to close it. The panel has no title bar to put an × in, and every player looks for
+        // one anyway.
+        boolean overClose = mouseX >= x + MEMBER_W - 12 && mouseX < x + MEMBER_W
+                && mouseY >= y && mouseY < y + 11;
+        g.drawString(font, "×", x + MEMBER_W - 10, y + 2, overClose ? 0xFFFFD0D0 : 0xFF9BC8D8, false);
+    }
+
+    /** Handles a click on the member panel. Returns whether it was the panel's. */
+    private boolean memberPanelClick(double mx, double my) {
+        var entry = memberRow();
+        if (entry == null) {
+            return false;
+        }
+        int x = memberPanelX();
+        int y = memberPanelY();
+        int h = memberPanelH();
+        if (mx < x - 2 || mx >= x + MEMBER_W + 2 || my < y - 2 || my >= y + h + 2) {
+            // Anywhere else closes it: the list underneath is what the click was aimed at, and a
+            // panel that has to be dismissed before the list can be used is in the way.
+            closeMembers();
+            return false;
+        }
+        if (my >= y && my < y + 11 && mx >= x + MEMBER_W - 14) {
+            closeMembers();
+            return true;
+        }
+        int fieldY = y + h - 24;
+        if (my >= fieldY - 2 && my < fieldY + 11) {
+            if (mx >= x + MEMBER_W - 22 && mx < x + MEMBER_W - 2) {
+                addMember();
+                return true;
+            }
+            // The field itself is not consumed: the click is what puts the cursor in it, and that
+            // is the vanilla handler's job. Consuming it here would leave a text box that cannot be
+            // clicked into when it is not already focused.
+            return false;
+        }
+        // A member row: the "×" at its end takes the name back out. The owner's row is the first
+        // one and has no ×, which is why the row index starts at one here.
+        int rowY = y + 13 + 10;
+        for (int i = 0; i < Math.min(entry.members().size(), MEMBER_ROWS); i++, rowY += 10) {
+            if (my >= rowY && my < rowY + 10) {
+                if (mx >= x + MEMBER_W - 18) {
+                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                            new dev.distantstock.net.GroupMemberC2S(entry.name(),
+                                    entry.members().get(i),
+                                    dev.distantstock.net.GroupMemberC2S.REMOVE));
+                }
+                return true;
+            }
+        }
+        return true;
+    }
+
+    private void addMember() {
+        var entry = memberRow();
+        if (entry == null || memberInput == null) {
+            return;
+        }
+        String name = memberInput.getValue().trim();
+        if (name.isEmpty()) {
+            return;
+        }
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new dev.distantstock.net.GroupMemberC2S(entry.name(), name,
+                        dev.distantstock.net.GroupMemberC2S.ADD));
+        memberInput.setValue("");
     }
 
     /**
@@ -646,10 +889,17 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (renameButton != null) {
             renameButton.visible = tuned;
         }
+        if (memberInput != null) {
+            memberInput.visible = tuned && membersFor != null;
+        }
         renderBackground(g, mouseX, mouseY, partial);
         super.render(g, mouseX, mouseY, partial);
         // After everything, because a dropdown that the widgets behind it paint over is not one.
+        // The member panel is drawn last of all: it is opened from the list and covers it.
         drawGroupList(g, mouseX, mouseY);
+        if (membersFor != null) {
+            drawMemberPanel(g, mouseX, mouseY);
+        }
         ItemStack hover = hoveredStock(mouseX, mouseY);
         if (hover.isEmpty()) {
             hover = hoveredCart(mouseX, mouseY);
@@ -911,6 +1161,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
+        // The panel is on top of the list, so it gets the click first. A click outside it closes it
+        // and is then offered to whatever it was covering — dismissing it must not eat the click.
+        if (membersFor != null && memberPanelClick(mx, my)) {
+            return true;
+        }
         if (groupListClick(mx, my)) {
             return true;
         }
@@ -969,6 +1224,23 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     @Override
     public boolean keyPressed(int key, int scan, int mods) {
+        // The member panel is the topmost thing on the screen, so its field is asked first: every
+        // key that reaches a focused field has to be offered to it before the rules below, or the
+        // same swallowing that once ate Backspace in the group field eats it here.
+        if (membersFor != null) {
+            if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER
+                    || key == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER) {
+                addMember();
+                return true;
+            }
+            if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) {
+                closeMembers();
+                return true;
+            }
+            if (memberInput != null && memberInput.keyPressed(key, scan, mods)) {
+                return true;
+            }
+        }
         // Enter is how the group field is committed: the server turns an unknown name into a new
         // system, so sending per keystroke would leave a trail of half-typed ones behind.
         if (receivingGroup != null && receivingGroup.isFocused()
@@ -1023,6 +1295,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private boolean typing() {
         return (search != null && search.isFocused())
                 || (receivingGroup != null && receivingGroup.isFocused())
+                || (memberInput != null && memberInput.isFocused())
                 || (address != null && address.isFocused());
     }
 

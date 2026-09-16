@@ -29,8 +29,16 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
     /** How many groups one screen is offered. The list scrolls in nothing; it has to fit. */
     public static final int MAX_ENTRIES = 24;
 
-    /** One row: what it is called, and whether this player may pick it or open it. */
-    public record Entry(UUID id, String name, boolean open, boolean mine, int docks) {
+    /**
+     * One row: what it is called, and whether this player may pick it or open it.
+     *
+     * <p>{@code owner} and {@code members} are names, because that is the only thing that answers
+     * the question the list is read with — "whose warehouse is this?" A uuid answers nothing a
+     * player can act on, and the short form of one answers even less. The owner is the player who
+     * made the system; the members are the players they let in.
+     */
+    public record Entry(UUID id, String name, boolean open, boolean mine, int docks,
+                        String owner, List<String> members) {
     }
 
     public static final Type<DockGroupsS2C> TYPE = new Type<>(
@@ -51,6 +59,11 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
             buf.writeBoolean(entry.open());
             buf.writeBoolean(entry.mine());
             buf.writeVarInt(entry.docks());
+            buf.writeUtf(entry.owner() == null ? "" : entry.owner(), 64);
+            buf.writeVarInt(entry.members().size());
+            for (String member : entry.members()) {
+                buf.writeUtf(member, 64);
+            }
         }
         buf.writeBoolean(msg.carried != null);
         if (msg.carried != null) {
@@ -67,8 +80,24 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
         }
         List<Entry> groups = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
-            groups.add(new Entry(buf.readUUID(), buf.readUtf(DockGroup.MAX_NAME_LENGTH),
-                    buf.readBoolean(), buf.readBoolean(), buf.readVarInt()));
+            UUID id = buf.readUUID();
+            String name = buf.readUtf(DockGroup.MAX_NAME_LENGTH);
+            boolean open = buf.readBoolean();
+            boolean mine = buf.readBoolean();
+            int docks = buf.readVarInt();
+            String owner = buf.readUtf(64);
+            int memberCount = buf.readVarInt();
+            // Members are capped on the way in as well as on the way out. The cap is the group's
+            // own, so a well-behaved server never hits it and a malformed packet cannot reserve a
+            // list of whatever length it likes.
+            if (memberCount < 0 || memberCount > DockGroup.MAX_MEMBERS) {
+                throw new io.netty.handler.codec.DecoderException("dock group member count " + memberCount);
+            }
+            List<String> members = new ArrayList<>(memberCount);
+            for (int m = 0; m < memberCount; m++) {
+                members.add(buf.readUtf(64));
+            }
+            groups.add(new Entry(id, name, open, mine, docks, owner, List.copyOf(members)));
         }
         UUID carried = buf.readBoolean() ? buf.readUUID() : null;
         return new DockGroupsS2C(groups, carried);
@@ -85,16 +114,25 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
         });
     }
 
-    /** Builds the list one player may see, capped. Server side. */
+    /**
+     * Builds the list one player may see, capped. Server side.
+     *
+     * <p>{@code nameOf} turns the owner's account into a name to show. It is passed in rather than
+     * looked up here so the one place that knows how this server names its players — the profile
+     * cache, with the online list in front of it — is the one place that answers.
+     */
     public static DockGroupsS2C of(DockGroupDirectory directory, UUID player, UUID carried,
-                                   java.util.function.ToIntFunction<UUID> dockCount) {
+                                   java.util.function.ToIntFunction<UUID> dockCount,
+                                   java.util.function.Function<UUID, String> nameOf) {
         List<Entry> out = new ArrayList<>();
         for (DockGroup group : directory.all()) {
             if (!group.admits(player)) {
                 continue;
             }
             out.add(new Entry(group.id(), group.name(), group.open(),
-                    group.ownedBy(player), dockCount.applyAsInt(group.id())));
+                    group.ownedBy(player), dockCount.applyAsInt(group.id()),
+                    group.owner() == null ? "" : nameOf.apply(group.owner()),
+                    List.copyOf(group.members().values())));
             if (out.size() >= MAX_ENTRIES) {
                 break;
             }

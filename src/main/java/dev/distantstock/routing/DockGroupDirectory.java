@@ -126,6 +126,37 @@ public final class DockGroupDirectory extends SavedData {
     }
 
     /**
+     * Names one player in a group, so a closed group lets them in too.
+     *
+     * <p>Guarded by the caller, like {@link #setOpen}: this only writes. The owner is the one who
+     * decides, and a caller that has not checked ownership is the whole of the attack surface —
+     * being named only ever grants what the owner could grant anyway.
+     */
+    public DockGroup addMember(UUID id, UUID player, String playerName) {
+        return writeMember(id, group -> group.withMember(player, playerName));
+    }
+
+    public DockGroup removeMember(UUID id, UUID player) {
+        return writeMember(id, group -> group.withoutMember(player));
+    }
+
+    private DockGroup writeMember(UUID id, java.util.function.UnaryOperator<DockGroup> change) {
+        DockGroup current = groups.get(id);
+        if (current == null) {
+            throw new IllegalArgumentException("Unknown dock group: " + id);
+        }
+        DockGroup next = change.apply(current);
+        if (next == current) {
+            // Nothing changed: writing anyway would mark the file dirty on every no-op, and a
+            // re-add of somebody already in the list would look like an edit it is not.
+            return current;
+        }
+        groups.put(id, next);
+        setDirty();
+        return next;
+    }
+
+    /**
      * Removes a group for good, sending the docks that were in it back to the default one.
      *
      * <p>The docks are not touched beyond their group: deleting a system must never break a machine.
@@ -159,13 +190,24 @@ public final class DockGroupDirectory extends SavedData {
                 entry.putUUID("Owner", group.owner());
             }
             entry.putBoolean("Open", group.open());
+            if (!group.members().isEmpty()) {
+                ListTag members = new ListTag();
+                group.members().forEach((member, memberName) -> {
+                    CompoundTag row = new CompoundTag();
+                    row.putUUID("Id", member);
+                    row.putString("Name", memberName);
+                    members.add(row);
+                });
+                entry.put("Members", members);
+            }
             entries.add(entry);
         }
         tag.put("Groups", entries);
         return tag;
     }
 
-    private static DockGroupDirectory load(CompoundTag tag, HolderLookup.Provider registries) {
+    /** Public so the file can be read back in a test: a save format is only as good as its round trip. */
+    public static DockGroupDirectory load(CompoundTag tag, HolderLookup.Provider registries) {
         DockGroupDirectory directory = new DockGroupDirectory();
         ListTag entries = tag.getList("Groups", Tag.TAG_COMPOUND);
         for (int i = 0; i < entries.size(); i++) {
@@ -179,7 +221,19 @@ public final class DockGroupDirectory extends SavedData {
                 // open. Defaulting the other way would lock players out of their own docks on the
                 // first load after an update.
                 boolean open = !entry.contains("Open") || entry.getBoolean("Open");
-                DockGroup group = new DockGroup(entry.getUUID("Id"), entry.getString("Name"), owner, open);
+                // Absent means the file predates members: a group with nobody named in it, which
+                // is exactly what it was. A row without an id is skipped rather than defaulted —
+                // a member keyed on a made-up uuid would be a stranger the owner never named.
+                Map<UUID, String> members = new LinkedHashMap<>();
+                ListTag rows = entry.getList("Members", Tag.TAG_COMPOUND);
+                for (int row = 0; row < rows.size() && members.size() < DockGroup.MAX_MEMBERS; row++) {
+                    CompoundTag member = rows.getCompound(row);
+                    if (member.hasUUID("Id")) {
+                        members.put(member.getUUID("Id"), member.getString("Name"));
+                    }
+                }
+                DockGroup group = new DockGroup(entry.getUUID("Id"), entry.getString("Name"),
+                        owner, open, members);
                 directory.groups.put(group.id(), group);
             } catch (IllegalArgumentException ignored) {
             }

@@ -354,5 +354,22 @@
   "item.distantstock.remote_package.crossing": "跨服寄往 %s · 港组 %s",
   "gui.distantstock.pair.mint_row.not_owner": "＋ 生成配对码 —— 只有组主能发（这个组不是你建的）",
   "gui.distantstock.pair.mint_row.new_group": "＋ 生成配对码 —— 先对「%s」按回车建组",
-  "create.gui.stock_keeper.package_address.hint": "包裹上写的地址；收货侧的港/蛙港要收这个地址"
+  "create.gui.stock_keeper.package_address.hint": "包裹上写的地址；收货侧的港/蛙港要收这个地址",
+  "gui.distantstock.member.title": "成员 · %s",
+  "gui.distantstock.member.owner_tag": "组主",
+  "gui.distantstock.member.nobody": "（服务器建的，没有组主）",
+  "gui.distantstock.member.empty": "（还没有别人，只有你自己）",
+  "gui.distantstock.member.more": "…还有 %s 人（用指令 group member list 看全）",
+  "gui.distantstock.member.hint_name": "输入玩家名",
+  "gui.distantstock.member.add": "加入",
+  "gui.distantstock.member.hint": "只在本服生效 · 成员能用不能改",
+  "gui.distantstock.member.not_owner": "只有组主能改成员名单",
+  "gui.distantstock.member.full": "成员名单满了（上限 %s 人）",
+  "gui.distantstock.member.unknown": "这个服务器不认识玩家「%s」：名字要跟他进服时的完全一样",
+  "gui.distantstock.member.is_owner": "%s 是这个组的主人，本来就能用",
+  "gui.distantstock.member.already": "%s 已经在名单里（名字已刷新）",
+  "gui.distantstock.member.added": "已把 %s 加入港组「%s」：他能用这个组，改不了它",
+  "gui.distantstock.member.not_member": "「%s」不在这个组的名单里",
+  "gui.distantstock.member.removed": "已把 %s 移出港组「%s」",
+  "gui.distantstock.group.locked_hint": "已锁定：只有组主和成员能用"
 }
