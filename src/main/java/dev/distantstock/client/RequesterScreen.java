@@ -237,6 +237,15 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
      * for, and a row that stopped asking when the screen closed is the behaviour wanted.
      */
     private String pendingDelete;
+    /**
+     * The remote destination whose row is asking to be forgotten, or null.
+     *
+     * <p>A separate field from {@link #pendingDelete} because the two are different acts on rows
+     * that sit side by side: deleting a system is done by its owner and takes the system with it,
+     * while forgetting a destination only drops this server's memory of one it never owned. A
+     * mis-click that ran the wrong one would be the worst of both.
+     */
+    private String pendingForget;
 
     public void applyRemoteGroups(dev.distantstock.net.RemoteGroupsS2C next) {
         remotes = next;
@@ -344,10 +353,16 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 // same way. The label is what the player has to identify it by: the group's name is
                 // written by whoever owns it over there, and two servers can both have a "仓库".
                 var entry = remotes.groups().get(i - local);
-                g.fill(x, rowY, x + w, rowY + 10, over ? 0xFF3E5A61 : 0xFF2E444B);
+                boolean doomed = entry.group().toString().equals(pendingForget);
+                g.fill(x, rowY, x + w, rowY + 10,
+                        doomed ? 0xFF4A2A4A : over ? 0xFF3E5A61 : 0xFF2E444B);
+                // The same "×" as an owned row has, and it means the smaller thing: this server
+                // stops remembering a destination it never owned. Nothing on the other server
+                // changes, and the group keeps working for whoever else was let into it.
+                g.drawString(font, "×", x + w - 8, rowY + 1, doomed ? 0xFFFFD0D0 : 0xFFC0A090, false);
                 boolean here = receivingGroup.getValue().trim().equalsIgnoreCase(entry.name());
-                g.drawString(font, trim(entry.display(), w - 6), x + 3, rowY + 1,
-                        here ? 0xFF9BE0C4 : 0xFFC8B6E8, false);
+                g.drawString(font, trim(entry.display(), w - 16), x + 3, rowY + 1,
+                        doomed ? 0xFFFFD0D0 : here ? 0xFF9BE0C4 : 0xFFC8B6E8, false);
             }
         }
     }
@@ -393,7 +408,24 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 // Picking a remote destination. The field carries the group's plain name and the
                 // server matches it against what the pairing codes brought in — the id never has
                 // to reach the client, and nothing here could check it if it did.
-                String name = remotes.groups().get(i - local).name();
+                var remote = remotes.groups().get(i - local);
+                if (mx >= x + w - 10) {
+                    // Two clicks, the same as deleting a system: the first asks, the second drops
+                    // this server's memory of a destination. Getting a new one costs another
+                    // pairing code from whoever owns the group.
+                    if (remote.group().toString().equals(pendingForget)) {
+                        pendingForget = null;
+                        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                                new dev.distantstock.net.PairCodeC2S(
+                                        dev.distantstock.net.PairCodeC2S.FORGET,
+                                        remote.group().toString(), 0));
+                    } else {
+                        pendingForget = remote.group().toString();
+                    }
+                    return true;
+                }
+                pendingForget = null;
+                String name = remote.name();
                 receivingGroup.setValue(name);
                 committedGroup = name;
                 net.neoforged.neoforge.network.PacketDistributor.sendToServer(
@@ -419,6 +451,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 return true;
             }
             pendingDelete = null;
+            pendingForget = null;
             if (entry.mine() && mx >= x + w - 28) {
                 net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                         new dev.distantstock.net.SetDockGroupC2S(entry.name(),

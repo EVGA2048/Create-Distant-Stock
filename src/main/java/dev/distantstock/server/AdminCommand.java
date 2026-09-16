@@ -141,7 +141,11 @@ public final class AdminCommand {
                                         .executes(AdminCommand::pairRevoke)))
                         .then(Commands.literal("redeem")
                                 .then(Commands.argument("code", StringArgumentType.word())
-                                        .executes(AdminCommand::pairRedeem))))
+                                        .executes(AdminCommand::pairRedeem)))
+                        .then(Commands.literal("forget")
+                                .then(Commands.argument("group", StringArgumentType.string())
+                                        .suggests((ctx, builder) -> suggestRemoteGroupNames(ctx, builder))
+                                        .executes(AdminCommand::pairForget))))
                 .then(Commands.literal("dock")
                         .then(Commands.literal("group")
                                 .then(Commands.argument("group", StringArgumentType.string())
@@ -173,6 +177,7 @@ public final class AdminCommand {
                 "  /distantstock pair redeem <码>       兑换别的服务器的配对码",
                 "  /distantstock pair list              本服发出的码 + 已认识的远端港组",
                 "  /distantstock pair revoke <码>       作废一个还没被兑换的码",
+                "  /distantstock pair forget <远端组>   忘掉一个远端目的地（对面不受影响）",
                 "  /distantstock dock group <名字>      把脚下的港加入系统",
                 "  /distantstock dock send-to <名字>    让脚下的港发往那个系统",
                 "  /distantstock returns list|restore|give|export   被退回的包裹",
@@ -486,6 +491,28 @@ public final class AdminCommand {
         return Command.SINGLE_SUCCESS;
     }
 
+    /**
+     * Drops this server's memory of a destination on another server.
+     *
+     * <p>The half of unpairing that is ours to do. Nothing over there changes — the group is still
+     * there and still works for anyone else who was let into it — but this server stops offering it
+     * and stops being able to name it, which is what a player who wants to stop sending somewhere
+     * is asking for. Parcels already on their way still land: the promise was made, and this
+     * command is a memory, not a wall.
+     */
+    private static int pairForget(CommandContext<CommandSourceStack> ctx) {
+        String token = StringArgumentType.getString(ctx, "group");
+        var remotes = dev.distantstock.routing.RemoteGroups.get(ctx.getSource().getServer());
+        var entry = remotes.findByName(token).orElse(null);
+        if (entry == null) {
+            return failure(ctx, "没有这个远端港组：" + token + "（用 /distantstock pair list 看有哪些）");
+        }
+        remotes.forget(entry.group());
+        ctx.getSource().sendSuccess(() -> Component.literal("已忘掉远端港组「" + entry.display()
+                + "」。对面那台服务器上的组没有任何变化。"), true);
+        return Command.SINGLE_SUCCESS;
+    }
+
     /** Both halves of the pairing state: what this server is offering, and what it has been given. */
     private static int pairList(CommandContext<CommandSourceStack> ctx) {
         MinecraftServer server = ctx.getSource().getServer();
@@ -633,6 +660,17 @@ public final class AdminCommand {
                 .map(PairingCodes.Code::code)
                 .toList();
         return SharedSuggestionProvider.suggest(codes, builder);
+    }
+
+    /** Remote destinations, offered by the same names the list and the screen draw. */
+    private static CompletableFuture<Suggestions> suggestRemoteGroupNames(CommandContext<CommandSourceStack> ctx,
+                                                                          SuggestionsBuilder builder) {
+        List<String> names = dev.distantstock.routing.RemoteGroups
+                .get(ctx.getSource().getServer()).all().stream()
+                .limit(MAX_SUGGESTIONS)
+                .map(dev.distantstock.routing.RemoteGroups.Entry::display)
+                .toList();
+        return SharedSuggestionProvider.suggest(names, builder);
     }
 
     private static CompletableFuture<Suggestions> suggestGroupNames(CommandContext<CommandSourceStack> ctx,
