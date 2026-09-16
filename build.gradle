@@ -34,7 +34,11 @@ neoForge {
         if (providers.gradleProperty('withPeerServer').isPresent()) {
             serverPeer {
                 server()
-                gameDirectory = layout.buildDirectory.dir('server-peer')
+                // Out of build/ on purpose: this directory is a server — a world, a node identity,
+                // and the configs the cross-server test depends on — and build/ is deleted by
+                // `clean`, which the verification chain runs every time. It was lost that way once,
+                // mid-run, with the server still writing into a directory that no longer existed.
+                gameDirectory = file('devtest/server-peer')
                 programArgument '--port'
                 programArgument '25566'
                 programArgument '--nogui'

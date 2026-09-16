@@ -8,11 +8,17 @@ Distant Stock 的 bridge 挂上、Router 带两个节点监听。
 
 | 东西 | 位置 | 说明 |
 |---|---|---|
-| Router | `build/transerver-router/router.properties` | 独立进程，`127.0.0.1:8765` |
-| 节点 A | `run/`（`./gradlew runServer`） | `远仓A`，端口 25565 |
-| 节点 B | `build/server-peer/`（`./gradlew -PwithPeerServer runServerPeer`） | `远仓B`，端口 25566 |
-| 节点身份 | `<游戏目录>/transerver/node-identity.properties` | **稳定 UUID，要跟存档一起备份** |
+| Router | `devtest/transerver/router.properties` | 独立进程，`127.0.0.1:8765`；数据在 `devtest/transerver/router-data/` |
+| 节点 A | `run/`（`./gradlew runServer`） | `远仓A`，端口 25565，RCON 25575 |
+| 节点 B | `devtest/server-peer/`（`./gradlew -PwithPeerServer runServerPeer`） | `远仓B`，端口 25566，RCON **25576** |
+| 节点身份 | `<游戏目录>/transerver/node-identity.properties` | **稳定 UUID，要跟存档一起备份**；Router 的 `nodes=` 列的就是这两个 |
 | 节点配置 | `<游戏目录>/config/transerver-server.toml` | `enabled` / `nodeAlias` / `routerUrl` / `networkSecret` |
+
+**B 服的目录在 `devtest/` 下，不在 `build/` 下**（2026-09-16 改）：它原来在 `build/server-peer`，
+而验证链每次都跑 `clean` —— 有一次 `clean` 正好在 B 跑着的时候执行，把它的世界和节点身份一起删了。
+`devtest/` 已 gitignore。身份文件丢了不用换节点：Router 的 `nodes=` 里记着原 UUID，照抄回去即可。
+
+两台的 RCON 端口**不能相同**（默认都写 25575，B 会绑定失败，日志里是 `Unable to initialise RCON`）。
 
 **改节点身份等于换一台服务器**：Router 配置里的 `nodes` 列的是这两个 UUID，
 身份文件删掉重建就会换 UUID，Router 那边要同步改。
@@ -79,7 +85,25 @@ Transerver node started: 远仓A (BWWRD1M5-JH08S0D3) via http://127.0.0.1:8765/
 - 跨服的组名在两边都要存在；只在一端建组，另一端下单会找不到目标。
 - Transerver 的 `networkSecret` 两端与 Router 必须一致，**至少 32 字节**。
 
-## 本机跑通到哪一步了（2026-09-16）
+## 2026-09-16 19:05 这次起来的（通了）
+
+```
+远仓A  node 5f398686-8594-408c-81a3-f477ef1ba7b3  :25565  rcon 25575  Transerver 已连接
+远仓B  node 5d2a90b4-dffd-4d8d-bf5b-5e26a33dcdbc  :25566  rcon 25576  Transerver 已连接
+Router 127.0.0.1:8765，Configured nodes: 上面两个
+```
+
+**上次卡住的 `pump failed` 没再出现**，而且链路是双向通的：A 的 `transerver/messages/sent-receipts/`
+里那条 `d8faa480…` 出现在 B 的 `completed/` 里，B 发的 `84d375b4…` 出现在 A 的 `completed/` 里，
+两边 outbox / inbox 都是 0。`knownNodes()` 走的是 Router 的 `GET /v1/nodes`，
+Router 里两个节点都列着，所以配对码那套群发问询有对象。
+
+**已经用控制台建好的东西**：两边的组——A 的「甲服仓库」`ca029954…`、B 的「乙服仓库」`6c9406fa…`。
+两个都是控制台建的，**没有主人**，所以在界面里点「生成配对码」会被拒（`ownedBy` 对无主组恒为 false）；
+要试界面那条路，得自己在游戏里建一个属于自己的组。控制台发码是可以的（有权限 2 就行）：
+B 上已经发过一个 `PKR4P5`（10 分钟，写本子时多半已过期）。
+
+## 上次卡在哪（2026-09-16 下午，已解决）
 
 **通了**：Router 起来带三个节点、两台服务器各自生成稳定身份、`transerver` 节点启动、
 Distant Stock 的 bridge 挂上（`transport.mode = 'transerver'`）、RCON 能发命令。
