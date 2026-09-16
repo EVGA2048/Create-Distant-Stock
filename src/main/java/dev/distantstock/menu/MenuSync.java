@@ -51,6 +51,9 @@ public final class MenuSync {
             if (entry.networkId() != null) {
                 buf.writeNbt(entry.networkId().save());
             }
+            // Which server it is on, so the list can draw them apart. The client cannot work it out
+            // for itself: it does not know its own node id, and both halves write an alias.
+            buf.writeBoolean(entry.local());
         }
     }
 
@@ -70,7 +73,8 @@ public final class MenuSync {
             int links = buf.readVarInt();
             dev.distantstock.routing.RemoteNetworkId networkId = buf.readBoolean()
                     ? dev.distantstock.routing.RemoteNetworkId.read(buf.readNbt()).orElse(null) : null;
-            directory.add(new NetworkDirectory.Entry(freq, server, links, networkId));
+            boolean local = buf.readBoolean();
+            directory.add(new NetworkDirectory.Entry(freq, server, links, networkId, local));
         }
         menu.networks = directory;
     }

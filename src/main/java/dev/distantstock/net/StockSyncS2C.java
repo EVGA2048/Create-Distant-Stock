@@ -20,7 +20,9 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
     public record Line(String itemId, int count) {
     }
 
-    public record NetworkLine(java.util.UUID freq, String server, int links, RemoteNetworkId networkId) {
+    /** One network as the terminal lists it, with which server it is on. */
+    public record NetworkLine(java.util.UUID freq, String server, int links, RemoteNetworkId networkId,
+                              boolean local) {
     }
 
     public static final Type<StockSyncS2C> TYPE = new Type<>(
@@ -51,7 +53,8 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
         }
         List<NetworkLine> networks = new ArrayList<>();
         for (NetworkDirectory.Entry entry : NetworkDirectory.visible(StockConfig.isHost())) {
-            networks.add(new NetworkLine(entry.freq(), entry.server(), entry.links(), entry.networkId()));
+            networks.add(new NetworkLine(entry.freq(), entry.server(), entry.links(), entry.networkId(),
+                    entry.local()));
         }
         return new StockSyncS2C(demo, lines, networks);
     }
@@ -69,7 +72,8 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
             menu.stock = list;
             List<NetworkDirectory.Entry> networks = new ArrayList<>();
             for (NetworkLine line : msg.networks) {
-                networks.add(new NetworkDirectory.Entry(line.freq, line.server, line.links, line.networkId));
+                networks.add(new NetworkDirectory.Entry(line.freq, line.server, line.links, line.networkId,
+                        line.local));
             }
             menu.networks = networks;
         });
@@ -83,6 +87,7 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
         if (line.networkId() != null) {
             buf.writeNbt(line.networkId().save());
         }
+        buf.writeBoolean(line.local());
     }
 
     private static NetworkLine readNetwork(RegistryFriendlyByteBuf buf) {
@@ -91,6 +96,7 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
         int links = buf.readVarInt();
         RemoteNetworkId networkId = buf.readBoolean()
                 ? RemoteNetworkId.read(buf.readNbt()).orElse(null) : null;
-        return new NetworkLine(freq, server, links, networkId);
+        boolean local = buf.readBoolean();
+        return new NetworkLine(freq, server, links, networkId, local);
     }
 }

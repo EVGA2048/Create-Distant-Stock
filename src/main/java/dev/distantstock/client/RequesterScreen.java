@@ -247,6 +247,16 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
      */
     private String pendingForget;
 
+    /**
+     * How far the network list is scrolled.
+     *
+     * <p>Without it the list simply stopped at the last row that fitted, and a server with a few
+     * networks of its own pushed every one of the other server's off the bottom — which is exactly
+     * the complaint: "the terminal only shows my own server's networks". The rows were there, below
+     * the fold, with no way to reach them.
+     */
+    private int netScroll;
+
     public void applyRemoteGroups(dev.distantstock.net.RemoteGroupsS2C next) {
         remotes = next;
     }
@@ -773,17 +783,30 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             }
             return;
         }
-        int shown = Math.min(menu.networks.size(), networkRows());
+        int rows = networkRows();
+        netScroll = Mth.clamp(netScroll, 0, Math.max(0, menu.networks.size() - rows));
+        int shown = Math.min(menu.networks.size() - netScroll, rows);
         for (int i = 0; i < shown; i++) {
-            NetworkDirectory.Entry entry = menu.networks.get(i);
+            NetworkDirectory.Entry entry = menu.networks.get(netScroll + i);
             int ry = y + 42 + i * 22;
-            g.fill(x + 25, ry, x + WINDOW_W - 25, ry + 18, 0x33FFFFFF);
+            // The two servers are drawn apart, because a player has to know which warehouse they
+            // are pointing at before they point at it, and both halves send an alias they chose.
+            g.fill(x + 25, ry, x + WINDOW_W - 25, ry + 18, entry.local() ? 0x33FFFFFF : 0x33403060);
             g.fill(x + 25, ry + 17, x + WINDOW_W - 25, ry + 18, 0xFFB89C78);
-            g.drawString(font, entry.server(), x + 31, ry + 3, INK, false);
+            String label = entry.local() || entry.networkId() == null
+                    ? entry.server()
+                    : entry.networkId().shortLabel() + "·" + entry.server();
+            g.drawString(font, label, x + 31, ry + 3, entry.local() ? INK : 0xFFC8B6E8, false);
             String id = entry.freq().toString().substring(0, 8);
             g.drawString(font, id, x + 31, ry + 10, 0x3A7774, false);
             Component links = Component.translatable("gui.distantstock.networks.links", entry.links());
             g.drawString(font, links, x + WINDOW_W - 31 - font.width(links), ry + 6, TITLE, false);
+        }
+        if (menu.networks.size() > rows) {
+            Component more = Component.translatable("gui.distantstock.networks.more",
+                    netScroll + shown, menu.networks.size());
+            g.drawString(font, more, x + WINDOW_W - 27 - font.width(more), y + imageHeight - 118,
+                    HINT, false);
         }
     }
 
@@ -800,9 +823,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (mx < x + 25 || mx >= x + WINDOW_W - 25 || my < y + 42) {
             return -1;
         }
-        int index = (int) ((my - y - 42) / 22);
-        int rowY = y + 42 + index * 22;
-        return index >= 0 && index < menu.networks.size() && index < networkRows() && my < rowY + 18 ? index : -1;
+        int index = (int) ((my - y - 42) / 22) + netScroll;
+        int rowY = y + 42 + (index - netScroll) * 22;
+        return index >= 0 && index < menu.networks.size() && index - netScroll < networkRows()
+                && my < rowY + 18 ? index : -1;
     }
 
     @Override
@@ -852,6 +876,12 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     public boolean mouseScrolled(double mx, double my, double sx, double sy) {
         if (mx >= itemsX() && mx < itemsX() + COLS * CELL && my >= topPos + 16 && my < topPos + imageHeight - 132) {
             scroll = Mth.clamp(scroll - (int) Math.signum(sy), 0, maxScroll());
+            return true;
+        }
+        if (!menu.tuned(minecraft.player) && mx >= leftPos + 25 && mx < leftPos + WINDOW_W - 25
+                && my >= topPos + 42) {
+            netScroll = Mth.clamp(netScroll - (int) Math.signum(sy), 0,
+                    Math.max(0, menu.networks.size() - networkRows()));
             return true;
         }
         return super.mouseScrolled(mx, my, sx, sy);

@@ -267,6 +267,14 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
         if (TowerBilling.enabled()) {
             GoggleText.line(tip, "goggle.distantstock.tower.ether",
                     tank.getFluidAmount(), ETHER_CAPACITY, TowerBilling.parcelCost());
+            if (tank.getFluidAmount() >= ETHER_CAPACITY) {
+                // A full tank is indistinguishable from a port that does not work: a pump pushing
+                // into a full container simply stops, the pipes go quiet, and the operator who just
+                // built the inlet reads that as "it is not accepting". It cost one of them an
+                // afternoon. The tower only drinks when it moves a parcel, so a full tank is the
+                // normal resting state of a tower nobody is using.
+                GoggleText.value(tip, "goggle.distantstock.tower.ether_full", ChatFormatting.GOLD);
+            }
         } else {
             // The switch is off, so an amount on this line would only invite the question of what it
             // is being spent on. The tank is still there and still fillable; it just is not a bill.

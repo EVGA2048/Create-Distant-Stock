@@ -55,6 +55,39 @@ public final class LinkSnapshot {
         inFlight = LinkQueues.inFlight() + ParcelEscrow.get(server).size();
     }
 
+    /**
+     * How long a peer's numbers stay believable without a fresh word from it.
+     *
+     * <p>Two announcement periods: one lost message must not blank the reading, and a peer that has
+     * said nothing for two minutes is a peer whose numbers this server does not know. The screen
+     * shows a dash then rather than a zero — zero is a real measurement, and a link that is up but
+     * silent is not one.
+     */
+    public static final long PEER_STALE_MS = 120_000;
+
+    /** Whether anything has been heard from a peer recently enough to draw its numbers. */
+    public static boolean peerFresh() {
+        return peerSeenMs > 0 && System.currentTimeMillis() - peerSeenMs < PEER_STALE_MS;
+    }
+
+    /**
+     * A peer's own numbers, from the announcement it just sent.
+     *
+     * <p>The one source of a peer's TPS in Transerver mode. There is no HTTP polling on that
+     * transport — the announce is the only regular message that crosses — so a peer's metrics ride
+     * along with the network list rather than being asked for, which would need a second channel and
+     * a second round trip to say the same thing.
+     */
+    public static void peerMetrics(String node, double tps, double mspt) {
+        peerId = node == null ? "" : node;
+        peerTps = tps;
+        peerMspt = mspt;
+        peerSeenMs = System.currentTimeMillis();
+        peerUp = true;
+        peersUp = Math.max(peersUp, 1);
+        peersTotal = Math.max(peersTotal, 1);
+    }
+
     public static void peersOk(int up, int total, String id, double tps, double mspt, long rttMs) {
         peerUp = up > 0;
         peersUp = up;
@@ -136,6 +169,7 @@ public final class LinkSnapshot {
                 peerUp,
                 peerTps,
                 peerMspt,
+                peerFresh(),
                 peerRttMs,
                 peerFails,
                 peersUp,
@@ -170,6 +204,7 @@ public final class LinkSnapshot {
             boolean peerUp,
             double peerTps,
             double peerMspt,
+            boolean peerFresh,
             double peerRttMs,
             int peerFails,
             int peersUp,

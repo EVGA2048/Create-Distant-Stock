@@ -124,7 +124,7 @@ public final class GameClock {
                 TranserverOrderService.tick(e.getServer());
             }
             if (ticks % 20 == 0) {
-                NetworkAnnouncementService.publishIfChanged();
+                NetworkAnnouncementService.publish();
             }
             if (ticks % 40 == 0) {
                 TranserverStockService.tick();

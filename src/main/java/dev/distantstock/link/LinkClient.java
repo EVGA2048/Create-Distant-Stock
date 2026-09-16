@@ -153,10 +153,11 @@ public final class LinkClient {
         Matcher matcher = NETWORK.matcher(json);
         while (matcher.find()) {
             try {
-                entries.add(new NetworkDirectory.Entry(
-                        UUID.fromString(matcher.group(1)),
-                        matcher.group(2),
-                        Integer.parseInt(matcher.group(3))));
+                // False: these came off the wire from another server, whatever it calls itself.
+            entries.add(new NetworkDirectory.Entry(
+                    UUID.fromString(matcher.group(1)),
+                    matcher.group(2),
+                    Integer.parseInt(matcher.group(3)), null, false));
             } catch (Exception ignored) {
             }
         }

@@ -344,5 +344,8 @@
   "gui.distantstock.remote_gauge.address.hint": "包裹上写的地址",
   "gui.distantstock.confirm": "确认",
   "goggle.distantstock.send.no_group": "无目的地：没有设置收货港组，包裹留在港内",
-  "goggle.distantstock.tower.ether_full": "以太：已满"
+  "goggle.distantstock.tower.ether_full": "以太：已满",
+  "goggle.distantstock.peer_silent": "对端：暂无比值（链路在线）",
+  "gui.distantstock.networks.more": "显示 %s / %s · 滚轮翻页",
+  "message.distantstock.casing.port.no_tower": "这块机壳不属于任何塔：这个口通向空处"
 }

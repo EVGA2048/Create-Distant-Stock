@@ -175,6 +175,14 @@ public final class TowerCasingBlock extends Block
             player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
                     open ? "message.distantstock.casing.port.open"
                             : "message.distantstock.casing.port.closed"), true);
+            if (open && coreFor(level, pos) == null) {
+                // The other silent trap: a port only reaches the core of the tower this casing is
+                // part of, and a casing standing on its own opens a socket onto nothing. The click
+                // works and the block looks right, so the player finds out when the pipes will not
+                // fill — say it here instead.
+                player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                        "message.distantstock.casing.port.no_tower"), false);
+            }
         }
         return net.minecraft.world.ItemInteractionResult.sidedSuccess(level.isClientSide);
     }

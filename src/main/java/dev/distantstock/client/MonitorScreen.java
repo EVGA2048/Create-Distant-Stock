@@ -46,6 +46,16 @@ public final class MonitorScreen extends Screen {
     private boolean towerPage;
     private int flipTicks;
     private int previousTps;
+    /**
+     * The peer's own previous readings.
+     *
+     * <p>Separate from the local pair on purpose. Both endpoints share one flip animation, and one
+     * pair of "the value before this update" between them meant the peer's cells spent the first
+     * fifth of every second showing <em>this</em> server's numbers before falling to their own —
+     * the flicker between 20 and 0 that the operator reported.
+     */
+    private int previousPeerTps;
+    private int previousPeerMspt;
     private int previousMspt;
     private int left;
     private int top;
@@ -63,6 +73,8 @@ public final class MonitorScreen extends Screen {
     public void update(LinkSnapshot.View next) {
         previousTps = (int) Math.round(view.localTps() * 10);
         previousMspt = (int) Math.round(view.localMspt() * 10);
+        previousPeerTps = (int) Math.round(view.peerTps() * 10);
+        previousPeerMspt = (int) Math.round(view.peerMspt() * 10);
         view = next;
         flipTicks = 8;
     }
@@ -100,12 +112,14 @@ public final class MonitorScreen extends Screen {
 
         drawEndpoint(g, left + 12, top + 51,
                 Component.translatable("gui.distantstock.local"),
-                view.localTps(), view.localMspt(), null, true);
+                view.localTps(), view.localMspt(), null, true, true,
+                previousTps, previousMspt);
         drawEndpoint(g, left + 142, top + 51,
                 Component.translatable("gui.distantstock.peer"),
                 view.peerTps(), view.peerMspt(),
                 view.peerRttMs() < 0 ? "—" : (int) view.peerRttMs() + " ms",
-                view.linkUp());
+                view.linkUp(), view.peerFresh(),
+                previousPeerTps, previousPeerMspt);
 
         drawCounters(g);
         super.render(g, mouseX, mouseY, partial);
@@ -155,20 +169,36 @@ public final class MonitorScreen extends Screen {
         g.drawString(font, route, left + W / 2 - font.width(route) / 2, top + 35, color, false);
     }
 
+    /**
+     * One endpoint's two readings.
+     *
+     * @param fresh whether this server has heard from that end recently. False is not the same as
+     *              offline: the link answers, but nobody has said what it is doing, and the cells
+     *              show a dash rather than a zero — zero is a reading, and this is the absence of one
+     */
     private void drawEndpoint(GuiGraphics g, int x, int y, Component name,
-                              double tps, double mspt, String rtt, boolean online) {
+                              double tps, double mspt, String rtt, boolean online, boolean fresh,
+                              int previousTenths, int previousMsptTenths) {
         g.drawString(font, name, x + 10, y + 6, BRASS, false);
         if (!online) {
             Component down = Component.translatable("gui.distantstock.link_down");
             g.drawString(font, down, x + 59 - font.width(down) / 2, y + 39, BAD, false);
             return;
         }
+        if (!fresh) {
+            drawFlipReadout(g, "—", "TPS", x + 59, y + 23, MUTED);
+            drawFlipReadout(g, "—", "MSPT", x + 43, y + 53, MUTED);
+            if (rtt != null) {
+                g.drawString(font, rtt, x + 108 - font.width(rtt), y + 55, MUTED, false);
+            }
+            return;
+        }
 
-        String tpsText = flipValue(n(tps), previousTps, tps, "");
+        String tpsText = flipValue(n(tps), previousTenths, tps, "");
         drawFlipReadout(g, tpsText, "TPS", x + 59, y + 23, online ? AETHER : MUTED);
         meter(g, x + 10, y + 42, 98, tps);
 
-        String msptText = flipValue(n(mspt), previousMspt, mspt, "");
+        String msptText = flipValue(n(mspt), previousMsptTenths, mspt, "");
         drawFlipReadout(g, msptText, "MSPT", x + 43, y + 53, MUTED);
         if (rtt != null) {
             g.drawString(font, rtt, x + 108 - font.width(rtt), y + 55, MUTED, false);

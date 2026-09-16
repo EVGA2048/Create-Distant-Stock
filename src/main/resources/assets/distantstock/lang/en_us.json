@@ -344,5 +344,8 @@
   "gui.distantstock.remote_gauge.address.hint": "Address the goods carry",
   "gui.distantstock.confirm": "Confirm",
   "goggle.distantstock.send.no_group": "No destination: no receiving dock group is set, the parcel stays here",
-  "goggle.distantstock.tower.ether_full": "Ether: full"
+  "goggle.distantstock.tower.ether_full": "Ether: full",
+  "goggle.distantstock.peer_silent": "Peer: no readings yet (link up)",
+  "gui.distantstock.networks.more": "showing %s of %s · scroll for more",
+  "message.distantstock.casing.port.no_tower": "This casing is not part of a tower: the port reaches nothing"
 }

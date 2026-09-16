@@ -11,9 +11,21 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** 主线程发布本地网络，IO 线程替换远端快照，GUI/HTTP 只读。 */
 public final class NetworkDirectory {
-    public record Entry(UUID freq, String server, int links, RemoteNetworkId networkId) {
+    public record Entry(UUID freq, String server, int links, RemoteNetworkId networkId,
+                        boolean local) {
         public Entry(UUID freq, String server, int links) {
-            this(freq, server, links, null);
+            this(freq, server, links, null, true);
+        }
+
+        /**
+         * Whether this network is on another server.
+         *
+         * <p>Asked by the terminal's list, which draws the two kinds differently: a player has to be
+         * able to tell "my warehouse" from "the one across the link" before pointing a machine at it,
+         * and an alias alone does not say which is which.
+         */
+        public boolean remote() {
+            return !local;
         }
     }
 

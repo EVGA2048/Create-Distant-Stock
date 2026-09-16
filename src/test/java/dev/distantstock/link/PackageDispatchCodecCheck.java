@@ -53,10 +53,17 @@ public final class PackageDispatchCodecCheck {
         rejectsOrder(orderTrailing, "order trailing data was accepted");
 
         List<NetworkDirectory.Entry> directory = List.of(
-                new NetworkDirectory.Entry(network.createFrequency(), "仓库服", 4, network));
-        byte[] announcement = NetworkAnnouncementCodec.encode(directory);
+                new NetworkDirectory.Entry(network.createFrequency(), "仓库服", 4, network, false));
+        // False, because that is what an announcement is: another server's networks, decoded on
+        // this side. The flag is not on the wire — the receiver is what makes them remote.
+        byte[] announcement = NetworkAnnouncementCodec.encode(directory, 19.75, 4.25);
         require(NetworkAnnouncementCodec.decode(announcement).equals(directory),
                 "network announcement changed during round trip");
+        // The metrics ride in the same payload, so the round trip has to bring those back too —
+        // they are what the monitor draws for the other server.
+        NetworkAnnouncementCodec.Metrics carried = NetworkAnnouncementCodec.metrics(announcement);
+        require(carried.known() && carried.tps() == 19.75 && carried.mspt() == 4.25,
+                "the announcement lost the sender's metrics");
         byte[] announcementTrailing = Arrays.copyOf(announcement, announcement.length + 1);
         try {
             NetworkAnnouncementCodec.decode(announcementTrailing);

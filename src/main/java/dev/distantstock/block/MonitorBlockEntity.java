@@ -29,6 +29,8 @@ public final class MonitorBlockEntity extends BlockEntity implements IHaveGoggle
     private double localMspt = 50;
     private boolean peerUp;
     private double peerTps;
+    /** Whether a peer has said anything recently, as opposed to the link merely answering. */
+    private boolean peerFresh;
     private int backlog;
     private int rtt = -1;
     private String role = "host";
@@ -77,6 +79,7 @@ public final class MonitorBlockEntity extends BlockEntity implements IHaveGoggle
         be.localMspt = v.localMspt();
         be.peerUp = v.linkUp();
         be.peerTps = v.peerTps();
+        be.peerFresh = v.peerFresh();
         be.backlog = v.orderDepth() + v.packageDepth();
         be.rtt = (int) v.peerRttMs();
         be.role = v.selfId();
@@ -112,7 +115,12 @@ public final class MonitorBlockEntity extends BlockEntity implements IHaveGoggle
             GoggleText.line(tip, "goggle.distantstock.freq", RequesterData.shortFreq(freq));
         }
         GoggleText.line(tip, "goggle.distantstock.local_tps", fmt(localTps), fmt(localMspt));
-        if (peerUp) {
+        if (peerUp && !peerFresh) {
+            // The link is up but the other server has not said what it is doing — a broadcast is
+            // seconds apart, and one missed is not an outage. Saying "0.0 TPS" here would send an
+            // operator to look for a broken server that is running fine.
+            GoggleText.line(tip, "goggle.distantstock.peer_silent");
+        } else if (peerUp) {
             GoggleText.line(tip, "goggle.distantstock.peer_tps", fmt(peerTps));
         } else {
             GoggleText.value(tip, "goggle.distantstock.peer_down", ChatFormatting.RED);

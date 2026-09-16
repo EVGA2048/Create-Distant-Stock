@@ -39,6 +39,7 @@ public record LinkSnapshotS2C(BlockPos source, LinkSnapshot.View view) implement
         buf.writeBoolean(view.peerUp());
         buf.writeDouble(view.peerTps());
         buf.writeDouble(view.peerMspt());
+        buf.writeBoolean(view.peerFresh());
         buf.writeDouble(view.peerRttMs());
         buf.writeVarInt(view.peerFails());
         buf.writeVarInt(view.peersUp());
@@ -147,6 +148,7 @@ public record LinkSnapshotS2C(BlockPos source, LinkSnapshot.View view) implement
                 buf.readBoolean(),
                 buf.readDouble(),
                 buf.readDouble(),
+                buf.readBoolean(),
                 buf.readDouble(),
                 buf.readVarInt(),
                 buf.readVarInt(),

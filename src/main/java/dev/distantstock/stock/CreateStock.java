@@ -56,7 +56,8 @@ public final class CreateStock {
                             WorldIdentity.get(level), link.dimension().location().toString(), row.getKey());
                 }
             }
-            out.add(new NetworkDirectory.Entry(row.getKey(), serverId, network.loadedLinks.size(), networkId));
+            out.add(new NetworkDirectory.Entry(row.getKey(), serverId, network.loadedLinks.size(), networkId,
+                    true));
         }
         return out;
     }
