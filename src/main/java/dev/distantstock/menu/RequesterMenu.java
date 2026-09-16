@@ -309,7 +309,8 @@ public final class RequesterMenu extends AbstractContainerMenu {
         // end does with it.
         net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(serverPlayer,
                 dev.distantstock.net.RemoteGroupsS2C.of(
-                        dev.distantstock.routing.RemoteGroups.get(player.level().getServer())));
+                        dev.distantstock.routing.RemoteGroups.get(player.level().getServer()),
+                        player.level().getServer()));
     }
 
     public ItemStack device(Player player) {

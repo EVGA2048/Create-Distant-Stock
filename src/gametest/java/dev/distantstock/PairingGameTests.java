@@ -235,6 +235,38 @@ public final class PairingGameTests {
         h.succeed();
     }
 
+    /**
+     * A peer's own name comes back with its file, and is what a readout uses.
+     *
+     * <p>The name is the whole point of remembering it: it is what a destination list, a parcel's
+     * tooltip and a pairing message print where they used to print eight characters of a uuid. A
+     * name that did not survive the restart would put those back to reading "5d2a90b4" after every
+     * reboot — which is exactly when a player is looking at the list trying to work out who is who.
+     */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void aPeerNameSurvivesItsFile(GameTestHelper h) {
+        dev.distantstock.routing.PeerNames names = new dev.distantstock.routing.PeerNames();
+        names.remember(OWNER, "远仓B");
+        h.assertTrue("远仓B".equals(names.name(OWNER)), "the name was not kept in memory");
+        h.assertTrue(names.name(STRANGER).isEmpty(), "a node nobody named reported a name");
+
+        dev.distantstock.routing.PeerNames loaded = dev.distantstock.routing.PeerNames.load(
+                names.save(new CompoundTag(), null), null);
+        h.assertTrue("远仓B".equals(loaded.name(OWNER)), "the name did not survive its own file");
+
+        // Re-remembering the same node is how a rename arrives: the last one heard wins.
+        loaded.remember(OWNER, "远仓乙");
+        h.assertTrue("远仓乙".equals(loaded.name(OWNER)), "a renamed node kept its old name");
+        loaded.remember(OWNER, "   ");
+        h.assertTrue("远仓乙".equals(loaded.name(OWNER)), "a blank alias overwrote a real one");
+
+        // And with no directory to ask, a node is still called something rather than nothing.
+        h.assertTrue(dev.distantstock.link.PairingService.label(STRANGER, null)
+                        .equals(STRANGER.toString().substring(0, 8)),
+                "a node with no name printed nothing at all");
+        h.succeed();
+    }
+
     private PairingGameTests() {
     }
 }

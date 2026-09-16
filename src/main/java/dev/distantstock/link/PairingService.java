@@ -231,9 +231,11 @@ public final class PairingService {
     /**
      * What a node is called on a screen.
      *
-     * <p>Transerver identifies nodes by UUID and hands out no display name, so the first eight
-     * characters are the most a player can be given for the server itself. The group's own name
-     * travels with it and is written by whoever owns it, so the pair reads as a place.
+     * <p>Transerver identifies nodes by UUID, so for a long time the most a player could be given
+     * was the first eight characters of one — which is not a name and told them nothing. Peers do
+     * name themselves, on every announcement, and that name is remembered; the uuid prefix is what
+     * is left for a node this server has not heard from yet, which is possible when a pairing code
+     * is redeemed before the first announcement arrives.
      */
     public static String label(UUID node, MinecraftServer server) {
         if (node == null) {
@@ -241,6 +243,12 @@ public final class PairingService {
         }
         if (server != null && node.toString().equals(TranserverBridge.localNodeId())) {
             return "本服";
+        }
+        if (server != null) {
+            String heard = dev.distantstock.routing.PeerNames.get(server).name(node);
+            if (!heard.isEmpty()) {
+                return heard;
+            }
         }
         return node.toString().substring(0, 8);
     }

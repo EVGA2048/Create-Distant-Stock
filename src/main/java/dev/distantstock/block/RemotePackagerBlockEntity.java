@@ -76,7 +76,8 @@ public final class RemotePackagerBlockEntity extends PackagerBlockEntity {
             return;
         }
         OrderRouteDirectory.get(level.getServer()).find(PackageItem.getOrderId(stack))
-                .ifPresent(route -> RemoteRouteData.write(stack, route));
+                .ifPresent(route -> RemoteRouteData.write(stack, route,
+                        dev.distantstock.link.RouteLabels.describe(level.getServer(), route)));
     }
 
     @Override

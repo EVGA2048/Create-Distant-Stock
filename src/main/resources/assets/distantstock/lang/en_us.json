@@ -351,7 +351,7 @@
   "message.distantstock.dock.target": "Receiving group set: %s (server: %s)",
   "message.distantstock.dock.target.no_group": "The terminal carries no receiving group: this dock is now aimed at \"%s\", which accepts anything — cross-server parcels will stay here. Pick a group in the terminal's 接收港组 field first.",
   "message.distantstock.dock.joined": "This dock is now in the receiving group: %s",
-  "item.distantstock.remote_package.crossing": "Crossing to %s · group %s",
+  "item.distantstock.remote_package.crossing": "Crossing to %s",
   "gui.distantstock.pair.mint_row.not_owner": "+ Mint a code — only the group's owner can",
   "gui.distantstock.pair.mint_row.new_group": "+ Mint a code — press Enter on \"%s\" first to create it",
   "create.gui.stock_keeper.package_address.hint": "The address the parcel carries; the receiving port must accept it",

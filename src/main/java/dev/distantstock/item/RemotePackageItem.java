@@ -53,10 +53,16 @@ public final class RemotePackageItem extends PackageItem {
         if (!RemoteRouteData.crossServer(stack)) {
             return;
         }
-        RemoteRouteData.read(stack).ifPresent(route -> tip.add(Component.translatable(
-                "item.distantstock.remote_package.crossing",
-                shortId(route.destinationNodeId()), shortId(route.receivingDockGroupId()))
-                .withStyle(ChatFormatting.LIGHT_PURPLE)));
+        RemoteRouteData.read(stack).ifPresent(route -> {
+            // The label was written when the route was, on the server, where the directories that
+            // know what a group is called live. A parcel routed by an older build carries none and
+            // falls back on the ids — which is what this line printed before it could say a name.
+            String label = RemoteRouteData.label(stack);
+            tip.add(Component.translatable("item.distantstock.remote_package.crossing",
+                    label.isEmpty()
+                            ? shortId(route.destinationNodeId()) + " · " + shortId(route.receivingDockGroupId())
+                            : label).withStyle(ChatFormatting.LIGHT_PURPLE));
+        });
     }
 
     private static String shortId(java.util.UUID id) {

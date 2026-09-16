@@ -103,6 +103,14 @@ public final class NetworkAnnouncementService {
             CompletableFuture<DeliveryResult> result = new CompletableFuture<>();
             server.execute(() -> {
                 NetworkDirectory.replacePeer(message.source(), entries);
+                // The announcer names itself on every entry it sends. Written down here so the
+                // readouts that mention another node — a group brought home by a pairing code, the
+                // second line on a crossing parcel — can say "远仓B" instead of a uuid prefix.
+                entries.stream().map(NetworkDirectory.Entry::server)
+                        .filter(alias -> alias != null && !alias.isBlank())
+                        .findFirst()
+                        .ifPresent(alias -> dev.distantstock.routing.PeerNames.get(server)
+                                .remember(source, alias));
                 if (metrics.known()) {
                     // This is where a peer's TPS comes from in Transerver mode: nothing else crosses
                     // on a regular beat, and the monitor shows the number.

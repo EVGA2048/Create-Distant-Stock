@@ -110,7 +110,7 @@ public record PairCodeC2S(String action, String value, int minutes) implements C
     /** Pushes the remote destinations to whoever asked, in the screen's own shape. */
     public static void sendList(MinecraftServer server, Player player) {
         if (player instanceof net.minecraft.server.level.ServerPlayer online) {
-            PacketDistributor.sendToPlayer(online, RemoteGroupsS2C.of(RemoteGroups.get(server)));
+            PacketDistributor.sendToPlayer(online, RemoteGroupsS2C.of(RemoteGroups.get(server), server));
         }
     }
 }

@@ -77,10 +77,20 @@ public record RemoteGroupsS2C(List<Entry> groups) implements CustomPacketPayload
         });
     }
 
-    public static RemoteGroupsS2C of(RemoteGroups directory) {
+    /**
+     * The remote destinations this server remembers.
+     *
+     * <p>The label is resolved now rather than read from the stored row: a group redeemed before
+     * this server had ever heard from that node kept a uuid prefix in its row for good, so the
+     * destination list went on saying "5d2a90b4" long after the node had introduced itself. The
+     * stored label stays as the fallback for a node that is quiet.
+     */
+    public static RemoteGroupsS2C of(RemoteGroups directory, net.minecraft.server.MinecraftServer server) {
         List<Entry> out = new ArrayList<>();
         for (RemoteGroups.Entry entry : directory.all()) {
-            out.add(new Entry(entry.group(), entry.name(), entry.label()));
+            String live = dev.distantstock.link.PairingService.label(entry.node(), server);
+            out.add(new Entry(entry.group(), entry.name(),
+                    live == null || live.isEmpty() ? entry.label() : live));
         }
         return new RemoteGroupsS2C(List.copyOf(out));
     }

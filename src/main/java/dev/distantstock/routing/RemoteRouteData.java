@@ -16,6 +16,16 @@ public final class RemoteRouteData {
     private static final String CORRELATION = "Correlation";
     private static final String CHILD_ORDER = "ChildOrder";
     private static final String CROSS_SERVER = "CrossServer";
+    /**
+     * Where the route goes, in words: "远仓B · 甲服仓库".
+     *
+     * <p>Written here because here is the only place that can write it — the directories that turn
+     * a group id into a name live on the server, and the tooltip that reads this runs on a client
+     * that has neither. Optional: a parcel routed by an older build has no label and falls back on
+     * the ids.
+     */
+    private static final String LABEL = "DestinationLabel";
+    private static final int MAX_LABEL = 96;
 
     public static Optional<RemoteRoute> read(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
@@ -67,6 +77,16 @@ public final class RemoteRouteData {
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(custom));
     }
 
+    /** The destination in words, or empty when the parcel carries no label. */
+    public static String label(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "";
+        }
+        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        return custom.contains(ROOT, CompoundTag.TAG_COMPOUND)
+                ? custom.getCompound(ROOT).getString(LABEL) : "";
+    }
+
     /** Whether this parcel is on its way to another server, as far as this side can tell. */
     public static boolean crossServer(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
@@ -78,9 +98,24 @@ public final class RemoteRouteData {
     }
 
     public static void write(ItemStack stack, RemoteRoute value) {
+        write(stack, value, "");
+    }
+
+    /**
+     * The same, with the destination spelled out for the player who will read the tooltip.
+     *
+     * <p>A blank label is written as no label rather than as an empty string, so a caller that has
+     * nothing to say leaves the parcel exactly as the id-only version would have.
+     */
+    public static void write(ItemStack stack, RemoteRoute value, String label) {
         if (stack == null || stack.isEmpty()) {
             throw new IllegalArgumentException("Cannot route an empty item stack");
         }
+        String described = label == null ? "" : label.trim();
+        if (described.length() > MAX_LABEL) {
+            described = described.substring(0, MAX_LABEL);
+        }
+        String written = described;
         stack.update(DataComponents.CUSTOM_DATA, CustomData.EMPTY, current -> {
             CompoundTag custom = current.copyTag();
             CompoundTag route = new CompoundTag();
@@ -89,6 +124,9 @@ public final class RemoteRouteData {
             route.putUUID(RECEIVING_GROUP, value.receivingDockGroupId());
             route.putUUID(CORRELATION, value.correlationId());
             route.putUUID(CHILD_ORDER, value.childOrderId());
+            if (!written.isEmpty()) {
+                route.putString(LABEL, written);
+            }
             custom.put(ROOT, route);
             return CustomData.of(custom);
         });
