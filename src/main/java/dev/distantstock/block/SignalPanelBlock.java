@@ -149,7 +149,7 @@ public final class SignalPanelBlock extends FactoryPanelBlock implements IWrench
     }
 
     /** The logistics frequency a held item carries, or null when it carries none. */
-    private static UUID lampBinding(ItemStack stack) {
+    static UUID lampBinding(ItemStack stack) {
         if (stack.getItem() instanceof RequesterItem && RequesterData.tuned(stack)) {
             return RequesterData.freq(stack);
         }

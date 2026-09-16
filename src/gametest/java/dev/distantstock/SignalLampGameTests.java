@@ -413,8 +413,13 @@ public final class SignalLampGameTests {
     }
 
     /**
-     * The conversion path: a plain Create board with a gauge, plus a lamp aimed at a free slot.
-     * The block is rebuilt, so the existing gauge has to survive the migration intact.
+     * A lamp joining a plain Create board that already has a gauge on it.
+     *
+     * <p>Which board it ends up as depends on what is installed: with Create: Deployer the lamp is a
+     * panel type of its own and the board is left exactly as it was, and without it the board is
+     * rebuilt as one of ours because that is the only place a lamp panel has ever lived. What this
+     * case guards is the same either way, and it is the part that would hurt: <b>the gauge that was
+     * already on the board has to come through untouched.</b>
      */
     @GameTest(template = "empty", timeoutTicks = 60)
     public static void lampJoinsPlainCreateBoardKeepingGauge(GameTestHelper h) {
@@ -443,16 +448,22 @@ public final class SignalLampGameTests {
                         new Vec3(local.x, local.y, wall.getZ()), Direction.NORTH, wall, false)));
 
         var after = level.getBlockEntity(pos);
-        h.assertTrue(after instanceof SignalPanelBlockEntity, "the board was not converted");
-        var converted = (SignalPanelBlockEntity) after;
-        h.assertTrue(converted.activePanels() == 2,
-                "expected gauge + lamp, got " + converted.activePanels());
-        h.assertTrue(converted.panels.get(gaugeSlot).isActive(), "the factory gauge slot was lost");
-        h.assertTrue(converted.panels.get(gaugeSlot).getFilter().is(Items.IRON_INGOT),
+        h.assertTrue(after instanceof FactoryPanelBlockEntity, "the board disappeared");
+        var joined = (FactoryPanelBlockEntity) after;
+        h.assertTrue(joined.activePanels() == 2,
+                "expected gauge + lamp, got " + joined.activePanels());
+        h.assertTrue(joined.panels.get(gaugeSlot).isActive(), "the factory gauge slot was lost");
+        h.assertTrue(joined.panels.get(gaugeSlot).getFilter().is(Items.IRON_INGOT),
                 "the factory gauge filter was replaced");
-        h.assertTrue(converted.panels.get(gaugeSlot).count == 7,
+        h.assertTrue(joined.panels.get(gaugeSlot).count == 7,
                 "the factory gauge amount was lost");
-        h.assertTrue(converted.isLamp(free), "the lamp did not take the free slot");
+        if (net.neoforged.fml.ModList.get().isLoaded("deployer")) {
+            h.assertTrue(joined.panels.get(free) instanceof dev.distantstock.panel.SignalLampPanelBehaviour,
+                    "the lamp did not land as our panel type: " + joined.panels.get(free));
+        } else {
+            h.assertTrue(((SignalPanelBlockEntity) joined).isLamp(free),
+                    "the lamp did not take the free slot");
+        }
         h.succeed();
     }
 

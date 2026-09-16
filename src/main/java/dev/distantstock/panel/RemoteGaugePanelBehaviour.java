@@ -13,6 +13,7 @@ import net.liukrast.deployer.lib.logistics.board.connection.PanelConnectionBuild
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
 /**
@@ -51,6 +52,22 @@ public class RemoteGaugePanelBehaviour extends AbstractPanelBehaviour {
      */
     @Override
     public void addConnections(PanelConnectionBuilder builder) {
+    }
+
+    /**
+     * The item in this panel's filter slot.
+     *
+     * <p>Deployer's base class deliberately answers {@code EMPTY} here — a panel type that has no
+     * filter should not pretend to have one — so every type that does have one has to say so. Drop
+     * this and the panel still shows its filter and still reads its network; it simply never sees
+     * the item, which on a gauge means it never orders and on a lamp means it is not a lamp.
+     */
+    @Override
+    public ItemStack getFilter() {
+        // Not super.getFilter(): Deployer's base class answers EMPTY on purpose, for panel types
+        // that have no filter at all, and calling up to it would hand us that empty stack. The
+        // filter itself is Create's, kept where Create keeps it.
+        return filter.item();
     }
 
     @Override

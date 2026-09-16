@@ -82,6 +82,10 @@ public final class SignalLampPanelItem extends BlockItem {
             var targeted = FactoryPanelBlock.getTargetedSlot(pos, state, context.getClickLocation());
             if (level.getBlockEntity(pos) instanceof FactoryPanelBlockEntity old
                     && old.panels.get(targeted).isActive()) return InteractionResult.FAIL;
+            if (!state.is(ModBlocks.SIGNAL_PANEL.get()) && !state.is(ModBlocks.REMOTE_GAUGE.get())
+                    && net.neoforged.fml.ModList.get().isLoaded("deployer")) {
+                return installOnSomeoneElsesBoard(context, level, pos, targeted);
+            }
             if (level.isClientSide) {
                 return InteractionResult.SUCCESS;
             }
@@ -137,6 +141,31 @@ public final class SignalLampPanelItem extends BlockItem {
             tooltip.add(net.minecraft.network.chat.Component.translatable("item.distantstock.brass_signal_lamp.usage")
                     .withStyle(net.minecraft.ChatFormatting.DARK_GRAY));
         }
+    }
+
+    /**
+     * Puts the lamp into a free slot of a board that is not ours, and leaves the board alone.
+     *
+     * <p>Without this the lamp would convert the board into one of our signal panels, because that is
+     * the only place a lamp panel has ever existed. With Deployer installed a lamp is a kind of panel,
+     * so it can sit beside a plain factory gauge on a board somebody already built — and the board
+     * stays the block it was.
+     */
+    private InteractionResult installOnSomeoneElsesBoard(UseOnContext context, Level level,
+                                                         BlockPos pos,
+                                                         FactoryPanelBlock.PanelSlot slot) {
+        if (level.isClientSide) {
+            return InteractionResult.SUCCESS;
+        }
+        if (!(level.getBlockEntity(pos) instanceof FactoryPanelBlockEntity board)
+                || !dev.distantstock.panel.DeployerPanels.installLamp(board, slot,
+                        context.getItemInHand())) {
+            return InteractionResult.FAIL;
+        }
+        if (context.getPlayer() == null || !context.getPlayer().isCreative()) {
+            context.getItemInHand().shrink(1);
+        }
+        return InteractionResult.SUCCESS;
     }
 
     private InteractionResult install(BlockPlaceContext context, SignalPanelBlockEntity be,

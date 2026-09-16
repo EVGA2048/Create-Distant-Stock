@@ -8,7 +8,9 @@ import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelConnection
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelRenderer;
 import com.simibubi.create.foundation.blockEntity.renderer.SmartBlockEntityRenderer;
 import dev.distantstock.DistantStock;
+import dev.distantstock.block.LampReadings;
 import dev.distantstock.block.LampState;
+import dev.distantstock.block.SignalLampModels;
 import dev.distantstock.block.SignalPanelBlockEntity;
 import dev.distantstock.item.SignalLampPanelItem;
 import dev.engine_room.flywheel.lib.model.baked.PartialModel;
@@ -26,27 +28,19 @@ import java.util.HashMap;
 import java.util.Map;
 
 public final class SignalPanelRenderer extends SmartBlockEntityRenderer<SignalPanelBlockEntity> {
-    private static final Map<String, PartialModel> LAMPS = new HashMap<>();
-
-    static {
-        for (SignalLampPanelItem.Material material : SignalLampPanelItem.Material.values()) {
-            for (SignalLampPanelItem.Color color : SignalLampPanelItem.Color.values()) {
-                for (String state : new String[]{"off", "on"}) {
-                    String key = material.name().toLowerCase() + "_" + color.name().toLowerCase()
-                            + "_" + state;
-                    LAMPS.put(key, PartialModel.of(ResourceLocation.fromNamespaceAndPath(
-                            DistantStock.MODID, "block/signal_panel/" + key)));
-                }
-            }
-        }
-    }
-
     public SignalPanelRenderer(BlockEntityRendererProvider.Context context) {
         super(context);
     }
 
     /** Force partial registration before the first model bake, not on renderer construction. */
-    public static void registerModels() {}
+    public static void registerModels() {
+        SignalLampModels.init();
+    }
+
+    /** The lamp art, shared with the panel type that draws a lamp on somebody else's board. */
+    private static Map<String, PartialModel> lamps() {
+        return SignalLampModels.all();
+    }
 
     @Override
     protected void renderSafe(SignalPanelBlockEntity be, float partialTicks, PoseStack ms,
@@ -108,18 +102,11 @@ public final class SignalPanelRenderer extends SmartBlockEntityRenderer<SignalPa
             if (level == null) {
                 lit = false;
             } else {
-                color = switch (level) {
-                    case IDLE, ALL_GOOD -> SignalLampPanelItem.Color.GREEN;
-                    case ACT -> SignalLampPanelItem.Color.CYAN;
-                    case WARN, WARN_URGENT -> SignalLampPanelItem.Color.ORANGE;
-                    case FATAL -> SignalLampPanelItem.Color.RED;
-                };
+                color = LampReadings.colorFor(level);
                 lit = blinkOn(be, partialTicks, level.blink());
             }
         }
-        String key = lamp.material().name().toLowerCase() + "_" + color.name().toLowerCase()
-                + "_" + (lit ? "on" : "off");
-        PartialModel model = LAMPS.get(key);
+        PartialModel model = SignalLampModels.lamp(lamp.material(), color, lit);
         renderPartial(model, be.getBlockState(), slot, ms, buffer, lit ? 0xF000F0 : light, overlay,
                 lit ? RenderType.cutout() : RenderType.translucent());
     }

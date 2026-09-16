@@ -54,14 +54,12 @@ public final class SignalLampClientSmoke {
                     states++;
                 }
             }
-            var field = SignalPanelRenderer.class.getDeclaredField("LAMPS");
-            field.setAccessible(true);
-            var partials = (Map<?, ?>) field.get(null);
+            var partials = dev.distantstock.block.SignalLampModels.all();
             for (var entry : partials.entrySet()) {
                 try { verify(((PartialModel) entry.getValue()).get(), mc); }
                 catch (AssertionError failure) { throw new AssertionError("Quarter model: " + entry.getKey(), failure); }
             }
-            var gaugeField = RemoteGaugeRenderer.class.getDeclaredField("MODELS");
+            var gaugeField = dev.distantstock.block.RemoteGaugeModels.class.getDeclaredField("MODELS");
             gaugeField.setAccessible(true);
             var gaugePartials = (Map<?, ?>) gaugeField.get(null);
             for (var entry : gaugePartials.entrySet()) {

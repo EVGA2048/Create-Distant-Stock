@@ -298,17 +298,8 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
 
     /** How urgent one connected source gauge looks, using the fields Create syncs to the client. */
     private static LampState sourceLevel(FactoryPanelBehaviour gauge) {
-        if (gauge.isMissingAddress() || gauge.redstonePowered) {
-            return LampState.FATAL;
-        }
-        if (gauge.satisfied) {
-            // Nothing on order means the line is ready but idle, not busy.
-            return gauge.getPromised() > 0 ? LampState.ALL_GOOD : LampState.IDLE;
-        }
-        if (gauge.promisedSatisfied) {
-            return LampState.ACT;
-        }
-        return gauge.waitingForNetwork ? LampState.WARN_URGENT : LampState.WARN;
+        // One ladder for every lamp, ours and the ones on other mods' boards. See LampReadings.
+        return LampReadings.ofGauge(gauge);
     }
 
     /**
@@ -364,13 +355,7 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
 
     /** A bound network reports through the same andon ladder as wired gauges. */
     private static LampState networkLevel(NetworkHealth net) {
-        if (!net.known() || net.locked() || net.loadedLinks() == 0) {
-            return LampState.FATAL;
-        }
-        if (net.loadedLinks() < net.totalLinks()) {
-            return LampState.ACT;
-        }
-        return net.idle() ? LampState.IDLE : LampState.ALL_GOOD;
+        return LampReadings.ofNetwork(net);
     }
 
     /** The sampled health of a bound lamp, or null when the slot reads gauges instead. */

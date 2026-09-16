@@ -64,6 +64,15 @@ public final class DockInteractionEvents {
         boolean parcel = PackageItem.isPackage(event.getItemStack());
         boolean terminal = event.getItemStack().getItem() instanceof RequesterItem;
         if (!parcel && !terminal) {
+            // A Create stock link or a named name tag means nothing to a dock or a desk, but both are
+            // how a signal lamp is pointed at a network and renamed — including a lamp standing on
+            // somebody else's board, which is the only place those clicks have nowhere else to go.
+            if (reachesAPanel(event.getItemStack())) {
+                BlockState target = event.getLevel().getBlockState(event.getPos());
+                if (target.getBlock() instanceof FactoryPanelBlock) {
+                    offerTerminalToPanel(event);
+                }
+            }
             return;
         }
 
@@ -99,10 +108,6 @@ public final class DockInteractionEvents {
         }
         var level = event.getLevel();
         ItemStack stack = event.getItemStack();
-        RemoteNetworkId network = RemoteGaugeBlock.networkFromStack(stack);
-        if (network == null) {
-            return;
-        }
         BlockPos pos = SignalLampPanelItem.panelUnder(level, event.getPos(),
                 event.getHitVec().getDirection());
         if (pos == null || !(level.getBlockEntity(pos) instanceof FactoryPanelBlockEntity board)) {
@@ -110,7 +115,15 @@ public final class DockInteractionEvents {
         }
         BlockState panelState = level.getBlockState(pos);
         var slot = FactoryPanelBlock.getTargetedSlot(pos, panelState, event.getHitVec().getLocation());
-        if (slot == null || !board.panels.get(slot).isActive()
+        if (slot == null || !board.panels.get(slot).isActive()) {
+            return;
+        }
+        if (dev.distantstock.panel.DeployerPanels.holdsSignalLamp(board, slot)) {
+            offerLampClick(event, board, slot, stack);
+            return;
+        }
+        RemoteNetworkId network = RemoteGaugeBlock.networkFromStack(stack);
+        if (network == null
                 || !dev.distantstock.panel.DeployerPanels.holdsRemoteGauge(board, slot)) {
             // Not one of ours: another mod's panel, or an empty slot. Either way the board's own
             // click logic is what should answer.
@@ -134,6 +147,53 @@ public final class DockInteractionEvents {
         }
         event.setCancellationResult(ItemInteractionResult.sidedSuccess(false).result());
         event.setCanceled(true);
+    }
+
+    /** Whether this stack is something a signal lamp answers to: a link, or a name. */
+    private static boolean reachesAPanel(ItemStack stack) {
+        return SignalPanelBlock.lampBinding(stack) != null
+                || (stack.is(net.minecraft.world.item.Items.NAME_TAG)
+                        && stack.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME));
+    }
+
+    /**
+     * Points a lamp standing on somebody else's board at a network, or names it.
+     *
+     * <p>Same gesture as on our own lamp board — a stock link or a tuned terminal binds it, sneaking
+     * clears the binding, a named name tag renames the light — and it has to be answered here
+     * because the block under the click is not ours and knows nothing about lamps.
+     */
+    private static void offerLampClick(PlayerInteractEvent.RightClickBlock event,
+                                       FactoryPanelBlockEntity board,
+                                       FactoryPanelBlock.PanelSlot slot, ItemStack stack) {
+        var level = event.getLevel();
+        var player = event.getEntity();
+        java.util.UUID network = SignalPanelBlock.lampBinding(stack);
+        if (network != null) {
+            if (!level.isClientSide) {
+                boolean unbind = player.isShiftKeyDown();
+                dev.distantstock.panel.DeployerPanels.bindLamp(board, slot, unbind ? null : network);
+                player.displayClientMessage(unbind
+                        ? Component.translatable("gui.distantstock.lamp.unbound")
+                        : Component.translatable("gui.distantstock.lamp.bound",
+                                RequesterData.shortFreq(network)), true);
+            }
+            event.setCancellationResult(ItemInteractionResult.sidedSuccess(level.isClientSide).result());
+            event.setCanceled(true);
+            return;
+        }
+        if (stack.is(net.minecraft.world.item.Items.NAME_TAG)
+                && stack.has(net.minecraft.core.component.DataComponents.CUSTOM_NAME)) {
+            if (!level.isClientSide) {
+                ItemStack marker = board.panels.get(slot).getFilter().copy();
+                marker.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
+                        stack.get(net.minecraft.core.component.DataComponents.CUSTOM_NAME));
+                board.panels.get(slot).setFilter(marker);
+                board.sendData();
+            }
+            event.setCancellationResult(ItemInteractionResult.SUCCESS.result());
+            event.setCanceled(true);
+        }
     }
 
     /**

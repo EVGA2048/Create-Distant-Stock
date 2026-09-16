@@ -6,6 +6,8 @@ import com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBloc
 import dev.distantstock.block.ModBlocks;
 import dev.distantstock.item.GaugePlacementEvents;
 import dev.distantstock.item.ModItems;
+import dev.distantstock.link.LinkQueues;
+import dev.distantstock.routing.RemoteNetworkId;
 import dev.distantstock.panel.DeployerPanels;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -121,6 +123,87 @@ public final class PanelTypeGameTests {
         var be = (FactoryPanelBlockEntity) level.getBlockEntity(board);
         h.assertTrue(DeployerPanels.holdsRemoteGauge(be, SLOT), "no remote gauge landed in the slot");
         h.assertTrue(gauge.getCount() == 2, "the click did not consume exactly one gauge");
+        h.succeed();
+    }
+
+    /**
+     * A remote gauge on somebody else's board orders by the same rules as one on ours.
+     *
+     * <p>The rules are the ones the board has always been held to: a panel with no binding files
+     * nothing, and a panel whose order is refused does not count it as in flight. Both are checked
+     * against the transport's own order queue rather than any state of ours, because what has to be
+     * caught is an order that left, wherever it went.
+     *
+     * <p>This world has no towers and no transport, which is exactly the state a pack without either
+     * is in — devices are not gated when nothing is gating them, and an order placed into an
+     * unreachable network is refused rather than queued. The other half — an order that actually
+     * leaves — needs a peer on the other end of the transport and is not reachable here; the same
+     * limit applies to the board's own case, and both are checked in play.
+     */
+    @GameTest(template = "empty", timeoutTicks = 200)
+    public static void aPanelOnACreateBoardOrdersFromTheFarSide(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos boardPos = createBoard(h);
+        var board = (FactoryPanelBlockEntity) level.getBlockEntity(boardPos);
+        h.assertTrue(DeployerPanels.install(board, SLOT, UUID.randomUUID()), "the panel would not install");
+
+        var panel = board.panels.get(SLOT);
+        panel.setFilter(new ItemStack(ModItems.REMOTE_PACKAGE.get()));
+        panel.count = 64;
+        h.assertTrue(panel.getLevelInStorage() == 0, "a board with no network read a stock level");
+
+        int before = LinkQueues.orderDepth();
+        h.runAfterDelay(40, () -> {
+            h.assertTrue(LinkQueues.orderDepth() == before, "an unbound panel filed an order");
+
+            h.assertTrue(DeployerPanels.bind(board, SLOT, new RemoteNetworkId(
+                            RemoteNetworkId.CURRENT_SCHEMA, UUID.randomUUID(), UUID.randomUUID(),
+                            "minecraft:overworld", UUID.randomUUID()),
+                    UUID.randomUUID(), ""), "the panel would not take a binding");
+            h.runAfterDelay(60, () -> {
+                h.assertTrue(DeployerPanels.outstandingIn(board, SLOT) == 0,
+                        "a refused order was counted as in flight");
+                h.assertTrue(LinkQueues.orderDepth() == before,
+                        "a bound panel with no transport still got an order out");
+                h.succeed();
+            });
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void theLampLandsOnACreateBoard(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos boardPos = createBoard(h);
+        var board = (FactoryPanelBlockEntity) level.getBlockEntity(boardPos);
+
+        ItemStack lamp = new ItemStack(ModItems.CYAN_INDICATOR_LAMP.get());
+        h.assertTrue(DeployerPanels.installLamp(board, SLOT, lamp), "the lamp would not install");
+        h.assertTrue(DeployerPanels.holdsSignalLamp(board, SLOT), "the slot does not hold our lamp");
+        h.assertTrue(level.getBlockState(boardPos).is(CREATE_GAUGE),
+                "installing a lamp changed the block the board is made of");
+        var behaviour = board.panels.get(SLOT);
+        h.assertTrue(behaviour.getFilter().is(ModItems.CYAN_INDICATOR_LAMP.get()),
+                "the lamp item did not become the panel's filter");
+        h.succeed();
+    }
+
+    /**
+     * A lamp with nothing to look at stays dark.
+     *
+     * <p>The one reading that would send someone looking in the wrong place is a green light on a
+     * panel that is not connected to anything, so "no state" is a real answer here rather than a
+     * missing one.
+     */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void anUnwiredLampIsDark(GameTestHelper h) {
+        BlockPos boardPos = createBoard(h);
+        var board = (FactoryPanelBlockEntity) h.getLevel().getBlockEntity(boardPos);
+        h.assertTrue(DeployerPanels.installLamp(board, SLOT,
+                new ItemStack(ModItems.BRASS_SIGNAL_LAMP.get())), "the lamp would not install");
+
+        var behaviour = (dev.distantstock.panel.SignalLampPanelBehaviour) board.panels.get(SLOT);
+        h.assertTrue(behaviour.isLampSlot(), "the slot does not read as a lamp");
+        h.assertTrue(behaviour.lampState() == null, "an unwired lamp reported a state");
         h.succeed();
     }
 

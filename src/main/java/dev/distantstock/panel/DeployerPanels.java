@@ -39,6 +39,10 @@ public final class DeployerPanels {
             PANELS.register("remote_gauge",
                     () -> new PanelType<>(RemoteGaugePanelBehaviour::new, RemoteGaugePanelBehaviour.class));
 
+    public static final DeferredHolder<PanelType<?>, PanelType<SignalLampPanelBehaviour>> SIGNAL_LAMP =
+            PANELS.register("signal_lamp",
+                    () -> new PanelType<>(SignalLampPanelBehaviour::new, SignalLampPanelBehaviour.class));
+
     private DeployerPanels() {
     }
 
@@ -61,16 +65,50 @@ public final class DeployerPanels {
      */
     public static boolean install(FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot,
                                   UUID network) {
-        FactoryPanelBehaviour existing = board.panels.get(slot);
-        if (existing == null || existing.isActive()) {
-            return false;
-        }
-        AbstractPanelBehaviour behaviour = REMOTE_GAUGE.get().create(board, slot);
+        AbstractPanelBehaviour behaviour = create(board, slot, REMOTE_GAUGE.get());
         if (behaviour == null) {
             return false;
         }
-        behaviour.active = true;
         behaviour.setNetwork(network);
+        return attach(board, slot, behaviour);
+    }
+
+    /**
+     * Puts a signal lamp into an empty slot of any board, carrying the lamp item it was placed with.
+     *
+     * <p>A lamp is a panel whose filter holds a lamp item, so the item comes with it: which material
+     * and which colour the light is, is the filter, exactly as it is on our own lamp board.
+     */
+    public static boolean installLamp(FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot,
+                                      net.minecraft.world.item.ItemStack lamp) {
+        AbstractPanelBehaviour behaviour = create(board, slot, SIGNAL_LAMP.get());
+        if (!(behaviour instanceof SignalLampPanelBehaviour lampBehaviour)) {
+            return false;
+        }
+        // No network: a lamp starts wired to whatever is pointed at it, and is bound to a frequency
+        // only when the player says so with a stock link.
+        lampBehaviour.setFilter(lamp.copyWithCount(1));
+        lampBehaviour.count = 0;
+        return attach(board, slot, behaviour);
+    }
+
+    /** A behaviour of this type for this slot, or null when the slot is not free. */
+    private static AbstractPanelBehaviour create(FactoryPanelBlockEntity board,
+                                                 FactoryPanelBlock.PanelSlot slot,
+                                                 PanelType<?> type) {
+        FactoryPanelBehaviour existing = board.panels.get(slot);
+        if (existing == null || existing.isActive()) {
+            return null;
+        }
+        AbstractPanelBehaviour behaviour = type.create(board, slot);
+        if (behaviour != null) {
+            behaviour.active = true;
+        }
+        return behaviour;
+    }
+
+    private static boolean attach(FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot,
+                                  AbstractPanelBehaviour behaviour) {
         board.attachBehaviourLate(behaviour);
         board.panels.put(slot, behaviour);
         board.redraw = true;
@@ -83,6 +121,32 @@ public final class DeployerPanels {
     public static boolean holdsRemoteGauge(FactoryPanelBlockEntity board,
                                            FactoryPanelBlock.PanelSlot slot) {
         return board.panels.get(slot) instanceof RemoteGaugePanelBehaviour;
+    }
+
+    /** Whether the given slot of the given board holds one of our signal lamps. */
+    public static boolean holdsSignalLamp(FactoryPanelBlockEntity board,
+                                          FactoryPanelBlock.PanelSlot slot) {
+        return board.panels.get(slot) instanceof SignalLampPanelBehaviour;
+    }
+
+    /**
+     * Binds the lamp in this slot to a Create network, or back to its wired gauges when freq is null.
+     *
+     * @return false when that slot holds no lamp of ours
+     */
+    public static boolean bindLamp(FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot,
+                                   UUID freq) {
+        if (board.panels.get(slot) instanceof SignalLampPanelBehaviour lamp) {
+            lamp.setLampNetwork(freq);
+            return true;
+        }
+        return false;
+    }
+
+    /** The create network the lamp in this slot reports on, or null when it reads its gauges. */
+    public static UUID lampNetwork(FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot) {
+        return board.panels.get(slot) instanceof SignalLampPanelBehaviour lamp ? lamp.lampNetwork()
+                : null;
     }
 
     /**
