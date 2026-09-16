@@ -59,7 +59,7 @@ def make_textures():
                 # 亮着的灯要看着像在发光，而不是「颜色深一点的同一块塑料」：整条色阶往白里提，
                 # 并给足不透明度。配合方块光等级 14，才有一圈能照到旁边方块的光。
                 palette = tuple(
-                    tuple(min(255, int(c + (255 - c) * 0.62)) for c in colour)
+                    tuple(min(255, int(c + (255 - c) * 0.25)) for c in colour)
                     for colour in palette
                 )
                 alpha = 255

@@ -752,6 +752,23 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                 sendError = "goggle.distantstock.send.no_route";
                 break;
             }
+            // A route that names no group is not a destination either, and this is the case the old
+            // check missed. Pointing a terminal at a dock writes whatever group the terminal holds,
+            // and a terminal holding none writes the *default* group — the one every dock belongs to
+            // and which means "whoever is listening". A player who set an address and nothing else
+            // therefore had a parcel posted to a wildcard group on some node, and it landed in
+            // whichever receiving dock matched while the dock reported nothing, because a route
+            // existed.
+            //
+            // Only for parcels leaving this node: a parcel staying here still has the local default
+            // group to land in, which is the ordinary in-server case and always has been. The order
+            // path draws the same line in TranserverOrderService.destinationNode — an order that
+            // named no group wants its goods back where they came from.
+            if (!dev.distantstock.link.TranserverBridge.isLocal(route.get().destinationNodeId().toString())
+                    && DockGroupDirectory.DEFAULT_GROUP_ID.equals(route.get().receivingDockGroupId())) {
+                sendError = "goggle.distantstock.send.no_group";
+                break;
+            }
             if (!route.equals(packageRoute)) {
                 RemoteRouteData.write(stack, route.get());
                 nbt = PackageCodec.encode(stack, level.registryAccess());
@@ -863,7 +880,9 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             GoggleText.line(tip, "goggle.distantstock.outbound", outboundSlots(), SLOTS);
         }
         if (!sendError.isBlank()) {
-            GoggleText.value(tip, sendError, ChatFormatting.RED);
+            // Gold rather than red: the dock is not broken, it is waiting for the operator to say
+            // where the parcel goes, and the lamp is blinking orange for the same reason.
+            GoggleText.value(tip, sendError, ChatFormatting.GOLD);
         }
         if (fallbackSlots() > 0) {
             GoggleText.line(tip, "goggle.distantstock.fallback.slots", fallbackSlots(), SLOTS);

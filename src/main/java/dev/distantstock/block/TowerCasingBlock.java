@@ -104,6 +104,36 @@ public final class TowerCasingBlock extends Block
         return CODEC;
     }
 
+    /**
+     * Two casings never draw the face between them.
+     *
+     * <p>A window is not a hole. The inside of a tower's skirt is a room, and a player looking
+     * through one pane was looking at the back of the pane beside it — the frame lines of a
+     * neighbour's inner face, drawn because this block cannot occlude anything (see {@code ModBlocks}:
+     * full occlusion culls the wall behind the window and the tower becomes a hole onto the far side
+     * of the world). Hiding casing-against-casing faces keeps that room a room, and leaves the
+     * tower's outline, the core and everything outside it alone.
+     *
+     * <p>Casings only: a casing's face is still drawn against air, against the core, and against
+     * anything else a player builds beside it.
+     */
+    @Override
+    public boolean hidesNeighborFace(net.minecraft.world.level.BlockGetter level, BlockPos pos,
+                                     BlockState state, BlockState neighborState, Direction side) {
+        return neighborState.is(this);
+    }
+
+    /**
+     * Needed for the above to be consulted at all: NeoForge skips external face hiding for blocks
+     * whose model sits in the solid layer, and an unlit casing is one of those. Both states answer
+     * the same way on purpose — otherwise a wall would show its inner faces again the moment the
+     * redstone went out.
+     */
+    @Override
+    public boolean supportsExternalFaceHiding(BlockState state) {
+        return true;
+    }
+
     @Override
     public Class<TowerCasingBlockEntity> getBlockEntityClass() {
         return TowerCasingBlockEntity.class;

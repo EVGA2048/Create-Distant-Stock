@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBehaviour;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockEntity;
+import com.simibubi.create.AllPartialModels;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelConnection;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelRenderer;
 import com.simibubi.create.content.redstone.link.LinkRenderer;
@@ -42,6 +43,42 @@ public final class RemoteGaugeRenderer extends FactoryPanelRenderer {
         return RemoteGaugeModels.panel(restocker, active);
     }
 
+    /**
+     * The housing one slot should be drawn with, whoever's panel it is.
+     *
+     * <p>Our board can hold other people's panels — Deployer puts them there and the placement
+     * gesture hands them over — and drawing one of ours around somebody else's machine was the
+     * bug: a player put an Extra Gauges gauge in the second slot and watched both slots turn
+     * remote-gauge blue while only one of them was ours. A panel is a picture of the machine
+     * behind it, so the slot has to ask who is in it.
+     *
+     * <p>Three answers, in order: ours, theirs, or Create's plain copper. "Theirs" goes through
+     * {@link dev.distantstock.panel.DeployerPanels}, which is the only place allowed to name
+     * Deployer's types; without Deployer a foreign panel is a plain Create one and gets plain
+     * Create art.
+     */
+    public static PartialModel housingFor(FactoryPanelBlockEntity be, FactoryPanelBehaviour behaviour) {
+        if (dev.distantstock.block.RemoteGaugeBlockEntity.isOurPanel(behaviour)) {
+            return panelModel(be.restocker, behaviour.count != 0);
+        }
+        FactoryPanelBlock.PanelState panelState = behaviour.count == 0
+                ? FactoryPanelBlock.PanelState.PASSIVE : FactoryPanelBlock.PanelState.ACTIVE;
+        FactoryPanelBlock.PanelType panelType = be.restocker
+                ? FactoryPanelBlock.PanelType.PACKAGER : FactoryPanelBlock.PanelType.NETWORK;
+        PartialModel theirs = net.neoforged.fml.ModList.get().isLoaded("deployer")
+                ? dev.distantstock.panel.DeployerPanels.modelOf(behaviour, panelState, panelType)
+                : null;
+        if (theirs != null) {
+            return theirs;
+        }
+        if (be.restocker) {
+            return behaviour.count == 0 ? AllPartialModels.FACTORY_PANEL_RESTOCKER
+                    : AllPartialModels.FACTORY_PANEL_RESTOCKER_WITH_BULB;
+        }
+        return behaviour.count == 0 ? AllPartialModels.FACTORY_PANEL
+                : AllPartialModels.FACTORY_PANEL_WITH_BULB;
+    }
+
     @Override
     protected void renderSafe(FactoryPanelBlockEntity be, float partialTicks, PoseStack pose,
                               MultiBufferSource buffers, int light, int overlay) {
@@ -51,7 +88,7 @@ public final class RemoteGaugeRenderer extends FactoryPanelRenderer {
             if (!behaviour.isActive()) {
                 continue;
             }
-            SignalPanelRenderer.renderPartial(panelModel(be.restocker, behaviour.count != 0), state,
+            SignalPanelRenderer.renderPartial(housingFor(be, behaviour), state,
                     entry.getKey(), pose, buffers, light, overlay, RenderType.cutout());
         }
         // FactoryPanelRenderer.renderSafe would draw these two for us, but it also draws Create's own
@@ -65,7 +102,13 @@ public final class RemoteGaugeRenderer extends FactoryPanelRenderer {
                 continue;
             }
             if (behaviour.getAmount() > 0) {
-                renderRemoteBulb(behaviour, partialTicks, pose, buffers, light, overlay);
+                // The bulb is part of the housing's art, so it follows the same question: a foreign
+                // panel's bulb is Create's texture, not ours.
+                if (dev.distantstock.block.RemoteGaugeBlockEntity.isOurPanel(behaviour)) {
+                    renderRemoteBulb(behaviour, partialTicks, pose, buffers, light, overlay);
+                } else {
+                    FactoryPanelRenderer.renderBulb(behaviour, partialTicks, pose, buffers, light, overlay);
+                }
             }
             for (FactoryPanelConnection connection : behaviour.targetedBy.values()) {
                 FactoryPanelRenderer.renderPath(behaviour, connection, partialTicks, pose, buffers, light, overlay);

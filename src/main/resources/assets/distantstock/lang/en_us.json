@@ -337,5 +337,12 @@
   "gui.distantstock.pair.refused": "The other server refused pairing code %s: expired or already spent.",
   "gui.distantstock.pair.paired": "Paired: destination \"%s\" is now available (from %s).",
   "gui.distantstock.pair.remote_no_rename": "A remote dock group's name belongs to whoever owns it there.",
-  "gui.distantstock.group.delete_confirm": "Delete?"
+  "gui.distantstock.group.delete_confirm": "Delete?",
+  "gui.distantstock.remote_gauge.destination": "Destination",
+  "gui.distantstock.remote_gauge.destination.hint": "Leave empty to keep the warehouse",
+  "gui.distantstock.remote_gauge.address": "Address",
+  "gui.distantstock.remote_gauge.address.hint": "Address the goods carry",
+  "gui.distantstock.confirm": "Confirm",
+  "goggle.distantstock.send.no_group": "No destination: no receiving dock group is set, the parcel stays here",
+  "goggle.distantstock.tower.ether_full": "Ether: full"
 }

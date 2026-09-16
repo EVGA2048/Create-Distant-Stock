@@ -337,5 +337,12 @@
   "gui.distantstock.pair.refused": "对面服务器拒绝了配对码「%s」：已过期或已被兑换。",
   "gui.distantstock.pair.paired": "配对成功：目的地「%s」已可用（来自 %s）。",
   "gui.distantstock.pair.remote_no_rename": "远端港组的名字由对面服务器的主人决定，这里改不了。",
-  "gui.distantstock.group.delete_confirm": "确认删除？"
+  "gui.distantstock.group.delete_confirm": "确认删除？",
+  "gui.distantstock.remote_gauge.destination": "目的地",
+  "gui.distantstock.remote_gauge.destination.hint": "留空则保持当前仓库",
+  "gui.distantstock.remote_gauge.address": "地址",
+  "gui.distantstock.remote_gauge.address.hint": "包裹上写的地址",
+  "gui.distantstock.confirm": "确认",
+  "goggle.distantstock.send.no_group": "无目的地：没有设置收货港组，包裹留在港内",
+  "goggle.distantstock.tower.ether_full": "以太：已满"
 }

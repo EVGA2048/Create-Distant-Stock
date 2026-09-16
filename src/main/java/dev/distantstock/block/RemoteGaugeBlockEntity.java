@@ -71,6 +71,17 @@ public final class RemoteGaugeBlockEntity extends FactoryPanelBlockEntity implem
                 AllAdvancements.FACTORY_GAUGE));
     }
 
+    /**
+     * Whether this slot holds one of our own panels rather than somebody else's.
+     *
+     * <p>Asked by the renderer, which has to draw each slot as whoever is in it: our board takes
+     * other mods' panels (Deployer puts them there), and a slot drawn with our housing would be
+     * claiming somebody else's machine is a distant gauge.
+     */
+    public static boolean isOurPanel(FactoryPanelBehaviour behaviour) {
+        return behaviour instanceof RemotePanelBehaviour;
+    }
+
     /** A panel that knows it is a distant gauge, so its screen can say so. */
     private static final class RemotePanelBehaviour extends FactoryPanelBehaviour {
         private RemotePanelBehaviour(FactoryPanelBlockEntity be, FactoryPanelBlock.PanelSlot slot) {

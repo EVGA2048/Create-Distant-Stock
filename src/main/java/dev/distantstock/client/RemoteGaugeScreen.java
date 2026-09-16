@@ -32,10 +32,16 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * be asking the player to type a UUID. The screen says so when there is none.
  */
 public final class RemoteGaugeScreen extends FactoryPanelScreen {
-    private static final int FIELD_W = 120;
     private static final int ROW_H = 18;
+    private static final int BUTTON_W = 44;
+    /** Space between Create's window and our first field. */
+    private static final int GAP = 6;
+    /** Two rows and the space between them: what the panel is lifted by, and what our fields take. */
+    private static final int FOOTER_H = ROW_H * 2 + 2;
     /** How blue the window is washed. Low enough to read through, high enough to notice. */
     private static final int TINT = 0x3040A0FF;
+    /** The plate the two fields sit on, outside Create's window. */
+    private static final int FOOTER_PLATE = 0xB0151D2A;
 
     private final FactoryPanelBehaviour behaviour;
     private EditBox destination;
@@ -58,15 +64,23 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen {
 
     @Override
     protected void init() {
+        // The panel is lifted by half the footer's height so that the two fields below it land where
+        // Create's window used to end. This has to happen *before* super.init(): catnip computes
+        // guiLeft/guiTop there, and only the offset may be set in advance.
+        //
+        // The first version of this screen placed its fields from the *screen's* size instead,
+        // believing catnip's window rectangle was out of reach. It is not — guiLeft, guiTop,
+        // windowWidth and windowHeight are protected fields of AbstractSimiScreen, and
+        // FactoryPanelScreen reads them itself — so the boxes landed on top of Create's own address
+        // box and its confirm button, which is what the player saw as scrambled labels.
+        setWindowOffset(0, -(FOOTER_H + GAP) / 2);
         super.init();
-        // Placed from the screen's own size rather than from Create's window rectangle: catnip's
-        // window fields are not reachable from here, and a field that is visible and centred beats
-        // one that is positioned exactly and does not compile. Where it lands relative to Create's
-        // window is the one thing about this screen that needs a pair of eyes.
-        int left = (width - FIELD_W) / 2;
-        int top = height - 74;
 
-        destination = new EditBox(font, left, top, FIELD_W, ROW_H,
+        int left = guiLeft;
+        int top = guiTop + windowHeight + GAP;
+        int wide = windowWidth - BUTTON_W - 4;
+
+        destination = new EditBox(font, left, top, wide, ROW_H,
                 Component.translatable("gui.distantstock.remote_gauge.destination"));
         destination.setHint(Component.translatable("gui.distantstock.remote_gauge.destination.hint"));
         destination.setMaxLength(dev.distantstock.routing.DockGroup.MAX_NAME_LENGTH);
@@ -76,7 +90,7 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen {
         destination.setValue("");
         addRenderableWidget(destination);
 
-        address = new EditBox(font, left, top + ROW_H + 4, FIELD_W - 42, ROW_H,
+        address = new EditBox(font, left, top + ROW_H + 2, wide, ROW_H,
                 Component.translatable("gui.distantstock.remote_gauge.address"));
         address.setHint(Component.translatable("gui.distantstock.remote_gauge.address.hint"));
         address.setMaxLength(64);
@@ -85,7 +99,7 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen {
 
         addRenderableWidget(Button.builder(Component.translatable("gui.distantstock.confirm"),
                         button -> send())
-                .bounds(left + FIELD_W - 38, top + ROW_H + 4, 38, ROW_H)
+                .bounds(left + windowWidth - BUTTON_W, top + ROW_H + 2, BUTTON_W, ROW_H)
                 .build());
     }
 
@@ -99,9 +113,16 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen {
     @Override
     protected void renderWindow(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
         super.renderWindow(graphics, mouseX, mouseY, partialTicks);
-        // A wash over the whole screen, drawn after Create's window. Everything stays readable; the
-        // point is only that this panel is visibly not a plain factory gauge.
-        graphics.fill(0, 0, width, height, TINT);
+        // A wash over Create's window, drawn after it. Everything in it stays readable; the point is
+        // only that this panel is visibly not a plain factory gauge. The wash stops at the window's
+        // edge now that the screen is taller than the window: tinting the whole screen would dim
+        // the two fields that are the reason this screen exists.
+        graphics.fill(guiLeft, guiTop, guiLeft + windowWidth, guiTop + windowHeight, TINT);
+        // And a plate under them, which sit outside the window and would otherwise float over
+        // whatever the player has built.
+        int top = guiTop + windowHeight + GAP;
+        graphics.fill(guiLeft - 4, top - 4, guiLeft + windowWidth + 4, top + FOOTER_H + 4,
+                FOOTER_PLATE);
     }
 
     /**

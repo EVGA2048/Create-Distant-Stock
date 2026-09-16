@@ -64,7 +64,8 @@ public final class TowerActivationGameTests {
         level.setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
         DockBlockEntity dock = (DockBlockEntity) level.getBlockEntity(pos);
         dock.setExport(UUID.randomUUID());
-        dock.setDefaultDestination(UUID.randomUUID(), DockGroupDirectory.DEFAULT_GROUP_ID);
+        dock.setDefaultDestination(UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId()),
+                DockGroupDirectory.DEFAULT_GROUP_ID);
         h.assertTrue(dock.canSend(), "a dock in a world without towers cannot send | gated="
                 + dev.distantstock.routing.TowerActivation.snapshot().gated(level.dimension())
                 + " running=" + dev.distantstock.block.LoadedTowers.all().stream()
@@ -333,7 +334,13 @@ public final class TowerActivationGameTests {
         level.setBlock(dockPos, ModBlocks.DOCK.get().defaultBlockState(), 3);
         DockBlockEntity dock = (DockBlockEntity) level.getBlockEntity(dockPos);
         dock.setExport(UUID.randomUUID());
-        dock.setDefaultDestination(UUID.randomUUID(), DockGroupDirectory.DEFAULT_GROUP_ID);
+        // The local node, because that is what the gesture writes for a dock pointing at a warehouse
+        // on this server — and these cases are about towers and billing, not about crossings. A
+        // parcel bound for another node with the default group is refused on purpose (see
+        // DockGameTests.aParcelWithNoGroupDoesNotLeaveTheNode); a random node id here was standing
+        // in for "somewhere" and made every one of them a crossing.
+        dock.setDefaultDestination(UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId()),
+                DockGroupDirectory.DEFAULT_GROUP_ID);
         return (TowerCoreBlockEntity) level.getBlockEntity(corePos);
     }
 

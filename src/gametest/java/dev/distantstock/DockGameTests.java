@@ -70,6 +70,46 @@ public final class DockGameTests {
         });
     }
 
+    /**
+     * An address is not a destination: a parcel leaving for another node with the wildcard group
+     * stays here and says so.
+     *
+     * <p>The regression this pins down. Pointing a terminal at a dock writes the group the terminal
+     * is holding, and a terminal holding none writes the <em>default</em> group — the one every dock
+     * belongs to, which means "whoever is listening". So a player who set only an address got a
+     * route, the route was not empty, the old gate was satisfied, and the parcel went: across the
+     * link to the other node, where it landed in whichever receiving dock matched the address.
+     * Nothing reported anything, because from the dock's point of view it had a destination.
+     *
+     * <p>The line is drawn at the node boundary on purpose. A parcel staying on this node with the
+     * default group is the ordinary in-server case and always has been; only a parcel being handed
+     * to another server has to name a group a human chose.
+     */
+    @GameTest(template = "empty", timeoutTicks = 140)
+    public static void aParcelWithNoGroupDoesNotLeaveTheNode(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        var dock = (DockBlockEntity) level.getBlockEntity(pos);
+        dock.setExport(UUID.randomUUID());
+        // Somewhere else, and the default group: exactly what the gesture leaves behind when the
+        // terminal carries no group.
+        dock.setDefaultDestination(UUID.randomUUID(), dev.distantstock.routing.DockGroupDirectory.DEFAULT_GROUP_ID);
+        h.assertTrue(dock.canSend(), "dock did not enter send mode");
+        ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        com.simibubi.create.content.logistics.box.PackageItem.addAddress(parcel, "111");
+        var handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, Direction.UP);
+        h.assertTrue(handler != null && handler.insertItem(0, parcel, false).isEmpty(),
+                "parcel did not enter the outgoing slot");
+        h.runAfterDelay(100, () -> {
+            h.assertTrue(!dock.displayedStack().isEmpty(),
+                    "a parcel with an address and no group was sent to another node anyway");
+            h.assertTrue(dock.status() == DockStatus.BLOCKED,
+                    "a parcel with no group did not raise the blocked lamp, got " + dock.status());
+            h.succeed();
+        });
+    }
+
     private DockGameTests() {
     }
 

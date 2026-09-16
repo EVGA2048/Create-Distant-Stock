@@ -117,6 +117,25 @@ public final class DeployerPanels {
         return true;
     }
 
+    /**
+     * The model an outside panel wants for itself, or null when it has not got one.
+     *
+     * <p>Asked by the renderers of our own boards. A board of ours can hold another mod's panel —
+     * Deployer puts them there and the placement gesture hands them over — and the panel knows what
+     * it looks like: Create's model wrapper asks exactly this question for panels on Create's
+     * boards. A slot drawn with our housing instead was the bug the player reported, an Extra
+     * Gauges gauge wearing remote-gauge blue.
+     *
+     * <p>Asked through here rather than from the renderer because naming Deployer's types anywhere
+     * else would break the pack that does not have Deployer installed. A plain Create panel is not
+     * one of Deployer's either, so it answers null and the caller draws Create's own housing.
+     */
+    public static dev.engine_room.flywheel.lib.model.baked.PartialModel modelOf(
+            FactoryPanelBehaviour behaviour, FactoryPanelBlock.PanelState state,
+            FactoryPanelBlock.PanelType type) {
+        return behaviour instanceof AbstractPanelBehaviour panel ? panel.getModel(state, type) : null;
+    }
+
     /** Whether the given slot of the given board holds a remote gauge of ours. */
     public static boolean holdsRemoteGauge(FactoryPanelBlockEntity board,
                                            FactoryPanelBlock.PanelSlot slot) {
