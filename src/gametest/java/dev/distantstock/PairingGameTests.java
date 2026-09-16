@@ -7,6 +7,7 @@ import dev.distantstock.routing.PairingCodes;
 import dev.distantstock.routing.RemoteGroups;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.CompoundTag;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -198,6 +199,39 @@ public final class PairingGameTests {
         h.assertTrue(codes.live(1_100L).size() == 8, "not every minted code is live");
         h.assertTrue(codes.live(1_000L + 61_000L).isEmpty(),
                 "expired codes are still in the list after a prune");
+        h.succeed();
+    }
+
+    /**
+     * A code minted from the console survives being written to the file.
+     *
+     * <p>This is a regression test with a crash behind it. A code minted by an operator at the
+     * server console has no player behind it, so its issuer is null — and the save wrote that null
+     * straight into an NBT UUID, which throws <em>out of the middle of a save</em>. The server did
+     * not fail to write one file: it failed to finish saving at all, and the watchdog killed it a
+     * minute later with "a single server tick took 60 seconds". Nothing in the game pointed at the
+     * pairing code; the stack trace was the only clue, on the way down.
+     *
+     * <p>So the test does what the save does: mint without an issuer, save, load, and check the
+     * code still works. A file that cannot round-trip is a file that takes the server with it.
+     */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void aCodeWithNoIssuerSurvivesItsFile(GameTestHelper h) {
+        DockGroupDirectory directory = new DockGroupDirectory();
+        DockGroup group = directory.createFor("控制台仓库", null);
+        PairingCodes codes = new PairingCodes();
+        PairingCodes.Code code = codes.issue(group.id(), null, PairingCodes.DEFAULT_MINUTES, 1_000L);
+
+        CompoundTag saved = codes.save(new CompoundTag(), null);
+        PairingCodes loaded = PairingCodes.load(saved, null);
+
+        h.assertTrue(loaded.live(2_000L).size() == 1,
+                "a code minted from the console did not survive its own file");
+        // Read before the claim, which spends the code and takes it out of the list.
+        h.assertTrue(loaded.live(2_000L).getFirst().issuer() == null,
+                "an issuer appeared from nowhere");
+        h.assertTrue(loaded.claim(directory, code.code(), 2_000L).isPresent(),
+                "the code that came back cannot be claimed");
         h.succeed();
     }
 

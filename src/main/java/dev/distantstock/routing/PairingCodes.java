@@ -52,7 +52,14 @@ public final class PairingCodes extends SavedData {
     /** Tried before giving up on a collision. At six characters from thirty-one, one is plenty. */
     private static final int MINT_ATTEMPTS = 64;
 
-    /** One code, as the file holds it. */
+    /**
+     * One code, as the file holds it.
+     *
+     * @param issuer the player who minted it, or null when nobody did — an operator at the server
+     *               console has no player behind the command. It is a name for the log, not a
+     *               permission: nothing is decided by it, which is why its absence is a null and
+     *               not a reason to refuse the mint.
+     */
     public record Code(String code, UUID group, UUID issuer, long expiresAt, int usesLeft) {
         public boolean live(long now) {
             return usesLeft > 0 && now < expiresAt;
@@ -203,7 +210,13 @@ public final class PairingCodes extends SavedData {
             CompoundTag entry = new CompoundTag();
             entry.putString("Code", code.code());
             entry.putUUID("Group", code.group());
-            entry.putUUID("Issuer", code.issuer());
+            // Written only when there is something to write. A code minted from the console has no
+            // player behind it, and the issuer is a name for the log — putting a null UUID here
+            // throws out of the middle of a save, which is a crash on the way down rather than a
+            // missing field. The same rule DockGroupDirectory follows for Owner.
+            if (code.issuer() != null) {
+                entry.putUUID("Issuer", code.issuer());
+            }
             entry.putLong("Expires", code.expiresAt());
             entry.putInt("Uses", code.usesLeft());
             entries.add(entry);
@@ -212,19 +225,30 @@ public final class PairingCodes extends SavedData {
         return tag;
     }
 
-    private static PairingCodes load(CompoundTag tag, HolderLookup.Provider registries) {
+    /**
+     * Reads the file back.
+     *
+     * <p>Public rather than private so a game test can round-trip a file it built itself.
+     * What it protects against is not a parsing bug but a writing one — a field that cannot be
+     * written is only visible at save time, and save time is when a server is going down.
+     */
+    public static PairingCodes load(CompoundTag tag, HolderLookup.Provider registries) {
         PairingCodes data = new PairingCodes();
         ListTag entries = tag.getList("Codes", Tag.TAG_COMPOUND);
         for (int i = 0; i < entries.size(); i++) {
             CompoundTag entry = entries.getCompound(i);
-            if (!entry.hasUUID("Group") || !entry.hasUUID("Issuer")) {
+            if (!entry.hasUUID("Group")) {
                 continue;
             }
             String code = normalize(entry.getString("Code"));
             if (code.length() != CODE_LENGTH) {
                 continue;
             }
-            data.codes.put(code, new Code(code, entry.getUUID("Group"), entry.getUUID("Issuer"),
+            // Absent for a code nobody with a name minted. Read as absent rather than as a reason
+            // to drop the row: the code still works, and which operator typed it is not what it is
+            // for.
+            UUID issuer = entry.hasUUID("Issuer") ? entry.getUUID("Issuer") : null;
+            data.codes.put(code, new Code(code, entry.getUUID("Group"), issuer,
                     entry.getLong("Expires"), Math.max(0, entry.getInt("Uses"))));
         }
         return data;
