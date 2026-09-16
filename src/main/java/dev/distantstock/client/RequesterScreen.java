@@ -303,6 +303,19 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         return Math.min(groupRows(), 6) + 1;
     }
 
+    /** The local group with this name, or null when nobody here has used the name. */
+    private dev.distantstock.net.DockGroupsS2C.Entry knownGroup(String name) {
+        if (groups == null || name == null || name.isEmpty()) {
+            return null;
+        }
+        for (var entry : groups.groups()) {
+            if (entry.name().equalsIgnoreCase(name)) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
     private int groupRows() {
         int local = groups == null ? 0 : groups.groups().size();
         int remote = remotes == null ? 0 : remotes.groups().size();
@@ -367,12 +380,31 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             boolean over = dropdownHit(mouseX, mouseY, i, x, y, w);
             int rowY = y + i * 10;
             if (i == destinations) {
-                // The pairing row. Minting only, and the server refuses if the player does not own
-                // the group — the label says so rather than the click failing without explanation.
-                String label = Component.translatable("gui.distantstock.pair.mint_row",
-                        receivingGroup.getValue().trim()).getString();
+                // The pairing row, and the one place the player finds out whether they may use it.
+                //
+                // A code can only be minted by the group's owner, and a group made from the server
+                // console has no owner at all — so the row did nothing for exactly the players who
+                // needed it most, and said nothing about why. The reason is on the row now.
+                String typed = receivingGroup.getValue().trim();
+                var known = knownGroup(typed);
+                boolean blocked = known != null && !known.mine();
+                boolean unknown = known == null && !typed.isEmpty()
+                        && groups != null && groups.groups().stream()
+                                .noneMatch(entry -> entry.name().equalsIgnoreCase(typed));
+                String label;
+                int colour;
+                if (blocked) {
+                    label = Component.translatable("gui.distantstock.pair.mint_row.not_owner").getString();
+                    colour = 0xFFB09090;
+                } else if (unknown) {
+                    label = Component.translatable("gui.distantstock.pair.mint_row.new_group", typed).getString();
+                    colour = 0xFFC8B090;
+                } else {
+                    label = Component.translatable("gui.distantstock.pair.mint_row", typed).getString();
+                    colour = 0xFFD8C8F0;
+                }
                 g.fill(x, rowY, x + w, rowY + 10, over ? 0xFF5A4A72 : 0xFF3A3050);
-                g.drawString(font, trim(label, w - 6), x + 3, rowY + 1, 0xFFD8C8F0, false);
+                g.drawString(font, trim(label, w - 6), x + 3, rowY + 1, colour, false);
             } else if (i < local) {
                 var entry = groups.groups().get(i);
                 boolean doomed = entry.name().equals(pendingDelete);

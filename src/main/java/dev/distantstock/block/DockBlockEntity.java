@@ -813,6 +813,12 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             }
             if (!route.equals(packageRoute)) {
                 RemoteRouteData.write(stack, route.get());
+                // Recorded here because here is where it is known: a parcel bound for another node
+                // is the one the tooltip has a second line for.
+                if (!dev.distantstock.link.TranserverBridge.isLocal(
+                        route.get().destinationNodeId().toString())) {
+                    RemoteRouteData.markCrossServer(stack);
+                }
                 nbt = PackageCodec.encode(stack, level.registryAccess());
                 if (nbt.isEmpty()) {
                     continue;

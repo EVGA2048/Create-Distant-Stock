@@ -350,5 +350,9 @@
   "message.distantstock.casing.port.no_tower": "这块机壳不属于任何塔：这个口通向空处",
   "message.distantstock.dock.target": "已设置收货港组：%s（服务器：%s）",
   "message.distantstock.dock.target.no_group": "终端没有设收货港组：本港现在指向「%s」（谁都收），跨服包裹会被留在港内 —— 先在终端的「接收港组」里选一个组再点。",
-  "message.distantstock.dock.joined": "本港已加入收货港组：%s"
+  "message.distantstock.dock.joined": "本港已加入收货港组：%s",
+  "item.distantstock.remote_package.crossing": "跨服寄往 %s · 港组 %s",
+  "gui.distantstock.pair.mint_row.not_owner": "＋ 生成配对码 —— 只有组主能发（这个组不是你建的）",
+  "gui.distantstock.pair.mint_row.new_group": "＋ 生成配对码 —— 先对「%s」按回车建组",
+  "create.gui.stock_keeper.package_address.hint": "包裹上写的地址；收货侧的港/蛙港要收这个地址"
 }

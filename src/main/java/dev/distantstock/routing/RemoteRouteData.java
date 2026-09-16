@@ -15,6 +15,7 @@ public final class RemoteRouteData {
     private static final String RECEIVING_GROUP = "ReceivingDockGroup";
     private static final String CORRELATION = "Correlation";
     private static final String CHILD_ORDER = "ChildOrder";
+    private static final String CROSS_SERVER = "CrossServer";
 
     public static Optional<RemoteRoute> read(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
@@ -42,6 +43,38 @@ public final class RemoteRouteData {
         } catch (IllegalArgumentException exception) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * Marks a parcel as one that is going to another server rather than to a dock on this one.
+     *
+     * <p>Set where the parcel leaves a dock, because that is the last place that knows. It is what
+     * lets the tooltip tell the truth about a parcel standing in a chest: "this one crosses" is a
+     * different sentence from "this belongs to a group over here", and the route alone cannot say
+     * which — both carry a destination node, and one of them is this server.
+     */
+    public static void markCrossServer(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return;
+        }
+        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        if (!custom.contains(ROOT, CompoundTag.TAG_COMPOUND)) {
+            return;
+        }
+        CompoundTag route = custom.getCompound(ROOT);
+        route.putBoolean(CROSS_SERVER, true);
+        custom.put(ROOT, route);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(custom));
+    }
+
+    /** Whether this parcel is on its way to another server, as far as this side can tell. */
+    public static boolean crossServer(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        return custom.contains(ROOT, CompoundTag.TAG_COMPOUND)
+                && custom.getCompound(ROOT).getBoolean(CROSS_SERVER);
     }
 
     public static void write(ItemStack stack, RemoteRoute value) {
