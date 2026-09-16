@@ -1,6 +1,8 @@
 package dev.distantstock.routing;
 
 import com.simibubi.create.content.logistics.packager.PackagingRequest;
+import com.simibubi.create.content.logistics.box.PackageItem;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -9,7 +11,6 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.saveddata.SavedData;
 
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -21,7 +22,19 @@ public final class OrderRouteDirectory extends SavedData {
     private static final Factory<OrderRouteDirectory> FACTORY =
             new Factory<>(OrderRouteDirectory::new, OrderRouteDirectory::load);
 
-    private record Entry(RemoteRoute route, long createdAt) {
+    private static final class Entry {
+        final RemoteRoute route;
+        final long createdAt;
+        final Map<Integer, java.util.Set<Integer>> received = new LinkedHashMap<>();
+        final Map<Integer, Integer> lastPackage = new LinkedHashMap<>();
+        int lastLink = -1;
+
+        Entry(RemoteRoute route, long createdAt) {
+            this.route = route;
+            this.createdAt = createdAt;
+        }
+        RemoteRoute route() { return route; }
+        long createdAt() { return createdAt; }
     }
 
     private final Map<Integer, Entry> routes = new LinkedHashMap<>();
@@ -32,27 +45,45 @@ public final class OrderRouteDirectory extends SavedData {
 
     public void remember(Collection<PackagingRequest> requests, RemoteRoute route) {
         long now = System.currentTimeMillis();
-        boolean changed = false;
+        var newIds = new java.util.HashSet<Integer>();
         for (PackagingRequest request : requests) {
-            Entry previous = routes.put(request.orderId(), new Entry(route, now));
+            Entry previous = routes.get(request.orderId());
             if (previous != null && !previous.route().equals(route)) {
                 throw new IllegalStateException("Create order ID collision: " + request.orderId());
             }
-            changed = true;
+            if (previous == null) newIds.add(request.orderId());
         }
-        while (routes.size() > MAX_ENTRIES) {
-            Integer oldest = routes.entrySet().stream()
-                    .min(Comparator.comparingLong(row -> row.getValue().createdAt()))
-                    .map(Map.Entry::getKey)
-                    .orElse(null);
-            if (oldest == null) {
-                break;
-            }
-            routes.remove(oldest);
+        // Never evict an in-flight order just to admit another: its next parcel still needs its route.
+        if (routes.size() + newIds.size() > MAX_ENTRIES) {
+            throw new IllegalStateException("Too many unfinished routed orders");
         }
-        if (changed) {
-            setDirty();
+        for (Integer id : newIds) routes.put(id, new Entry(route, now));
+        if (!newIds.isEmpty()) setDirty();
+    }
+
+    /** Called only after durable escrow ownership; Create fragments can arrive out of order. */
+    public void packageEscrowed(ItemStack parcel) {
+        if (!PackageItem.hasOrderData(parcel)) return;
+        int orderId = PackageItem.getOrderId(parcel);
+        Entry entry = routes.get(orderId);
+        if (entry == null) return;
+        // A forwarded foreign parcel can reuse a local Create integer order ID.
+        if (RemoteRouteData.read(parcel).filter(route -> !route.equals(entry.route())).isPresent()) return;
+        int link = PackageItem.getLinkIndex(parcel);
+        int index = PackageItem.getIndex(parcel);
+        if (link < 0 || index < 0) return;
+        entry.received.computeIfAbsent(link, ignored -> new java.util.HashSet<>()).add(index);
+        if (PackageItem.isFinal(parcel)) entry.lastPackage.put(link, index);
+        if (PackageItem.isFinalLink(parcel)) entry.lastLink = link;
+        setDirty();
+        if (entry.lastLink < 0 || entry.received.size() != (long) entry.lastLink + 1) return;
+        for (int i = 0; i <= entry.lastLink; i++) {
+            var indexes = entry.received.get(i);
+            Integer last = entry.lastPackage.get(i);
+            if (indexes == null || last == null || indexes.size() != (long) last + 1) return;
+            for (int j = 0; j <= last; j++) if (!indexes.contains(j)) return;
         }
+        consume(orderId);
     }
 
     public Optional<RemoteRoute> find(int createOrderId) {
@@ -60,7 +91,7 @@ public final class OrderRouteDirectory extends SavedData {
         return entry == null ? Optional.empty() : Optional.of(entry.route());
     }
 
-    /** Removes the route for a consumed order. Call after the parcel enters the escrow. */
+    /** Removes a completely accounted-for order, never just its first parcel. */
     public boolean consume(int createOrderId) {
         if (routes.remove(createOrderId) != null) {
             setDirty();
@@ -82,6 +113,17 @@ public final class OrderRouteDirectory extends SavedData {
             saved.putUUID("ReceivingDockGroup", route.receivingDockGroupId());
             saved.putUUID("Correlation", route.correlationId());
             saved.putUUID("ChildOrder", route.childOrderId());
+            saved.putInt("LastLink", row.getValue().lastLink);
+            ListTag progress = new ListTag();
+            row.getValue().received.forEach((link, indexes) -> {
+                CompoundTag part = new CompoundTag();
+                part.putInt("Link", link);
+                part.putIntArray("Indexes", indexes.stream().mapToInt(Integer::intValue).sorted().toArray());
+                if (row.getValue().lastPackage.containsKey(link))
+                    part.putInt("Last", row.getValue().lastPackage.get(link));
+                progress.add(part);
+            });
+            saved.put("Progress", progress);
             list.add(saved);
         }
         tag.put("Routes", list);
@@ -107,8 +149,20 @@ public final class OrderRouteDirectory extends SavedData {
                         saved.getUUID("ReceivingDockGroup"),
                         saved.getUUID("Correlation"),
                         saved.getUUID("ChildOrder"));
-                directory.routes.put(saved.getInt("OrderId"),
-                        new Entry(route, saved.getLong("CreatedAt")));
+                Entry entry = new Entry(route, saved.getLong("CreatedAt"));
+                entry.lastLink = saved.contains("LastLink", Tag.TAG_INT) ? saved.getInt("LastLink") : -1;
+                ListTag progress = saved.getList("Progress", Tag.TAG_COMPOUND);
+                for (int j = 0; j < progress.size(); j++) {
+                    CompoundTag part = progress.getCompound(j);
+                    int link = part.getInt("Link");
+                    if (link < 0) continue;
+                    var indexes = new java.util.HashSet<Integer>();
+                    for (int index : part.getIntArray("Indexes")) if (index >= 0) indexes.add(index);
+                    entry.received.put(link, indexes);
+                    if (part.contains("Last", Tag.TAG_INT) && part.getInt("Last") >= 0)
+                        entry.lastPackage.put(link, part.getInt("Last"));
+                }
+                directory.routes.put(saved.getInt("OrderId"), entry);
             } catch (IllegalArgumentException ignored) {
             }
         }

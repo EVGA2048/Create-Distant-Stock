@@ -9,3 +9,4 @@ run-data/
 .DS_Store
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
+devtest/

@@ -73,7 +73,7 @@ public final class ModBlocks {
 
     private static DeferredHolder<net.minecraft.world.level.block.Block, IndicatorLampBlock> lamp(String name) {
         return BLOCKS.register(name, () -> new IndicatorLampBlock(panel()
-                .lightLevel(state -> state.getValue(IndicatorLampBlock.LIT) ? 10 : 0)));
+                .lightLevel(state -> state.getValue(IndicatorLampBlock.LIT) ? 14 : 0)));
     }
 
     private static BlockBehaviour.Properties machine() {

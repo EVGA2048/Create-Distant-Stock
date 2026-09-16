@@ -73,8 +73,18 @@ if (providers.gradleProperty('withGameTests').isPresent()) {
      * possible because the leftovers were real tickets in a real save.
      */
     tasks.named('runGameTestServer').configure {
+        def startedAt = 0L
         doFirst {
+            startedAt = System.currentTimeMillis()
             delete layout.buildDirectory.dir('gametest-run/world')
+        }
+        doLast {
+            def report = layout.buildDirectory.file('gametest-run/logs/latest.log').get().asFile
+            if (!report.exists() || report.lastModified() < startedAt
+                    || !(report.text =~ /All [1-9]\d* required tests passed/).find()
+                    || report.text.contains('required tests failed')) {
+                throw new GradleException('Game tests did not finish successfully; inspect build/gametest-run/logs/latest.log')
+            }
         }
     }
     tasks.named('runClientSmoke').configure {

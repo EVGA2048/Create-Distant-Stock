@@ -56,14 +56,14 @@ public final class OrderService {
     public static Result place(MinecraftServer server, RemoteNetworkId networkId, UUID legacyFrequency,
                                String address, UUID receivingDockGroupId, List<LinkQueues.Line> lines) {
         if (networkId == null) {
-            return place(legacyFrequency, address, receivingDockGroupId, lines);
+            return placeLocal(server, legacyFrequency, address, receivingDockGroupId, lines);
         }
         if (lines == null || lines.isEmpty()) {
             return Result.EMPTY;
         }
-        UUID localNode = TranserverBridge.nodeId();
+        UUID localNode = UUID.fromString(TranserverBridge.localNodeId());
         if (networkId.nodeId().equals(localNode)) {
-            return place(networkId.createFrequency(), address, receivingDockGroupId, lines);
+            return placeLocal(server, networkId.createFrequency(), address, receivingDockGroupId, lines);
         }
         UUID correlationId = UUID.randomUUID();
         UUID childOrderId = UUID.randomUUID();
@@ -87,6 +87,19 @@ public final class OrderService {
                     networkId.nodeId(), networkId.createFrequency(), receivingDockGroupId, exception);
             return Result.FAIL;
         }
+    }
+
+    private static Result placeLocal(MinecraftServer server, UUID frequency, String address,
+                                     UUID receivingGroup, List<LinkQueues.Line> lines) {
+        if (lines == null || lines.isEmpty()) return Result.EMPTY;
+        if (!CreateStock.hasNetwork(frequency)) return place(frequency, address, receivingGroup, lines);
+        List<StockCache.Entry> items = new ArrayList<>();
+        for (LinkQueues.Line line : lines) items.add(new StockCache.Entry(line.itemId(), line.count()));
+        RemoteRoute route = RemoteRoute.create(UUID.fromString(TranserverBridge.localNodeId()),
+                receivingGroup == null ? DockGroupDirectory.DEFAULT_GROUP_ID : receivingGroup);
+        boolean ok = CreateStock.request(frequency, items, address, server, route);
+        LinkQueues.lastPack(frequency, ok ? LinkQueues.PackResult.SUCCESS : LinkQueues.PackResult.NO_STOCK);
+        return ok ? Result.QUEUED : Result.FAIL;
     }
 
     public static void drainInbound(MinecraftServer server) {

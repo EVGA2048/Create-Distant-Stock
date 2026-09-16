@@ -328,7 +328,9 @@ SOFT_CRYSTAL = "crystal_shell"
 # the preview's flat background and a nearly empty hole in a game where what is behind it is the
 # inside of a 3x3 skirt: reported from play as "you can still see the texture in the middle". Raising
 # the alpha keeps the pane's shape, its glow and its colour, and stops it being a doorway.
-WINDOW_ALPHA = {40: 216, 64: 208, 91: 222, 112: 238, 113: 238}
+# 观察窗那一格的透明度（越低越透）。原来 200+ 基本是不透明玻璃，看着像磨砂墙；
+# 现在压到 100 上下，隔着机壳能看清里面的塔架。
+WINDOW_ALPHA = {40: 96, 64: 88, 91: 104, 112: 128, 113: 128}
 
 
 def opaque_window(image):

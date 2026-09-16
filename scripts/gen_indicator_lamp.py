@@ -55,6 +55,14 @@ def make_textures():
             pixels = image.load()
             palette = palettes["on" if powered else "off"]
             alpha = 204 if powered else 190
+            if powered:
+                # 亮着的灯要看着像在发光，而不是「颜色深一点的同一块塑料」：整条色阶往白里提，
+                # 并给足不透明度。配合方块光等级 14，才有一圈能照到旁边方块的光。
+                palette = tuple(
+                    tuple(min(255, int(c + (255 - c) * 0.62)) for c in colour)
+                    for colour in palette
+                )
+                alpha = 255
             # Dedicated 5x5 atlas patch: one texture pixel per model unit,
             # like the tiny bulb on Create's factory gauge.
             for y, row in enumerate(pattern):

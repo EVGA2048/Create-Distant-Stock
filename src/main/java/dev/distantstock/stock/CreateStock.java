@@ -191,7 +191,13 @@ public final class CreateStock {
                 return false;
             }
         }
-        OrderRouteDirectory.get(server).remember(requests.values(), route);
+        try {
+            OrderRouteDirectory.get(server).remember(requests.values(), route);
+        } catch (IllegalStateException exception) {
+            org.apache.logging.log4j.LogManager.getLogger().warn(
+                    "[DistantStock/Order] refused before packaging: {}", exception.getMessage());
+            return false;
+        }
         LogisticsManager.performPackageRequests(requests);
         return true;
     }

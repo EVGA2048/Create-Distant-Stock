@@ -190,8 +190,9 @@ public final class ResonatorRenderer extends SmartBlockEntityRenderer<ResonatorB
      */
     private static final float[][] BEAM_COLOUR = {
             {0.42f, 0.48f, 0.52f, 0.0f},
-            {0.55f, 0.85f, 1.0f, 0.30f},
-            {0.25f, 0.60f, 1.0f, 0.55f},
+            // 待机与工作态都往白里走、往亮里走：原来那两条蓝在夜空里几乎看不出是一道光柱。
+            {0.86f, 0.93f, 1.0f, 0.45f},
+            {0.97f, 0.99f, 1.0f, 0.78f},
     };
 
     /** Vanilla's beam texture: a bright vertical streak, already stitched into the block atlas. */

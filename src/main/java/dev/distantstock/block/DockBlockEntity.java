@@ -772,10 +772,8 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                             level.getGameTime(), level.registryAccess());
                     outboundInv.extractItem(slot, 1, false);
                     noteTraffic(level);
-                    // Route consumed: the escrow now owns the parcel and its destination.
-                    if (PackageItem.hasOrderData(stack)) {
-                        OrderRouteDirectory.get(level.getServer()).consume(PackageItem.getOrderId(stack));
-                    }
+                    // Other Create packagers/fragments of this order may still be on their way.
+                    OrderRouteDirectory.get(level.getServer()).packageEscrowed(stack);
                     sendError = "";
                 } catch (IllegalArgumentException ignored) {
                     // The escrow refused the parcel, so it never left. The ether goes back with it.
