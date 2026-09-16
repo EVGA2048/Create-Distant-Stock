@@ -106,6 +106,22 @@ public record BindGaugePanelC2S(BlockPos pos, int slot, String destination, Stri
                         Component.translatable("gui.distantstock.group.closed"), true);
                 return;
             }
+            if (existing == null) {
+                // A destination on another server that a pairing code brought in. It is passed
+                // through as it stands — the directory holding it, and every dock answering to it,
+                // are on the far end — and it is never turned into a group here: a local copy
+                // would be a group with no docks whose name shadows the real one.
+                var remote = dev.distantstock.routing.RemoteGroups.get(player.level().getServer())
+                        .findByName(wanted).orElse(null);
+                if (remote != null) {
+                    if (rebind(board, slot, remote.group(), msg.address)) {
+                        return;
+                    }
+                    player.displayClientMessage(
+                            Component.translatable("gui.distantstock.remote_gauge.needs_terminal"), true);
+                    return;
+                }
+            }
             DockGroup group = existing != null ? existing
                     : directory.createFor(wanted, player.getUUID());
             if (rebind(board, slot, group.id(), msg.address)) {

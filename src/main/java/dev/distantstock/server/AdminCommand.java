@@ -12,6 +12,7 @@ import dev.distantstock.block.DockBlockEntity;
 import dev.distantstock.block.LoadedDocks;
 import dev.distantstock.link.InboundOrderInbox;
 import dev.distantstock.link.LinkSnapshot;
+import dev.distantstock.link.PairingService;
 import dev.distantstock.link.PackageCodec;
 import dev.distantstock.link.ParcelEscrow;
 import dev.distantstock.link.ParcelQuarantine;
@@ -20,6 +21,7 @@ import dev.distantstock.link.TranserverBridge;
 import dev.distantstock.net.AdminConfigS2C;
 import dev.distantstock.routing.DockGroup;
 import dev.distantstock.routing.DockGroupDirectory;
+import dev.distantstock.routing.PairingCodes;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -123,6 +125,23 @@ public final class AdminCommand {
                                         .executes(ctx -> groupDelete(ctx, false))
                                         .then(Commands.literal("confirm")
                                                 .executes(ctx -> groupDelete(ctx, true))))))
+                .then(Commands.literal("pair")
+                        .executes(AdminCommand::pairList)
+                        .then(Commands.literal("list").executes(AdminCommand::pairList))
+                        .then(Commands.literal("create")
+                                .then(Commands.argument("group", StringArgumentType.string())
+                                        .suggests((ctx, builder) -> suggestGroupNames(ctx, builder))
+                                        .executes(ctx -> pairCreate(ctx, PairingCodes.DEFAULT_MINUTES))
+                                        .then(Commands.argument("minutes", IntegerArgumentType.integer(1, 60))
+                                                .executes(ctx -> pairCreate(ctx,
+                                                        IntegerArgumentType.getInteger(ctx, "minutes"))))))
+                        .then(Commands.literal("revoke")
+                                .then(Commands.argument("code", StringArgumentType.word())
+                                        .suggests((ctx, builder) -> suggestPairCodes(ctx, builder))
+                                        .executes(AdminCommand::pairRevoke)))
+                        .then(Commands.literal("redeem")
+                                .then(Commands.argument("code", StringArgumentType.word())
+                                        .executes(AdminCommand::pairRedeem))))
                 .then(Commands.literal("dock")
                         .then(Commands.literal("group")
                                 .then(Commands.argument("group", StringArgumentType.string())
@@ -150,6 +169,10 @@ public final class AdminCommand {
                 "  /distantstock group list            列出所有系统（港组）",
                 "  /distantstock group create <名字>    新建一个系统",
                 "  /distantstock group delete <名字>    删除（要再输一次 confirm）",
+                "  /distantstock pair create <组名>     给别的服务器发一个配对码（默认 10 分钟）",
+                "  /distantstock pair redeem <码>       兑换别的服务器的配对码",
+                "  /distantstock pair list              本服发出的码 + 已认识的远端港组",
+                "  /distantstock pair revoke <码>       作废一个还没被兑换的码",
                 "  /distantstock dock group <名字>      把脚下的港加入系统",
                 "  /distantstock dock send-to <名字>    让脚下的港发往那个系统",
                 "  /distantstock returns list|restore|give|export   被退回的包裹",
@@ -416,6 +439,78 @@ public final class AdminCommand {
     }
 
     /** 把玩家准星正对的那个港加进指定港组。没瞄到港就明确说出来，不静默。 */
+    /**
+     * A pairing code for one of this server's groups, for a player on another server to redeem.
+     *
+     * <p>Ownership is asked of the player who runs it; an operator may mint for a group they do not
+     * own, which is the same override they already have over the group commands. The code is
+     * printed in a form that survives being copied anywhere, and it is the only thing the other
+     * server will ever see of this group until somebody spends it.
+     */
+    private static int pairCreate(CommandContext<CommandSourceStack> ctx, int minutes) {
+        MinecraftServer server = ctx.getSource().getServer();
+        String name = StringArgumentType.getString(ctx, "group");
+        DockGroup group = DockGroupDirectory.get(server).findByName(name).orElse(null);
+        if (group == null) {
+            return failure(ctx, "没有这个港组：" + name);
+        }
+        var player = ctx.getSource().getPlayer();
+        boolean owner = player != null && group.ownedBy(player.getUUID());
+        if (!owner && !ctx.getSource().hasPermission(2)) {
+            return failure(ctx, "只有港组主能给它生成配对码：" + group.name());
+        }
+        PairingCodes.Code code = PairingCodes.get(server).issue(group.id(),
+                player == null ? null : player.getUUID(), minutes, System.currentTimeMillis());
+        ctx.getSource().sendSuccess(() -> Component.literal("配对码「" + code.code() + "」· 港组「"
+                + group.name() + "」· " + minutes + " 分钟内有效，只能兑换一次。"
+                + "把它发给对面服务器的玩家，让对方在终端界面的配对框里兑换。"), false);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int pairRevoke(CommandContext<CommandSourceStack> ctx) {
+        String code = StringArgumentType.getString(ctx, "code");
+        if (!PairingCodes.get(ctx.getSource().getServer()).revoke(code)) {
+            return failure(ctx, "没有这个还在有效期内的配对码：" + code);
+        }
+        ctx.getSource().sendSuccess(() -> Component.literal("已作废配对码「"
+                + PairingCodes.normalize(code) + "」。"), false);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int pairRedeem(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        // The redemption answers in chat, seconds later, possibly from another server: it needs a
+        // player to answer, so the console cannot run this one.
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        PairingService.redeem(ctx.getSource().getServer(), player,
+                StringArgumentType.getString(ctx, "code"));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** Both halves of the pairing state: what this server is offering, and what it has been given. */
+    private static int pairList(CommandContext<CommandSourceStack> ctx) {
+        MinecraftServer server = ctx.getSource().getServer();
+        long now = System.currentTimeMillis();
+        List<PairingCodes.Code> codes = PairingCodes.get(server).live(now);
+        DockGroupDirectory directory = DockGroupDirectory.get(server);
+        ctx.getSource().sendSuccess(() -> Component.literal("本服有效配对码：" + codes.size()
+                + "（最多 " + PairingCodes.MAX_MINUTES + " 分钟，一次性；point create <组名> 生成）"), false);
+        for (PairingCodes.Code code : codes) {
+            String group = directory.find(code.group()).map(DockGroup::name).orElse("（港组已删除）");
+            long minutesLeft = Math.max(0, (code.expiresAt() - now + 59_999) / 60_000);
+            ctx.getSource().sendSuccess(() -> Component.literal("· " + code.code()
+                    + " · 港组「" + group + "」· 剩余 " + minutesLeft + " 分钟"), false);
+        }
+        List<dev.distantstock.routing.RemoteGroups.Entry> remotes =
+                dev.distantstock.routing.RemoteGroups.get(server).all();
+        ctx.getSource().sendSuccess(() -> Component.literal("已认识的远端港组：" + remotes.size()
+                + "（用 /distantstock pair redeem <码> 认识新的）"), false);
+        for (var remote : remotes) {
+            ctx.getSource().sendSuccess(() -> Component.literal("· " + remote.display()
+                    + " · 节点 " + remote.node()), false);
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
     private static int dockGroup(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
         Optional<DockGroup> group = resolveGroup(ctx, StringArgumentType.getString(ctx, "group"));
@@ -435,7 +530,29 @@ public final class AdminCommand {
     /** 把玩家准星正对的那个港的默认目的地设成「本机 + 指定港组」。 */
     private static int dockSendTo(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
-        Optional<DockGroup> group = resolveGroup(ctx, StringArgumentType.getString(ctx, "group"));
+        String token = StringArgumentType.getString(ctx, "group");
+        // A destination on another server first, and only if this one has no group by that name:
+        // the two live in different files, and a name that means something here must not be
+        // shadowed by a copy of it from elsewhere. This is the command that sends parcels across —
+        // a dock pointed at a remote group and a remote node ships to the machine that answers to
+        // it over there.
+        var remote = dev.distantstock.routing.RemoteGroups
+                .get(ctx.getSource().getServer()).findByName(token).orElse(null);
+        if (remote != null) {
+            DockBlockEntity target = lookedAtDock(player);
+            if (target == null) {
+                return failure(ctx, "没有瞄到远仓港：请把准星正对一个港方块再执行这条命令");
+            }
+            target.setDefaultDestination(remote.node(), remote.group());
+            ctx.getSource().sendSuccess(() -> Component.literal("港 " + place(target)
+                    + " 的默认目的地已设为 " + remote.display() + "（节点 " + shortId(remote.node()) + "）"), false);
+            if (!target.canSend()) {
+                ctx.getSource().sendSuccess(() -> Component.literal(
+                        "提示：该港当前是收货模式，不会发货；切换到发送/双向模式后这个默认目的地才会生效"), false);
+            }
+            return Command.SINGLE_SUCCESS;
+        }
+        Optional<DockGroup> group = resolveGroup(ctx, token);
         if (group.isEmpty()) {
             return Command.SINGLE_SUCCESS;
         }
@@ -506,6 +623,16 @@ public final class AdminCommand {
 
     private static String names(List<DockGroup> groups) {
         return String.join("、", groups.stream().limit(MAX_SUGGESTIONS).map(DockGroup::name).toList());
+    }
+
+    private static CompletableFuture<Suggestions> suggestPairCodes(CommandContext<CommandSourceStack> ctx,
+                                                                   SuggestionsBuilder builder) {
+        List<String> codes = PairingCodes.get(ctx.getSource().getServer())
+                .live(System.currentTimeMillis()).stream()
+                .limit(MAX_SUGGESTIONS)
+                .map(PairingCodes.Code::code)
+                .toList();
+        return SharedSuggestionProvider.suggest(codes, builder);
     }
 
     private static CompletableFuture<Suggestions> suggestGroupNames(CommandContext<CommandSourceStack> ctx,

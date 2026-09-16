@@ -1,5 +1,6 @@
 package dev.distantstock.link;
 
+import dev.distantstock.routing.DockGroupDirectory;
 import dev.distantstock.routing.RemoteRoute;
 import dev.distantstock.routing.RoutingChannels;
 import dev.distantstock.routing.WorldIdentity;
@@ -43,9 +44,9 @@ public final class TranserverOrderService {
                 for (LinkQueues.Line line : record.request().lines()) {
                     items.add(new StockCache.Entry(line.itemId(), line.count()));
                 }
-                RemoteRoute route = new RemoteRoute(RemoteRoute.CURRENT_SCHEMA, record.sourceNodeId(),
-                        record.request().receivingDockGroupId(), record.request().correlationId(),
-                        record.request().childOrderId());
+                RemoteRoute route = new RemoteRoute(RemoteRoute.CURRENT_SCHEMA,
+                        destinationNode(server, record), record.request().receivingDockGroupId(),
+                        record.request().correlationId(), record.request().childOrderId());
                 boolean applied = CreateStock.request(record.request().networkId().createFrequency(), items,
                         record.request().address(), server, route);
                 inbox.state(record.childOrderId(), applied ? InboundOrderInbox.State.APPLIED
@@ -64,6 +65,34 @@ public final class TranserverOrderService {
             }
             inbox.flush(server);
         }
+    }
+
+    /**
+     * Which node the goods are finally delivered on: this one, or the one that placed the order.
+     *
+     * <p>A group named in this server's own directory is a group here, so the parcel stays here and
+     * comes out of a dock on this server — that is what a destination redeemed from a pairing code
+     * means, and the only way to order from somebody else's warehouse and have the goods handed to
+     * a player standing next to it. Anything else names a group this server has never heard of: the
+     * order goes home, and the goods come out of the dock the ordering player chose there.
+     *
+     * <p>The default group is excluded on purpose. It exists in every directory, including this
+     * one, so it would otherwise read as "deliver here" — and it means the opposite: an order that
+     * named no group is an order that wants its goods back where it came from.
+     */
+    private static UUID destinationNode(MinecraftServer server,
+                                        InboundOrderInbox.Record record) {
+        UUID group = record.request().receivingDockGroupId();
+        if (group == null || group.equals(DockGroupDirectory.DEFAULT_GROUP_ID)) {
+            return record.sourceNodeId();
+        }
+        if (!DockGroupDirectory.get(server).find(group).isPresent()) {
+            return record.sourceNodeId();
+        }
+        UUID local = TranserverBridge.nodeId();
+        // Without a Transerver attached this save is the only node there is; the sentinel is what
+        // every other record in the mod uses to mean "here".
+        return local == null ? UUID.fromString(TranserverBridge.localNodeId()) : local;
     }
 
     private static CompletableFuture<DeliveryResult> receive(ReceivedMessage message) {

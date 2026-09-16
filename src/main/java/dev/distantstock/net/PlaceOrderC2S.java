@@ -60,6 +60,10 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
      *       Nobody owns the default, so this is not a door being opened.
      *   <li>It names a system the player is not in. That is the case a lock exists for, and it is
      *       refused: a closed system is not a place to push goods into.
+     *   <li>It names a system on another server, learned from a pairing code. Nothing here can
+     *       check it — the directory that holds it and every dock that answers to it are on the far
+     *       end — so it is passed through as it stands. See {@code TranserverOrderService} for what
+     *       the receiving server does with a group that turns out to be one of its own.
      * </ul>
      */
     private static UUID resolveGroup(Player p, UUID asked) {
@@ -71,7 +75,8 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
         }
         DockGroup group = DockGroupDirectory.get(p.level().getServer()).find(asked).orElse(null);
         if (group == null) {
-            return DockGroupDirectory.DEFAULT_GROUP_ID;
+            return dev.distantstock.routing.RemoteGroups.get(p.level().getServer()).find(asked).isPresent()
+                    ? asked : DockGroupDirectory.DEFAULT_GROUP_ID;
         }
         return group.admits(p.getUUID()) ? group.id() : null;
     }

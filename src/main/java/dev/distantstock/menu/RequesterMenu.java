@@ -161,6 +161,16 @@ public final class RequesterMenu extends AbstractContainerMenu {
                 return;
             }
             if (carried.isPresent()) {
+                if (directory.find(carried.get()).isEmpty()) {
+                    // A destination on another server. Its name belongs to whoever owns it over
+                    // there, and renaming it here would only be a local label on somebody else's
+                    // group — the one thing the list must not show. (The rename would also throw:
+                    // the id is not in this directory.)
+                    player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                            "gui.distantstock.pair.remote_no_rename"), true);
+                    sendGroupList(player, stack);
+                    return;
+                }
                 dev.distantstock.routing.DockGroup existing = directory.findByName(trimmed).orElse(null);
                 if (existing != null && !existing.id().equals(carried.get())) {
                     // The name is taken by a different group. Refusing keeps two groups from
@@ -207,6 +217,19 @@ public final class RequesterMenu extends AbstractContainerMenu {
             return;
         }
         dev.distantstock.routing.DockGroup existing = directory.findByName(trimmed).orElse(null);
+        if (existing == null) {
+            // Not a name from here. It may be one from another server that a redeemed pairing code
+            // wrote down — the whole reason a code exists is that this name could not otherwise be
+            // typed on this side. Nothing about it can be checked from here: the directory that
+            // holds it is on the far end, and so is every dock that answers to it.
+            var remote = dev.distantstock.routing.RemoteGroups.get(player.level().getServer())
+                    .findByName(trimmed).orElse(null);
+            if (remote != null) {
+                setCarriedGroup(player, stack, remote.group(), remote.name());
+                sendGroupList(player, stack);
+                return;
+            }
+        }
         if (existing != null && !existing.admits(who)) {
             // Selecting a closed group would only fail later, at the dock. Refusing here is the one
             // moment the player can still be told why.
@@ -242,14 +265,25 @@ public final class RequesterMenu extends AbstractContainerMenu {
 
     /** Writes a group to whichever of the two owns it. See {@link #carriedGroup}. */
     private void setCarriedGroup(Player player, ItemStack stack, dev.distantstock.routing.DockGroup group) {
+        setCarriedGroup(player, stack, group == null ? null : group.id(),
+                group == null ? null : group.name());
+    }
+
+    /**
+     * The same, by bare id and name, for a group this server has no {@code DockGroup} for.
+     *
+     * <p>A destination from another server is an id and a label and nothing else — there is no
+     * record of it here to hand around, and inventing one would mean a local group that no local
+     * dock can be in.
+     */
+    private void setCarriedGroup(Player player, ItemStack stack, UUID id, String name) {
         GaugeBlockEntity be = gauge(player);
         if (be != null) {
-            be.setReceivingGroup(group == null
-                    ? dev.distantstock.routing.DockGroupDirectory.DEFAULT_GROUP_ID : group.id());
+            be.setReceivingGroup(id == null
+                    ? dev.distantstock.routing.DockGroupDirectory.DEFAULT_GROUP_ID : id);
             return;
         }
-        RequesterData.setReceivingGroup(stack, group == null ? null : group.id(),
-                group == null ? null : group.name());
+        RequesterData.setReceivingGroup(stack, id, name);
     }
 
     /** Pushes the current list to whoever has this screen open. */
@@ -268,6 +302,12 @@ public final class RequesterMenu extends AbstractContainerMenu {
         net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(serverPlayer,
                 dev.distantstock.net.DockGroupsS2C.of(directory, player.getUUID(), carried,
                         group -> dev.distantstock.block.LoadedDocks.allInGroup(group).size()));
+        // The other half of the same list. Sent together because the screen draws one list: a
+        // destination from another server is chosen the same way and differs only in what the far
+        // end does with it.
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(serverPlayer,
+                dev.distantstock.net.RemoteGroupsS2C.of(
+                        dev.distantstock.routing.RemoteGroups.get(player.level().getServer())));
     }
 
     public ItemStack device(Player player) {

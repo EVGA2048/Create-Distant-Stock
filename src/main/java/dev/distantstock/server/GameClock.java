@@ -8,6 +8,7 @@ import dev.distantstock.link.LinkServer;
 import dev.distantstock.link.LinkSnapshot;
 import dev.distantstock.link.OrderService;
 import dev.distantstock.link.PackagePump;
+import dev.distantstock.link.PairingService;
 import dev.distantstock.link.PackageStripService;
 import dev.distantstock.link.ParcelEscrowPump;
 import dev.distantstock.link.TranserverBridge;
@@ -54,6 +55,7 @@ public final class GameClock {
             PackageStripService.register();
             NetworkAnnouncementService.register();
             TranserverStockService.register();
+            PairingService.register();
             TranserverBridge.start(e.getServer());
             LOG.info("[DistantStock] Transerver channels registered, bridge started");
         }
@@ -127,6 +129,10 @@ public final class GameClock {
             if (ticks % 40 == 0) {
                 TranserverStockService.tick();
             }
+            // Every tick: a redemption is a player watching a screen. The work is one map walk that
+            // is empty almost always, and a ten-second wait that expires on a forty-tick beat reads
+            // as a second of nothing happening between the answer and the message.
+            PairingService.tick(e.getServer());
         }
 
         if (ticks % 20 == 0) {

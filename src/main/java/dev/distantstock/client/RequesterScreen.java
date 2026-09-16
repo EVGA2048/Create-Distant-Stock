@@ -93,8 +93,12 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         addRenderableWidget(address);
 
 
+        // The field stops short of the plate's right edge so the rename button beside it has
+        // somewhere to sit: it used to hang twenty pixels off the end of the artwork, which is
+        // what "突兀且错位" was about.
+        int groupField = Math.max(60, imageWidth - 144);
         receivingGroup = new EditBox(font, leftPos + 82, topPos + imageHeight - 87,
-                Math.max(60, imageWidth - 116), 10,
+                groupField, 10,
                 Component.translatable("gui.distantstock.route.group"));
         receivingGroup.setBordered(false);
         receivingGroup.setTextColor(INK);
@@ -108,7 +112,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         renameButton = addRenderableWidget(net.minecraft.client.gui.components.Button
                 .builder(net.minecraft.network.chat.Component.translatable("gui.distantstock.group.rename"),
                         b -> commitDockGroup(dev.distantstock.net.SetDockGroupC2S.RENAME))
-                .bounds(leftPos + imageWidth - 30, topPos + this.imageHeight - 89, 26, 14).build());
+                .bounds(leftPos + groupField + 84, topPos + this.imageHeight - 89, 28, 14).build());
         receivingGroup.setValue(keepGroup);
         // Remember what was put in the box, so closing an untouched screen sends nothing. Without
         // this the field's contents were compared against an empty string, so every close looked
@@ -176,14 +180,83 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 new dev.distantstock.net.SetDockGroupC2S(name, action));
     }
 
+    /**
+     * Spends a pairing code typed into the destination field, if that is what is in it.
+     *
+     * <p>One field for both, because from the player's side they are the same act: naming a
+     * destination that is not here yet. A name makes a system on this server; a code names one on
+     * another server, which is the one thing this side cannot invent for itself. They are told
+     * apart by shape — six characters from an alphabet with nothing confusable in it — and a name
+     * that happens to look like one is a name nobody can have made here anyway.
+     *
+     * <p>The answer comes back in chat a moment later, possibly from another server, so the field
+     * is left alone: the code is the one thing the player may still want to check they typed.
+     */
+    private boolean redeemCodeIfTyped() {
+        if (receivingGroup == null || groups == null) {
+            return false;
+        }
+        String typed = receivingGroup.getValue().trim();
+        if (!dev.distantstock.routing.PairingCodes.wellFormed(typed)) {
+            return false;
+        }
+        for (var entry : groups.groups()) {
+            if (entry.name().equalsIgnoreCase(typed)) {
+                return false;
+            }
+        }
+        if (remotes != null) {
+            for (var entry : remotes.groups()) {
+                if (entry.name().equalsIgnoreCase(typed) || entry.display().equalsIgnoreCase(typed)) {
+                    return false;
+                }
+            }
+        }
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(new dev.distantstock.net.PairCodeC2S(
+                dev.distantstock.net.PairCodeC2S.REDEEM, typed, 0));
+        committedGroup = typed;
+        return true;
+    }
+
     @Override
     public void onClose() {
-        commitDockGroup(dev.distantstock.net.SetDockGroupC2S.SELECT);
+        if (!redeemCodeIfTyped()) {
+            commitDockGroup(dev.distantstock.net.SetDockGroupC2S.SELECT);
+        }
         super.onClose();
     }
 
     /** The list the server last sent: what this player may point the requester at. */
     private dev.distantstock.net.DockGroupsS2C groups;
+    /** The other half of the same list: destinations on servers this one has been let into. */
+    private dev.distantstock.net.RemoteGroupsS2C remotes;
+
+    public void applyRemoteGroups(dev.distantstock.net.RemoteGroupsS2C next) {
+        remotes = next;
+    }
+
+    /**
+     * How many rows the open dropdown has: the destinations, then the pairing row.
+     *
+     * <p>The last row is not a destination — it mints a code for whatever is in the field — and it
+     * is there because the alternative was a second button beside the field, and the field's plate
+     * has room for one. It is also where the player is already looking when they are choosing a
+     * destination, which is exactly when "my friend's server is not in this list" is the question.
+     */
+    private int dropdownRows() {
+        return Math.min(groupRows(), 6) + 1;
+    }
+
+    private int groupRows() {
+        int local = groups == null ? 0 : groups.groups().size();
+        int remote = remotes == null ? 0 : remotes.groups().size();
+        return local + remote;
+    }
+
+    /** Which row of the open dropdown, if any, is under the mouse. */
+    private boolean dropdownHit(double mx, double my, int index, int x, int y, int w) {
+        return mx >= x && mx < x + w && my >= y + index * 10 && my < y + index * 10 + 10;
+    }
 
     public void applyGroups(dev.distantstock.net.DockGroupsS2C next) {
         groups = next;
@@ -221,22 +294,57 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         int x = leftPos + 82;
         int y = topPos + this.imageHeight - 76;
         int w = 112;
-        int rows = Math.min(groups.groups().size(), 6);
+        int rows = dropdownRows();
         if (rows == 0) {
             return;
         }
         g.fill(x - 1, y - 1, x + w + 1, y + rows * 10 + 1, 0xFF24343A);
+        int local = groups.groups().size();
+        int destinations = rows - 1;
         for (int i = 0; i < rows; i++) {
-            var entry = groups.groups().get(i);
-            boolean over = mouseX >= x && mouseX < x + w && mouseY >= y + i * 10 && mouseY < y + i * 10 + 10;
-            g.fill(x, y + i * 10, x + w, y + i * 10 + 10, over ? 0xFF3E5A61 : 0xFF2E444B);
-            // The carried one is marked so the field's value and the list agree at a glance.
-            boolean here = groups.carried() != null && groups.carried().equals(entry.id());
-            g.drawString(font, entry.name(), x + 3, y + i * 10 + 1, here ? 0xFF9BE0C4 : INK, false);
-            String tail = entry.docks() + (entry.open() ? "  ○" : "  ●");
-            g.drawString(font, tail, x + w - 2 - font.width(tail), y + i * 10 + 1,
-                    entry.open() ? HINT : 0xFFC0A090, false);
+            boolean over = dropdownHit(mouseX, mouseY, i, x, y, w);
+            int rowY = y + i * 10;
+            if (i == destinations) {
+                // The pairing row. Minting only, and the server refuses if the player does not own
+                // the group — the label says so rather than the click failing without explanation.
+                String label = Component.translatable("gui.distantstock.pair.mint_row",
+                        receivingGroup.getValue().trim()).getString();
+                g.fill(x, rowY, x + w, rowY + 10, over ? 0xFF5A4A72 : 0xFF3A3050);
+                g.drawString(font, trim(label, w - 6), x + 3, rowY + 1, 0xFFD8C8F0, false);
+            } else if (i < local) {
+                var entry = groups.groups().get(i);
+                g.fill(x, rowY, x + w, rowY + 10, over ? 0xFF3E5A61 : 0xFF2E444B);
+                // The carried one is marked so the field's value and the list agree at a glance.
+                boolean here = groups.carried() != null && groups.carried().equals(entry.id());
+                g.drawString(font, trim(entry.name(), w - 30), x + 3, rowY + 1,
+                        here ? 0xFF9BE0C4 : INK, false);
+                String tail = entry.docks() + (entry.open() ? "  ○" : "  ●");
+                g.drawString(font, tail, x + w - 2 - font.width(tail), rowY + 1,
+                        entry.open() ? HINT : 0xFFC0A090, false);
+            } else {
+                // A destination on another server, drawn in the same list because it is chosen the
+                // same way. The label is what the player has to identify it by: the group's name is
+                // written by whoever owns it over there, and two servers can both have a "仓库".
+                var entry = remotes.groups().get(i - local);
+                g.fill(x, rowY, x + w, rowY + 10, over ? 0xFF3E5A61 : 0xFF2E444B);
+                boolean here = receivingGroup.getValue().trim().equalsIgnoreCase(entry.name());
+                g.drawString(font, trim(entry.display(), w - 6), x + 3, rowY + 1,
+                        here ? 0xFF9BE0C4 : 0xFFC8B6E8, false);
+            }
         }
+    }
+
+    /** A string that fits a row, with the end cut off rather than drawn over the edge. */
+    private String trim(String text, int width) {
+        if (font.width(text) <= width) {
+            return text;
+        }
+        String ellipsis = "…";
+        int cut = text.length();
+        while (cut > 1 && font.width(text.substring(0, cut) + ellipsis) > width) {
+            cut--;
+        }
+        return text.substring(0, cut) + ellipsis;
     }
 
     private boolean groupListClick(double mx, double my) {
@@ -246,10 +354,35 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         int x = leftPos + 82;
         int y = topPos + this.imageHeight - 76;
         int w = 112;
-        int rows = Math.min(groups.groups().size(), 6);
+        int rows = dropdownRows();
+        int destinations = rows - 1;
+        int local = groups.groups().size();
         for (int i = 0; i < rows; i++) {
-            if (mx < x || mx >= x + w || my < y + i * 10 || my >= y + i * 10 + 10) {
+            if (!dropdownHit(mx, my, i, x, y, w)) {
                 continue;
+            }
+            if (i == destinations) {
+                // Mint a code for the group named in the field. The server checks ownership; this
+                // side only decides which group the row is offering.
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                        new dev.distantstock.net.PairCodeC2S(dev.distantstock.net.PairCodeC2S.ISSUE,
+                                receivingGroup.getValue().trim(),
+                                dev.distantstock.routing.PairingCodes.DEFAULT_MINUTES));
+                receivingGroup.setFocused(false);
+                return true;
+            }
+            if (i >= local) {
+                // Picking a remote destination. The field carries the group's plain name and the
+                // server matches it against what the pairing codes brought in — the id never has
+                // to reach the client, and nothing here could check it if it did.
+                String name = remotes.groups().get(i - local).name();
+                receivingGroup.setValue(name);
+                committedGroup = name;
+                net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                        new dev.distantstock.net.SetDockGroupC2S(name,
+                                dev.distantstock.net.SetDockGroupC2S.SELECT));
+                receivingGroup.setFocused(false);
+                return true;
             }
             var entry = groups.groups().get(i);
             // The right-hand end of the row is the lock, and only on a system this player owns.
@@ -665,7 +798,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (receivingGroup != null && receivingGroup.isFocused()
                 && (key == org.lwjgl.glfw.GLFW.GLFW_KEY_ENTER
                 || key == org.lwjgl.glfw.GLFW.GLFW_KEY_KP_ENTER)) {
-            commitDockGroup(dev.distantstock.net.SetDockGroupC2S.SELECT);
+            if (!redeemCodeIfTyped()) {
+                commitDockGroup(dev.distantstock.net.SetDockGroupC2S.SELECT);
+            }
             receivingGroup.setFocused(false);
             return true;
         }

@@ -323,5 +323,18 @@
   "gui.distantstock.remote_gauge.needs_terminal": "This panel has no warehouse yet — point a tuned terminal at it first",
   "gui.distantstock.group.default_fixed": "The default system cannot be renamed or removed",
   "goggle.distantstock.tower.not_turning": "  No rotation — a tower that is not turning carries nothing",
-  "goggle.distantstock.tower.too_slow": "  Turning too slowly (%s rpm) to carry anything"
+  "goggle.distantstock.tower.too_slow": "  Turning too slowly (%s rpm) to carry anything",
+  "gui.distantstock.pair.mint_row": "+ Mint a pairing code: %s",
+  "gui.distantstock.pair.minted": "Pairing code %s for group %s, good for %s minutes and one redemption. Send it to the player on the other server.",
+  "gui.distantstock.pair.no_group": "No such dock group: %s",
+  "gui.distantstock.pair.not_owner": "Only the group's owner can mint a code for it.",
+  "gui.distantstock.pair.forgotten": "Forgot that remote dock group.",
+  "gui.distantstock.pair.empty": "The pairing code is empty.",
+  "gui.distantstock.pair.malformed": "A pairing code is %s letters and digits; check for a missing character.",
+  "gui.distantstock.pair.local": "That code belongs to this server: just pick \"%s\" as the destination.",
+  "gui.distantstock.pair.no_link": "No other server is linked; a pairing code is only useful across one.",
+  "gui.distantstock.pair.no_answer": "No server recognised pairing code %s: it may have expired, been spent, or the other side is not linked.",
+  "gui.distantstock.pair.refused": "The other server refused pairing code %s: expired or already spent.",
+  "gui.distantstock.pair.paired": "Paired: destination \"%s\" is now available (from %s).",
+  "gui.distantstock.pair.remote_no_rename": "A remote dock group's name belongs to whoever owns it there."
 }
