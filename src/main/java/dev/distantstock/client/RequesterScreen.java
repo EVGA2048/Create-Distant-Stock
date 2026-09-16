@@ -113,6 +113,16 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 .builder(net.minecraft.network.chat.Component.translatable("gui.distantstock.group.rename"),
                         b -> commitDockGroup(dev.distantstock.net.SetDockGroupC2S.RENAME))
                 .bounds(leftPos + groupField + 84, topPos + this.imageHeight - 89, 28, 14).build());
+        // A small arrow inside the right end of the field, which opens the list of systems. Clicking
+        // the field itself still works the old way — this is for the player who would not think to.
+        addRenderableWidget(net.minecraft.client.gui.components.Button
+                .builder(Component.literal("▾"), b -> {
+                    groupPickerOpen = !groupPickerOpen;
+                    if (groupPickerOpen) {
+                        receivingGroup.setFocused(true);
+                    }
+                })
+                .bounds(leftPos + 82 + groupField - 12, topPos + imageHeight - 88, 12, 12).build());
         receivingGroup.setValue(keepGroup);
         // Remember what was put in the box, so closing an untouched screen sends nothing. Without
         // this the field's contents were compared against an empty string, so every close looked
@@ -257,6 +267,14 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
      */
     private int netScroll;
 
+    /**
+     * Whether the system list is being shown because the arrow beside the field was clicked.
+     *
+     * <p>The list is the answer to "which systems are there", so it must not depend on the player
+     * first discovering that the field is editable.
+     */
+    private boolean groupPickerOpen;
+
     public void applyRemoteGroups(dev.distantstock.net.RemoteGroupsS2C next) {
         remotes = next;
     }
@@ -314,7 +332,13 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
      * focused also means a player who knows the name can keep ignoring it.
      */
     private void drawGroupList(GuiGraphics g, int mouseX, int mouseY) {
-        if (groups == null || receivingGroup == null || !receivingGroup.isFocused()) {
+        // Drawn while the field has focus, and also while the little arrow beside it has been
+        // clicked. Focus alone was not enough: a player who did not know the field was a field
+        // never clicked into it, and so never saw that the list of systems existed at all —
+        // "I don't know what systems there are" was the report, about a list that was already
+        // there and already showed every one of them.
+        if (groups == null || receivingGroup == null
+                || !(receivingGroup.isFocused() || groupPickerOpen)) {
             return;
         }
         int x = leftPos + 82;
@@ -391,7 +415,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     }
 
     private boolean groupListClick(double mx, double my) {
-        if (groups == null || receivingGroup == null || !receivingGroup.isFocused()) {
+        if (groups == null || receivingGroup == null
+                || !(receivingGroup.isFocused() || groupPickerOpen)) {
             return false;
         }
         int x = leftPos + 82;
@@ -918,7 +943,28 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (search.isFocused() && search.keyPressed(key, scan, mods)) {
             return true;
         }
+        if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE && groupPickerOpen) {
+            groupPickerOpen = false;
+            return true;
+        }
+        // While one of our fields has focus, every other key is the field's.
+        //
+        // Vanilla closes a container screen on the inventory key, and letters reach a text field
+        // through charTyped rather than keyPressed — so typing an "e" into the search box or the
+        // system field closed the screen instead of typing an "e". Vanilla's creative-inventory
+        // search box has the same problem and answers it the same way. Escape is the one key that
+        // must keep working, or a focused field would be a room with no door.
+        if (typing()) {
+            return true;
+        }
         return super.keyPressed(key, scan, mods);
+    }
+
+    /** Whether any of this screen's text fields is taking keys. */
+    private boolean typing() {
+        return (search != null && search.isFocused())
+                || (receivingGroup != null && receivingGroup.isFocused())
+                || (address != null && address.isFocused());
     }
 
     private void request() {
