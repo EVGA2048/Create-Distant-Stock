@@ -26,6 +26,19 @@ neoForge {
         }
         server {
             server()
+            programArgument '--nogui'
+        }
+        // A second server, for the cross-server test: two nodes, one Router. Distant Stock's
+        // remote orders are the one thing no single-server game test can exercise, and nothing
+        // about the pair is special except the port and the game directory.
+        if (providers.gradleProperty('withPeerServer').isPresent()) {
+            serverPeer {
+                server()
+                gameDirectory = layout.buildDirectory.dir('server-peer')
+                programArgument '--port'
+                programArgument '25566'
+                programArgument '--nogui'
+            }
         }
         if (providers.gradleProperty('withGameTests').isPresent()) {
             clientSmoke {
