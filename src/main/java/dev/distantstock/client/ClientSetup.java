@@ -126,6 +126,12 @@ public final class ClientSetup {
             e.registerBlockEntityRenderer(ModBlockEntities.DOCK.get(), DockParcelRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.SIGNAL_PANEL.get(), SignalPanelRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.ETHER_RESONATOR.get(), ResonatorRenderer::new);
+            // The monitor's face is a flap display, and this is Create's renderer for one: the
+            // glyphs, the flip animation and the light they are drawn in all come from it. Nothing
+            // of ours is involved, which is the point — a board that looks like a display board
+            // because it is one.
+            e.registerBlockEntityRenderer(ModBlockEntities.MONITOR.get(),
+                    com.simibubi.create.content.trains.display.FlapDisplayRenderer::new);
         }
 
         @SubscribeEvent

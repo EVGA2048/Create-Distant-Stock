@@ -146,6 +146,12 @@ def block_textures(atlas):
         d.line((11, 10, 11, 11), fill=INK)
         d.line((3, 13, 8, 13), fill='#161d1b')
         save('gauge_face' + ('_lit' if on else ''), face)
+    # The monitor's face is owned by gen_monitor_face.py now: the front of that block is a real
+    # Create flap display, so the texture is a recessed backing rather than a painted board.
+    return
+
+
+def _unused_monitor_face():
     mon = Image.new('RGBA', (16, 16), IRON_D)
     d = ImageDraw.Draw(mon)
     d.line((0, 0, 15, 0), fill=IRON_L)
