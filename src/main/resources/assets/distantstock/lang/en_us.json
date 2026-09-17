@@ -263,7 +263,7 @@
   "goggle.distantstock.tower.carrying.idle": "Carrying nothing — %s devices when it turns",
   "goggle.distantstock.tower.chunks": "Keeps a %sx%s chunk area loaded",
   "goggle.distantstock.tower.ether": "Ether %s / %s mB — %s mB per parcel",
-  "goggle.distantstock.tower.ether.off": "Ether: not billed (tower.chargeParcels is off)",
+  "goggle.distantstock.tower.ether.off": "Ether %s / %s mB (not billed)",
   "goggle.distantstock.send.no_ether": "Held: the tower cannot pay for this parcel",
   "gui.distantstock.uncharged": "No tower carries this desk — it can be read, not ordered from",
   "distantstock.ponder.distant_tower.header": "Raising an interlink tower",

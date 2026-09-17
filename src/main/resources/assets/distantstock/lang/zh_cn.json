@@ -263,7 +263,7 @@
   "goggle.distantstock.tower.carrying.idle": "未带载 —— 转起来后可带 %s 台",
   "goggle.distantstock.tower.chunks": "常驻加载 %sx%s 区块",
   "goggle.distantstock.tower.ether": "以太 %s / %s mB —— 每个邮包 %s mB",
-  "goggle.distantstock.tower.ether.off": "以太：未启用（tower.chargeParcels 为关）",
+  "goggle.distantstock.tower.ether.off": "以太 %s / %s mB（不计费）",
   "goggle.distantstock.send.no_ether": "已滞留：塔付不起这个邮包",
   "gui.distantstock.uncharged": "没有塔带载这台请求台 —— 可以看，不能下单",
   "distantstock.ponder.distant_tower.header": "建造互通塔",

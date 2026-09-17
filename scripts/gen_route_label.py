@@ -8,8 +8,14 @@ pasted onto our screen. The user reported it as "边框都没去除干净".
 
 The colours below are sampled from the undisturbed part of that sprite, so the plate still
 matches the sheet it sits on; only the shape is redrawn, as one rectangle with a frame that runs
-all the way round it. The label goes at x=24 and the destination field starts at x=82, both
+all the way round it. The label goes at x=16 and the destination field starts at x=60, both
 inside the field band, which is why the frame is drawn to the edges and nothing else is.
+
+**WIDTH is 182, not 194**, and that is the second half of the same complaint. The window's content
+column — the item slots and the search bar — is CreateSheets.BG, 182 wide, drawn at x+22. A 194-wide
+plate drawn at x+8 lined up with nothing: it hung fourteen pixels off the left of every other row
+and twelve pixels over the right, which is what "the textures are all misaligned" was about. The
+band's own structure is unchanged — it is the same strip of the sheet, cut to the right length.
 
 Run from anywhere: python3 scripts/gen_route_label.py
 """
@@ -20,7 +26,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'src/main/resources/assets/distantstock/textures/gui/route_label.png'
 
-WIDTH, HEIGHT = 194, 26
+WIDTH, HEIGHT = 182, 26
 
 EDGE = (179, 187, 191, 255)          # the outer grey
 TOP_EDGE = (186, 194, 198, 255)      # its lit first row

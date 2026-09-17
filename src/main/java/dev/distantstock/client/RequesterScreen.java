@@ -1125,13 +1125,26 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         return Component.translatable("create.gui.stock_keeper.no_search_results");
     }
 
+    /**
+     * One labelled row of the window's lower half: a plate with a label, and a field beside it.
+     *
+     * <p>The plate is 182 wide at x+22 — the same column as the item slots and the search bar
+     * ({@link CreateSheets#BG}). It used to be 194 at x+8, which lined up with nothing: every row of
+     * this screen started fourteen pixels to the right of it, and the two rows read as strips cut
+     * from somewhere else and laid over the window. Reported as "the textures are all misaligned".
+     */
     private void renderRouteRow(GuiGraphics g, int offset, String label) {
-        int x = leftPos + 8;
+        int x = leftPos + ROW_X;
         int y = topPos + offset;
         g.blit(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
-                "distantstock", "textures/gui/route_label.png"), x, y, 0, 0, 194, 26, 194, 26);
-        g.drawString(font, Component.translatable(label), x + 24, y + 11, INK, false);
+                "distantstock", "textures/gui/route_label.png"), x, y, 0, 0, ROW_W, 26, ROW_W, 26);
+        g.drawString(font, Component.translatable(label), x + 16, y + 11, INK, false);
     }
+
+    /** The window's content column: where the item slots, the search bar and these rows all start. */
+    private static final int ROW_X = 22;
+    /** Its width. See {@link #renderRouteRow}. */
+    private static final int ROW_W = 182;
 
     private void renderEntry(GuiGraphics g, ItemStack stack, int count, boolean hot) {
         PoseStack ms = g.pose();
@@ -1319,6 +1332,12 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             return true;
         }
         if (address != null && address.isFocused() && address.keyPressed(key, scan, mods)) {
+            return true;
+        }
+        // 本端地址框和上面几个一视同仁。上一版只把它加进了 typing()，没加到这里 —— 于是它有
+        // 焦点时退格被下面那条「正在打字就吞掉」的规则吃掉，只能打字不能删字。
+        if (homeAddress != null && homeAddress.isFocused()
+                && homeAddress.keyPressed(key, scan, mods)) {
             return true;
         }
         if (search != null && search.isFocused() && search.keyPressed(key, scan, mods)) {

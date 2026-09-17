@@ -1,0 +1,18 @@
+{
+  "type": "create:filling",
+  "ingredients": [
+    {
+      "item": "minecraft:glass_bottle"
+    },
+    {
+      "type": "neoforge:single",
+      "amount": 250,
+      "fluid": "distantstock:molten_amethyst"
+    }
+  ],
+  "results": [
+    {
+      "id": "distantstock:molten_amethyst_bottle"
+    }
+  ]
+}

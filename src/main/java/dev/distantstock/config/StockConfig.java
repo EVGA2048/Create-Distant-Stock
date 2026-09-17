@@ -58,8 +58,10 @@ public final class StockConfig {
         CASING_REDSTONE_RANGE = b.comment(
                         "How far a redstone signal spreads through connected distant casings, in blocks,",
                         "before the window stops opening. Bounds a search per casing, so a large build",
-                        "does not hitch when a lever is flipped.")
-                .defineInRange("casing.redstoneRange", 32, 1, 64);
+                        "does not hitch when a lever is flipped.",
+                        "64 by default: a wall of casings around a real base is longer than 32 blocks,",
+                        "and having the far end of it stay opaque reads as the window being broken.")
+                .defineInRange("casing.redstoneRange", 64, 1, 192);
         TOWER_CHARGE_PARCELS = b.comment(
                         "Charge the tower ether for every parcel that leaves a dock it carries.",
                         "Off by default: the tower system is still being tested, and a server that",
@@ -97,15 +99,37 @@ public final class StockConfig {
     }
 
     /**
+     * Test seam, on the same terms as {@link dev.distantstock.routing.TowerBilling}'s.
+     *
+     * <p>The game test runner shares one config between cases running in parallel, so a case that
+     * wrote a smaller range would be writing it for everything else in the batch. A field with the
+     * lifetime of one test method does not. The one case that uses it lowers the range to 35, which
+     * is longer than every other case's run, so nothing else can see the difference either.
+     */
+    private static volatile Integer casingRangeOverride;
+
+    public static void overrideCasingRangeForTesting(Integer range) {
+        casingRangeOverride = range;
+    }
+
+    public static void clearCasingRangeOverride() {
+        casingRangeOverride = null;
+    }
+
+    /**
      * The casing window's reach, read often enough that the config's own value is worth not
-     * unwrapping each time. Zero means the config is not loaded yet — the block can be ticked
-     * before the server config file is read — and the compile-time default stands in.
+     * unwrapping each time. The fallback is the compile-time default, for a block ticked before the
+     * config file has been read.
      */
     public static int casingRedstoneRange() {
+        Integer override = casingRangeOverride;
+        if (override != null) {
+            return override;
+        }
         try {
             return CASING_REDSTONE_RANGE.get();
         } catch (IllegalStateException notLoaded) {
-            return 32;
+            return 64;
         }
     }
 

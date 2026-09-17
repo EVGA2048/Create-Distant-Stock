@@ -10,7 +10,8 @@
     "gearbox": "distantstock:block/tower/gearbox",
     "polished": "distantstock:block/tower/polished",
     "axis": "distantstock:block/tower/axis",
-    "axis_top": "distantstock:block/tower/axis_top"
+    "axis_top": "distantstock:block/tower/axis_top",
+    "fluid": "distantstock:block/tower/fluid"
   },
   "elements": [
     {
@@ -1022,6 +1023,102 @@
             0.0
           ],
           "texture": "#axis"
+        }
+      }
+    },
+    {
+      "name": "fluid_window_north",
+      "from": [
+        3.0,
+        3.0,
+        -0.02
+      ],
+      "to": [
+        13.0,
+        13.0,
+        -0.02
+      ],
+      "faces": {
+        "north": {
+          "texture": "#fluid",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        }
+      }
+    },
+    {
+      "name": "fluid_window_south",
+      "from": [
+        3.0,
+        3.0,
+        16.02
+      ],
+      "to": [
+        13.0,
+        13.0,
+        16.02
+      ],
+      "faces": {
+        "south": {
+          "texture": "#fluid",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        }
+      }
+    },
+    {
+      "name": "fluid_window_west",
+      "from": [
+        -0.02,
+        3.0,
+        3.0
+      ],
+      "to": [
+        -0.02,
+        13.0,
+        13.0
+      ],
+      "faces": {
+        "west": {
+          "texture": "#fluid",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        }
+      }
+    },
+    {
+      "name": "fluid_window_east",
+      "from": [
+        16.02,
+        3.0,
+        3.0
+      ],
+      "to": [
+        16.02,
+        13.0,
+        13.0
+      ],
+      "faces": {
+        "east": {
+          "texture": "#fluid",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
         }
       }
     }

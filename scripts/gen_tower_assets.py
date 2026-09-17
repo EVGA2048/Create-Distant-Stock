@@ -554,6 +554,38 @@ def inset_crystal_stub(model: dict) -> None:
             element["to"][axis] = round(element["to"][axis] - COINCIDENT_STEP, 4)
 
 
+# The sight glass in each of the base's four sides, and the one thing the base could not show
+# before: how much ether is in it. Ten units square and centred on the shell, cut into the casing
+# texture's face as a separate quad a hair outside the shell — the same trick the coincident faces
+# use, from the other side, so the glass and the shell never z-fight.
+#
+# It is drawn on the *outside* of the shell on purpose, and it only becomes visible when a
+# neighbour stops hiding it: the base is a 3x3, so each of these windows sits behind one of the
+# eight casings around the core. An inactive casing is a solid cube and hides it; an active one is
+# a window, and the ether shows through. That is the whole reason the handoff drew `fluid.png` for
+# a model that never used it.
+WINDOW_LOW, WINDOW_HIGH = 3.0, 13.0
+WINDOW_STEP = COINCIDENT_STEP
+
+
+def fluid_window(model: dict) -> None:
+    """Put a sight glass on each of the base's four sides."""
+    model["textures"]["fluid"] = "distantstock:block/tower/fluid"
+    added = []
+    for face, axis, plane, sign in (("north", 2, 0.0, -1), ("south", 2, 16.0, 1),
+                                    ("west", 0, 0.0, -1), ("east", 0, 16.0, 1)):
+        low = [WINDOW_LOW, WINDOW_LOW, WINDOW_LOW]
+        high = [WINDOW_HIGH, WINDOW_HIGH, WINDOW_HIGH]
+        low[axis] = high[axis] = plane + sign * WINDOW_STEP
+        added.append({
+            "name": f"fluid_window_{face}",
+            "from": low,
+            "to": high,
+            "faces": {face: {"texture": "#fluid", "uv": [0, 0, 16, 16]}},
+        })
+    model["elements"].extend(added)
+
+
 # The axle the base takes from below: four units across, dead centre. The same four units Create's
 # shaft draws in the block underneath, which is the whole point — the two have to meet.
 AXLE_LOW, AXLE_HIGH = 6.0, 10.0
@@ -703,6 +735,7 @@ def main():
     core_model = write("tower_core", core, core_textures)
     inset_crystal_stub(core_model)
     underside_axle(core_model)
+    fluid_window(core_model)
     (MODEL_OUT / "tower_core.json").write_text(json.dumps(core_model, indent=2) + "\n")
     write_casing()
 

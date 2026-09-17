@@ -19,9 +19,10 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * signal spreads along connected casings, that it stops at the configured range, and that it goes
  * away again when the signal does.
  *
- * <p>The arena is 8x8x8, so the run is short and the range cap is driven through the config
- * instead. Testing the default of 32 would need a 34-block line, and the property under test is
- * that the cap is read and honoured, not that it happens to be 32.
+ * <p>The arena is 8x8x8, so the run is short and the property under test is that the cap is read
+ * and honoured, not that it happens to be any particular number. The one case that needs a line
+ * longer than the cap borrows a longer arena, and lowers the cap through the config's test seam
+ * when the configured value is longer than that arena — see {@link #windowStopsAtTheRangeLimit}.
  */
 @GameTestHolder("distantstock")
 @PrefixGameTestTemplate(false)
@@ -53,25 +54,37 @@ public final class CasingGameTests {
      * <p>The run is longer than the range on purpose: a test that only checked "inside the range
      * is lit" would pass just as well with no range check at all.
      *
-     * <p>A long arena rather than a lowered config. The cap is a single global value and the game
-     * test runner runs its cases in parallel, so a case that turned it down would be turning it down
-     * for every other case in the batch as well.
+     * <p>A long arena rather than a lowered config, and a lowered config only when even the long
+     * arena is not long enough. The cap is a single global value and the game test runner runs its
+     * cases in parallel, so turning it down is done through a seam with the lifetime of this case
+     * rather than by writing a file — and to a value longer than any other case's run, so no other
+     * case can see it.
      */
     @GameTest(template = "empty_long", timeoutTicks = 300)
     public static void windowStopsAtTheRangeLimit(GameTestHelper h) {
         int range = StockConfig.casingRedstoneRange();
+        boolean borrowed = false;
         if (range > LONG_RUN - FIRST_X - 2) {
-            h.fail("this test needs an arena longer than casing.redstoneRange; lengthen empty_long");
-            return;
+            // The arena is 40 long, so a cap of 64 cannot be tested in it: the whole run would be
+            // inside the range and there would be nothing to assert. 35 is the longest cap that
+            // still leaves two casings beyond it inside this arena.
+            range = LONG_RUN - FIRST_X - 2;
+            StockConfig.overrideCasingRangeForTesting(range);
+            borrowed = true;
         }
+        boolean lowered = borrowed;
         for (int x = FIRST_X; x <= LONG_RUN; x++) {
             h.setBlock(x, Y, Z, ModBlocks.TOWER_CASING.get().defaultBlockState());
         }
         h.setBlock(SOURCE_X, Y, Z, Blocks.REDSTONE_BLOCK.defaultBlockState());
         // The wave walks one casing per tick, so the wait is the whole run plus room to spare.
+        int asserted = range;
         h.runAfterDelay(LONG_RUN + 20, () -> {
-            lit(h, FIRST_X + range, "the last casing inside the range");
-            dark(h, FIRST_X + range + 2, "a casing past the range");
+            if (lowered) {
+                StockConfig.clearCasingRangeOverride();
+            }
+            lit(h, FIRST_X + asserted, "the last casing inside the range");
+            dark(h, FIRST_X + asserted + 2, "a casing past the range");
             dark(h, LONG_RUN, "the far end of an arena longer than the range");
             h.succeed();
         });
