@@ -31,6 +31,14 @@ public record SetDockGroupC2S(String name, int action) implements CustomPacketPa
     public static final int TOGGLE_OPEN = 2;
     /** Remove the named system. The player has already confirmed; the screen asks first. */
     public static final int DELETE = 3;
+    /**
+     * 只要一份最新的列表，什么都不改。
+     *
+     * <p>界面打开时会发这一条。列表是服务器推的，而推的那一次可以和界面创建抢跑 —— 抢输了这份
+     * 就永远缺着，表现是"下拉列表点开是空的 / 点了不弹"，而且只有重开界面才可能好。要一次比
+     * 赌它送到便宜得多。
+     */
+    public static final int REFRESH = 4;
 
     public static final Type<SetDockGroupC2S> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "set_dock_group"));

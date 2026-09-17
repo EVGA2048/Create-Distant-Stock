@@ -145,6 +145,9 @@ public final class SignalLampClientSmoke {
                 scenes++;
             }
             LogUtils.getLogger().info("DISTANTSTOCK_PONDER_OK: {} scenes have a structure and their text", scenes);
+            if (checkTerminalClick()) {
+                LogUtils.getLogger().info("DISTANTSTOCK_TERMINAL_CLICK_OK: 点一下就有反应");
+            }
             LogUtils.getLogger().info("DISTANTSTOCK_CLIENT_SMOKE_PASSED: {} block states, {} quarter-lamp models, {} remote gauge models, factory panel, client mixin",
                     states, partials.size(), gaugePartials.size());
         } catch (Throwable failure) {
@@ -152,6 +155,58 @@ public final class SignalLampClientSmoke {
         } finally {
             mc.stop();
         }
+    }
+
+    /**
+     * 仓管界面「点一下有没有反应」。
+     *
+     * <p>玩家报的是"三个 UI 不跟手，港组那个点一下不弹窗，得先打一个字再退格"。这类毛病靠读代码
+     * 判断不了 —— 焦点、命中区、绘制条件分散在三处，谁少一环都只是"没反应"。所以这里在真实客户端
+     * 里把界面开起来，用程序点一下那个框，然后问它：你被聚焦了吗？退格能删掉字吗？
+     *
+     * <p>这是唯一能自动化的部分：弹窗画得对不对仍然要人看，但"点了没反应"这一条从此不会再回来。
+     */
+    private static boolean checkTerminalClick() {
+        var mc = Minecraft.getInstance();
+        if (mc.player == null) {
+            // 冒烟跑在标题界面：没有世界就没有玩家，没有玩家就开不了仓管界面。跳过要说出来，
+            // 不能让"没跑"看着像"跑过了"。
+            LogUtils.getLogger().warn(
+                    "DISTANTSTOCK_TERMINAL_CLICK_SKIPPED: 标题界面没有玩家，界面点击检查未运行");
+            return false;
+        }
+        var menu = new dev.distantstock.menu.RequesterMenu(0, mc.player.getInventory(),
+                net.minecraft.world.InteractionHand.MAIN_HAND);
+        var screen = new dev.distantstock.client.RequesterScreen(menu, mc.player.getInventory(),
+                net.minecraft.network.chat.Component.literal("smoke"));
+        screen.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+
+        // 找出「接收港组」那个框：EditBox 里提示文字是它自己的翻译键那一个。
+        net.minecraft.client.gui.components.EditBox group = null;
+        for (var child : screen.children()) {
+            if (child instanceof net.minecraft.client.gui.components.EditBox box
+                    && box.getMessage().getString().equals(net.minecraft.network.chat.Component
+                            .translatable("gui.distantstock.route.group").getString())) {
+                group = box;
+                break;
+            }
+        }
+        if (group == null) {
+            throw new AssertionError("界面里找不到接收港组那个输入框");
+        }
+        int cx = group.getX() + group.getWidth() / 2;
+        int cy = group.getY() + group.getHeight() / 2;
+        screen.mouseClicked(cx, cy, 0);
+        if (screen.getFocused() != group) {
+            throw new AssertionError("点了接收港组那个框，它没有被聚焦 —— 下拉列表的条件就不成立");
+        }
+        // 退格：上一个版本这里被 keyPressed 的"正在打字就吞掉"规则吃掉了。
+        group.setValue("测试");
+        screen.keyPressed(org.lwjgl.glfw.GLFW.GLFW_KEY_BACKSPACE, 0, 0);
+        if (!group.getValue().equals("测")) {
+            throw new AssertionError("退格没有删掉字：" + group.getValue());
+        }
+        return true;
     }
 
     private static void verify(BakedModel model, Minecraft mc) {

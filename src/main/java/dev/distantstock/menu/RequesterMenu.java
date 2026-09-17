@@ -151,6 +151,11 @@ public final class RequesterMenu extends AbstractContainerMenu {
      */
     public void writeDockGroup(Player player, String name, int action) {
         ItemStack stack = device(player);
+        if (action == dev.distantstock.net.SetDockGroupC2S.REFRESH) {
+            // 界面刚打开：只把列表再发一遍，一个字都不改。名字在这里没有意义，所以放在校验前面。
+            sendGroupList(player, stack);
+            return;
+        }
         if (name == null || (!isGauge() && stack.isEmpty())) {
             return;
         }

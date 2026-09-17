@@ -170,6 +170,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             opened = true;
             uiSound(SoundEvents.WOOD_HIT, 0.5f, 1.5f);
             uiSound(SoundEvents.BOOK_PAGE_TURN, 1f, 1f);
+            // 列表是服务器推的，而推的那一次可能和界面创建抢跑；抢输了这一份就永远缺着，
+            // 表现是"下拉点开是空的"。开界面时主动要一次，比赌它送到便宜。
+            PacketDistributor.sendToServer(new dev.distantstock.net.SetDockGroupC2S(
+                    "", dev.distantstock.net.SetDockGroupC2S.REFRESH));
         }
     }
 
@@ -1237,6 +1241,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (groupListClick(mx, my)) {
             return true;
         }
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            focusTheRowUnder(mx, my);
+        }
         int network = networkIndex(mx, my);
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && network >= 0) {
             NetworkDirectory.Entry entry = menu.networks.get(network);
@@ -1366,6 +1373,46 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             return true;
         }
         return super.keyPressed(key, scan, mods);
+    }
+
+    /**
+     * 点一行就把那一行的输入框聚焦 —— 整行，不只是输入框本身那一条。
+     *
+     * <p>玩家报的是"三个 UI 不跟手，港组那个点一下不弹窗，得先打一个字再退格"。原因是几何：
+     * 每一行的底板有 26 像素高，而里面的输入框只有 10 像素 —— 点在底板上（文字下面、行与行之间、
+     * 靠着标签那一侧）什么都不会发生，因为那一击落在 EditBox 之外。三个框都是同一个毛病，
+     * 因为三个框画在同一套底板里。
+     *
+     * <p>港组那一行还额外把列表打开：列表的显示条件原本是"输入框有焦点"，现在点是点、焦点是焦点，
+     * 两条路各自都能让它出来。
+     *
+     * <p>这一击不消费，继续往下传给原版：光标该落在文字的哪个位置还落在哪里。
+     */
+    private void focusTheRowUnder(double mx, double my) {
+        // 本端地址那一行：底板 -130..-104。
+        if (homeAddress != null
+                && in(mx, my, ROW_X, ROW_W, imageHeight - 130, 26)) {
+            homeAddress.setFocused(true);
+            return;
+        }
+        // 接收港组那一行：底板 -98..-72，输入框在右半边。
+        if (receivingGroup != null
+                && in(mx, my, ROW_X, ROW_W, imageHeight - 98, 26)) {
+            receivingGroup.setFocused(true);
+            groupPickerOpen = true;
+            return;
+        }
+        // 底下那条地址栏：底板比输入框宽一圈。
+        if (address != null
+                && in(mx, my, 24, 122, imageHeight - 42, 12)) {
+            address.setFocused(true);
+        }
+    }
+
+    /** 方块坐标里的一块矩形，x/宽/顶/高。 */
+    private boolean in(double mx, double my, int x, int width, int top, int height) {
+        return mx >= leftPos + x && mx < leftPos + x + width
+                && my >= topPos + top && my < topPos + top + height;
     }
 
     /** Whether any of this screen's text fields is taking keys. */
