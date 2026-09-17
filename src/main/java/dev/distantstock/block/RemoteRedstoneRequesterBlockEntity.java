@@ -28,9 +28,11 @@ import java.util.Map;
  * across servers instead of asking the local packagers, and the goods arrive at a dock group on this
  * side.
  *
- * <p><b>Unbound is a plain redstone requester.</b> The block is a variant of one, and a player who
- * places it and never binds it has a redstone requester with a different coat of paint; taking that
- * away would make an unconfigured machine look broken. The binding is what makes it distant.
+ * <p><b>Unbound is a plain redstone requester, and says so.</b> The block is a variant of one, and a
+ * player who places it and never binds it has a redstone requester with a different coat of paint;
+ * taking that away would make an unconfigured machine look broken. What it must not do is stay
+ * quiet about it — see {@link #bindingLines()} for why the silence was worse than the fault it was
+ * avoiding.
  *
  * <p><b>Nothing is ordered twice for one pulse.</b> The pulse is the whole trigger, and the machine
  * answers one edge with one order — there is no outstanding count to keep here as there is on a
@@ -39,6 +41,8 @@ import java.util.Map;
 public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterBlockEntity
         implements IHaveGoggleInformation {
     private RemoteBinding binding;
+    /** 组名的**客户端副本**。服务端从不读它，读的时候现算（见 {@link #knownGroupName()}）。 */
+    private String syncedGroupName;
 
     public RemoteRedstoneRequesterBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.REMOTE_REDSTONE_REQUESTER.get(), pos, state);
@@ -96,8 +100,14 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
             lastRequestSucceeded = false;
             return;
         }
+        // 地址用机器自己屏幕上那个框，而不是绑定时从终端抄来的那份。
+        //
+        // 这就是"这台机器没作用"的那半个 bug：Create 的请求器把地址存在 encodedTargetAdress 里，
+        // 玩家照着原版习惯在屏幕里把它填好，而对面收到的包裹上写的是另一个地址 —— 绑定那一刻从
+        // 终端抄下来的快照，之后再没更新过。一个看得见、能改、而且显然在问"送到哪"的框填了等于
+        // 没填。现在它是唯一说了算的：绑定剩下的只是"从哪台服务器的哪张网络发货"。
         boolean ok = RemoteGaugeOrders.orderAll(level == null ? null : level.getServer(),
-                bound.network(), bound.address(), bound.receivingGroup(), lines);
+                bound.network(), encodedTargetAdress, bound.receivingGroup(), bound.homeAddress(), lines);
         lastRequestSucceeded = ok;
         playEffect(ok);
     }
@@ -145,29 +155,35 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
         return counts;
     }
 
-    /**
-     * Where this machine orders from, or nothing at all when it is a plain requester.
-     *
-     * <p>An unbound machine says nothing rather than saying "unbound": the screen behind it already
-     * shows nine items and an address, and a line announcing the absence of a binding would read as
-     * a fault on a machine that is working exactly as a redstone requester should.
-     */
     @Override
     public boolean addToGoggleTooltip(List<net.minecraft.network.chat.Component> tooltip, boolean sneaking) {
         tooltip.addAll(bindingLines());
         return !tooltip.isEmpty();
     }
 
-    /** How this machine's binding is doing, for the goggles. */
+    /**
+     * 绑在哪儿，或者没绑。
+     *
+     * <p>没绑定的时候**要说出来**。这里原来什么都不画，理由是一台没配置的机器不该看起来像坏的 ——
+     * 那条理由在实机上被推翻了：没绑定时这台机器确实按普通红石请求器工作（脉冲打出去走本机网络），
+     * 于是玩家看到的就是"远仓红石请求器没作用"，而屏幕上没有一个字告诉他为什么。它与旁边那台原版
+     * 请求器**长得一样、行为也一样**，唯一的区别是名字 —— 那不叫"工作正常"，那叫"看不出来"。
+     */
     public List<net.minecraft.network.chat.Component> bindingLines() {
-        if (binding == null) {
-            return List.of();
-        }
         List<net.minecraft.network.chat.Component> tip = new ArrayList<>();
         GoggleText.title(tip, "block.distantstock.remote_redstone_requester");
+        if (binding == null) {
+            GoggleText.line(tip, "goggle.distantstock.remote_requester.unbound");
+            GoggleText.line(tip, "goggle.distantstock.remote_requester.bind_hint");
+            return tip;
+        }
         GoggleText.line(tip, "goggle.distantstock.remote_gauge.source", binding.network().shortLabel());
         GoggleText.line(tip, "goggle.distantstock.remote_gauge.group",
                 binding.receivingGroup() == null ? "—" : RequesterData.shortFreq(binding.receivingGroup()));
+        // 送货地址在这台机器上不是绑定的一部分（它用的是屏幕里那个框），所以这里把它读出来给
+        // 玩家看：屏幕里填了什么、对面包裹上会写什么，是同一件事的两个地方。
+        GoggleText.line(tip, "goggle.distantstock.address",
+                encodedTargetAdress == null || encodedTargetAdress.isBlank() ? "—" : encodedTargetAdress);
         return tip;
     }
 
@@ -176,6 +192,9 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
         super.write(tag, registries, clientPacket);
         if (binding != null) {
             tag.put("RemoteBinding", binding.save());
+        }
+        if (clientPacket) {
+            tag.putString("GroupName", liveGroupName());
         }
     }
 
@@ -193,5 +212,63 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
     protected void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.read(tag, registries, clientPacket);
         binding = RemoteBinding.read(tag.getCompound("RemoteBinding"));
+        if (clientPacket || level == null || level.isClientSide) {
+            // 只读同步过来的那一份。组名是要在屏幕上画出来的，而客户端没有目录可查 —— 一个 uuid
+            // 前八位在一行写着「接收港组」的框里等于什么都没说。
+            syncedGroupName = tag.contains("GroupName") ? tag.getString("GroupName") : null;
+        }
+    }
+
+    /**
+     * 屏幕要显示的那个组名：客户端读同步过来的那一份，服务端现算。
+     *
+     * <p>和港护目镜那一行是同一个坑（那边当时显示的是 uuid 前八位）：组名只有服务端查得到。
+     */
+    public String knownGroupName() {
+        if (level != null && !level.isClientSide) {
+            return liveGroupName();
+        }
+        return syncedGroupName == null || syncedGroupName.isEmpty()
+                ? (binding == null || binding.receivingGroup() == null ? ""
+                        : RequesterData.shortFreq(binding.receivingGroup()))
+                : syncedGroupName;
+    }
+
+    private String liveGroupName() {
+        if (binding == null || binding.receivingGroup() == null
+                || level == null || level.getServer() == null) {
+            return "";
+        }
+        return dev.distantstock.routing.DockGroupDirectory.get(level.getServer())
+                .find(binding.receivingGroup())
+                .map(dev.distantstock.routing.DockGroup::name)
+                .orElseGet(() -> RequesterData.shortFreq(binding.receivingGroup()));
+    }
+
+    /** 屏幕改完目标以后写回来：网络和送货地址不动，只换接收港组和本端地址。 */
+    public void retarget(@Nullable java.util.UUID group, String homeAddress) {
+        if (binding == null) {
+            return;
+        }
+        bind(new RemoteBinding(binding.network(), group, binding.address(), homeAddress));
+    }
+
+    /**
+     * 这台机器的界面是**我们自己的**菜单类型，所以标题也归我们。
+     *
+     * <p>标题是服务端在 openMenu 时发过来的这一句。沿用 Create 的类型就只能是「红石请求器」——
+     * 一台远仓请求器和旁边那台原版长得一模一样，玩家分不出该往哪台里填。
+     */
+    @Override
+    public net.minecraft.network.chat.Component getDisplayName() {
+        return net.minecraft.network.chat.Component.translatable("block.distantstock.remote_redstone_requester");
+    }
+
+    @Override
+    public net.minecraft.world.inventory.AbstractContainerMenu createMenu(
+            int id, net.minecraft.world.entity.player.Inventory inventory,
+            net.minecraft.world.entity.player.Player player) {
+        return new dev.distantstock.menu.RemoteRedstoneRequesterMenu(
+                dev.distantstock.menu.ModMenus.REMOTE_REQUESTER.get(), id, inventory, this);
     }
 }

@@ -44,12 +44,29 @@ public final class DockGroupGameTests {
         h.succeed();
     }
 
+    /**
+     * 开放的网络：谁都能自己加入，但**加入之前谁都用不了**。
+     *
+     * <p>这一条是从运输蜂停泊港搬过来的那个反转，也是最容易被改回去的一条。原来的写法是
+     * 「开放＝谁都能用」，名单于是成了摆设 —— 一个陌生人的包裹可以从你的港里出来，而名单上
+     * 没有他、以后也不会有人知道是他。现在锁只管「能不能自己进来」：进得来的人进名单，名单
+     * 决定谁能用。
+     */
     @GameTest(template = "empty", timeoutTicks = 20)
-    public static void anOpenGroupAdmitsEveryone(GameTestHelper h) {
+    public static void anOpenGroupAdmitsNobodyUntilTheyJoin(GameTestHelper h) {
         DockGroup open = new DockGroup(UUID.randomUUID(), "public", OWNER, true);
-        h.assertTrue(open.admits(STRANGER), "an open group refused a stranger");
-        // Being let in is not the same as owning it: only the owner may rename it or change the lock.
-        h.assertFalse(open.ownedBy(STRANGER), "an open group made a stranger its owner");
+        h.assertTrue(open.joinableBy(STRANGER), "开放的网络不让陌生人自己加入");
+        h.assertFalse(open.admits(STRANGER), "开放的网络在加入之前就能用 —— 名单成了摆设");
+        // 进得来不等于当得上家：改名、上锁、点名永远只认组主。
+        h.assertFalse(open.ownedBy(STRANGER), "开放的网络把陌生人变成了组主");
+
+        DockGroup joined = open.withMember(STRANGER, "陌生人");
+        h.assertTrue(joined.admits(STRANGER), "加进名单之后还是用不了");
+        h.assertFalse(joined.joinableBy(STRANGER), "加进去了还能再加入一次");
+
+        // 加进来之后主人把锁关上：名单不变，用还是能用。锁是门，不是钥匙本身。
+        DockGroup closed = joined.withOpen(false);
+        h.assertTrue(closed.admits(STRANGER), "主人上锁把名单里的人一起关在外面了");
         h.succeed();
     }
 
@@ -66,6 +83,81 @@ public final class DockGroupGameTests {
         h.assertTrue(legacy.admits(STRANGER), "an ownerless group refused a player");
         h.assertTrue(legacy.admits(null), "an ownerless group refused a nameless player");
         h.assertFalse(legacy.ownedBy(STRANGER), "an ownerless group reported an owner");
+        h.succeed();
+    }
+
+    /**
+     * 自己加入：只有开着的、你还没在里面的、也不是你的网络。
+     *
+     * <p>这一条是运输蜂停泊港的「添加你自己」：一个网络的主人把锁打开，就等于对所有还没进来的人
+     * 说了同意，不需要谁醒着去点一下。所以规则只有一条 —— 锁。已经在里面的人和所有者都不算
+     * 「加入」，因为加入改变不了他们的状态，而一句「已加入」会读起来像是刚被授予了什么。
+     */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void onlyAnOpenGroupCanBeJoinedWithoutItsOwner(GameTestHelper h) {
+        DockGroup open = new DockGroup(UUID.randomUUID(), "open", OWNER, true);
+        h.assertTrue(open.joinableBy(STRANGER), "开着的网络不让陌生人自己加入");
+        h.assertFalse(open.joinableBy(OWNER), "组主被当成可以加入的人");
+        h.assertFalse(open.joinableBy(null), "一个不存在的玩家也算加入");
+
+        DockGroup closed = new DockGroup(UUID.randomUUID(), "closed", OWNER, false);
+        h.assertFalse(closed.joinableBy(STRANGER), "锁着的网络能自己进 —— 锁就没意义了");
+
+        DockGroup withMember = closed.withMember(STRANGER, "stranger");
+        h.assertFalse(withMember.joinableBy(STRANGER), "已经在名单里的人还能再加入一次");
+        h.assertTrue(withMember.admits(STRANGER), "名单里的人被关在外面");
+        // 进来的人不带管理权：加入和被点名一样，都只是能用 —— 改名、上锁、点别人还是组主的。
+        h.assertFalse(withMember.ownedBy(STRANGER), "成员拿到了组主权限");
+
+        // 无主的组没有「加入」这回事：它本来就承认所有人，名单也不决定什么，
+        // 收进来的名字只会是一串谁也不看的记录。
+        DockGroup unowned = new DockGroup(UUID.randomUUID(), "legacy", null, true);
+        h.assertFalse(unowned.joinableBy(STRANGER), "无主的组还能加入 —— 名单上会挂满没有意义的条目");
+        h.assertTrue(unowned.admits(STRANGER), "无主的组把玩家挡在外面了");
+        h.succeed();
+    }
+
+    /**
+     * 加入 → 上锁之后还在里面 → 离开 → 进不去了，走一遍真的目录写入。
+     *
+     * <p>上面那条查的是规则，这条查的是规则和存档之间那一段，而顺序本身就是结论的一半：加入
+     * 只有在网络**上锁之后**才看得出效果。开着的网络本来就承认所有人（{@code admits} 第一条
+     * 就是它），所以站在一个开着的网络里说"我加入了"什么也没证明 —— 加入真正的意义是它上锁
+     * 以后你还在名单上。
+     *
+     * <p>反过来，离开也不该是拉黑：走完一圈之后把锁再打开，还得能回来。
+     */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void joiningAndLeavingGoesThroughTheDirectory(GameTestHelper h) {
+        DockGroupDirectory directory = DockGroupDirectory.get(h.getLevel().getServer());
+        // 名字带随机后缀：测试世界是一份普通存档，组会跨次运行留着，固定名字会让第二次跑直接撞上
+        // 上一次留下的那个（这一条已经踩过一次）。
+        DockGroup created = directory.createFor(
+                "可加入的 " + UUID.randomUUID().toString().substring(0, 8), OWNER);
+        h.assertFalse(created.joinableBy(STRANGER), "玩家新建的网络默认就能加入 —— 应该是锁着的");
+        h.assertFalse(created.admits(STRANGER), "锁着的网络直接就能用");
+
+        directory.setOpen(created.id(), true);
+        h.assertTrue(directory.require(created.id()).joinableBy(STRANGER), "开了锁还是进不去");
+
+        directory.addMember(created.id(), STRANGER, "stranger");
+        // 关回去：加入的意义就在这一步 —— 网络重新上锁，名单里的人还在里面。
+        directory.setOpen(created.id(), false);
+        DockGroup joined = directory.require(created.id());
+        h.assertTrue(joined.admits(STRANGER), "上锁之后名单里的人被关在外面");
+        h.assertFalse(joined.joinableBy(STRANGER), "已经在里面的人还能再加入一次");
+
+        directory.removeMember(joined.id(), STRANGER);
+        DockGroup left = directory.require(created.id());
+        h.assertFalse(left.admits(STRANGER), "离开之后还能用这个锁着的网络");
+        h.assertFalse(left.joinableBy(STRANGER), "锁着的网络还能自己进去");
+
+        directory.setOpen(left.id(), true);
+        h.assertTrue(directory.require(left.id()).joinableBy(STRANGER),
+                "离开之后再也回不去了 —— 离开变成了拉黑");
+        // 但"能回去"和"还在里面"是两回事：开着就能用的话，离开就等于没离开。
+        h.assertFalse(directory.require(left.id()).admits(STRANGER),
+                "离开之后开着就能用 —— 那离开等于没离开");
         h.succeed();
     }
 
@@ -90,11 +182,13 @@ public final class DockGroupGameTests {
         h.assertTrue(made.ownedBy(OWNER), "a group made by a player was not theirs");
         h.assertFalse(made.admits(STRANGER), "a freshly made group let a stranger in");
 
+        // 开锁开的是门：能自己进来，但进来之前仍然用不了。
         directory.setOpen(made.id(), true);
-        h.assertTrue(directory.require(made.id()).admits(STRANGER), "opening a group changed nothing");
+        h.assertTrue(directory.require(made.id()).joinableBy(STRANGER), "开锁之后还是进不来");
+        h.assertFalse(directory.require(made.id()).admits(STRANGER), "开锁就等于把东西给出去了");
 
         directory.setOpen(made.id(), false);
-        h.assertFalse(directory.require(made.id()).admits(STRANGER), "closing a group changed nothing");
+        h.assertFalse(directory.require(made.id()).joinableBy(STRANGER), "上锁之后还能自己进来");
         h.succeed();
     }
 

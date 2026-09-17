@@ -91,15 +91,22 @@ public final class LoadedDocks {
     /**
      * Selects an available dock in the requested group: the highest priority tier that has room wins, and
      * docks of equal priority take turns in a stable order.
+     *
+     * <p><b>The group is the only thing that picks a dock.</b> A dock used to filter on an address of
+     * its own as well, and that made the group mean less than it says: two docks in one group, given
+     * different addresses, silently stopped being interchangeable — each took only the half of the
+     * traffic its own address matched, and which half depended on a field nothing on the dock showed.
+     * A group whose docks are not interchangeable with each other is a longer way of naming one dock.
+     *
+     * <p>The address still decides where a parcel goes, just not here: it is what the local logistics
+     * network sorts by <em>after</em> the parcel has left the dock. The one it wears by then is the
+     * home address the crossing swapped in, and a frogport or a chute reading it is what splits a
+     * delivery between two corners of one server.
      */
     public static DockBlockEntity importFor(ItemStack pkg, UUID groupId) {
         List<DockBlockEntity> matching = new ArrayList<>();
         for (DockBlockEntity be : ALL) {
             if (!deliverable(be) || !be.canReceive() || !be.groupId().equals(groupId)) {
-                continue;
-            }
-            String filter = be.address().isBlank() ? "*" : be.address();
-            if (!PackageItem.matchAddress(pkg, filter)) {
                 continue;
             }
             matching.add(be);
@@ -123,15 +130,13 @@ public final class LoadedDocks {
         noMatch(pkg, DockGroupDirectory.DEFAULT_GROUP_ID);
     }
 
+    /** Tells a group's docks that a parcel for them could not be placed, so they can report it. */
     public static void noMatch(ItemStack pkg, UUID groupId) {
         for (DockBlockEntity be : ALL) {
             if (!deliverable(be) || !be.canReceive() || !be.groupId().equals(groupId)) {
                 continue;
             }
-            String filter = be.address().isBlank() ? "*" : be.address();
-            if (!PackageItem.matchAddress(pkg, filter)) {
-                be.rejected();
-            }
+            be.rejected();
         }
     }
 
@@ -142,6 +147,26 @@ public final class LoadedDocks {
      * builds a DockBlockEntity for every loaded dock, and those copies are not the ones a parcel can
      * be delivered to, so counting them would double every number an operator reads.
      */
+    /**
+     * How many loaded docks are in this group, without building the list.
+     *
+     * <p>For the readouts that only want the number: the goggle line, and the value it is synced
+     * from, which is re-checked on a tick. {@link #allInGroup} collects and sorts, which is right
+     * for the screens that draw the docks in a stable order and wrong for a count.
+     */
+    public static int countInGroup(UUID groupId) {
+        int count = 0;
+        for (DockBlockEntity be : ALL) {
+            if (be.isRemoved() || be.getLevel() == null || be.getLevel().isClientSide) {
+                continue;
+            }
+            if (be.groupId().equals(groupId)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public static List<DockBlockEntity> allInGroup(UUID groupId) {
         List<DockBlockEntity> matching = new ArrayList<>();
         for (DockBlockEntity be : ALL) {

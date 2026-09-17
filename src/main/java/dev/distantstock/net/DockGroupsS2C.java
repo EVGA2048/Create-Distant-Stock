@@ -37,8 +37,21 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
      * player can act on, and the short form of one answers even less. The owner is the player who
      * made the system; the members are the players they let in.
      */
+    /**
+     * One row: what it is called, and whether this player may pick it or open it.
+     *
+     * <p>{@code owner} and {@code members} are names, because that is the only thing that answers
+     * the question the list is read with — "whose warehouse is this?" A uuid answers nothing a
+     * player can act on, and the short form of one answers even less. The owner is the player who
+     * made the system; the members are the players they let in.
+     *
+     * <p>{@code admitted} is the group's own answer to "may this player use it", and it is sent
+     * separately from {@code open} because the two are not the same question: an open group admits
+     * everybody and a closed one admits its list, so a row can be open and still not admit this
+     * player (they simply have not joined yet) — which is exactly the row that needs a way in.
+     */
     public record Entry(UUID id, String name, boolean open, boolean mine, int docks,
-                        String owner, List<String> members) {
+                        String owner, List<String> members, boolean admitted) {
     }
 
     public static final Type<DockGroupsS2C> TYPE = new Type<>(
@@ -58,6 +71,7 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
             buf.writeUtf(entry.name(), DockGroup.MAX_NAME_LENGTH);
             buf.writeBoolean(entry.open());
             buf.writeBoolean(entry.mine());
+            buf.writeBoolean(entry.admitted());
             buf.writeVarInt(entry.docks());
             buf.writeUtf(entry.owner() == null ? "" : entry.owner(), 64);
             buf.writeVarInt(entry.members().size());
@@ -84,6 +98,7 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
             String name = buf.readUtf(DockGroup.MAX_NAME_LENGTH);
             boolean open = buf.readBoolean();
             boolean mine = buf.readBoolean();
+            boolean admitted = buf.readBoolean();
             int docks = buf.readVarInt();
             String owner = buf.readUtf(64);
             int memberCount = buf.readVarInt();
@@ -97,7 +112,7 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
             for (int m = 0; m < memberCount; m++) {
                 members.add(buf.readUtf(64));
             }
-            groups.add(new Entry(id, name, open, mine, docks, owner, List.copyOf(members)));
+            groups.add(new Entry(id, name, open, mine, docks, owner, List.copyOf(members), admitted));
         }
         UUID carried = buf.readBoolean() ? buf.readUUID() : null;
         return new DockGroupsS2C(groups, carried);
@@ -107,9 +122,15 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
         // Straight to the screen that asked, the way the other client payloads do: the list is
         // only meaningful to a requester screen, and there is at most one open.
         ctx.enqueueWork(() -> {
+            // Two screens draw this list: the terminal's dropdown and the page opened from it. Each
+            // is sent whichever part it draws — they are never both open, because the page replaces
+            // the terminal rather than floating over it.
             if (net.minecraft.client.Minecraft.getInstance().screen
                     instanceof dev.distantstock.client.RequesterScreen screen) {
                 screen.applyGroups(msg);
+            } else if (net.minecraft.client.Minecraft.getInstance().screen
+                    instanceof dev.distantstock.client.DockGroupScreen page) {
+                page.applyGroups(msg);
             }
         });
     }
@@ -126,13 +147,20 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
                                    java.util.function.Function<UUID, String> nameOf) {
         List<Entry> out = new ArrayList<>();
         for (DockGroup group : directory.all()) {
-            if (!group.admits(player)) {
+            boolean admitted = group.admits(player);
+            if (!admitted && !group.open()) {
+                // 锁着的、又不是给我的：画一行点不动的名字比不画更糟。
+                //
+                // An open group this player is not in is a different case and does get sent, because
+                // there is something to do with it — that is the one they can join. A closed one
+                // they are not in has nothing on it for them but the fact that it exists, and a list
+                // of names that refuse to be picked is a list a player learns to stop reading.
                 continue;
             }
             out.add(new Entry(group.id(), group.name(), group.open(),
                     group.ownedBy(player), dockCount.applyAsInt(group.id()),
                     group.owner() == null ? "" : nameOf.apply(group.owner()),
-                    List.copyOf(group.members().values())));
+                    List.copyOf(group.members().values()), admitted));
             if (out.size() >= MAX_ENTRIES) {
                 break;
             }

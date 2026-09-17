@@ -19,6 +19,22 @@ import java.util.Optional;
 public final class OrderRouteDirectory extends SavedData {
     private static final String DATA_NAME = "distantstock_order_routes";
     private static final int MAX_ENTRIES = 4096;
+    /**
+     * How long an unfinished order keeps its route before the file stops carrying it.
+     *
+     * <p>A row is meant to live from the moment an order is placed to the moment its last parcel is
+     * escrowed, and in the ordinary case that is seconds. What the age is for is the other case: an
+     * order whose parcels never all arrive — one was broken, one is in a dock nobody emptied, the
+     * machine that would have packed it was switched off. Nothing in the mod ever gives up on those,
+     * so before this they accumulated until the file hit its cap and every new order was refused.
+     *
+     * <p>Generous on purpose. A week is far longer than any parcel can sit in transit without a
+     * player noticing, and dropping the row early is the worse mistake of the two: the parcel that
+     * finally arrives finds no route, is not rewritten as a remote parcel, and sits in the dock with
+     * its lamp orange — visible, and recoverable by hand. Keeping the row for ever to avoid that
+     * ends with no orders working at all.
+     */
+    private static final long MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000;
     private static final Factory<OrderRouteDirectory> FACTORY =
             new Factory<>(OrderRouteDirectory::new, OrderRouteDirectory::load);
 
@@ -53,13 +69,24 @@ public final class OrderRouteDirectory extends SavedData {
         return server.overworld().getDataStorage().computeIfAbsent(FACTORY, DATA_NAME);
     }
 
-    public void remember(Collection<PackagingRequest> requests, RemoteRoute route) {
-        remember(requests, route, "");
+    public boolean remember(Collection<PackagingRequest> requests, RemoteRoute route) {
+        return remember(requests, route, "");
     }
 
-    /** The same, for an order whose parcels have to wear a different address once they are home. */
-    public void remember(Collection<PackagingRequest> requests, RemoteRoute route, String homeAddress) {
+    /**
+     * The same, for an order whose parcels have to wear a different address once they are home.
+     *
+     * <p>Answers whether the route was written, because the caller is about to tell a player their
+     * order went through. A refused order is a thing the player can act on — no room, so try again
+     * in a moment — and it is much better said than discovered an hour later when nothing arrives.
+     *
+     * <p>Throws only on a genuine collision: two different routes claiming one Create order id is a
+     * bug, not a full file, and it must not be silently resolved in favour of whichever asked
+     * second.
+     */
+    public boolean remember(Collection<PackagingRequest> requests, RemoteRoute route, String homeAddress) {
         long now = System.currentTimeMillis();
+        expire(now);
         var newIds = new java.util.HashSet<Integer>();
         for (PackagingRequest request : requests) {
             Entry previous = routes.get(request.orderId());
@@ -70,10 +97,31 @@ public final class OrderRouteDirectory extends SavedData {
         }
         // Never evict an in-flight order just to admit another: its next parcel still needs its route.
         if (routes.size() + newIds.size() > MAX_ENTRIES) {
-            throw new IllegalStateException("Too many unfinished routed orders");
+            return false;
         }
         for (Integer id : newIds) routes.put(id, new Entry(route, homeAddress, now));
         if (!newIds.isEmpty()) setDirty();
+        return true;
+    }
+
+    /**
+     * Drops the orders that are old enough that nothing is coming for them any more.
+     *
+     * <p>Run from {@link #remember} rather than on a timer: the only moment the file's size matters
+     * is the moment something wants to be added to it, and a save that is busy enough to fill the
+     * file is a save that places orders often enough to sweep it.
+     */
+    private void expire(long now) {
+        int before = routes.size();
+        routes.entrySet().removeIf(row -> now - row.getValue().createdAt() > MAX_AGE_MS);
+        if (routes.size() != before) {
+            setDirty();
+        }
+    }
+
+    /** How many unfinished orders are being carried. For the admin readout, and for tests. */
+    public int size() {
+        return routes.size();
     }
 
     /** Called only after durable escrow ownership; Create fragments can arrive out of order. */

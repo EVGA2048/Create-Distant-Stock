@@ -19,16 +19,16 @@
       "model": "distantstock:block/tower/tower_casing_active"
     },
     "port=north,powered=true": {
-      "model": "distantstock:block/tower/tower_casing_port_north"
+      "model": "distantstock:block/tower/tower_casing_port_north_active"
     },
     "port=east,powered=true": {
-      "model": "distantstock:block/tower/tower_casing_port_east"
+      "model": "distantstock:block/tower/tower_casing_port_east_active"
     },
     "port=south,powered=true": {
-      "model": "distantstock:block/tower/tower_casing_port_south"
+      "model": "distantstock:block/tower/tower_casing_port_south_active"
     },
     "port=west,powered=true": {
-      "model": "distantstock:block/tower/tower_casing_port_west"
+      "model": "distantstock:block/tower/tower_casing_port_west_active"
     }
   }
 }

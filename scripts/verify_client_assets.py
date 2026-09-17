@@ -117,6 +117,36 @@ for path in sorted(MODELS.rglob("*.json")):
                         f"missing texture variable: {path.relative_to(ROOT)} -> {reference}"
                     )
 
+# 远仓机壳的观察窗：**powered=true 的每一个变体都必须指向一个声明了 translucent 的模型**。
+#
+# 这条是踩出来的，不是想出来的。模型进哪个渲染层只由它自己的 `render_type` 决定，而**实体层不混合
+# alpha** —— 观察窗那张 CT 图集的窗芯是 alpha 34 的玻璃，画在实体层里就是一块不透明的淡蓝色板子。
+# 四个 port 模型当时就是漏了这一个字段：不带接口的机壳通上红石会变透明，带接口的不会，而两者的几何
+# 和贴图完全一样 —— 玩家看到的就是"只有带接口的那个不透明"。alpha 来回调了三轮都没修好，因为调的
+# 根本不是那个东西。
+#
+# 只管机壳这一个方块。别的方块上 `powered` 是"有红石信号"，那是另一件事，它们的贴图本来就不透明
+# （打包机的红石灯、红石请求器的灯芯），拿这条去要求它们只会逼出一堆没用的 translucent。
+CASING_STATE = BLOCKSTATES / "tower_casing.json"
+if CASING_STATE.is_file():
+    for key, variant in load_json(CASING_STATE).get("variants", {}).items():
+        if "powered=true" not in key.replace(" ", ""):
+            continue
+        for entry in (variant if isinstance(variant, list) else [variant]):
+            reference = entry.get("model") if isinstance(entry, dict) else None
+            if not isinstance(reference, str):
+                continue
+            model_path = local_path(reference, "model")
+            if model_path is None or not model_path.is_file():
+                continue
+            declared = load_json(model_path).get("render_type")
+            if declared != "minecraft:translucent":
+                errors.append(
+                    f"powered variant is not in the translucent layer: "
+                    f"{CASING_STATE.relative_to(ROOT)} [{key}] -> {model_path.relative_to(ROOT)} "
+                    f"(render_type={declared!r})"
+                )
+
 lamp_names = ["cyan", "orange", "red", "green", "white", "brass"]
 faces = ["floor", "ceiling", "wall"]
 facings = ["north", "east", "south", "west"]

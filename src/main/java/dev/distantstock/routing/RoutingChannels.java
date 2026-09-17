@@ -11,15 +11,10 @@ public final class RoutingChannels {
     public static final String ORDER_RESULT = "distantstock:v1.order.result";
     public static final String PACKAGE_DISPATCH = "distantstock:v1.package.dispatch";
     public static final String PACKAGE_STRIP = "distantstock:v1.package.strip";
-    /** Asking every known node whether it minted a pairing code. See {@code PairingService}. */
-    public static final String PAIR_CLAIM = "distantstock:v1.pair.claim";
-    /** The one node that did, answering with the group that code stands for. */
-    public static final String PAIR_GRANT = "distantstock:v1.pair.grant";
 
     private static final List<String> ALL = List.of(
             NETWORK_ANNOUNCE, STOCK_QUERY, STOCK_RESULT,
-            ORDER_REQUEST, ORDER_RESULT, PACKAGE_DISPATCH, PACKAGE_STRIP,
-            PAIR_CLAIM, PAIR_GRANT);
+            ORDER_REQUEST, ORDER_RESULT, PACKAGE_DISPATCH, PACKAGE_STRIP);
 
     public static List<String> all() {
         return ALL;

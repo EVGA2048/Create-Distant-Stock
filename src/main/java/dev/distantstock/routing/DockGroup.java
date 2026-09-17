@@ -12,16 +12,17 @@ import java.util.UUID;
  * <p>Renaming a group must not invalidate orders or parcels already in transit, so the name is only
  * ever a label: the id is the identity and nothing routes by name.
  *
- * <p><b>Ownership is the lock.</b> A group names the player who made it and whether it stands open
- * to everyone else. Closing one does not lock the docks already in it — they are where they are —
- * it stops anyone else from adding a dock of their own or pointing a sender at it. That is the
- * question a player actually asks: not "who can see my group" but "who can make their parcels come
- * out of my dock".
+ * <p><b>Members are the key.</b> A group admits its owner and the players the owner named, and
+ * nobody else — a door into the warehouse, not a share of its ledgers. Everything that manages it
+ * (renaming, opening and closing, deleting, naming more members) stays with the owner alone, which
+ * is the split Create draws between using a logistics network and administrating one.
  *
- * <p><b>Members are the key.</b> A closed group admits its owner and the players the owner named,
- * and nobody else — a door into the warehouse, not a share of its ledgers. Everything that manages
- * it (renaming, opening and closing, deleting, naming more members) stays with the owner alone,
- * which is the split Create draws between using a logistics network and administrating one.
+ * <p><b>The lock is the way in, not the permission itself.</b> An open group is one anybody may add
+ * themselves to; once they are on the list they are a member like any other, and closing the group
+ * afterwards does not take that back. This is the model 运输蜂停泊港 uses, and it was copied on
+ * purpose: the other reading — an open group that anybody may use without ever joining — makes the
+ * member list decoration, and the member list is the thing that answers "who is using my warehouse".
+ * A closed group admits only the names the owner wrote down, so the way in is to ask.
  *
  * <p>Names are kept beside the ids because a name is the only thing a server can show a player to
  * identify somebody by, and because the person let in is usually offline when the list is read.
@@ -30,7 +31,7 @@ import java.util.UUID;
  *
  * <p>Membership is per server. The other side of a crossing has its own directory and its own idea
  * of who may use a group, and none of this crosses with a parcel — the only thing the far end ever
- * learns about a group is the id a pairing code carried.
+ * learns about a group is the id that travels in an order and on the parcels of one.
  */
 public record DockGroup(UUID id, String name, UUID owner, boolean open, Map<UUID, String> members) {
     public static final int MAX_NAME_LENGTH = 48;
@@ -57,11 +58,20 @@ public record DockGroup(UUID id, String name, UUID owner, boolean open, Map<UUID
         this(id, name, owner, open, Map.of());
     }
 
-    /** Whether this player may add docks to the group or send parcels into it. */
+    /**
+     * Whether this player may add docks to the group or send parcels into it.
+     *
+     * <p>The owner, or a name on the list — and the lock is deliberately not consulted. An open
+     * group is one anybody may *join*; it is not one anybody may skip the list with. Reading it the
+     * other way is what made the member list decorative, and the list is the only thing that answers
+     * "who is sending into my warehouse".
+     */
     public boolean admits(UUID player) {
-        if (open || owner == null) {
+        if (owner == null) {
             // A group with no owner predates ownership, and one the server made through the admin
-            // command has none either. Neither has anyone to keep out.
+            // command has none either. Neither has anyone to keep out — and, just as important,
+            // neither has a list for a player to join, so requiring one would lock players out of
+            // the default group and with it every dock that was never configured.
             return true;
         }
         if (player == null) {
@@ -78,6 +88,25 @@ public record DockGroup(UUID id, String name, UUID owner, boolean open, Map<UUID
     /** Whether this player was named by the owner, rather than being the owner. */
     public boolean hasMember(UUID player) {
         return player != null && members.containsKey(player);
+    }
+
+    /**
+     * Whether this player may let themselves in — 运输蜂停泊港 的「添加你自己」那一句。
+     *
+     * <p>An open group is one whose owner has already said yes to everybody, so the answer here is
+     * the lock and nothing else. Being in already, and being the owner, are both refused for the
+     * same reason: neither is a state that joining could change, and a "you joined" message for a
+     * network you were already in reads as though something had been granted.
+     *
+     * <p>A group with no owner is not joinable either, which is a different point: its list means
+     * nothing (everybody is admitted) and it has nobody to do the admitting. Names collected there
+     * would be names on a list that decides nothing.
+     *
+     * <p>This is the rule the packet checks, so the screen and the server cannot disagree about who
+     * may walk in.
+     */
+    public boolean joinableBy(UUID player) {
+        return player != null && owner != null && open && !ownedBy(player) && !hasMember(player);
     }
 
     /** The name recorded for a player the owner let in, or null. */

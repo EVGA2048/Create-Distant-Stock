@@ -64,23 +64,53 @@ public final class PackageDispatchCodecCheck {
         acceptsVersionOneOrder();
 
         List<NetworkDirectory.Entry> directory = List.of(
-                new NetworkDirectory.Entry(network.createFrequency(), "仓库服", 4, network, false));
-        // False, because that is what an announcement is: another server's networks, decoded on
-        // this side. The flag is not on the wire — the receiver is what makes them remote.
-        byte[] announcement = NetworkAnnouncementCodec.encode(directory, 19.75, 4.25);
-        require(NetworkAnnouncementCodec.decode(announcement).equals(directory),
-                "network announcement changed during round trip");
+                new NetworkDirectory.Entry(network.createFrequency(), "仓库服", 4, network, false, false));
+        // False for local, because that is what an announcement is: another server's networks,
+        // decoded on this side. The flag is not on the wire — the receiver is what makes them
+        // remote. False for packable is a fact about the sender and does travel.
+        UUID owner = UUID.randomUUID();
+        UUID member = UUID.randomUUID();
+        List<NetworkAnnouncementCodec.Group> groups = List.of(
+                new NetworkAnnouncementCodec.Group(groupId, "乙服仓库", owner, true, 3,
+                        List.of(new NetworkAnnouncementCodec.Group.Member(member, "Iris_Aria0"))),
+                new NetworkAnnouncementCodec.Group(UUID.randomUUID(), "无主", null, false, 0, List.of()));
+        byte[] announcement = NetworkAnnouncementCodec.encode(directory, 19.75, 4.25, groups);
+        List<NetworkDirectory.Entry> readBack = NetworkAnnouncementCodec.decode(announcement);
+        require(readBack.size() == 1, "the announcement came back with " + readBack.size() + " networks");
+        require(readBack.getFirst().freq().equals(network.createFrequency()),
+                "the announcement came back with a different network");
+        require(!readBack.getFirst().packable(),
+                "a network the sender cannot pack for came back saying it could");
         // The metrics ride in the same payload, so the round trip has to bring those back too —
         // they are what the monitor draws for the other server.
         NetworkAnnouncementCodec.Metrics carried = NetworkAnnouncementCodec.metrics(announcement);
         require(carried.known() && carried.tps() == 19.75 && carried.mspt() == 4.25,
                 "the announcement lost the sender's metrics");
+        // The dock groups ride in it as well, and they are what a cross-server destination is made
+        // of: an id to address, a name to draw, and the member list that decides who may use it.
+        List<NetworkAnnouncementCodec.Group> readGroups = NetworkAnnouncementCodec.groups(announcement);
+        require(readGroups.equals(groups), "the announcement lost or changed its dock groups: " + readGroups);
+        // An ownerless group has to survive as ownerless, or every group an admin made would come
+        // back owned by nobody-knows-whom and stop admitting the players it used to.
+        require(readGroups.get(1).owner() == null, "an ownerless group came back with an owner");
         byte[] announcementTrailing = Arrays.copyOf(announcement, announcement.length + 1);
         try {
             NetworkAnnouncementCodec.decode(announcementTrailing);
             throw new AssertionError("announcement trailing data was accepted");
         } catch (IOException expected) {
         }
+        // A version 2 payload — no group section, no "can pack" — still has to read, because the
+        // other server is not obliged to be upgraded in the same minute. What it must not do is
+        // leave the previous payload's groups lying in the codec's slot: a caller that reads them
+        // without decoding would hand the last peer's destinations to this one.
+        NetworkAnnouncementCodec.groups(announcement);
+        NetworkAnnouncementCodec.decode(announcementVersionTwo(directory, 12.5, 3.5));
+        require(NetworkAnnouncementCodec.groups(
+                announcementVersionTwo(directory, 12.5, 3.5)).isEmpty(),
+                "an older payload inherited the dock groups of the payload before it");
+        require(NetworkAnnouncementCodec.metrics(
+                announcementVersionTwo(directory, 12.5, 3.5)).tps() == 12.5,
+                "a version 2 payload lost its metrics");
 
         StockWireCodec.Query stockQuery = new StockWireCodec.Query(UUID.randomUUID(), network);
         require(StockWireCodec.decodeQuery(StockWireCodec.encodeQuery(stockQuery)).equals(stockQuery),
@@ -187,6 +217,38 @@ public final class PackageDispatchCodecCheck {
         require(decoded.homeAddress().isEmpty(), "a version 1 order invented a home address");
         require(decoded.lines().size() == 1 && decoded.lines().getFirst().count() == 16,
                 "a version 1 order lost its lines behind the missing field");
+    }
+
+    /**
+     * A version 2 announcement, written out by hand.
+     *
+     * <p>Built here rather than by asking the codec for an old version, because the point of the
+     * check is that the reader still understands a payload this build can no longer produce — a
+     * peer that has not been updated keeps sending them, and the day it stops being able to read
+     * one is the day a linked pair of servers has to be upgraded in lockstep.
+     */
+    private static byte[] announcementVersionTwo(List<NetworkDirectory.Entry> entries, double tps,
+                                                 double mspt) throws Exception {
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
+        out.writeInt(0x44534e41);
+        out.writeInt(2);
+        out.writeInt(entries.size());
+        for (NetworkDirectory.Entry entry : entries) {
+            RemoteNetworkId id = entry.networkId();
+            out.writeLong(id.nodeId().getMostSignificantBits());
+            out.writeLong(id.nodeId().getLeastSignificantBits());
+            out.writeLong(id.worldId().getMostSignificantBits());
+            out.writeLong(id.worldId().getLeastSignificantBits());
+            writeString(out, id.dimensionId());
+            out.writeLong(id.createFrequency().getMostSignificantBits());
+            out.writeLong(id.createFrequency().getLeastSignificantBits());
+            writeString(out, entry.server());
+            out.writeInt(entry.links());
+        }
+        out.writeDouble(tps);
+        out.writeDouble(mspt);
+        return bytes.toByteArray();
     }
 
     private static void writeString(java.io.DataOutputStream out, String value) throws Exception {

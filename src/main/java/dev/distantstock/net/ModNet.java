@@ -19,7 +19,10 @@ public final class ModNet {
         r.playToServer(SetTowerSettingsC2S.TYPE, SetTowerSettingsC2S.STREAM_CODEC, SetTowerSettingsC2S::handle);
         r.playToServer(SetDockGroupC2S.TYPE, SetDockGroupC2S.STREAM_CODEC, SetDockGroupC2S::handle);
         r.playToServer(BindGaugePanelC2S.TYPE, BindGaugePanelC2S.STREAM_CODEC, BindGaugePanelC2S::handle);
-        r.playToServer(PairCodeC2S.TYPE, PairCodeC2S.STREAM_CODEC, PairCodeC2S::handle);
+        r.playToServer(ForgetRemoteGroupC2S.TYPE, ForgetRemoteGroupC2S.STREAM_CODEC,
+                ForgetRemoteGroupC2S::handle);
+        r.playToServer(SetRequesterTargetC2S.TYPE, SetRequesterTargetC2S.STREAM_CODEC,
+                SetRequesterTargetC2S::handle);
         r.playToServer(GroupMemberC2S.TYPE, GroupMemberC2S.STREAM_CODEC, GroupMemberC2S::handle);
         r.playToClient(RemoteGroupsS2C.TYPE, RemoteGroupsS2C.STREAM_CODEC, RemoteGroupsS2C::handle);
         r.playToClient(OpenMonitorS2C.TYPE, OpenMonitorS2C.STREAM_CODEC, OpenMonitorS2C::handle);

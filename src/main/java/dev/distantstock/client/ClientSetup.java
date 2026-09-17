@@ -34,6 +34,7 @@ public final class ClientSetup {
         public static void screens(RegisterMenuScreensEvent e) {
             e.register(ModMenus.REQUESTER.get(), RequesterScreen::new);
             e.register(ModMenus.LAMP_MONITOR.get(), LampMonitorScreen::new);
+            e.register(ModMenus.REMOTE_REQUESTER.get(), RemoteRedstoneRequesterScreen::new);
         }
 
         /**

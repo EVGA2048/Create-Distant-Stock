@@ -82,9 +82,9 @@ public final class TranserverOrderService {
      * Which node the goods are finally delivered on: this one, or the one that placed the order.
      *
      * <p>A group named in this server's own directory is a group here, so the parcel stays here and
-     * comes out of a dock on this server — that is what a destination redeemed from a pairing code
-     * means, and the only way to order from somebody else's warehouse and have the goods handed to
-     * a player standing next to it. Anything else names a group this server has never heard of: the
+     * comes out of a dock on this server — that is what a destination on somebody else's server
+     * announcement means, and the only way to order from their warehouse and have the goods handed
+     * to a player standing next to it. Anything else names a group this server has never heard of: the
      * order goes home, and the goods come out of the dock the ordering player chose there.
      *
      * <p>The default group is excluded on purpose. It exists in every directory, including this

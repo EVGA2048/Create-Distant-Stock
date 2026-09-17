@@ -392,9 +392,10 @@ public final class TowerGameTests {
                 h.succeed();
             });
         } finally {
-            // Cleared by the activation cases' own teardown as well; this keeps a failing case from
-            // leaving a pin behind for the next one.
-            h.runAfterDelay(120, dev.distantstock.routing.TowerActivation::unpinDevices);
+            // 只放掉自己钉的那个。清空整张表会把**同时在跑**的别的用例的 pin 一起擦掉 —— gametest
+            // 是并行跑在同一个 JVM 里的，那张表是全局的。
+            h.runAfterDelay(120, () -> dev.distantstock.routing.TowerActivation.unpinDevice(
+                    dev.distantstock.routing.TowerSystem.TowerId.of(h.getLevel().dimension(), monitor)));
         }
     }
 }

@@ -38,17 +38,17 @@ import java.util.concurrent.ConcurrentHashMap;
  * dock reads a picture at most one second old, which is the same beat the towers rescan on, so a
  * tower can never carry a device under a state the tower itself has already forgotten.
  *
- * <p><b>The mechanic is only in force in a dimension that contains a running tower.</b> A world
- * with no towers at all behaves exactly as it did before towers existed: every dock keeps sending
- * and receiving, and nothing is charged. That is the promise this whole stage is built around —
- * an existing save must not stall because the mod grew a new machine.
+ * <p><b>没塔就不能用。</b>远仓设备必须站在一座**正在运行**的塔的范围里才工作：不在任何塔范围内
+ * 的港不收也不发，打包机不打包，仪表不下单。这是用户 2026-09-17 拍板的规则，也是这个模组"要先把
+ * 基础设施搭起来"那句话的字面意思。
  *
- * <p><b>A running tower claims a dimension, an idle one does not.</b> Once a tower stands and turns
- * in a dimension, devices there are on when a system reaches them and off when none does. A tower
- * that is built but not turning carries nothing and claims nothing, so a broken shaft degrades to
- * "the tower is dark" instead of "every dock in the dimension is dark and there is no way to see
- * why". This is also what keeps the two halves of a test world apart: a tower built by one test
- * does not switch off the docks of another.
+ * <p>原来的写法是反的：一个维度里没有在转的塔时，所有设备照常工作、也不扣费（当时那条注释叫
+ * "老存档不该因为模组长出一台新机器就停摆"）。那条承诺被推翻了 —— 它真正的后果是"邻居建了座塔，
+ * 我全厂停产"，而且新玩家永远学不会塔是必需品。测试里用 {@code pinDevice} 显式说"这台设备是被
+ * 带着的"，因为测试世界本来就不该为每个用例搭一座真塔。
+ *
+ * <p><b>一座正在转的塔才算数，建好不转的不算。</b>传动轴断了就是"塔是暗的"，而不是"整个维度全黑"，
+ * 玩家一眼能看出该去修哪。
  */
 public final class TowerActivation {
     /** The snapshot's beat, the same twenty ticks the towers and the docks rescan on. */
@@ -136,14 +136,15 @@ public final class TowerActivation {
         }
 
         /**
-         * Whether a device at this position is switched on.
+         * 这台设备是不是被某座在转的塔带着。
          *
-         * <p>Only meaningful for gated dimensions; callers that asked {@link #gated} already know
-         * the answer for the rest, and a device in a dimension with no running tower is on.
+         * <p>**没塔就是不在**：维度不在表里（这个维度没有任何在转的塔）、或者位置不在集合里
+         * （塔够不着、或者带载名额用完了），答案都是"不工作"。以前这里是反的（{@code on == null}
+         * 当作"全都算"），那是"老存档不该停摆"那条已废弃的承诺留下的。
          */
         public boolean active(ResourceKey<Level> dimension, BlockPos pos) {
             LongSet on = activated.get(dimension);
-            return on == null || on.contains(pos.asLong());
+            return on != null && on.contains(pos.asLong());
         }
 
         /** The tower that carries a device, or null when nothing does. */
@@ -301,7 +302,20 @@ public final class TowerActivation {
         pinnedAny = true;
     }
 
-    /** Drops every pinned answer. */
+    /**
+     * Drops one pinned answer.
+     *
+     * <p>用例收尾要用这一个，不要用{@link #unpinDevices()} —— 那张表是全局的，而 game test 是
+     * **并行跑在同一个 JVM 里**的：一个用例把整张表清空，等于把同时在跑的另一批用例的 pin 一起擦了，
+     * 表现是"失败的那几条每次都不一样"。这件事在塔的硬门槛之后才暴露出来，因为从那以后每个碰设备的
+     * 用例都得先 pin 一下。
+     */
+    public static void unpinDevice(TowerSystem.TowerId device) {
+        PINNED.remove(device);
+        pinnedAny = !PINNED.isEmpty();
+    }
+
+    /** Drops every pinned answer. For the world going away, not for a case finishing. */
     public static void unpinDevices() {
         PINNED.clear();
         pinnedAny = false;
@@ -312,17 +326,17 @@ public final class TowerActivation {
      *
      * <p>Kept free of the world so the rules can be checked directly. {@link #survey} is the thin
      * world half, and it does no deciding of its own beyond which entities are loaded.
-     */
-    public static Snapshot of(List<TowerSystem.Member> towers, List<TowerSystem.Device> devices) {
-        return of(towers, devices, Map.of());
-    }
-
-    /**
-     * The same, with the parcels the docks counted this minute.
      *
      * <p>The counts arrive already taken, keyed by device, because the ticking is the docks' — this
      * half only has to add each device's window to the tower that carries it, which is the same
      * decision it has just made for every other purpose.
+     *
+     * <p>The map is not optional, and there is deliberately no overload that leaves it out. There
+     * was one, and {@code survey} took it: it collected every dock's window and then called the
+     * two-argument form, so the readout asked for a tower's traffic, was handed an empty map, and
+     * printed zero for as long as the tower stood. Nothing failed — a flow that has never moved and
+     * a flow nobody wired up look exactly alike. A caller with nothing to report passes
+     * {@code Map.of()} and says so in its own line.
      *
      * @param traffic per device, the parcels that crossed it in the last ten minutes
      */
@@ -406,11 +420,9 @@ public final class TowerActivation {
                 claimed.add(member.id().dimension());
             }
         }
-        if (claimed.isEmpty()) {
-            // No tower is turning anywhere: nothing to carry, and nothing to read. The gates answer
-            // "on" for every device in the world, at the cost of this one check a second.
-            return Snapshot.EMPTY;
-        }
+        // 没有塔在转 = 没有设备被带着。这里**不能**提前返回"一切照旧"（原来是那样）：那正是
+        // 被推翻的那条老承诺，也是"没塔免费用"的来源。继续往下走，claimed 为空就意味着
+        // addDevice 一台设备都不收，快照里一台设备也没有 —— 结果一样，但道理是对的。
 
         List<TowerSystem.Device> devices = new ArrayList<>();
         Map<String, LongSet> seen = new HashMap<>();
@@ -442,7 +454,7 @@ public final class TowerActivation {
             }
             scanRemoteGauges(level, member, devices, seen, claimed);
         }
-        return of(towers, devices);
+        return of(towers, devices, traffic);
     }
 
     /**

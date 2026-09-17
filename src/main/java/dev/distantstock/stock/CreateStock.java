@@ -56,8 +56,12 @@ public final class CreateStock {
                             WorldIdentity.get(level), link.dimension().location().toString(), row.getKey());
                 }
             }
+            // Whether an order for this network would actually be packed by anything. Asked here
+            // rather than where the list is drawn, because the answer is a fact about this server's
+            // loaded machines and only this side can look.
+            boolean packable = dev.distantstock.block.RemotePackagerBlockEntity.canPack(row.getKey());
             out.add(new NetworkDirectory.Entry(row.getKey(), serverId, network.loadedLinks.size(), networkId,
-                    true));
+                    true, packable));
         }
         return out;
     }
@@ -135,11 +139,23 @@ public final class CreateStock {
         return network.loadedLinks == null ? 0 : network.loadedLinks.size();
     }
 
+    /**
+     * 一张网络的库存，按物品聚合。
+     *
+     * <p><b>用的是 Create 的近似汇总，不是它那份精确的。</b>两个缓存的差别在存活时间上：
+     * {@code ACCURATE_SUMMARIES} 是 {@code TickBasedCache(1)} —— 活一个 tick，"取一次"就等于
+     * "把整个网络重新数一遍"；{@code SUMMARIES} 是 {@code TickBasedCache(20)}，而且和 Create 自己的
+     * 仓管界面共用同一份。我们原来用的是前者，于是每秒钟对每一张网络全量重数一次 —— 仓库越大越贵，
+     * 而且跟有没有人在看没有任何关系。
+     *
+     * <p>代价是数字最多旧一秒。对这个用途（界面上的列表、发给对端的摘要）无所谓：真正要紧的那次
+     * 核对发生在对面打包的时候，Create 自己会在那里用精确的那份再确认一遍。
+     */
     public static List<StockCache.Entry> summary(UUID freq) {
         if (!hasNetwork(freq)) {
             return List.of();
         }
-        InventorySummary sum = LogisticsManager.getSummaryOfNetwork(freq, true);
+        InventorySummary sum = LogisticsManager.getSummaryOfNetwork(freq, false);
         if (sum == null || sum.isEmpty()) {
             return List.of();
         }
@@ -205,7 +221,16 @@ public final class CreateStock {
             }
         }
         try {
-            OrderRouteDirectory.get(server).remember(requests.values(), route, homeAddress);
+            if (!OrderRouteDirectory.get(server).remember(requests.values(), route, homeAddress)) {
+                // 记不下路线就不发这个订单。以前这里是一句"满了就抛"，抛出来的东西被下面
+                // catch 住、变成同一个 false —— 结果一样，但异常当控制流，而且满了之后**每**
+                // 一单都这样，没有任何提示。现在满了会先清掉过期的（见 OrderRouteDirectory.expire），
+                // 真的还满就明说。
+                org.apache.logging.log4j.LogManager.getLogger().warn(
+                        "[DistantStock/Order] refused before packaging: {} unfinished orders, no room",
+                        OrderRouteDirectory.get(server).size());
+                return false;
+            }
         } catch (IllegalStateException exception) {
             org.apache.logging.log4j.LogManager.getLogger().warn(
                     "[DistantStock/Order] refused before packaging: {}", exception.getMessage());

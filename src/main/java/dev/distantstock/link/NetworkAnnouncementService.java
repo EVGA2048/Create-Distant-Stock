@@ -8,6 +8,7 @@ import net.minecraft.server.MinecraftServer;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.Set;
@@ -25,6 +26,7 @@ public final class NetworkAnnouncementService {
     private static final long REFRESH_MS = 45_000;
 
     private static List<NetworkDirectory.Entry> lastLocal = List.of();
+    private static List<NetworkAnnouncementCodec.Group> lastGroups = List.of();
     private static Set<String> lastRecipients = Set.of();
     private static long lastSentAt;
 
@@ -56,24 +58,61 @@ public final class NetworkAnnouncementService {
         if (recipients.isEmpty()) {
             return;
         }
+        List<NetworkAnnouncementCodec.Group> groups = localGroups();
         long now = System.currentTimeMillis();
-        boolean changed = !local.equals(lastLocal) || !recipients.equals(lastRecipients);
+        boolean changed = !local.equals(lastLocal) || !groups.equals(lastGroups)
+                || !recipients.equals(lastRecipients);
         if (!changed && now - lastSentAt < REFRESH_MS) {
             return;
         }
         try {
             byte[] payload = NetworkAnnouncementCodec.encode(local,
-                    LinkSnapshot.localTps, LinkSnapshot.localMspt);
+                    LinkSnapshot.localTps, LinkSnapshot.localMspt, groups);
             for (String node : recipients) {
                 if (!node.equals(self.toString())) {
                     TranserverBridge.send(node, RoutingChannels.NETWORK_ANNOUNCE, payload, null);
                 }
             }
             lastLocal = List.copyOf(local);
+            lastGroups = List.copyOf(groups);
             lastRecipients = Set.copyOf(recipients);
             lastSentAt = now;
         } catch (IOException ignored) {
         }
+    }
+
+    /**
+     * This node's dock groups, as they will be shown and judged on the other side.
+     *
+     * <p>Everything a destination needs and nothing that only makes sense here: the id to address
+     * it, the name to draw, who keeps it, whether anybody may join it, how many docks are behind it,
+     * and who is on the list. Membership travels so that the *sending* side can refuse an order from
+     * somebody the group would not admit — the receiving server cannot check that itself, because an
+     * order arrives with no player on it.
+     *
+     * <p>Dock counts are live, which is also why the announce beat exists: a group whose docks were
+     * all broken is a destination that will not deliver, and the other server should stop drawing it
+     * as though it would.
+     */
+    private static List<NetworkAnnouncementCodec.Group> localGroups() {
+        MinecraftServer server = TranserverBridge.server();
+        if (server == null) {
+            return List.of();
+        }
+        List<NetworkAnnouncementCodec.Group> out = new java.util.ArrayList<>();
+        for (dev.distantstock.routing.DockGroup group
+                : dev.distantstock.routing.DockGroupDirectory.get(server).all()) {
+            List<NetworkAnnouncementCodec.Group.Member> members = new java.util.ArrayList<>();
+            group.members().forEach((id, name) -> members.add(
+                    new NetworkAnnouncementCodec.Group.Member(id, name)));
+            out.add(new NetworkAnnouncementCodec.Group(group.id(), group.name(), group.owner(),
+                    group.open(), dev.distantstock.block.LoadedDocks.allInGroup(group.id()).size(),
+                    List.copyOf(members)));
+            if (out.size() >= 64) {
+                break;
+            }
+        }
+        return List.copyOf(out);
     }
 
     private static void acknowledgeCompleted() {
@@ -100,17 +139,23 @@ public final class NetworkAnnouncementService {
                 return CompletableFuture.completedFuture(DeliveryResult.RETRY);
             }
             NetworkAnnouncementCodec.Metrics metrics = NetworkAnnouncementCodec.metrics(message.payload());
+            // Read out of the codec's last-decode slot, the same way the metrics are: one walk of
+            // the payload, and the fields a caller may want are kept beside the list it returns.
+            List<NetworkAnnouncementCodec.Group> groups = NetworkAnnouncementCodec.groups(message.payload());
             CompletableFuture<DeliveryResult> result = new CompletableFuture<>();
             server.execute(() -> {
                 NetworkDirectory.replacePeer(message.source(), entries);
                 // The announcer names itself on every entry it sends. Written down here so the
-                // readouts that mention another node — a group brought home by a pairing code, the
-                // second line on a crossing parcel — can say "远仓B" instead of a uuid prefix.
-                entries.stream().map(NetworkDirectory.Entry::server)
-                        .filter(alias -> alias != null && !alias.isBlank())
-                        .findFirst()
-                        .ifPresent(alias -> dev.distantstock.routing.PeerNames.get(server)
-                                .remember(source, alias));
+                // readouts that mention another node — a remote dock group, the second line on a
+                // crossing parcel — can say "远仓B" instead of a uuid prefix.
+                String alias = entries.stream().map(NetworkDirectory.Entry::server)
+                        .filter(name -> name != null && !name.isBlank())
+                        .findFirst().orElse("");
+                if (!alias.isBlank()) {
+                    dev.distantstock.routing.PeerNames.get(server).remember(source, alias);
+                }
+                rememberGroups(server, source, alias, groups);
+
                 if (metrics.known()) {
                     // This is where a peer's TPS comes from in Transerver mode: nothing else crosses
                     // on a regular beat, and the monitor shows the number.
@@ -122,6 +167,35 @@ public final class NetworkAnnouncementService {
         } catch (IOException | IllegalArgumentException exception) {
             return CompletableFuture.completedFuture(DeliveryResult.REJECTED);
         }
+    }
+
+    /**
+     * Writes the announced groups into this server's list of other servers' groups.
+     *
+     * <p>This is what a pairing code used to do, by hand and once: a group on the far side becomes
+     * a destination here, with the name its owner gave it and the node's own name in front of it.
+     * Doing it on every announcement instead means a rename over there is a rename here, and a
+     * group that no longer exists stops being offered rather than staying in the list for ever.
+     *
+     * <p>An announcement that carries no groups still replaces: the peer is telling the truth about
+     * an empty list, and the last thing to do with that is keep offering the groups it used to have.
+     */
+    private static void rememberGroups(MinecraftServer server, UUID node, String alias,
+                                       List<NetworkAnnouncementCodec.Group> groups) {
+        dev.distantstock.routing.RemoteGroups directory =
+                dev.distantstock.routing.RemoteGroups.get(server);
+        String label = alias == null || alias.isBlank()
+                ? node.toString().substring(0, 8) : alias;
+        List<dev.distantstock.routing.RemoteGroups.Entry> rows = new java.util.ArrayList<>();
+        for (NetworkAnnouncementCodec.Group group : groups) {
+            Map<UUID, String> members = new java.util.LinkedHashMap<>();
+            for (NetworkAnnouncementCodec.Group.Member member : group.members()) {
+                members.put(member.id(), member.name());
+            }
+            rows.add(new dev.distantstock.routing.RemoteGroups.Entry(node, group.id(), group.name(),
+                    label, 0, group.open(), group.owner(), Map.copyOf(members), group.docks()));
+        }
+        directory.replaceFrom(node, rows, System.currentTimeMillis());
     }
 
     private NetworkAnnouncementService() {

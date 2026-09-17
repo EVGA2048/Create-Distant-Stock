@@ -25,7 +25,25 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class TranserverStockService {
-    private static final Map<RemoteNetworkId, UUID> OUTSTANDING = new ConcurrentHashMap<>();
+    /** 一次还没等到回音的查询，以及它是什么时候发出去的。 */
+    private record Pending(UUID queryId, long sentAt) {
+    }
+
+    /**
+     * 发出去、还没等到回音的查询。
+     *
+     * <p><b>没有超时的时候这里是一道单向的门。</b>条目只在"回音到了"的时候才被删掉，于是丢一次回音
+     * （对面正好在重启、消息在路由器里搁浅、服务器在关机途中）就等于把这个网络永久静音了 —— 界面上
+     * 看是"库存一直空着"，界面重开多少次都一样，因为根本不再有人去问。玩家报的
+     * 「重启服务器以后请求台看不见物品，要拆掉重新放重新设频率」就是它。
+     *
+     * <p>现在过期的条目会被丢掉、重新问一遍。代价是最坏情况白问一次；不这么做的代价是一条网络永远
+     * 哑掉。这两者不对等。
+     */
+    private static final Map<RemoteNetworkId, Pending> OUTSTANDING = new ConcurrentHashMap<>();
+
+    /** 多久没等到回音就把那次查询忘掉重问。比一次来回长得多，比人的耐心短。 */
+    private static final long RETRY_AFTER_MS = 10_000L;
 
     public static void register() {
         TranserverBridge.handler(RoutingChannels.STOCK_QUERY, TranserverStockService::query);
@@ -39,7 +57,11 @@ public final class TranserverStockService {
             return;
         }
         for (RemoteNetworkId network : StockCache.watchedNetworks(5 * 60_000L)) {
-            if (network.nodeId().equals(local) || OUTSTANDING.containsKey(network)) {
+            if (network.nodeId().equals(local)) {
+                continue;
+            }
+            Pending pending = OUTSTANDING.get(network);
+            if (pending != null && System.currentTimeMillis() - pending.sentAt() < RETRY_AFTER_MS) {
                 continue;
             }
             long age = StockCache.ageMs(network);
@@ -51,7 +73,7 @@ public final class TranserverStockService {
                 UUID messageId = TranserverBridge.send(network.nodeId().toString(), RoutingChannels.STOCK_QUERY,
                         StockWireCodec.encodeQuery(new StockWireCodec.Query(queryId, network)), queryId.toString());
                 if (messageId != null) {
-                    OUTSTANDING.put(network, queryId);
+                    OUTSTANDING.put(network, new Pending(queryId, System.currentTimeMillis()));
                 }
             } catch (IOException ignored) {
             }

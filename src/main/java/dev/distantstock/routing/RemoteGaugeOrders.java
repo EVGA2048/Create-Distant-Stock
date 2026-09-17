@@ -81,7 +81,8 @@ public final class RemoteGaugeOrders {
             return false;
         }
         String id = BuiltInRegistries.ITEM.getKey(item.getItem()).toString();
-        return orderAll(server, network, address, receivingGroup, List.of(new LinkQueues.Line(id, count)));
+        return orderAll(server, network, address, receivingGroup, "",
+                List.of(new LinkQueues.Line(id, count)));
     }
 
     /**
@@ -92,11 +93,26 @@ public final class RemoteGaugeOrders {
      */
     public static boolean orderAll(MinecraftServer server, RemoteNetworkId network, String address,
                                    java.util.UUID receivingGroup, List<LinkQueues.Line> lines) {
+        return orderAll(server, network, address, receivingGroup, "", lines);
+    }
+
+    /**
+     * The same, for an order whose parcels must wear a different address once they are home.
+     *
+     * <p>{@code homeAddress} is written onto every parcel of this order and applied on the far side
+     * of the crossing — see {@link dev.distantstock.routing.RemoteRouteData#applyHomeAddress}. Blank
+     * is the ordinary case: goods that stay on the server they were packed on never need a second
+     * address.
+     */
+    public static boolean orderAll(MinecraftServer server, RemoteNetworkId network, String address,
+                                   java.util.UUID receivingGroup, String homeAddress,
+                                   List<LinkQueues.Line> lines) {
         if (server == null || network == null || lines == null || lines.isEmpty()) {
             return false;
         }
         OrderService.Result result = OrderService.place(server, network, network.createFrequency(),
-                address == null ? "" : address, receivingGroup, List.copyOf(lines));
+                address == null ? "" : address, receivingGroup, List.copyOf(lines),
+                homeAddress == null ? "" : homeAddress);
         return result == OrderService.Result.QUEUED;
     }
 }

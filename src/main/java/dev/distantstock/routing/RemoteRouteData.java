@@ -15,7 +15,9 @@ public final class RemoteRouteData {
     private static final String RECEIVING_GROUP = "ReceivingDockGroup";
     private static final String CORRELATION = "Correlation";
     private static final String CHILD_ORDER = "ChildOrder";
-    private static final String CROSS_SERVER = "CrossServer";
+    // "CrossServer" 这个键不再写了，也不再读：它当年是出港时盖上的一个布尔标记，而没有任何地方会
+    // 把它去掉，于是落地之后的包裹永远显示着一条已经走完的路。现在答案每次现算（见 crossServer）。
+    // 老存档里残留的这个键会被忽略。
     /**
      * Where the route goes, in words: "远仓B · 甲服仓库".
      *
@@ -66,28 +68,6 @@ public final class RemoteRouteData {
         } catch (IllegalArgumentException exception) {
             return Optional.empty();
         }
-    }
-
-    /**
-     * Marks a parcel as one that is going to another server rather than to a dock on this one.
-     *
-     * <p>Set where the parcel leaves a dock, because that is the last place that knows. It is what
-     * lets the tooltip tell the truth about a parcel standing in a chest: "this one crosses" is a
-     * different sentence from "this belongs to a group over here", and the route alone cannot say
-     * which — both carry a destination node, and one of them is this server.
-     */
-    public static void markCrossServer(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
-            return;
-        }
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        if (!custom.contains(ROOT, CompoundTag.TAG_COMPOUND)) {
-            return;
-        }
-        CompoundTag route = custom.getCompound(ROOT);
-        route.putBoolean(CROSS_SERVER, true);
-        custom.put(ROOT, route);
-        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(custom));
     }
 
     /** The destination in words, or empty when the parcel carries no label. */
@@ -145,14 +125,19 @@ public final class RemoteRouteData {
         return true;
     }
 
-    /** Whether this parcel is on its way to another server, as far as this side can tell. */
+    /**
+     * 这件包裹是不是"还要去别的服务器"——问的是它身上那条路线指向哪儿，不是问谁在什么时候给它盖过章。
+     *
+     * <p>原来存的是打包/出港那一刻盖上的一个布尔标记，而**没有任何地方会把它去掉**：包裹过了海、
+     * 换了地址、落了地，那个标记还在，于是它一辈子显示「跨服寄往…」——一条已经走完的路，每次摸它
+     * 都被再告知一次。落地的证据本来就在数据里：路线指向的那台服务器**就是这一台**。所以这里改成
+     * 每次现算 —— 一台服务器不会变成另一台，这个答案也不会过期。
+     */
     public static boolean crossServer(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
-            return false;
-        }
-        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
-        return custom.contains(ROOT, CompoundTag.TAG_COMPOUND)
-                && custom.getCompound(ROOT).getBoolean(CROSS_SERVER);
+        return read(stack)
+                .map(route -> !dev.distantstock.link.TranserverBridge.isLocal(
+                        route.destinationNodeId().toString()))
+                .orElse(false);
     }
 
     public static void write(ItemStack stack, RemoteRoute value) {

@@ -12,7 +12,6 @@ import dev.distantstock.block.DockBlockEntity;
 import dev.distantstock.block.LoadedDocks;
 import dev.distantstock.link.InboundOrderInbox;
 import dev.distantstock.link.LinkSnapshot;
-import dev.distantstock.link.PairingService;
 import dev.distantstock.link.PackageCodec;
 import dev.distantstock.link.ParcelEscrow;
 import dev.distantstock.link.ParcelQuarantine;
@@ -21,7 +20,6 @@ import dev.distantstock.link.TranserverBridge;
 import dev.distantstock.net.AdminConfigS2C;
 import dev.distantstock.routing.DockGroup;
 import dev.distantstock.routing.DockGroupDirectory;
-import dev.distantstock.routing.PairingCodes;
 import dev.distantstock.routing.PlayerNames;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
@@ -114,6 +112,7 @@ public final class AdminCommand {
                                         .suggests((ctx, builder) -> suggestQuarantineIds(ctx, builder))
                                         .executes(AdminCommand::quarantineDiscard))))
                 .then(Commands.literal("help").executes(AdminCommand::help))
+                .then(Commands.literal("tower").executes(AdminCommand::towerStatus))
                 .then(Commands.literal("group")
                         .executes(AdminCommand::groupList)
                         .then(Commands.literal("list").executes(AdminCommand::groupList))
@@ -142,27 +141,15 @@ public final class AdminCommand {
                                                 .suggests((ctx, builder) -> suggestGroupNames(ctx, builder))
                                                 .then(Commands.argument("player", StringArgumentType.word())
                                                         .executes(ctx -> groupMember(ctx, false)))))))
-                .then(Commands.literal("pair")
-                        .executes(AdminCommand::pairList)
-                        .then(Commands.literal("list").executes(AdminCommand::pairList))
-                        .then(Commands.literal("create")
-                                .then(Commands.argument("group", StringArgumentType.string())
-                                        .suggests((ctx, builder) -> suggestGroupNames(ctx, builder))
-                                        .executes(ctx -> pairCreate(ctx, PairingCodes.DEFAULT_MINUTES))
-                                        .then(Commands.argument("minutes", IntegerArgumentType.integer(1, 60))
-                                                .executes(ctx -> pairCreate(ctx,
-                                                        IntegerArgumentType.getInteger(ctx, "minutes"))))))
-                        .then(Commands.literal("revoke")
-                                .then(Commands.argument("code", StringArgumentType.word())
-                                        .suggests((ctx, builder) -> suggestPairCodes(ctx, builder))
-                                        .executes(AdminCommand::pairRevoke)))
-                        .then(Commands.literal("redeem")
-                                .then(Commands.argument("code", StringArgumentType.word())
-                                        .executes(AdminCommand::pairRedeem)))
+                // 配对码已经删掉了（用户 2026-09-17 判定没用）：远端的港组现在跟着公告自己过来，
+                // 不需要谁来念一串码。指令里留下的是"看看认识了哪些"和"忘掉一个"。
+                .then(Commands.literal("remote")
+                        .executes(AdminCommand::remoteList)
+                        .then(Commands.literal("list").executes(AdminCommand::remoteList))
                         .then(Commands.literal("forget")
                                 .then(Commands.argument("group", StringArgumentType.string())
                                         .suggests((ctx, builder) -> suggestRemoteGroupNames(ctx, builder))
-                                        .executes(AdminCommand::pairForget))))
+                                        .executes(AdminCommand::remoteForget))))
                 .then(Commands.literal("dock")
                         .then(Commands.literal("group")
                                 .then(Commands.argument("group", StringArgumentType.string())
@@ -187,17 +174,15 @@ public final class AdminCommand {
                 "远仓指令（所有操作在终端界面里也能做，指令只是快捷方式）：",
                 "  /distantstock status                传输模式与队列",
                 "  /distantstock help                  这一页",
+                "  /distantstock tower                 每座塔的状态 + 哪些设备没被带载、为什么",
                 "  /distantstock group list            列出所有系统（港组）",
                 "  /distantstock group create <名字>    新建一个系统",
                 "  /distantstock group delete <名字>    删除（要再输一次 confirm）",
                 "  /distantstock group member list <组名>          谁能用这个锁着的组",
                 "  /distantstock group member add <组名> <玩家名>   把一个人放进来（只有组主能改）",
                 "  /distantstock group member remove <组名> <玩家名> 把他请出去",
-                "  /distantstock pair create <组名>     给别的服务器发一个配对码（默认 10 分钟）",
-                "  /distantstock pair redeem <码>       兑换别的服务器的配对码",
-                "  /distantstock pair list              本服发出的码 + 已认识的远端港组",
-                "  /distantstock pair revoke <码>       作废一个还没被兑换的码",
-                "  /distantstock pair forget <远端组>   忘掉一个远端目的地（对面不受影响）",
+                "  /distantstock remote list            对面服务器公告过来的港组（目的地）",
+                "  /distantstock remote forget <远端组> 隐藏一个远端目的地（对面不受影响）",
                 "  /distantstock dock group <名字>      把脚下的港加入系统",
                 "  /distantstock dock send-to <名字>    让脚下的港发往那个系统",
                 "  /distantstock returns list|restore|give|export   被退回的包裹",
@@ -430,6 +415,96 @@ public final class AdminCommand {
     }
 
     /**
+     * 每座塔现在是什么状态，以及哪些远仓设备没被带载、为什么。
+     *
+     * <p>没塔就不能用，于是"我的工厂为什么停了"变成这个模组最常被问的问题，而它的答案有好几种：
+     * 塔根本没搭成、搭成了但没在转、设备在塔的范围之外、塔带载的设备数用满了。这四种在游戏里长得
+     * 一模一样 —— 都是"机器不动了"。护目镜只说得清你正看着的那一台，这条指令一口气把整个维度说清楚。
+     *
+     * <p>报的是两个分开的问题：「哪个塔罩着它」和「哪个塔带着它」。前者是几何，建好了就成立；后者
+     * 还要那座塔在转、而且没被操作员关掉带载开关。混成一句话说，玩家会去拆一座本来没问题的塔。
+     */
+    private static int towerStatus(CommandContext<CommandSourceStack> ctx) {
+        MinecraftServer server = ctx.getSource().getServer();
+        List<dev.distantstock.block.TowerCoreBlockEntity> towers =
+                dev.distantstock.block.LoadedTowers.all();
+        ctx.getSource().sendSuccess(() -> Component.literal("互通塔：" + towers.size()
+                + " 座已加载（没塔在转的维度里，远仓设备一律不工作）"), false);
+        for (var tower : towers) {
+            var level = tower.getLevel();
+            var tier = tower.tier();
+            var id = level == null ? null : dev.distantstock.routing.TowerSystem.TowerId.of(
+                    level.dimension(), tower.getBlockPos());
+            var usage = id == null ? null : dev.distantstock.routing.TowerActivation.usage(id);
+            String line = (level == null ? "?" : level.dimension().location().toString())
+                    + " " + tower.getBlockPos().toShortString()
+                    + " · 等级 " + (tier == null ? "不成塔" : tier.name())
+                    + " · " + (tower.isRunning() ? "正在转" : "没在转")
+                    + (usage == null ? "" : " · 带载 " + usage.carried() + "/" + usage.limit());
+            ctx.getSource().sendSuccess(() -> Component.literal("· " + line), false);
+        }
+
+        List<String> idle = new ArrayList<>();
+        for (var dock : LoadedDocks.allDocks()) {
+            noteIfIdle(idle, dock.getLevel(), dock.getBlockPos(), "远仓港" + dockMode(dock));
+        }
+        for (var gauge : LoadedDocks.allGauges()) {
+            noteIfIdle(idle, gauge.getLevel(), gauge.getBlockPos(), "远仓仪表");
+        }
+        for (var packager : dev.distantstock.block.LoadedDevices.packagers()) {
+            noteIfIdle(idle, packager.getLevel(), packager.getBlockPos(), "远仓打包机");
+        }
+        for (var monitor : dev.distantstock.block.LoadedDevices.monitors()) {
+            // 监视器不在带载名单里：它不被"带着"，它只是画那座塔。所以只报它底下有没有塔。
+            var level = monitor.getLevel();
+            if (level != null && dev.distantstock.routing.TowerActivation.towerAt(
+                    level, monitor.getBlockPos()) == null) {
+                idle.add(where(level, monitor.getBlockPos()) + " 远仓监视器 —— 头顶没有塔，读数会停在「无」");
+            }
+        }
+        if (idle.isEmpty()) {
+            ctx.getSource().sendSuccess(() -> Component.literal("所有已加载的远仓设备都在工作"), false);
+        } else {
+            ctx.getSource().sendSuccess(() -> Component.literal("没在工作：" + idle.size()
+                    + " 台（护目镜对着它们也是这么说的）"), false);
+            for (String line : idle) {
+                ctx.getSource().sendSuccess(() -> Component.literal("· " + line), false);
+            }
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** 港没在转的原因里，模式算一条：发货模式的港根本不收件，和有没有塔无关。 */
+    private static String dockMode(dev.distantstock.block.DockBlockEntity dock) {
+        return switch (dock.mode()) {
+            case SEND -> "（发货模式，收不了件）";
+            case BIDIRECTIONAL -> "（双向）";
+            case RECEIVE -> "";
+        };
+    }
+
+    /**
+     * 这一台为什么没被带载，用玩家能照着修的话写出来。
+     *
+     * <p>"没塔罩着"和"塔在、但它没在转"是两件要做的事：前者要往上堆耦合器，后者要看那根传动轴。
+     * 报成同一句话，玩家会把一座好塔拆了重建。
+     */
+    private static void noteIfIdle(List<String> out, net.minecraft.world.level.Level level,
+                                   BlockPos pos, String what) {
+        if (level == null || dev.distantstock.routing.TowerActivation.active(level, pos)) {
+            return;
+        }
+        boolean underATower = dev.distantstock.routing.TowerActivation.towerAt(level, pos) != null;
+        out.add(where(level, pos) + " " + what + " —— " + (underATower
+                ? "塔在头顶，但它没在转（或缺应力），所以这台没被带载"
+                : "不在任何塔的激活范围内"));
+    }
+
+    private static String where(net.minecraft.world.level.Level level, BlockPos pos) {
+        return level.dimension().location() + " " + pos.toShortString();
+    }
+
+    /**
      * 所有港组：名字、uuid、当前有多少个已加载的港属于它。
      *
      * <p>港组是收件侧的路由单位，而在此之前游戏里根本造不出第二个组（create/rename 一个调用者都没有），
@@ -445,7 +520,7 @@ public final class AdminCommand {
             // 组主写成名字：列表是给人看的，一串 uuid 前八位谁也认不出是谁。
             String owner = group.owner() == null ? "（无主，对所有人开放）"
                     : PlayerNames.display(server, group.owner())
-                    + (group.open() ? "（开放）" : "（已锁定）");
+                    + (group.open() ? "（开放加入）" : "（已锁定）");
             String members = group.members().isEmpty() ? ""
                     : " · 成员 " + group.members().size();
             ctx.getSource().sendSuccess(() -> Component.literal("· " + group.name()
@@ -529,7 +604,8 @@ public final class AdminCommand {
         ctx.getSource().sendSuccess(() -> Component.literal("港组「" + group.name() + "」· 组主 "
                 + (group.owner() == null ? "无（服务器建的，对所有人开放）"
                         : PlayerNames.display(server, group.owner()))
-                + " · " + (group.open() ? "开放：谁都能用" : "已锁定：只有组主和成员能用")), false);
+                + " · " + (group.open() ? "开放加入：谁都能把自己加进名单"
+                        : "已锁定：只有组主和名单里的人能用")), false);
         // 名单为空也要说出来，中间那条横线就是「没人」和「命令没输出」的区别。
         if (group.members().isEmpty()) {
             ctx.getSource().sendSuccess(() -> Component.literal("  ·（名单是空的）"), false);
@@ -559,98 +635,50 @@ public final class AdminCommand {
         return Command.SINGLE_SUCCESS;
     }
 
-    /** 把玩家准星正对的那个港加进指定港组。没瞄到港就明确说出来，不静默。 */
     /**
-     * A pairing code for one of this server's groups, for a player on another server to redeem.
+     * What this server has heard from its peers about their dock groups.
      *
-     * <p>Ownership is asked of the player who runs it; an operator may mint for a group they do not
-     * own, which is the same override they already have over the group commands. The code is
-     * printed in a form that survives being copied anywhere, and it is the only thing the other
-     * server will ever see of this group until somebody spends it.
+     * <p>Read-only, and deliberately so: every row here was said by the server that owns the group,
+     * and there is nothing this side can change about it. The one thing a player can do is stop
+     * being shown a row.
      */
-    private static int pairCreate(CommandContext<CommandSourceStack> ctx, int minutes) {
+    private static int remoteList(CommandContext<CommandSourceStack> ctx) {
         MinecraftServer server = ctx.getSource().getServer();
-        String name = StringArgumentType.getString(ctx, "group");
-        DockGroup group = DockGroupDirectory.get(server).findByName(name).orElse(null);
-        if (group == null) {
-            return failure(ctx, "没有这个港组：" + name);
+        List<dev.distantstock.routing.RemoteGroups.Entry> remotes =
+                dev.distantstock.routing.RemoteGroups.get(server).all();
+        ctx.getSource().sendSuccess(() -> Component.literal("已认识 " + remotes.size()
+                + " 个远端港组（对面服务器的公告带过来的，不用配对码）："), false);
+        for (var remote : remotes) {
+            String owner = remote.owner() == null ? "无主" : remote.owner().toString().substring(0, 8);
+            ctx.getSource().sendSuccess(() -> Component.literal("· " + remote.display()
+                    + " · 港 " + remote.docks() + " 个 · 名单 " + remote.members().size()
+                    + " 人 · " + (remote.open() ? "开放加入" : "锁着") + " · 组主 " + owner
+                    + " · 节点 " + remote.node()), false);
         }
-        var player = ctx.getSource().getPlayer();
-        boolean owner = player != null && group.ownedBy(player.getUUID());
-        if (!owner && !ctx.getSource().hasPermission(2)) {
-            return failure(ctx, "只有港组主能给它生成配对码：" + group.name());
-        }
-        PairingCodes.Code code = PairingCodes.get(server).issue(group.id(),
-                player == null ? null : player.getUUID(), minutes, System.currentTimeMillis());
-        ctx.getSource().sendSuccess(() -> Component.literal("配对码「" + code.code() + "」· 港组「"
-                + group.name() + "」· " + minutes + " 分钟内有效，只能兑换一次。"
-                + "把它发给对面服务器的玩家，让对方在终端界面的配对框里兑换。"), false);
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private static int pairRevoke(CommandContext<CommandSourceStack> ctx) {
-        String code = StringArgumentType.getString(ctx, "code");
-        if (!PairingCodes.get(ctx.getSource().getServer()).revoke(code)) {
-            return failure(ctx, "没有这个还在有效期内的配对码：" + code);
-        }
-        ctx.getSource().sendSuccess(() -> Component.literal("已作废配对码「"
-                + PairingCodes.normalize(code) + "」。"), false);
-        return Command.SINGLE_SUCCESS;
-    }
-
-    private static int pairRedeem(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        // The redemption answers in chat, seconds later, possibly from another server: it needs a
-        // player to answer, so the console cannot run this one.
-        ServerPlayer player = ctx.getSource().getPlayerOrException();
-        PairingService.redeem(ctx.getSource().getServer(), player,
-                StringArgumentType.getString(ctx, "code"));
         return Command.SINGLE_SUCCESS;
     }
 
     /**
-     * Drops this server's memory of a destination on another server.
+     * Hides a destination this server knows about on another server.
      *
-     * <p>The half of unpairing that is ours to do. Nothing over there changes — the group is still
-     * there and still works for anyone else who was let into it — but this server stops offering it
-     * and stops being able to name it, which is what a player who wants to stop sending somewhere
-     * is asking for. Parcels already on their way still land: the promise was made, and this
-     * command is a memory, not a wall.
+     * <p>Nothing over there changes — the group is still there and still works for anyone else who
+     * was let into it — but this server stops offering it. Parcels already on their way still land:
+     * the promise was made, and this command is a memory, not a wall.
+     *
+     * <p>The hide lasts while the far side says the same thing about the group. Renamed over there,
+     * or a changed member list, and it is offered again on the next announcement — see
+     * {@link dev.distantstock.routing.RemoteGroups#forget}.
      */
-    private static int pairForget(CommandContext<CommandSourceStack> ctx) {
+    private static int remoteForget(CommandContext<CommandSourceStack> ctx) {
         String token = StringArgumentType.getString(ctx, "group");
         var remotes = dev.distantstock.routing.RemoteGroups.get(ctx.getSource().getServer());
         var entry = remotes.findByName(token).orElse(null);
         if (entry == null) {
-            return failure(ctx, "没有这个远端港组：" + token + "（用 /distantstock pair list 看有哪些）");
+            return failure(ctx, "没有这个远端港组：" + token + "（用 /distantstock remote list 看有哪些）");
         }
         remotes.forget(entry.group());
-        ctx.getSource().sendSuccess(() -> Component.literal("已忘掉远端港组「" + entry.display()
-                + "」。对面那台服务器上的组没有任何变化。"), true);
-        return Command.SINGLE_SUCCESS;
-    }
-
-    /** Both halves of the pairing state: what this server is offering, and what it has been given. */
-    private static int pairList(CommandContext<CommandSourceStack> ctx) {
-        MinecraftServer server = ctx.getSource().getServer();
-        long now = System.currentTimeMillis();
-        List<PairingCodes.Code> codes = PairingCodes.get(server).live(now);
-        DockGroupDirectory directory = DockGroupDirectory.get(server);
-        ctx.getSource().sendSuccess(() -> Component.literal("本服有效配对码：" + codes.size()
-                + "（最多 " + PairingCodes.MAX_MINUTES + " 分钟，一次性；point create <组名> 生成）"), false);
-        for (PairingCodes.Code code : codes) {
-            String group = directory.find(code.group()).map(DockGroup::name).orElse("（港组已删除）");
-            long minutesLeft = Math.max(0, (code.expiresAt() - now + 59_999) / 60_000);
-            ctx.getSource().sendSuccess(() -> Component.literal("· " + code.code()
-                    + " · 港组「" + group + "」· 剩余 " + minutesLeft + " 分钟"), false);
-        }
-        List<dev.distantstock.routing.RemoteGroups.Entry> remotes =
-                dev.distantstock.routing.RemoteGroups.get(server).all();
-        ctx.getSource().sendSuccess(() -> Component.literal("已认识的远端港组：" + remotes.size()
-                + "（用 /distantstock pair redeem <码> 认识新的）"), false);
-        for (var remote : remotes) {
-            ctx.getSource().sendSuccess(() -> Component.literal("· " + remote.display()
-                    + " · 节点 " + remote.node()), false);
-        }
+        ctx.getSource().sendSuccess(() -> Component.literal("已隐藏远端港组「" + entry.display()
+                + "」。对面那台服务器上的组没有任何变化；对面改动它之后会重新出现。"), true);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -766,16 +794,6 @@ public final class AdminCommand {
 
     private static String names(List<DockGroup> groups) {
         return String.join("、", groups.stream().limit(MAX_SUGGESTIONS).map(DockGroup::name).toList());
-    }
-
-    private static CompletableFuture<Suggestions> suggestPairCodes(CommandContext<CommandSourceStack> ctx,
-                                                                   SuggestionsBuilder builder) {
-        List<String> codes = PairingCodes.get(ctx.getSource().getServer())
-                .live(System.currentTimeMillis()).stream()
-                .limit(MAX_SUGGESTIONS)
-                .map(PairingCodes.Code::code)
-                .toList();
-        return SharedSuggestionProvider.suggest(codes, builder);
     }
 
     /** Remote destinations, offered by the same names the list and the screen draw. */

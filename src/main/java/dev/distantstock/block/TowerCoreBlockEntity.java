@@ -51,6 +51,12 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
 
     private int couplers;
     private TowerTier tier;
+    /**
+     * 服务端是不是在计费，随方块实体同步过来。
+     *
+     * <p>看下面的 {@code write}：这是一个"谁在算账谁说了算"的读数，而不是客户端自己那份配置。
+     */
+    private boolean charging;
 
     private final FluidTank tank = new FluidTank(ETHER_CAPACITY,
             stack -> stack.getFluid() == ModFluids.ETHER.get());
@@ -276,7 +282,7 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
                 stored.isEmpty() ? ModFluids.ETHER.get().getFluidType().getDescription()
                         : stored.getHoverName(),
                 tank.getFluidAmount(), ETHER_CAPACITY);
-        if (!TowerBilling.enabled()) {
+        if (!charging) {
             GoggleText.line(tip, "goggle.distantstock.tower.ether.off");
         }
         // 罐满时不再单独喊一句「已满」：储罐的读数是 4000 / 4000 mB，谁都看得懂，而那一行金色
@@ -356,12 +362,23 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
         if (tier != null) {
             tag.putString("Tier", tier.name());
         }
+        // 计费是**服务端**的事，读数却画在客户端。
+        //
+        // tower.chargeParcels 是 common 配置，两台机器各读各的文件，而 NeoForge 的配置文件只补新键、
+        // 从不改已有的值 —— 于是老客户端那份一直留着当年的 false，护目镜一口咬定"不计费"，服务端却
+        // 照扣不误，玩家看到的是一句话在撒谎。所以这个读数跟着方块实体同步：谁在算账，谁说了算。
+        if (clientPacket) {
+            tag.putBoolean("Charging", TowerBilling.enabled());
+        }
         tag.put("Tank", tank.writeToNBT(registries, new CompoundTag()));
     }
 
     @Override
     protected void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.read(tag, registries, clientPacket);
+        if (clientPacket) {
+            charging = tag.getBoolean("Charging");
+        }
         couplers = tag.getInt("Couplers");
         tier = null;
         if (tag.contains("Tier")) {

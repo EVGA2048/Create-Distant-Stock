@@ -32,6 +32,7 @@ public final class DockGameTests {
         BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
         level.setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
         var dock = (DockBlockEntity) level.getBlockEntity(pos);
+        TestTowers.carried(h, pos);
         var parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
         player.setItemInHand(InteractionHand.MAIN_HAND, parcel);
         var hit = new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false);
@@ -55,6 +56,7 @@ public final class DockGameTests {
         BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
         level.setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
         var dock = (DockBlockEntity) level.getBlockEntity(pos);
+        TestTowers.carried(h, pos);
         dock.setExport(UUID.randomUUID());
         h.assertTrue(dock.canSend(), "dock did not enter send mode");
         var handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, Direction.UP);
@@ -66,6 +68,63 @@ public final class DockGameTests {
                     "routeless parcel was sent away instead of being held");
             h.assertTrue(dock.status() == DockStatus.BLOCKED,
                     "routeless parcel did not raise the blocked lamp, got " + dock.status());
+            h.succeed();
+        });
+    }
+
+    /**
+     * 护目镜那一行「接收港组：X（本组 N 个港）」在客户端要说出真名字和真数字。
+     *
+     * <p>报的是"仓管里 A服港组后面写着 1，摸港却显示本组 0 个港"，而且名字是 `fce02bd0` 这样的
+     * uuid 前八位。原因不是算错了，是**在错的机器上算**：护目镜是客户端画的，而客户端没有 server ——
+     * `DockGroupDirectory` 查不到（退回 uuid 前缀），`LoadedDocks` 那边连它自己都不算数（
+     * `deliverable` 要求"服务端那一份"），所以那个数字永远是 0。和当年「不计费」是同一个坑。
+     *
+     * <p>所以这条用例查的不是"算得对不对"，是"**客户端手里有没有那份答案**"：把服务端算好的
+     * 那一份，按方块更新的方式过一遍，再看客户端画出来的那行字。它必须和这个港真实挂着的组对得上。
+     */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void theGoggleNamesTheGroupAndCountsItsDocks(GameTestHelper h) {
+        var level = h.getLevel();
+        var group = dev.distantstock.routing.DockGroupDirectory.get(level.getServer())
+                .create("护目镜组 " + java.util.UUID.randomUUID().toString().substring(0, 8));
+
+        BlockPos mine = h.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos neighbour = h.absolutePos(new BlockPos(4, 2, 2));
+        level.setBlock(mine, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        level.setBlock(neighbour, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        var dock = (DockBlockEntity) level.getBlockEntity(mine);
+        TestTowers.carried(h, mine);
+        TestTowers.carried(h, neighbour);
+        dock.setGroupId(group.id());
+        ((DockBlockEntity) level.getBlockEntity(neighbour)).setGroupId(group.id());
+
+        // 一拍之后再看：方块实体是这一刻才注册进 LoadedDocks 的（onLoad），同刻去数一定是 0。
+        // 这个文件里其它用例也都是这么等的。
+        h.runAfterDelay(2, () -> {
+            int onServer = dev.distantstock.block.LoadedDocks.countInGroup(group.id());
+            h.assertTrue(onServer == 2, "服务端自己数出来的是 " + onServer + " 台港，应该是 2");
+
+            // 服务端那一份：写出来的更新标签就是客户端收到的东西。
+            var update = dock.getUpdateTag(level.registryAccess());
+            String name = update.getString("GroupName");
+            int count = update.getInt("GroupDocks");
+            h.assertTrue(name.equals(group.name()),
+                    "同步给客户端的组名是「" + name + "」，应该是「" + group.name() + "」");
+            h.assertTrue(count == 2,
+                    "同步给客户端的港数是 " + count + "，这个组里有两台港");
+
+            // 客户端那一份：一个**没有 level 的**方块实体，和客户端一样没有 server 可问。它只读同步
+            // 过来的那两个字段，画出来的必须还是真名字和真数字 —— 名字不能退回 uuid 前八位，数字不能是 0。
+            var mirror = new DockBlockEntity(dev.distantstock.block.ModBlockEntities.DOCK.get(), mine,
+                    ModBlocks.DOCK.get().defaultBlockState());
+            mirror.loadClientUpdate(update, level.registryAccess());
+            h.assertTrue(mirror.knownGroupName().equals(group.name()),
+                    "客户端画出来的组名是「" + mirror.knownGroupName() + "」，应该是「" + group.name() + "」");
+            h.assertTrue(mirror.knownGroupDocks() == 2,
+                    "客户端画出来的港数是 " + mirror.knownGroupDocks() + "，应该是 2");
+            h.assertTrue(mirror.groupId().equals(group.id()),
+                    "同步过来的港挂错了组：" + mirror.groupId() + " 而不是 " + group.id());
             h.succeed();
         });
     }
@@ -91,6 +150,7 @@ public final class DockGameTests {
         BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
         level.setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
         var dock = (DockBlockEntity) level.getBlockEntity(pos);
+        TestTowers.carried(h, pos);
         dock.setExport(UUID.randomUUID());
         // Somewhere else, and the default group: exactly what the gesture leaves behind when the
         // terminal carries no group.
@@ -152,12 +212,11 @@ public final class DockGameTests {
         receiver.setGroupId(to.id());
 
         // Each on its own tower, and the sender pointed at the other system.
+        // carrier 留空：这两台港要"能工作"，而测试世界里没有塔可以记账（见 TestTowers）。
         TowerActivation.pinDevice(dev.distantstock.routing.TowerSystem.TowerId.of(level.dimension(), senderPos),
-                true, dev.distantstock.routing.TowerSystem.TowerId.of(level.dimension(),
-                        h.absolutePos(new BlockPos(2, 0, 2))));
+                true, null);
         TowerActivation.pinDevice(dev.distantstock.routing.TowerSystem.TowerId.of(level.dimension(), receiverPos),
-                true, dev.distantstock.routing.TowerSystem.TowerId.of(level.dimension(),
-                        h.absolutePos(new BlockPos(6, 0, 2))));
+                true, null);
         try {
             sender.setExport(java.util.UUID.randomUUID());
             sender.setDefaultDestination(node, to.id());
@@ -176,10 +235,25 @@ public final class DockGameTests {
                         "the parcel never reached the receiving tower's dock");
                 h.assertTrue(sender.displayedStack().isEmpty(),
                         "the parcel is in both docks");
+                // 十分钟流量那张表的**入口**在这一端：塔的读数只有在港真的记了一笔之后才有东西可
+                // 汇总。这条曾经是断的 —— survey() 把港的环收进 Map 又丢掉了，只剩一个两参的
+                // of(towers, devices)，于是仪表上"十分钟流量"永远是 0/0（真机上是 GPT 看出来的）。
+                // 聚合那一半由 TowerActivationGameTests 里的用例守着，这里守"港自己有没有记"。
+                var sent = sender.traffic();
+                var arrived = receiver.traffic();
+                h.assertTrue(sent.sent() == 1 && sent.received() == 0,
+                        "发件的港记成了 " + sent + "，该是 1/0");
+                h.assertTrue(arrived.received() == 1 && arrived.sent() == 0,
+                        "收件的港记成了 " + arrived + "，该是 0/1");
                 h.succeed();
             });
         } finally {
-            h.runAfterDelay(240, TowerActivation::unpinDevices);
+            h.runAfterDelay(240, () -> {
+                TowerActivation.unpinDevice(
+                        dev.distantstock.routing.TowerSystem.TowerId.of(level.dimension(), senderPos));
+                TowerActivation.unpinDevice(
+                        dev.distantstock.routing.TowerSystem.TowerId.of(level.dimension(), receiverPos));
+            });
         }
     }
 
@@ -219,6 +293,7 @@ public final class DockGameTests {
         dev.distantstock.block.DockBlockEntity dock =
                 (dev.distantstock.block.DockBlockEntity) h.getLevel().getBlockEntity(pos);
         h.assertTrue(dock != null, "港没有出现");
+        TestTowers.carried(h, pos);
 
         // 能力问的是"哪个方块的哪一面"：港自己，朝下的那一面。
         var below = h.getLevel().getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,

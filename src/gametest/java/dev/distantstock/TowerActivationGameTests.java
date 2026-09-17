@@ -51,14 +51,17 @@ import java.util.UUID;
 @PrefixGameTestTemplate(false)
 public final class TowerActivationGameTests {
     /**
-     * The promise: a world without towers behaves exactly as it did before towers existed.
+     * **没塔就不能用** —— 这条规则本身。
      *
-     * <p>No case in this suite builds a tower that is both complete and turning, so this is the
-     * real world state too, with nothing pinned: the dock ships a parcel through the ordinary route
-     * machinery, exactly as it did before this stage.
+     * <p>它原来断言的是反过来的事（"没有塔的存档照常收发"），那是模组早期的一条兼容承诺。用户
+     * 2026-09-17 拍板推翻：机器必须站在一座**正在运行**的塔的范围内才工作，否则"塔是必需品"这句
+     * 话在新玩家那里永远学不会，而且真正的后果是"邻居建了座塔，我全厂停产"。
+     *
+     * <p>这里没有任何 pin：这个世界的状态就是"一座塔都没有"，而那正是新存档、也是玩家第一次
+     * 放下港时的样子。包裹必须被拒收，而且港要说得出为什么（无塔时灯是暗的、护目镜第一行就是红的）。
      */
     @GameTest(template = "empty", timeoutTicks = 200)
-    public static void withoutTowersADockStillShips(GameTestHelper h) {
+    public static void withoutATowerADockRefusesToWork(GameTestHelper h) {
         ServerLevel level = h.getLevel();
         BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
         level.setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
@@ -66,19 +69,12 @@ public final class TowerActivationGameTests {
         dock.setExport(UUID.randomUUID());
         dock.setDefaultDestination(UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId()),
                 DockGroupDirectory.DEFAULT_GROUP_ID);
-        h.assertTrue(dock.canSend(), "a dock in a world without towers cannot send | gated="
-                + dev.distantstock.routing.TowerActivation.snapshot().gated(level.dimension())
-                + " running=" + dev.distantstock.block.LoadedTowers.all().stream()
-                        .filter(dev.distantstock.block.TowerCoreBlockEntity::isRunning).count()
-                + " tiers=" + dev.distantstock.block.LoadedTowers.all().stream()
-                        .map(be -> String.valueOf(be.tier())).toList());
 
-        h.assertTrue(insertParcel(level, pos), "the parcel did not enter the outgoing slot");
-        h.runAfterDelay(140, () -> {
-            h.assertTrue(dock.displayedStack().isEmpty(),
-                    "the parcel never left a dock that no tower has to carry");
-            h.succeed();
-        });
+        h.assertFalse(dock.canSend(), "a dock in a world without towers still reports that it can send");
+        h.assertFalse(dock.canReceive(), "a dock in a world without towers still reports that it can receive");
+        h.assertFalse(insertParcel(level, pos),
+                "a dock no tower carries took a parcel in — 塔的硬门槛没有生效");
+        h.succeed();
     }
 
     /** The edge of a tower's reach, which is a sphere around the base and nothing else. */
@@ -100,7 +96,8 @@ public final class TowerActivationGameTests {
         // And the same edge through the snapshot the gates actually read.
         TowerSystem.Device inside = device(base.offset(8, 0, 0));
         TowerSystem.Device outside = device(base.offset(9, 0, 0));
-        TowerActivation.Snapshot snapshot = TowerActivation.of(List.of(tower), List.of(inside, outside));
+        TowerActivation.Snapshot snapshot = TowerActivation.of(List.of(tower), List.of(inside, outside),
+                java.util.Map.of());
         h.assertTrue(snapshot.active(h.getLevel().dimension(), inside.pos()),
                 "a device inside the reach was not activated");
         h.assertFalse(snapshot.active(h.getLevel().dimension(), outside.pos()),
@@ -168,10 +165,64 @@ public final class TowerActivationGameTests {
         h.assertTrue(first.get(1).device().pos().equals(middle.pos()), "the second closest did not stay");
 
         // The two answers the gates see, from a run through the real snapshot.
-        TowerActivation.Snapshot snapshot = TowerActivation.of(List.of(tower), new ArrayList<>(backward));
+        TowerActivation.Snapshot snapshot = TowerActivation.of(List.of(tower), new ArrayList<>(backward),
+                java.util.Map.of());
         h.assertTrue(snapshot.active(h.getLevel().dimension(), near.pos()), "the closest device is off");
         h.assertFalse(snapshot.active(h.getLevel().dimension(), far.pos()),
                 "a device past the budget is on");
+        h.succeed();
+    }
+
+    /**
+     * What a dock counted lands on the tower that carries it, and only on that one.
+     *
+     * <p>Both halves matter and both are silent when wrong. The counts are keyed by device, so the
+     * merge has to put each window on the tower that won the device — the nearest one, the first
+     * one and the system's first member are all plausible ways to get it wrong, and all three would
+     * print a number, just not the right one. The third tower carries nothing and has to read zero
+     * rather than its neighbour's traffic.
+     *
+     * <p>Only the rules half is here: the counts go in as a plain list, so no tower has to stand in
+     * the world. The live half — the survey handing these counts over at all — is guarded by the
+     * signature instead of by a case. It used to be possible to call the builder without them, and
+     * {@code survey} did exactly that, collecting every dock's window and then dropping it on the
+     * floor: the flow line read 0/0 for a tower whose docks had been moving parcels all along, and
+     * nothing failed, because a readout nobody wired up and a line that has never moved are the
+     * same zero. There is no such overload any more.
+     *
+     * <p>The third piece — a dock counting its own parcels — is checked where a parcel is actually
+     * moved, in {@code DockGameTests.aParcelCrossesFromOneTowerToAnother}. It cannot be checked
+     * here: a tower that is complete and turning claims every dock in this shared level, which is
+     * why no case in this file builds one.
+     */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void aDocksWindowLandsOnTheTowerThatCarriesIt(GameTestHelper h) {
+        BlockPos first = new BlockPos(0, 64, 0);
+        BlockPos second = new BlockPos(100, 64, 0);
+        BlockPos lonely = new BlockPos(200, 64, 0);
+        TowerSystem.Member near = tower(first, 20, 8, true);
+        TowerSystem.Member far = tower(second, 20, 8, true);
+        TowerSystem.Member empty = tower(lonely, 20, 8, true);
+        TowerSystem.Device firstDock = device(first.offset(1, 0, 0));
+        TowerSystem.Device secondDock = device(first.offset(2, 0, 0));
+        TowerSystem.Device otherDock = device(second.offset(1, 0, 0));
+
+        TowerActivation.Snapshot snapshot = TowerActivation.of(List.of(near, far, empty),
+                List.of(firstDock, secondDock, otherDock),
+                java.util.Map.of(firstDock, new TowerActivation.Traffic(3, 1),
+                        secondDock, new TowerActivation.Traffic(1, 1),
+                        otherDock, new TowerActivation.Traffic(0, 2)));
+
+        // Two docks under one tower add up: one tower's readout is the whole line's traffic.
+        TowerActivation.Traffic nearTraffic = snapshot.traffic(near.id());
+        h.assertTrue(nearTraffic.sent() == 4 && nearTraffic.received() == 2,
+                "the near tower was given " + nearTraffic + " instead of 4/2");
+        TowerActivation.Traffic farTraffic = snapshot.traffic(far.id());
+        h.assertTrue(farTraffic.sent() == 0 && farTraffic.received() == 2,
+                "the far tower was given " + farTraffic + " instead of 0/2");
+        TowerActivation.Traffic emptyTraffic = snapshot.traffic(empty.id());
+        h.assertTrue(emptyTraffic.sent() == 0 && emptyTraffic.received() == 0,
+                "a tower carrying nothing was given " + emptyTraffic);
         h.succeed();
     }
 
@@ -188,7 +239,10 @@ public final class TowerActivationGameTests {
         BlockPos pos = h.absolutePos(new BlockPos(4, 2, 4));
         level.setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
         DockBlockEntity dock = (DockBlockEntity) level.getBlockEntity(pos);
-        dock.setImport("");
+        dock.setImport();
+        // 先把"它被某座塔带着"钉上：这条用例讲的是**失去**塔之后会怎样，所以前半段必须是一台
+        // 正常工作的港。塔的硬门槛让这件事不再是不言自明的。
+        TestTowers.carried(h, pos);
         ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
         h.assertTrue(dock.insert(parcel.copy()), "the dock refused a parcel while it was carried");
 
@@ -208,7 +262,7 @@ public final class TowerActivationGameTests {
                         "a dock outside its tower still took a parcel in");
                 h.succeed();
             } finally {
-                TowerActivation.unpinDevices();
+                TowerActivation.unpinDevice(TowerSystem.TowerId.of(level.dimension(), pos));
             }
         });
     }
@@ -265,7 +319,8 @@ public final class TowerActivationGameTests {
                         h.succeed();
                     } finally {
                         TowerBilling.clearOverride();
-                        TowerActivation.unpinDevices();
+                        TowerActivation.unpinDevice(TowerSystem.TowerId.of(level.dimension(), freeDock));
+                        TowerActivation.unpinDevice(TowerSystem.TowerId.of(level.dimension(), paidDock));
                     }
                 });
             });

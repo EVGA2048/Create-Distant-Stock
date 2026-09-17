@@ -11,10 +11,23 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /** 主线程发布本地网络，IO 线程替换远端快照，GUI/HTTP 只读。 */
 public final class NetworkDirectory {
+    /**
+     * One network, as the terminal and the monitors see it.
+     *
+     * @param packable whether the node this network lives on has a machine that can pack an order
+     *                 for it: a 远仓打包机, standing in a tower's range. True is also what "nobody
+     *                 said" means — a network reached over a transport that does not carry the
+     *                 answer, or a peer too old to send it. The flag only ever draws a warning,
+     *                 and a warning that appears where nothing is wrong is worse than a missing one.
+     */
     public record Entry(UUID freq, String server, int links, RemoteNetworkId networkId,
-                        boolean local) {
+                        boolean local, boolean packable) {
         public Entry(UUID freq, String server, int links) {
-            this(freq, server, links, null, true);
+            this(freq, server, links, null, true, true);
+        }
+
+        public Entry(UUID freq, String server, int links, RemoteNetworkId networkId, boolean local) {
+            this(freq, server, links, networkId, local, true);
         }
 
         /**

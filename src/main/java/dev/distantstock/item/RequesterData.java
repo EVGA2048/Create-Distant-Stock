@@ -74,20 +74,6 @@ public final class RequesterData {
         return tag(stack).getString(HOME_ADDRESS);
     }
 
-    /**
-     * The address a dock on <em>this</em> side answers to, as this requester is set up.
-     *
-     * <p>A dock's filter asks one question: what does a parcel landing here have written on it? A
-     * parcel packed on this server wears {@link #address}; one that crossed and came home wears
-     * {@link #HOME_ADDRESS} — because the crossing swapped them. So the answer is the home address
-     * when there is one, and the only address when there is not. That second half is what keeps a
-     * requester set up before home addresses existed writing exactly what it always wrote.
-     */
-    public static String localAddress(ItemStack stack) {
-        String home = homeAddress(stack);
-        return home.isEmpty() ? address(stack) : home;
-    }
-
     public static void setHomeAddress(ItemStack stack, String homeAddress) {
         String value = homeAddress == null ? "" : homeAddress;
         update(stack, tag -> {

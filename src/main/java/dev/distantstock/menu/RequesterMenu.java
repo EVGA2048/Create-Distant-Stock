@@ -250,13 +250,23 @@ public final class RequesterMenu extends AbstractContainerMenu {
         }
         dev.distantstock.routing.DockGroup existing = directory.findByName(trimmed).orElse(null);
         if (existing == null) {
-            // Not a name from here. It may be one from another server that a redeemed pairing code
-            // wrote down — the whole reason a code exists is that this name could not otherwise be
-            // typed on this side. Nothing about it can be checked from here: the directory that
-            // holds it is on the far end, and so is every dock that answers to it.
+            // Not a name from here. It may be one from another server, learned from that server's
+            // announcement — the whole point of the announcement carrying groups is that this name
+            // could not otherwise be typed on this side. What holds it and what answers to it are
+            // both on the far end; the one thing this side does have is the member list that came
+            // with it.
             var remote = dev.distantstock.routing.RemoteGroups.get(player.level().getServer())
                     .findByName(trimmed).orElse(null);
             if (remote != null) {
+                // 名单也照查，和本服的组一样。远端组没有"这个人能不能用"的第二处判据：订单上没有
+                // 玩家，对面判不了（见 OrderDestination）。客户端已经画成灰的、点不动了，这一句是给
+                // 改过的客户端准备的 —— 少了它，一个选不动的目的地照样会被写进手里这台终端。
+                if (!remote.admits(who)) {
+                    player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                            "gui.distantstock.group.not_admitted", remote.name()), true);
+                    sendGroupList(player, stack);
+                    return;
+                }
                 // 名字带上服务器：这个框决定货从哪台服务器出来，而"远仓B · 仓库"和"仓库"在框里
                 // 长得一样是不行的。存进去的是显示形式，查找照样认（RemoteGroups.findByName
                 // 两个都匹配），所以重新打开终端时框里还是完整的那个目的地。
@@ -345,7 +355,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
         net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(serverPlayer,
                 dev.distantstock.net.RemoteGroupsS2C.of(
                         dev.distantstock.routing.RemoteGroups.get(player.level().getServer()),
-                        player.level().getServer()));
+                        player.level().getServer(), player.getUUID()));
     }
 
     public ItemStack device(Player player) {

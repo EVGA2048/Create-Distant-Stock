@@ -92,28 +92,28 @@ public final class SignalLampGameTests {
     }
 
     /**
-     * 港的过滤条件问的是「落进我这里的包裹身上写着什么」，所以它答的是这一侧的地址。
+     * 两个地址各自独立：写一个不动另一个，清一个不动另一个。
      *
-     * <p>两个地址都填了就用本端那个：货过海回来时穿的正是它。只填了一个（老终端、或者货根本
-     * 不过海）就还是那一个 —— 这条退路是给已经配好的存档留的，多出一个框不该让谁家的港突然
-     * 改成什么都收。
+     * <p>港不再按地址收件了（它只认接收港组），所以"港该答哪一个地址"这个问题没有了 —— 原来那条
+     * 用例问的正是它，连同 {@code RequesterData.localAddress} 一起删掉。剩下的是这两个字段本身的
+     * 契约：终端上有两个框，它们互不干扰，因为它们回答的是两个不同的问题（包裹在对面被谁认领 /
+     * 过海之后改成什么）。
      */
     @GameTest(template = "empty", timeoutTicks = 20)
-    public static void aDockAnswersToThisSidesAddress(GameTestHelper h) {
+    public static void theTwoAddressesAreWrittenIndependently(GameTestHelper h) {
         var terminal = new ItemStack(ModItems.REQUESTER.get());
         RequesterData.setAddress(terminal, "乙站发货口");
-        h.assertTrue(RequesterData.localAddress(terminal).equals("乙站发货口"),
-                "只有一个地址时港答的不是它");
+        h.assertTrue(RequesterData.address(terminal).equals("乙站发货口"), "远端地址没写进去");
+        h.assertTrue(RequesterData.homeAddress(terminal).isEmpty(),
+                "写远端地址的时候本端地址被凭空写了一个");
         RequesterData.setHomeAddress(terminal, "甲站收货口");
-        h.assertTrue(RequesterData.localAddress(terminal).equals("甲站收货口"),
-                "填了本端地址以后港还在答对面那个地址");
+        h.assertTrue(RequesterData.homeAddress(terminal).equals("甲站收货口"), "本端地址没写进去");
+        h.assertTrue(RequesterData.address(terminal).equals("乙站发货口"),
+                "写本端地址的时候远端地址被改了");
         RequesterData.setHomeAddress(terminal, "");
-        h.assertTrue(RequesterData.localAddress(terminal).equals("乙站发货口"),
-                "清掉本端地址以后没有退回那唯一的地址");
-        // 两个都空 = 谁都收，这正是港的 `*` 通配。
-        RequesterData.setAddress(terminal, "");
-        h.assertTrue(RequesterData.localAddress(terminal).isEmpty(),
-                "两个地址都空的时候港还是答了一个地址");
+        h.assertTrue(RequesterData.homeAddress(terminal).isEmpty(), "本端地址清不掉");
+        h.assertTrue(RequesterData.address(terminal).equals("乙站发货口"),
+                "清本端地址把远端地址一起清了");
         h.succeed();
     }
 
@@ -623,6 +623,7 @@ public final class SignalLampGameTests {
         var level = h.getLevel();
         BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
         level.setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        TestTowers.carried(h, pos);
         BlockPos hopperPos = pos.east();
         level.setBlock(hopperPos, Blocks.HOPPER.defaultBlockState().setValue(HopperBlock.FACING, Direction.WEST), 3);
         var hopper = (HopperBlockEntity) level.getBlockEntity(hopperPos);

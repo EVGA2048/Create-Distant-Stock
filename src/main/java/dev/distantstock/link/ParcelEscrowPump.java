@@ -168,8 +168,10 @@ public final class ParcelEscrowPump {
                                 record.parcelId(), record.receivingDockGroupId(), record.strips());
                         sent++;
                     } else if (result == DeliveryResult.REJECTED) {
-                        // 永久拒绝：本机收不了这个包裹（清单缺条目／包裹解不开）。交给既有的退件流程。
-                        escrow.rejected(record.parcelId(), "local_incompatible");
+                        // 永久拒绝：本机不会收这个包裹 —— 清单缺条目、包裹解不开，或者**这一侧根本没有
+                        // 它要去的那个收货港组**（那个组等多久都不会出现，见 TranserverPackageService）。
+                        // 交给既有的退件流程。
+                        escrow.rejected(record.parcelId(), "target_refused");
                     }
                     // RETRY 不是失败：目标港所在区块还没加载、港满了或在忙，下一个 tick 会再试。
                     // RETRY is not a failure: it is the same "not yet" the transport path reports, and the

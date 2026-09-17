@@ -15,23 +15,41 @@ import java.util.UUID;
 
 public final class NetworkAnnouncementCodec {
     private static final int MAGIC = 0x44534e41;
-    /** Version 1 carried only the network list; 2 appends the sender's own tick metrics. */
-    private static final int VERSION = 2;
+    /**
+     * Version 1 carried only the network list; 2 appends the sender's own tick metrics; 3 adds
+     * whether each network has a machine that can pack for it, and the sender's dock groups.
+     *
+     * <p>Older payloads are still read: every field added since 1 is read only when the version
+     * says it is there, and a peer that speaks 2 leaves the newer answers at their defaults. The
+     * defaults are the permissive ones — "can pack" and "no opinion about who may use this group" —
+     * so a mixed pair of versions loses a warning, never an order.
+     */
+    private static final int VERSION = 3;
+    private static final int VERSION_WITH_METRICS = 2;
     private static final int VERSION_WITHOUT_METRICS = 1;
     private static final int MAX_NETWORKS = 256;
+    private static final int MAX_GROUPS = 64;
+    private static final int MAX_MEMBERS = 32;
     private static final int MAX_TEXT = 256;
 
     /**
-     * One announcement: the networks on this node, and the numbers the other node draws about us.
+     * One announcement: what is on this node, and the numbers the other node draws about us.
      *
      * <p>The metrics ride here because the announcement is the only message that crosses on a
      * regular beat, and a peer's TPS is something every monitor shows. A second channel asking
      * "how are you" would be a second round trip for two floats that are already going the same way.
+     *
+     * <p>The dock groups ride here for the same reason and to the same end: they are the other half
+     * of every cross-server destination, they change rarely, and the message that says what this
+     * node has is exactly the message that should say what it can receive.
      */
-    public static byte[] encode(List<NetworkDirectory.Entry> entries, double tps, double mspt)
-            throws IOException {
+    public static byte[] encode(List<NetworkDirectory.Entry> entries, double tps, double mspt,
+                                List<Group> groups) throws IOException {
         if (entries.size() > MAX_NETWORKS) {
             throw new IOException("Too many announced networks");
+        }
+        if (groups.size() > MAX_GROUPS) {
+            throw new IOException("Too many announced dock groups");
         }
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
@@ -49,10 +67,42 @@ public final class NetworkAnnouncementCodec {
             uuid(out, id.createFrequency());
             string(out, entry.server());
             out.writeInt(Math.max(0, entry.links()));
+            out.writeBoolean(entry.packable());
         }
         out.writeDouble(tps);
         out.writeDouble(mspt);
+        out.writeInt(groups.size());
+        for (Group group : groups) {
+            uuid(out, group.id());
+            string(out, group.name());
+            out.writeBoolean(group.owner() != null);
+            if (group.owner() != null) {
+                uuid(out, group.owner());
+            }
+            out.writeBoolean(group.open());
+            out.writeInt(Math.max(0, group.docks()));
+            out.writeInt(group.members().size());
+            for (Group.Member member : group.members()) {
+                uuid(out, member.id());
+                string(out, member.name());
+            }
+        }
         return bytes.toByteArray();
+    }
+
+    /**
+     * One dock group of the sending node, as it looks to a stranger.
+     *
+     * <p>Members are named because a name is the only thing that can be shown for somebody who is
+     * offline, and the ids travel with them because that is what a permission is decided on.
+     *
+     * @param docks how many receiving docks the group has, which is the difference between a
+     *              destination and a name
+     */
+    public record Group(UUID id, String name, UUID owner, boolean open, int docks,
+                        List<Member> members) {
+        public record Member(UUID id, String name) {
+        }
     }
 
     /** The two readings an announcement carries about the node that sent it. */
@@ -70,10 +120,17 @@ public final class NetworkAnnouncementCodec {
         return lastMetrics;
     }
 
+    /** The dock groups from the last {@link #decode}. See {@link #lastMetrics} for the pattern. */
+    public static List<Group> groups(byte[] payload) {
+        return lastGroups;
+    }
+
     private static Metrics lastMetrics = Metrics.UNKNOWN;
+    private static List<Group> lastGroups = List.of();
 
     public static List<NetworkDirectory.Entry> decode(byte[] payload) throws IOException {
         lastMetrics = Metrics.UNKNOWN;
+        lastGroups = List.of();
         if (payload == null || payload.length < 12 || payload.length > 256 * 1024) {
             throw new IOException("Network announcement size is invalid");
         }
@@ -82,7 +139,7 @@ public final class NetworkAnnouncementCodec {
             throw new IOException("Unsupported network announcement");
         }
         int version = in.readInt();
-        if (version != VERSION && version != VERSION_WITHOUT_METRICS) {
+        if (version < VERSION_WITHOUT_METRICS || version > VERSION) {
             throw new IOException("Unsupported network announcement");
         }
         int count = in.readInt();
@@ -100,19 +157,50 @@ public final class NetworkAnnouncementCodec {
             if (links < 0) {
                 throw new IOException("Network link count is invalid");
             }
+            // "Can pack" is new in 3, and a peer that does not send it means "no opinion" — which
+            // is the permissive answer, so the terminal draws no warning about it.
+            boolean packable = version < VERSION || in.readBoolean();
             RemoteNetworkId id = new RemoteNetworkId(1, node, world, dimension, frequency);
             // False by definition: this is a list that arrived from another node.
-            entries.add(new NetworkDirectory.Entry(frequency, alias, links, id, false));
+            entries.add(new NetworkDirectory.Entry(frequency, alias, links, id, false, packable));
         }
-        if (version >= VERSION && in.available() >= 16) {
+        if (version >= VERSION_WITH_METRICS && in.available() >= 16) {
             // Kept as the last thing read rather than returned: the network list is what every
             // caller is here for, and a caller that also wants the numbers asks for them.
             lastMetrics = new Metrics(in.readDouble(), in.readDouble());
+        }
+        if (version >= VERSION) {
+            lastGroups = readGroups(in);
         }
         if (in.available() != 0) {
             throw new IOException("Network announcement contains trailing data");
         }
         return List.copyOf(entries);
+    }
+
+    private static List<Group> readGroups(DataInputStream in) throws IOException {
+        int count = in.readInt();
+        if (count < 0 || count > MAX_GROUPS) {
+            throw new IOException("Announced dock group count is invalid");
+        }
+        List<Group> groups = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            UUID id = uuid(in);
+            String name = string(in);
+            UUID owner = in.readBoolean() ? uuid(in) : null;
+            boolean open = in.readBoolean();
+            int docks = in.readInt();
+            int members = in.readInt();
+            if (docks < 0 || members < 0 || members > MAX_MEMBERS) {
+                throw new IOException("Announced dock group is invalid");
+            }
+            List<Group.Member> named = new ArrayList<>(members);
+            for (int m = 0; m < members; m++) {
+                named.add(new Group.Member(uuid(in), string(in)));
+            }
+            groups.add(new Group(id, name, owner, open, docks, List.copyOf(named)));
+        }
+        return List.copyOf(groups);
     }
 
     private static void string(DataOutputStream out, String value) throws IOException {

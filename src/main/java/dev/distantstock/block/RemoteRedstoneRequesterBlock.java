@@ -69,7 +69,7 @@ public final class RemoteRedstoneRequesterBlock extends RedstoneRequesterBlock {
             return ItemInteractionResult.sidedSuccess(false);
         }
         be.bind(new RemoteBinding(network, RequesterData.receivingGroup(stack).orElse(null),
-                RequesterData.address(stack)));
+                RequesterData.address(stack), RequesterData.homeAddress(stack)));
         player.displayClientMessage(Component.translatable("gui.distantstock.remote_gauge.bound",
                 network.shortLabel()), true);
         return ItemInteractionResult.sidedSuccess(false);

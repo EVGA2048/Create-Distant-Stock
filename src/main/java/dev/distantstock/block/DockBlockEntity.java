@@ -96,7 +96,14 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
 
         @Override
         public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
-            if (slot != 0 || !PackageItem.isPackage(stack) || occupied()) {
+            // 这里挡的是**塔的硬门槛**那一条，不是模式：不在一座正在运行的塔的范围内的港，传送带和
+            // 漏斗也不许往里塞东西。少了这一句，硬门槛就漏了半条 —— 玩家手工递进去会被拒，机器递进去
+            // 却能进，而"没塔不能用"的意思显然包括机器那一半。
+            //
+            // 模式**不在这里**判。把一个包裹塞进收货港是本来就有的一条路：它进发出格、发不出去、
+            // 于是被判成"卡住"（见 outboundIsStranded），玩家空手右键或溜槽随时能拿走。按 canSend()
+            // 挡会把这条路一起堵死，而它跟有没有塔毫无关系。
+            if (slot != 0 || !PackageItem.isPackage(stack) || occupied() || !carriedByTower()) {
                 return stack;
             }
             return outboundInv.insertItem(0, stack, simulate);
@@ -121,7 +128,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
 
         @Override
         public boolean isItemValid(int slot, ItemStack stack) {
-            return slot == 0 && PackageItem.isPackage(stack);
+            return slot == 0 && PackageItem.isPackage(stack) && carriedByTower();
         }
     };
 
@@ -222,9 +229,18 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
 
     private UUID freq;
     private RemoteNetworkId networkId;
-    private String address = "";
     private DockMode mode = DockMode.RECEIVE;
     private UUID groupId = DockGroupDirectory.DEFAULT_GROUP_ID;
+    /**
+     * 组名和组里的港数，**只给客户端看的副本**。
+     *
+     * <p>服务端从不读它们，读的时候现算（{@link #groupDisplayName} / {@link #groupDockCount}）；
+     * 客户端只读它们。分区明确是为了不让"上一次同步过来的值"有机会被当成答案。
+     */
+    private String syncedGroupName;
+    private int syncedGroupDocks;
+    /** 同上，发货目的地的组名（「发往」那一行画的是它）。 */
+    private String syncedTargetGroupName;
     private boolean linkUp;
     private int backlogOrders;
     private int inFlight;
@@ -259,7 +275,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         behaviours.add(new DockPriorityBehaviour(this));
     }
 
-    /** Switches the routing direction without touching the tuned frequency or the local address. */
+    /** Switches the routing direction without touching the tuned frequency or the receiving group. */
     public void setMode(DockMode newMode) {
         if (newMode == null) {
             throw new IllegalArgumentException("mode must not be null");
@@ -275,10 +291,6 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
 
     public UUID freq() {
         return freq;
-    }
-
-    public String address() {
-        return address;
     }
 
     public DockMode mode() {
@@ -325,23 +337,27 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     }
 
     /**
-     * Whether this dock may send, which now also means "a tower carries it".
+     * Whether a running tower carries this dock. The one gate every path shares.
      *
-     * <p>The gate lives here because this is where every path already asks: shipping, pulling a
-     * parcel from a neighbour, handing one over, and the selection that picks a dock for an
-     * incoming parcel all read one of these two methods. It is deliberately cheap — the answer is
-     * a hash lookup in a snapshot, rebuilt once a second, not a search.
+     * <p>It is deliberately cheap — a hash lookup in a snapshot rebuilt once a second, not a search.
      *
-     * <p>A world without towers answers yes for everything, which is the promise: adding towers to
-     * a save must not stop the docks that were already there.
+     * <p><b>A save with no tower in range has no working docks.</b> That is the rule the user set
+     * (2026-09-17): distant machinery has to stand inside a running tower's range, the way Create's
+     * machines want rotation. It used to answer yes for everything, on the theory that adding towers
+     * must not break the docks a save already had; the theory was wrong — it made the tower optional
+     * decoration for the very machines whose whole point is that they reach across a server.
      */
+    public boolean carriedByTower() {
+        return TowerActivation.active(level, worldPosition);
+    }
+
+    /** Whether this dock may send: the mode says so, and a tower is carrying it. */
     public boolean canSend() {
-        return (mode == DockMode.SEND || mode == DockMode.BIDIRECTIONAL)
-                && TowerActivation.active(level, worldPosition);
+        return (mode == DockMode.SEND || mode == DockMode.BIDIRECTIONAL) && carriedByTower();
     }
 
     public boolean canReceive() {
-        return receivingMode() && TowerActivation.active(level, worldPosition);
+        return receivingMode() && carriedByTower();
     }
 
     /** The tuned direction alone, without the tower gate. */
@@ -437,7 +453,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         sync();
     }
 
-    /** Removes the Create network binding without discarding the dock's address or group. */
+    /** Removes the Create network binding without discarding the dock's receiving group. */
     public void clearNetwork() {
         networkId = null;
         freq = null;
@@ -576,18 +592,16 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         sync();
     }
 
-    public void setImport(String address) {
+    public void setImport() {
         networkId = null;
         freq = null;
-        this.address = address == null ? "" : address;
         mode = DockMode.RECEIVE;
         sync();
     }
 
-    public void setBidirectional(UUID freq, String address) {
+    public void setBidirectional(UUID freq) {
         this.networkId = null;
         this.freq = freq;
-        this.address = address == null ? "" : address;
         mode = DockMode.BIDIRECTIONAL;
         sync();
     }
@@ -620,10 +634,46 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     }
 
     /**
+     * A group name for the readout: the synced copy on the client, the live lookup on the server.
+     *
+     * <p>It used to be the live lookup in both places, and on the client that could only ever return
+     * the uuid prefix — there is no server there, and no directory to look in. So a dock that had
+     * just been added to 甲服仓库 drew 「fce02bd0」, and the count beside it drew 0 for the same kind
+     * of reason. Both are facts about the server, and both now travel with the block entity.
+     */
+    public String knownGroupName() {
+        return known(syncedGroupName, groupId);
+    }
+
+    /** 「发往」那一行的组名。同一个道理：客户端只能读同步过来的那一份。 */
+    private String knownTargetGroupName() {
+        return known(syncedTargetGroupName, defaultReceivingGroupId);
+    }
+
+    private String known(String synced, java.util.UUID group) {
+        if (level != null && !level.isClientSide) {
+            return groupName(group);
+        }
+        return synced == null || synced.isEmpty() ? RequesterData.shortFreq(group) : synced;
+    }
+
+    /**
+     * The dock count the readout draws. See {@link #knownGroupName}.
+     *
+     * <p>Public with its sibling above because they are the two values the goggle asks for, and the
+     * case worth testing — a block entity with no server behind it — cannot be reached from a game
+     * test any other way: the runner has a server level, and the whole bug lived on the other side
+     * of that line.
+     */
+    public int knownGroupDocks() {
+        return level != null && !level.isClientSide ? groupDockCount() : syncedGroupDocks;
+    }
+
+    /**
      * A dock group's name, or a short form rather than nothing when the file cannot be read.
      *
-     * <p>Read from the directory every time the goggles are drawn. That is a map lookup on a file
-     * that is already in memory, and the name it returns is the one the player recognises.
+     * <p>Server-side only. On the client there is no directory to read and the answer would be the
+     * uuid prefix — see {@link #knownGroupName}.
      */
     private String groupName(java.util.UUID group) {
         if (group == null) {
@@ -714,10 +764,6 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             text = text.copy().append(Component.literal(" " + RequesterData.shortFreq(freq))
                     .withStyle(ChatFormatting.AQUA));
         }
-        if (canReceive()) {
-            text = text.copy().append(Component.literal(" " + (address.isBlank() ? "*" : address))
-                    .withStyle(ChatFormatting.WHITE));
-        }
         if (canSend() && defaultDestinationNode != null) {
             text = text.copy().append(Component.literal(" -> "
                             + RequesterData.shortFreq(defaultDestinationNode))
@@ -742,6 +788,15 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             be.sync();
         }
         if (level.getGameTime() % 10 == 0) {
+            // 组名和港数每十刻对一次，变了就再同步一次。只同步一次是不够的：它们会**自己**变 ——
+            // 组主改个名字、同组的另一台港被拆掉或加进来，这一台什么都不知道，而护目镜上那一行
+            // 就一直写着上一次的答案。十刻和上面那一批读数同一个节拍。
+            String currentName = be.groupName(be.groupId);
+            int currentDocks = be.groupDockCount();
+            if (!currentName.equals(be.syncedGroupName) || currentDocks != be.syncedGroupDocks
+                    || !be.groupName(be.defaultReceivingGroupId).equals(be.syncedTargetGroupName)) {
+                be.sync();
+            }
             LinkSnapshot.View snapshot = LinkSnapshot.view();
             be.linkUp = snapshot.linkUp() || (!snapshot.transerverAttached()
                     && !dev.distantstock.config.StockConfig.hasPeer());
@@ -914,12 +969,6 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             if (!route.equals(packageRoute)) {
                 RemoteRouteData.write(stack, route.get(),
                         dev.distantstock.link.RouteLabels.describe(level.getServer(), route.get()));
-                // Recorded here because here is where it is known: a parcel bound for another node
-                // is the one the tooltip has a second line for.
-                if (!dev.distantstock.link.TranserverBridge.isLocal(
-                        route.get().destinationNodeId().toString())) {
-                    RemoteRouteData.markCrossServer(stack);
-                }
                 nbt = PackageCodec.encode(stack, level.registryAccess());
                 if (nbt.isEmpty()) {
                     continue;
@@ -1000,15 +1049,18 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             case BIDIRECTIONAL -> "goggle.distantstock.mode.bidirectional";
         });
         GoggleText.line(tip, "goggle.distantstock.status." + status().getSerializedName());
-        // Which system this dock belongs to, by name. Two systems on one server are two names in a
-        // list, and without this line the only way to tell which one a dock is in is to remember.
-        GoggleText.line(tip, "goggle.distantstock.group", groupName(groupId));
+        // 接收港组：这个港收谁的包裹，也是它唯一的收件条件。写在最上面几行里，因为戴护目镜看港
+        // 的人第一个问题就是"我这个港到底挂在哪个组上"—— 以前这里只有一行「系统：X」，而收件
+        // 条件那一行写的是地址，于是"组决定落哪个港"这件事在界面上根本看不出来。
+        //
+        // 组里几个港一起写出来：一个组里只有一个港，和一组里有五个港，是两个完全不同的东西
+        // （前者没有冗余，后者按优先级挑空的那个），而这个区别只看名字是看不出来的。
+        GoggleText.line(tip, "goggle.distantstock.group", knownGroupName(), knownGroupDocks());
         if (canSend() && freq != null) {
             GoggleText.line(tip, "goggle.distantstock.freq", RequesterData.shortFreq(freq));
             GoggleText.line(tip, "goggle.distantstock.backlog", backlogOrders, inFlight);
         }
         if (canReceive()) {
-            GoggleText.line(tip, "goggle.distantstock.address", address.isBlank() ? "*" : address);
             if (isFull()) {
                 GoggleText.line(tip, "goggle.distantstock.slots.full");
             } else {
@@ -1024,7 +1076,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                 // has no way to map a prefix back to one.
                 GoggleText.line(tip, "goggle.distantstock.target",
                         RequesterData.shortFreq(defaultDestinationNode),
-                        groupName(defaultReceivingGroupId));
+                        knownTargetGroupName());
             }
             GoggleText.line(tip, "goggle.distantstock.outbound", outboundSlots(), SLOTS);
         }
@@ -1133,7 +1185,6 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         if (networkId != null) {
             tag.put("RemoteNetwork", networkId.save());
         }
-        tag.putString("Address", address);
         tag.putString("Mode", mode.name().toLowerCase(Locale.ROOT));
         tag.putUUID("DockGroup", groupId);
         tag.put("ReceivedInv", receivedInv.serializeNBT(registries));
@@ -1150,6 +1201,39 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         tag.putUUID("DefaultGroup", defaultReceivingGroupId);
         tag.putInt("Priority", priority);
         tag.putString("SendError", sendError);
+        if (clientPacket) {
+            // 护目镜那两行组名和港数是**客户端**画的（Create 的护目镜在客户端收集），而客户端没有
+            // server：组名查不到目录、港数走不过 deliverable 的"服务端才算"，于是一个刚加进 A服港组
+            // 的港会显示「fce02bd0（本组 0 个港）」—— 名字是 uuid 前八位，数字永远是 0。和当年那个
+            // 「不计费」是同一个坑：**服务端才知道的事，读数必须跟着方块实体同步过去，不能在客户端现算。**
+            if (level != null && !level.isClientSide) {
+                // 顺手记下来，好让 serverTick 里那个"变了没有"的比较有个基准；客户端写盘时不重算，
+                // 它手里只有同步过来的那一份。
+                syncedGroupName = groupName(groupId);
+                syncedGroupDocks = groupDockCount();
+                syncedTargetGroupName = groupName(defaultReceivingGroupId);
+            }
+            tag.putString("GroupName", syncedGroupName == null ? "" : syncedGroupName);
+            tag.putInt("GroupDocks", syncedGroupDocks);
+            tag.putString("TargetGroupName",
+                    syncedTargetGroupName == null ? "" : syncedTargetGroupName);
+        }
+    }
+
+    /** 这个组现在有几台已加载的港。同上：只有服务端数得对。 */
+    private int groupDockCount() {
+        return level == null || level.isClientSide ? 0 : LoadedDocks.countInGroup(groupId);
+    }
+
+    /**
+     * 把一份客户端更新读进来 —— 客户端收到方块更新时走的就是这条路。
+     *
+     * <p>公开是因为它就是"这块方块把新状态交给客户端"这件事本身，而那条路只有在**背后没有服务端**
+     * 的方块实体上跑一遍才验得了（game test 跑在有服务端的世界里）。见
+     * {@code DockGameTests.theGoggleNamesTheGroupAndCountsItsDocks}。
+     */
+    public void loadClientUpdate(CompoundTag tag, HolderLookup.Provider registries) {
+        read(tag, registries, true);
     }
 
     @Override
@@ -1161,7 +1245,10 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         if (networkId != null) {
             freq = networkId.createFrequency();
         }
-        address = tag.getString("Address");
+        // "Address" is no longer read. A dock's own address stopped selecting which parcels it takes
+        // when the group became the only thing that picks one — the tag stays behind in old saves and
+        // is ignored, because a dock that used to take only half of its group's traffic now takes all
+        // of it, which is what the group always said it would do.
         mode = readMode(tag.getString("Mode"), freq != null ? DockMode.SEND : DockMode.RECEIVE);
         groupId = tag.hasUUID("DockGroup") ? tag.getUUID("DockGroup") : DockGroupDirectory.DEFAULT_GROUP_ID;
         if (tag.contains("ReceivedInv")) {
@@ -1189,6 +1276,14 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                 ? tag.getUUID("DefaultGroup") : DockGroupDirectory.DEFAULT_GROUP_ID;
         priority = Math.max(0, Math.min(MAX_PRIORITY, tag.getInt("Priority")));
         sendError = tag.getString("SendError");
+        // 客户端只读这两个；服务端那份由上面两个方法现算，不从盘上读回来 —— 盘上那份是上一次
+        // 同步过去的旧值，拿它当答案就等于把"上一次"当成"现在"。
+        if (clientPacket || level == null || level.isClientSide) {
+            syncedGroupName = tag.contains("GroupName") ? tag.getString("GroupName") : null;
+            syncedGroupDocks = tag.getInt("GroupDocks");
+            syncedTargetGroupName = tag.contains("TargetGroupName")
+                    ? tag.getString("TargetGroupName") : null;
+        }
     }
 
     private void updateVisual() {

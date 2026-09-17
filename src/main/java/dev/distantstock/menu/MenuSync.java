@@ -54,6 +54,10 @@ public final class MenuSync {
             // Which server it is on, so the list can draw them apart. The client cannot work it out
             // for itself: it does not know its own node id, and both halves write an alias.
             buf.writeBoolean(entry.local());
+            // Whether an order for it would be packed by anything. Sent here as well as on the
+            // periodic sync, because this is the packet that fills the list the moment the screen
+            // opens — without it the first thing a player sees is a network drawn as working.
+            buf.writeBoolean(entry.packable());
         }
     }
 
@@ -74,7 +78,8 @@ public final class MenuSync {
             dev.distantstock.routing.RemoteNetworkId networkId = buf.readBoolean()
                     ? dev.distantstock.routing.RemoteNetworkId.read(buf.readNbt()).orElse(null) : null;
             boolean local = buf.readBoolean();
-            directory.add(new NetworkDirectory.Entry(freq, server, links, networkId, local));
+            boolean packable = buf.readBoolean();
+            directory.add(new NetworkDirectory.Entry(freq, server, links, networkId, local, packable));
         }
         menu.networks = directory;
     }

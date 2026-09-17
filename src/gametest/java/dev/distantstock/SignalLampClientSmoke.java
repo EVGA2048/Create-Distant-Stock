@@ -145,6 +145,7 @@ public final class SignalLampClientSmoke {
                 scenes++;
             }
             LogUtils.getLogger().info("DISTANTSTOCK_PONDER_OK: {} scenes have a structure and their text", scenes);
+            checkDockGroupPage(mc);
             if (checkTerminalClick()) {
                 LogUtils.getLogger().info("DISTANTSTOCK_TERMINAL_CLICK_OK: 点一下就有反应");
             }
@@ -155,6 +156,32 @@ public final class SignalLampClientSmoke {
         } finally {
             mc.stop();
         }
+    }
+
+    /**
+     * 港组那一页能不能开出来、画不画得出来。
+     *
+     * <p>它是从一个手绘的按钮打开的（终端列表行上的「网络…」），而"点了没反应"这类问题读代码
+     * 是看不出来的：命中区、屏幕的构造、init 里的布局，任何一环出错都只是"什么都没发生"。
+     * 这里在真实客户端里把它开出来、跑一遍 init 和绘制 —— 抛异常就是失败，不会再悄悄过去。
+     *
+     * <p>它不绑菜单，所以标题界面上就能跑，不像下面那条要玩家。两版都画：自己建的（有输入框、
+     * 有按钮）和别人的（只有只读的一行）。
+     */
+    private static void checkDockGroupPage(Minecraft mc) {
+        var graphics = new net.minecraft.client.gui.GuiGraphics(mc, mc.renderBuffers().bufferSource());
+        var mine = new dev.distantstock.net.DockGroupsS2C.Entry(java.util.UUID.randomUUID(),
+                "测试网络", true, true, 2, "某人", java.util.List.of("甲", "乙"), true);
+        var page = new dev.distantstock.client.DockGroupScreen(null, mine);
+        page.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+        page.render(graphics, 0, 0, 0f);
+
+        var theirs = new dev.distantstock.net.DockGroupsS2C.Entry(java.util.UUID.randomUUID(),
+                "别人的网络", true, false, 1, "某人", java.util.List.of(), false);
+        var stranger = new dev.distantstock.client.DockGroupScreen(null, theirs);
+        stranger.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+        stranger.render(graphics, 0, 0, 0f);
+        LogUtils.getLogger().info("DISTANTSTOCK_GROUP_PAGE_OK: 港组页面开得出、画得出来");
     }
 
     /**

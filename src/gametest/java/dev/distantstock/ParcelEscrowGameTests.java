@@ -12,6 +12,7 @@ import dev.distantstock.routing.DockGroup;
 import dev.distantstock.routing.DockGroupDirectory;
 import com.simibubi.create.content.logistics.box.PackageItem;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.MinecraftServer;
@@ -82,43 +83,41 @@ public final class ParcelEscrowGameTests {
     }
 
     /**
-     * 按地址投递：同一个组里的两个港，包裹只该落在地址对上的那一个。
+     * 组决定落哪个港：包裹的地址**不参与**选择，多古怪的地址都照样落进这个组。
      *
-     * <p>组决定「从哪些港出来」，地址决定「具体是哪一个」—— 一个组里有好几个港时，
-     * 后者才是玩家真正在用的那件事。这条链的最后一跳是 {@code PackageItem.matchAddress}，
-     * 港没写地址时当作 {@code *}（谁都收）。
+     * <p>这条规则以前是反的 —— 港会拿自己的地址再筛一遍包裹，于是同一个组里的两个港只要写了不同
+     * 的地址就各收一半，"一组多个港"退化成了"几个各管一半的港"，而哪个港吃哪一半取决于一个方块上
+     * 根本不显示、只有戴护目镜才看得见的东西。现在港只认组；地址是包裹落地**之后**，由本机物流
+     * （蛙港、溜槽、传送带）用来继续分拣的。
+     *
+     * <p>断言故意用一个谁也不会去写的地址：以前它会被同组的两个港一起拒收，包裹无处可去。
      */
     @GameTest(template = "empty", timeoutTicks = 100)
-    public static void aParcelLandsInTheDockItsAddressNames(GameTestHelper h) {
+    public static void aGroupChoosesTheDockAndTheAddressDoesNot(GameTestHelper h) {
         var level = h.getLevel();
         MinecraftServer server = level.getServer();
         DockGroup group = DockGroupDirectory.get(server)
                 .create("地址组 " + java.util.UUID.randomUUID().toString().substring(0, 8));
-        DockBlockEntity named = placeDock(h, TARGET_X, group.id());
-        DockBlockEntity open = placeDock(h, OTHER_X, group.id());
-        // 两个都写死地址，而且不同：只写一个的话另一个就成了 `*`（谁都收），
-        // 两个港都会匹配上，选中哪个都是对的，这条用例就什么都证明不了。
-        named.setImport("甲站");
-        open.setImport("乙站");
+        DockBlockEntity one = placeDock(h, TARGET_X, group.id());
+        DockBlockEntity other = placeDock(h, OTHER_X, group.id());
 
         h.runAfterDelay(2, () -> {
             ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
-            com.simibubi.create.content.logistics.box.PackageItem.addAddress(parcel, "甲站");
-            h.assertTrue("甲站".equals(com.simibubi.create.content.logistics.box.PackageItem
+            com.simibubi.create.content.logistics.box.PackageItem.addAddress(parcel, "没人认领的门牌");
+            h.assertTrue("没人认领的门牌".equals(com.simibubi.create.content.logistics.box.PackageItem
                             .getAddress(parcel)),
                     "包裹地址没写进去，后面的断言就没有意义了");
 
             ParcelEscrow escrow = ParcelEscrow.get(server);
-            escrow.hold(parcel, "甲站", TranserverBridge.localNodeId(), group.id(),
+            escrow.hold(parcel, "没人认领的门牌", TranserverBridge.localNodeId(), group.id(),
                     level.dimension().location().toString(),
                     h.absolutePos(new BlockPos(OTHER_X, Y, Z)), level.getGameTime(),
                     level.registryAccess());
             ParcelEscrowPump.tick(server);
 
-            h.assertTrue(named.displayedStack().is(ModItems.REMOTE_PACKAGE.get()),
-                    "包裹没有落进地址对上的那个港");
-            h.assertTrue(open.displayedStack().isEmpty(),
-                    "包裹落进了同组里地址不对的那个港（乙站）");
+            boolean landed = one.displayedStack().is(ModItems.REMOTE_PACKAGE.get())
+                    || other.displayedStack().is(ModItems.REMOTE_PACKAGE.get());
+            h.assertTrue(landed, "包裹没落进这个组的任何一个港 —— 地址又被当成收件条件了");
             h.succeed();
         });
     }
@@ -126,9 +125,9 @@ public final class ParcelEscrowGameTests {
     /**
      * 过海那一刻换地址：包裹从对面带来的门牌，到这边就换成这边的。
      *
-     * <p>这条用例的全部意义在这个布置上：港认的是「本端地址」，而包裹身上写的是对面那台服务器
-     * 的地址。除了过海那一下的替换，没有任何东西能让它对上 —— 所以包裹落进港，就等于证明替换
-     * 发生在找港之前；落地以后标签被清掉，也就等于证明它不会再被换第二次。
+     * <p>证据在包裹自己身上，而不是在"它落进了哪个港"上：港现在只认组，包裹进港跟它身上写什么
+     * 无关，所以落进港这件事证明不了替换发生过。落地之后它穿的必须是本端地址，标签必须已经清掉
+     * （留着就会被换第二次，第二次没有对面那台服务器的地址可换，包裹会凭空变成另一个门牌）。
      */
     @GameTest(template = "empty", timeoutTicks = 100)
     public static void aCrossingSwapsTheParcelsAddress(GameTestHelper h) {
@@ -137,7 +136,6 @@ public final class ParcelEscrowGameTests {
         DockGroup group = DockGroupDirectory.get(server)
                 .create("过海组 " + java.util.UUID.randomUUID().toString().substring(0, 8));
         DockBlockEntity dock = placeDock(h, TARGET_X, group.id());
-        dock.setImport("甲站收货口");
 
         h.runAfterDelay(2, () -> {
             ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
@@ -160,7 +158,7 @@ public final class ParcelEscrowGameTests {
 
             ItemStack landed = dock.displayedStack();
             h.assertTrue(landed.is(ModItems.REMOTE_PACKAGE.get()),
-                    "包裹没有落进港：地址没有在对的时候换成这一侧的");
+                    "包裹没有落进这个组的港");
             h.assertTrue("甲站收货口".equals(PackageItem.getAddress(landed)),
                     "落地的包裹还穿着对岸的门牌：" + PackageItem.getAddress(landed));
             h.assertTrue(dev.distantstock.routing.RemoteRouteData.homeAddress(landed).isEmpty(),
@@ -170,23 +168,66 @@ public final class ParcelEscrowGameTests {
     }
 
     /**
-     * 地址里的两套语法：Create 的 `*` 通配符，和 `@名字`（指名给某个玩家）。
+     * 摸一下：两个地址都在，而且**过完海只剩一个**。
      *
-     * <p>通配符是 Create 自己的规矩（蛙港地址栏写着"使用 * 作为文本通配符"），我们找港走的
-     * 就是它的 {@code matchAddress}，所以这里钉住的是"我们确实还在用它" —— 哪天有人图省事改成
-     * 字符串相等，这条会立刻红。
+     * <p>玩家报的是"设置了远端111本端222，但只能看见一个"。第二个地址以前挂在"这单会跨服"后面，
+     * 而那个标记是出港时盖上的、**没有任何地方会去掉** —— 于是落地之后的包裹一辈子挂着
+     * 「跨服寄往…」，一条已经走完的路，每摸一次都被再告知一次。
      *
-     * <p>`@名字` 是我们加的那一层，它的全部意义在"只有那个人能取走"：一条只会让包裹显示得好看
-     * 一点的语法不值得存在，而一条没人测的所有权规则不值得信任。
+     * <p>现在两件事分开：第二个地址只问"它身上有没有"，跨服那一行只问"路线指向的还是不是别的
+     * 服务器"。后者是个现算的答案，落地那一刻它自己就变了 —— 因为包裹脚下的这台服务器，正是路线
+     * 指向的那一台。
      */
     @GameTest(template = "empty", timeoutTicks = 40)
-    public static void addressesCarryCreateWildcardsAndPlayerNames(GameTestHelper h) {
-        // 通配符：两边都可以是模式，这是 Create 的语义。
-        h.assertTrue(PackageItem.matchAddress("工厂/铁锭", "工厂/*"), "Create 的通配符没有生效");
-        h.assertTrue(PackageItem.matchAddress("任意地址", "*"), "* 不匹配任何东西");
-        h.assertTrue(PackageItem.matchAddress("甲站", "甲站"), "同一个地址反而不匹配了");
-        h.assertFalse(PackageItem.matchAddress("甲站", "乙站"), "不该匹配的地址匹配上了");
+    public static void bothAddressesAreVisibleUntilTheParcelCrosses(GameTestHelper h) {
+        // 一件正在往对面去的包裹：路线指向别的节点，身上还带着回来要穿的地址。
+        ItemStack crossing = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        PackageItem.addAddress(crossing, "111");
+        dev.distantstock.routing.RemoteRouteData.write(crossing,
+                new dev.distantstock.routing.RemoteRoute(
+                        dev.distantstock.routing.RemoteRoute.CURRENT_SCHEMA,
+                        java.util.UUID.randomUUID(),
+                        DockGroupDirectory.DEFAULT_GROUP_ID,
+                        java.util.UUID.randomUUID(), java.util.UUID.randomUUID()),
+                "远仓B · 仓库", "222");
 
+        java.util.List<Component> lines = dev.distantstock.item.RemotePackageItem.extraLines(crossing);
+        h.assertTrue(lines.stream().anyMatch(line -> line.getString().contains("222")),
+                "包裹身上写着两个地址，却没有一行说出第二个：" + lines);
+        h.assertTrue(lines.stream().anyMatch(line -> line.getString().contains("远仓B · 仓库")),
+                "它正要去对面，却没说要去哪儿：" + lines);
+
+        // 过海：地址换成 222，第二个地址的标签清掉。
+        ItemStack landed = crossing.copy();
+        h.assertTrue(dev.distantstock.routing.RemoteRouteData.applyHomeAddress(landed),
+                "过海没有换地址");
+        h.assertTrue("222".equals(PackageItem.getAddress(landed)),
+                "换完的地址不对：" + PackageItem.getAddress(landed));
+        // 落地的包裹：路线指向的那台服务器就是这一台（这才是"到了"的定义），所以两行都不该再有。
+        dev.distantstock.routing.RemoteRouteData.write(landed,
+                new dev.distantstock.routing.RemoteRoute(
+                        dev.distantstock.routing.RemoteRoute.CURRENT_SCHEMA,
+                        java.util.UUID.fromString(TranserverBridge.localNodeId()),
+                        DockGroupDirectory.DEFAULT_GROUP_ID,
+                        java.util.UUID.randomUUID(), java.util.UUID.randomUUID()));
+        java.util.List<Component> after = dev.distantstock.item.RemotePackageItem.extraLines(landed);
+        h.assertTrue(after.stream().noneMatch(line -> line.getString().contains("222")),
+                "落地之后还在说「对面服务器上用 222」，那是已经用掉的东西：" + after);
+        h.assertTrue(after.isEmpty(),
+                "落地之后的包裹只剩 Create 自己那一行地址，这里却还多出：" + after);
+        h.succeed();
+    }
+
+    /**
+     * 地址里的一层语法：`@名字`（指名给某个玩家）。
+     *
+     * <p>Create 自己的通配符（`*`）不再由我们匹配了 —— 港只认组，地址落地之后由本机物流接手，
+     * 而蛙港匹配地址用的就是 Create 的 {@code matchAddress}，那套规矩一条没变，只是换了地方执行。
+     * 这里所以只钉我们**加**的那一层：`@名字` 的全部意义在"只有那个人能取走"，一条只会让包裹
+     * 显示得好看一点的语法不值得存在，而一条没人测的所有权规则不值得信任。
+     */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void addressesCarryPlayerNames(GameTestHelper h) {
         // @名字：取出来的是名字，不是原串。
         ItemStack named = new ItemStack(ModItems.REMOTE_PACKAGE.get());
         PackageItem.addAddress(named, "@张三");
@@ -213,7 +254,7 @@ public final class ParcelEscrowGameTests {
         DockGroup group = DockGroupDirectory.get(level.getServer())
                 .create("指名组 " + java.util.UUID.randomUUID().toString().substring(0, 8));
         DockBlockEntity dock = placeDock(h, TARGET_X, group.id());
-        dock.setImport("@张三");
+        // 港身上不写地址：收不收这包裹只看组，"是不是给谁的"是包裹自己的事。
         h.runAfterDelay(2, () -> {
             h.assertTrue(dock.insert(named), "港没有收下这包裹");
             h.assertFalse(dock.takeReceived(stranger), "陌生人把指名给别人的包裹取走了");
@@ -236,7 +277,6 @@ public final class ParcelEscrowGameTests {
         DockGroup group = DockGroupDirectory.get(server)
                 .create("单地址组 " + java.util.UUID.randomUUID().toString().substring(0, 8));
         DockBlockEntity dock = placeDock(h, TARGET_X, group.id());
-        dock.setImport("");   // 空 = 谁都收，所以落地不靠地址，这条用例只测「没被动过」
 
         h.runAfterDelay(2, () -> {
             ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
@@ -294,6 +334,49 @@ public final class ParcelEscrowGameTests {
     }
 
     /**
+     * 收件港组在这一侧根本不存在：等一会儿，然后退回，而不是永远重投。
+     *
+     * <p>和上一条用例的区别正是这条的全部意义。上面那个组**存在**，只是里面没有港 —— 那是"区块没
+     * 加载、港满了"那一类，等就是了。这一个组**不存在**，而组 id 是随机的：没人能再把它造出来，
+     * 所以"等"不是耐心，是把一件货永远留在空中。真机上就是这么卡住的：两件包裹对着一个谁都认不出
+     * 的组 id，每几秒被重投一次，投了一整个下午，日志里一个字都没有。
+     *
+     * <p>宽限期是五分钟的游戏刻，用例等不起，所以这里直接调那个收参数的入口、宽限期给 0。参数化而
+     * 不是加一个静态开关：game test 是并行跑在同一个 JVM 里的，那种开关会顺手改掉别人正在跑的那条。
+     *
+     * <p>退回是**有出路**的，和"丢掉"不是一回事：记录进 REJECTED，退件流程接手，包裹从发件港的
+     * 底面掉出来还给玩家；发件港早就没了才进服务器的退件箱等管理员发还。
+     */
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void aGroupThatDoesNotExistHereIsRefusedNotRetried(GameTestHelper h) {
+        var level = h.getLevel();
+        MinecraftServer server = level.getServer();
+        // 一个随机 uuid：这一侧的目录里没有这个组，而且以后也不会有。
+        UUID nowhere = UUID.randomUUID();
+        h.runAfterDelay(2, () -> {
+            h.assertTrue(DockGroupDirectory.get(server).find(nowhere).isEmpty(),
+                    "用例的前提不成立：这一侧居然有这个组");
+
+            ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+            var dispatch = dev.distantstock.link.PackageDispatchCodec.create(UUID.randomUUID(), nowhere,
+                    "", dev.distantstock.link.PayloadManifest.fromPackage(parcel),
+                    dev.distantstock.link.PackageCodec.encode(parcel, level.registryAccess()));
+
+            // 宽限期内还是"等一下"。这一条不能少：两边各建一次组是常态，对面可能正在建。
+            h.assertTrue(dev.distantstock.link.TranserverPackageService.apply(server, dispatch,
+                            TranserverBridge.localNodeId(), 20L * 60 * 5)
+                            == dev.transerver.api.DeliveryResult.RETRY,
+                    "对面可能正在建这个组，这一侧却当场就把它退了");
+            // 宽限期过了：退回，而且是被明确拒绝，不是继续等。
+            h.assertTrue(dev.distantstock.link.TranserverPackageService.apply(server, dispatch,
+                            TranserverBridge.localNodeId(), 0L)
+                            == dev.transerver.api.DeliveryResult.REJECTED,
+                    "一个永远不存在的收件港组没有被退回，包裹会一直被重投");
+            h.succeed();
+        });
+    }
+
+    /**
      * isLocal 的边界。空白目的地是「比节点 id 更早的记录」，只能由本机认领；哨兵必须是一个
      * uuid 的规范写法，否则写进记录再读出来就匹配不上；别人的节点 id 不能被当成本机，那会把
      * 包裹投进错误的存档。
@@ -325,6 +408,8 @@ public final class ParcelEscrowGameTests {
         DockBlockEntity dock = (DockBlockEntity) h.getLevel().getBlockEntity(pos);
         h.assertTrue(dock != null, "x=" + x + " 处没有生成远仓港方块实体");
         dock.setGroupId(groupId);
+        // 这些用例讲的是投递，不是塔：设备由"某座塔"带着（见 TestTowers）。
+        TestTowers.carried(h, pos);
         return dock;
     }
 

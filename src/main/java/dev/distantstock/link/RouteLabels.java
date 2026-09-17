@@ -21,15 +21,15 @@ public final class RouteLabels {
     /**
      * The destination as a place: which server, then which group on it.
      *
-     * <p>Each half falls back on its own. A group nobody here has heard of — one brought in by a
-     * pairing code and since forgotten — still leaves the server's name, and a node that has never
-     * announced itself leaves the group's.
+     * <p>Each half falls back on its own. A group nobody here has heard of — one from a peer that
+     * has stopped announcing it, or that this server hid — still leaves the server's name, and a
+     * node that has never announced itself leaves the group's.
      */
     public static String describe(MinecraftServer server, RemoteRoute route) {
         if (server == null || route == null) {
             return "";
         }
-        String node = PairingService.label(route.destinationNodeId(), server);
+        String node = dev.distantstock.routing.PeerNames.label(server, route.destinationNodeId());
         String group = groupName(server, route.receivingDockGroupId());
         if (group.isEmpty()) {
             return node;
@@ -38,9 +38,9 @@ public final class RouteLabels {
     }
 
     /**
-     * The group's name: its own if this server holds it, the remembered one if a pairing code
-     * brought it, and its uuid prefix if it is neither — a route can name a group this server has
-     * no record of, and that is not an error, it is simply something it cannot name.
+     * The group's name: its own if this server holds it, the remembered one if a peer announced
+     * it, and its uuid prefix if it is neither — a route can name a group this server has no
+     * record of, and that is not an error, it is simply something it cannot name.
      */
     private static String groupName(MinecraftServer server, java.util.UUID group) {
         if (group == null) {

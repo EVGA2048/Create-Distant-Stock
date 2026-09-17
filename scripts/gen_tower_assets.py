@@ -322,15 +322,15 @@ FORCE_OPAQUE = {"crystal"}
 SOFT_CRYSTAL = "crystal_shell"
 
 
-# The window, made into glass you cannot read the room through.
+# 观察窗那一格的透明度（越低越透）。
 #
-# The handoff drew the pane at alpha 40 with a bright core at 112, which is a lovely window against
-# the preview's flat background and a nearly empty hole in a game where what is behind it is the
-# inside of a 3x3 skirt: reported from play as "you can still see the texture in the middle". Raising
-# the alpha keeps the pane's shape, its glow and its colour, and stops it being a doorway.
-# 观察窗那一格的透明度（越低越透）。原来 200+ 基本是不透明玻璃，看着像磨砂墙；
-# 现在压到 100 上下，隔着机壳能看清里面的塔架。
-WINDOW_ALPHA = {40: 96, 64: 88, 91: 104, 112: 128, 113: 128}
+# 这个数字改过三次，每次都是因为"太透"或"看不见"其中之一，所以把结论写在这儿：
+#   1. 交接包画的是 alpha 40、中心 112 —— 在预览的纯色背景上很好看，进游戏就是个大洞
+#      （玩家原话："中间还是能看见纹理"）；
+#   2. 于是压到 88~128，窗口成了一块磨砂板。可它的用途不是挡住视线，而是让人**看见里面还剩
+#      多少以太** —— 玩家原话："一圈机壳里面都看不见有流体"。磨砂和洞一样不对；
+#   3. 现在 30~60：保住窗格的形状、颜色和那圈高光，但隔着它必须读得出液面。
+WINDOW_ALPHA = {40: 30, 64: 34, 91: 40, 112: 60, 113: 60}
 
 
 def opaque_window(image):

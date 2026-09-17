@@ -144,6 +144,20 @@ def transerverJar = file("../Transerver/build/libs/Transerver-0.1.0-SNAPSHOT.jar
 def deployerJar = new File(modpackMods, 'deployer-0.1.2.jar')
 def extraGaugesJar = new File(modpackMods, 'extra_gauges-2.1.2.jar')
 
+/*
+ * Create: Mobile Packages, loaded alongside rather than compiled against.
+ *
+ * Its 运输蜂停泊港 is where the dock-group membership screen comes from — a network with an owner,
+ * a list of players and a lock, which is the shape our dock groups already have — and it is worth
+ * having the original in the world while that screen is being written, to compare against rather
+ * than to remember. Nothing here names any of its classes, so it is runtime-only, and a machine
+ * without the pack simply does not load it.
+ *
+ * Runtime-only on purpose, unlike Deployer and Extra Gauges: those two are compiled against because
+ * our panels are registered into their registries, and this one is a reference, not a dependency.
+ */
+def mobilePackagesJar = new File(modpackMods, 'create_mobile_packages-1.21.1-0.7.4.jar')
+
 tasks.register('extractPonder') {
     onlyIf { !ponderJar.exists() }
     doLast {
@@ -188,6 +202,9 @@ dependencies {
     if (extraGaugesJar.exists()) {
         compileOnly files(extraGaugesJar)
         runtimeOnly files(extraGaugesJar)
+    }
+    if (mobilePackagesJar.exists()) {
+        runtimeOnly files(mobilePackagesJar)
     }
 }
 

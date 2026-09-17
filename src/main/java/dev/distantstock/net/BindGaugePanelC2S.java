@@ -107,13 +107,20 @@ public record BindGaugePanelC2S(BlockPos pos, int slot, String destination, Stri
                 return;
             }
             if (existing == null) {
-                // A destination on another server that a pairing code brought in. It is passed
-                // through as it stands — the directory holding it, and every dock answering to it,
-                // are on the far end — and it is never turned into a group here: a local copy
+                // A destination on another server, learned from that server's announcement. It is
+                // passed through as it stands — the directory holding it, and every dock answering
+                // to it, are on the far end — and it is never turned into a group here: a local copy
                 // would be a group with no docks whose name shadows the real one.
                 var remote = dev.distantstock.routing.RemoteGroups.get(player.level().getServer())
                         .findByName(wanted).orElse(null);
                 if (remote != null) {
+                    if (!remote.admits(player.getUUID())) {
+                        // 和本服的组同一句拒绝。客户端已经把那行画灰了，这一句是给改过的客户端准备的：
+                        // 名单是随公告过来的，而这是**唯一**判得了的地方（订单上没有玩家，对面判不了）。
+                        player.displayClientMessage(Component.translatable(
+                                "gui.distantstock.group.not_admitted", remote.name()), true);
+                        return;
+                    }
                     if (rebind(board, slot, remote.group(), msg.address)) {
                         return;
                     }

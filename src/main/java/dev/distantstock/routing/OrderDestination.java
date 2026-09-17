@@ -12,9 +12,9 @@ import java.util.UUID;
  *
  * <ul>
  *   <li>A group of <b>this</b> server's — the goods are delivered here, out of that group's docks.
- *   <li>A group brought in by a <b>pairing code</b>, which lives on the other server — the goods
- *       stay there and come out of its docks. That is how a player orders from somebody else's
- *       warehouse and has the goods handed to a player standing next to it.
+ *   <li>A group of the <b>other</b> server's, learned from its announcement — the goods stay there
+ *       and come out of its docks. That is how a player orders from somebody else's warehouse and
+ *       has the goods handed to a player standing next to it.
  * </ul>
  *
  * <p>Extracted from the packet handler so the rule can be tested without a player clicking a
@@ -22,6 +22,13 @@ import java.util.UUID;
  * recognises. It fell back to the default group, which matches <em>every</em> dock whose address is
  * blank, so a requester still holding a deleted group's id would quietly post the goods to whoever
  * happened to be listening. A destination nobody can name is not a destination.
+ *
+ * <p><b>Both halves are judged here, and only here.</b> A local group has always been checked
+ * against its own member list. A remote one could not be: the order arrives on the other server with
+ * no player on it, so that server has nobody to check. What it can do — and now does — is send its
+ * member list with every announcement, which puts the judgement back on this side, at the one moment
+ * a player is attached to the order. A peer that has never said who is in a group leaves no opinion
+ * here, and nothing is refused on a guess.
  */
 public final class OrderDestination {
     public enum Kind {
@@ -29,7 +36,7 @@ public final class OrderDestination {
         HERE_DEFAULT,
         /** A group of this server's, and the player may use it. */
         HERE,
-        /** A group from the other server, learned from a pairing code. */
+        /** A group on another server, learned from its announcement, that this player may use. */
         THERE,
         /** A group of this server's that the player is not in. */
         REFUSED,
@@ -53,9 +60,15 @@ public final class OrderDestination {
         }
         DockGroup group = DockGroupDirectory.get(server).find(asked).orElse(null);
         if (group == null) {
-            return RemoteGroups.get(server).find(asked).isPresent()
+            // 不在本服目录里：看看是不是对面服务器公告过来的组。是的话，用**对面那份名单**判这个人
+            // 能不能用 —— 跨服的订单上不带玩家，对面判不了，这边是唯一判得了的地方。
+            var remote = RemoteGroups.get(server).find(asked).orElse(null);
+            if (remote == null) {
+                return new Answer(Kind.UNKNOWN, null);
+            }
+            return remote.admits(player)
                     ? new Answer(Kind.THERE, asked)
-                    : new Answer(Kind.UNKNOWN, null);
+                    : new Answer(Kind.REFUSED, null);
         }
         return group.admits(player)
                 ? new Answer(Kind.HERE, group.id())

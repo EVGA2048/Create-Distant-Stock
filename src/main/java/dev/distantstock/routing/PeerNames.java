@@ -62,6 +62,31 @@ public final class PeerNames extends SavedData {
         return node == null ? "" : names.getOrDefault(node, "");
     }
 
+    /**
+     * What to call a node on a screen: its own name, "本服" for this one, or a uuid prefix.
+     *
+     * <p>Lived in the pairing service until the codes were deleted, which is why the fallback is a
+     * uuid prefix rather than something better — a code could be redeemed before the first
+     * announcement ever arrived, and eight characters was all there was to show. The codes are
+     * gone; the fallback stays, because a peer that goes quiet keeps its rows in the destination
+     * list and a row with no label at all is worse than a short one.
+     */
+    public static String label(MinecraftServer server, UUID node) {
+        if (node == null) {
+            return "";
+        }
+        if (node.toString().equals(dev.distantstock.link.TranserverBridge.localNodeId())) {
+            return "本服";
+        }
+        if (server != null) {
+            String heard = get(server).name(node);
+            if (!heard.isEmpty()) {
+                return heard;
+            }
+        }
+        return node.toString().substring(0, 8);
+    }
+
     @Override
     public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
         CompoundTag written = new CompoundTag();

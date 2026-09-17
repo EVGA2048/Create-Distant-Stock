@@ -31,6 +31,49 @@ import java.util.UUID;
 @GameTestHolder("distantstock")
 @PrefixGameTestTemplate(false)
 public final class RequesterFlowGameTests {
+    /**
+     * 请求台重启之后还记得自己调在哪张网络上。
+     *
+     * <p>玩家报的是"重启服务器以后请求台看不见东西了，要拆掉重新放、重新设频率"。这条检查的正是那件
+     * 事里唯一属于我们的一段：落盘和读回。世界存档走的是 BlockEntity 的那对方法，而它们的调用时机
+     * 和普通方块实体不同（存档时只写、读档时只读，中间还会来一次只给客户端的同步包），少写一个键
+     * 或者读错一个键，表现都只是"重启以后它变回没配过的样子"。
+     *
+     * <p>这里模拟的是一次真正的存取：写进 NBT、把方块拆掉、重新放一个、再读回来。
+     */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void theDeskKeepsItsTuningAcrossAReload(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.GAUGE.get().defaultBlockState(), 3);
+        var desk = (dev.distantstock.block.GaugeBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(desk != null, "请求台没有出现");
+
+        UUID freq = UUID.randomUUID();
+        UUID group = UUID.randomUUID();
+        desk.setFreq(freq);
+        desk.setAddress("111");
+        desk.setHomeAddress("222");
+        desk.setReceivingGroup(group);
+
+        var saved = desk.saveWithoutMetadata(level.registryAccess());
+
+        // 拆掉再放一个：读回来的必须是新那一个，而不是同一个对象记着的旧值。
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(pos, ModBlocks.GAUGE.get().defaultBlockState(), 3);
+        var reloaded = (dev.distantstock.block.GaugeBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(reloaded != null && reloaded != desk, "重置方块之后请求台没有重建");
+        reloaded.loadWithComponents(saved, level.registryAccess());
+
+        h.assertTrue(freq.equals(reloaded.freq()),
+                "频率没留下来 —— 重启之后这台机器就不认识自己的库存了：" + reloaded.freq());
+        h.assertTrue("111".equals(reloaded.address()), "远端地址没留下来：" + reloaded.address());
+        h.assertTrue("222".equals(reloaded.homeAddress()), "本端地址没留下来：" + reloaded.homeAddress());
+        h.assertTrue(group.equals(reloaded.receivingGroup()),
+                "收货港组没留下来：" + reloaded.receivingGroup());
+        h.succeed();
+    }
+
     @GameTest(template = "empty", timeoutTicks = 450)
     public static void localRequestRoutesEveryVanillaPackageToSelectedGroup(GameTestHelper h) {
         runRequest(h, false);
@@ -60,9 +103,10 @@ public final class RequesterFlowGameTests {
                 .setValue(BlockStateProperties.ATTACH_FACE, net.minecraft.world.level.block.state.properties.AttachFace.FLOOR), 3);
         var packager = (PackagerBlockEntity) level.getBlockEntity(packPos);
         var link = (PackagerLinkBlockEntity) level.getBlockEntity(packPos.above());
-        DockBlockEntity sender = dock(h, new BlockPos(4, 2, 2), from, "sender");
-        DockBlockEntity target = dock(h, new BlockPos(6, 2, 2), to, "factory");
-        DockBlockEntity decoy = dock(h, new BlockPos(6, 2, 5), from, "factory");
+        // 三个港只有两种地址，而地址已经不参与选港了：谁是收件方由组决定，诱饵港落在另一个组里。
+        DockBlockEntity sender = dock(h, new BlockPos(4, 2, 2), from);
+        DockBlockEntity target = dock(h, new BlockPos(6, 2, 2), to);
+        DockBlockEntity decoy = dock(h, new BlockPos(6, 2, 5), from);
         sender.setExport(frequency);
         int[] received = {0};
         int[] parcels = {0};
@@ -112,13 +156,13 @@ public final class RequesterFlowGameTests {
         });
     }
 
-    private static DockBlockEntity dock(GameTestHelper h, BlockPos relative, UUID group, String address) {
+    private static DockBlockEntity dock(GameTestHelper h, BlockPos relative, UUID group) {
         var level = h.getLevel();
         BlockPos pos = h.absolutePos(relative);
         level.setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
         var dock = (DockBlockEntity) level.getBlockEntity(pos);
         dock.setGroupId(group);
-        dock.setImport(address);
+        dock.setImport();
         TowerActivation.pinDevice(TowerSystem.TowerId.of(level.dimension(), pos), true,
                 TowerSystem.TowerId.of(level.dimension(), pos.below()));
         return dock;

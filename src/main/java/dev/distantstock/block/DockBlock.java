@@ -134,40 +134,33 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
         if (stack.getItem() instanceof RequesterItem) {
             if (!level.isClientSide) {
                 if (player.isShiftKeyDown()) {
-                    // Sneak + requester: apply the requester's dock group and address to this dock.
+                    // 潜行右键：把这个港挂到终端携带的那个接收港组上，并切成收货。
                     //
-                    // 写进去的是「这一侧的地址」：本端地址填了就用它，没填就用那个唯一的地址。
-                    // 港的过滤条件问的是「落进我这里的包裹身上写着什么」，而包裹到这边时穿的正是
-                    // 本端地址 —— 只有过一个地址的玩家，两个地址本来就是同一个，于是这条规则退化成
-                    // 原来的行为，已经配好的存档不会因为多了一个框而失灵。
-                    be.setImport(RequesterData.localAddress(stack));
-                    RequesterData.receivingGroup(stack).ifPresent(group -> {
-                        // Joining someone else's group means their parcels come out of this dock.
-                        // A closed group refuses, and says so out loud: a click that is silently
-                        // ignored reads as a broken item, not as a locked door.
-                        if (admits(level, group, player)) {
-                            be.setGroupId(group);
-                            // Same reason as the plain click: the whole effect of the gesture is a
-                            // line on a block, and saying nothing leaves the player unsure whether
-                            // the group was written at all.
-                            player.displayClientMessage(Component.translatable(
-                                    "message.distantstock.dock.joined",
-                                    RequesterData.receivingGroupName(stack)
-                                            .orElse(group.toString().substring(0, 8))), true);
-                        } else {
-                            player.displayClientMessage(
-                                    Component.translatable("gui.distantstock.group.closed"), true);
-                        }
-                    });
-                    // 两个地址都填了的时候，玩家必须知道刚才写进去的是哪一个 —— 这一下同时改了
-                    // 港的过滤条件和它的组，而过滤条件看不见（要戴护目镜），选错了就是「包裹到了
-                    // 却停在外面」。空地址也说出来：那等于什么都收，是另一件需要知道的事。
-                    String written = be.address();
-                    player.displayClientMessage(Component.translatable(
-                            "message.distantstock.dock.address",
-                            written.isBlank()
-                                    ? Component.translatable("message.distantstock.dock.address.any")
-                                    : Component.literal(written)), true);
+                    // **只写组，不写地址**：港的收件条件从此只有组一个（见 LoadedDocks.importFor）。
+                    // 同组的港互相顶替 —— 包裹来了按优先级挑一个空闲的 —— 若再让每个港按自己的地址
+                    // 各筛一半，"一组多个港"就退化成了"几个各管一半的港"。地址是包裹身上的东西：
+                    // 落地之后由本机物流（蛙港、溜槽、传送带）按它继续分拣。
+                    //
+                    // 没设组的终端按默认组算，和模组里其它地方的解释一致；否则这一下会什么都不做，
+                    // 而玩家在动作栏里看到的是"已加入"。
+                    java.util.UUID group = RequesterData.receivingGroup(stack)
+                            .orElse(DockGroupDirectory.DEFAULT_GROUP_ID);
+                    // Joining someone else's group means their parcels come out of this dock. A
+                    // closed group refuses, and says so out loud: a click that is silently ignored
+                    // reads as a broken item, not as a locked door.
+                    if (admits(level, group, player)) {
+                        be.setImport();
+                        be.setGroupId(group);
+                        // 整个手势的全部效果就是方块上的一行字，不说出来玩家不知道写进去没有。
+                        player.displayClientMessage(Component.translatable(
+                                "message.distantstock.dock.joined",
+                                RequesterData.receivingGroupName(stack)
+                                        .orElse(Component.translatable(
+                                                "gui.distantstock.group.default").getString())), true);
+                    } else {
+                        player.displayClientMessage(
+                                Component.translatable("gui.distantstock.group.closed"), true);
+                    }
                 } else if (!RequesterData.tuned(stack)) {
                     // Untuned terminal, plain click: say so rather than doing nothing. Sneak-click
                     // still works — writing an address and joining a group need no network, and a
