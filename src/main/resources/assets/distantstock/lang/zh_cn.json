@@ -296,7 +296,7 @@
   "gui.distantstock.tower.on": "开",
   "gui.distantstock.tower.off": "关",
   "gui.distantstock.group.default": "默认收货港组",
-  "gui.distantstock.route.group.hint": "输入系统名；不存在就新建一个",
+  "gui.distantstock.route.group.hint": "选你自己的组＝货回本服；选「服务器 · 组名」＝货留那台服务器",
   "gui.distantstock.group.closed": "那个系统不对你开放",
   "gui.distantstock.manual.h6": "互通塔",
   "gui.distantstock.manual.p6": "塔是远仓设备工作的前提。有塔在转的维度里，没被任何塔罩住的远仓设备会停，护目镜上会红字写明。建法：用远仓机壳在中央的互通塔底座周围围出 3×3 裙板，底座正下方接一根竖直传动轴——底面是它唯一接受旋转的接面。往上堆至少五段耦合器，顶上盖一台以太谐振器。高度就是等级：五段是 I 级，十七段是 VII 级，每升一级都能带载更多设备、够到更远、常驻加载更大的区块范围。塔从下方那根轴吃应力，等级越高吃得越多。塔顶的光柱就是它的状态：没在转是暗灰，在转是青色，有包裹经过时变成更深的蓝色并自己发亮。",
@@ -375,5 +375,9 @@
   "gui.distantstock.route.home.hint": "留空＝过海后不改地址",
   "item.distantstock.remote_package.home_address": "过海后改用地址：%s",
   "message.distantstock.dock.address": "收件地址：%s",
-  "message.distantstock.dock.address.any": "空（什么都收）"
+  "message.distantstock.dock.address.any": "空（什么都收）",
+  "gui.distantstock.group.unknown": "这个收货港组不存在了：重新选一个再下单",
+  "gui.distantstock.queued_at": "已下单：货从 %s 出来",
+  "gui.distantstock.where.local": "本服 · %s",
+  "gui.distantstock.where.remote": "%s（对岸）"
 }

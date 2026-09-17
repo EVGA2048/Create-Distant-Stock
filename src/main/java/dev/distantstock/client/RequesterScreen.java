@@ -573,7 +573,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                     return true;
                 }
                 pendingForget = null;
-                String name = remote.name();
+                // 写进去的是「哪台服务器 · 组名」而不是光秃秃的组名。这个框决定货从哪台服务器的哪个港
+                // 出来：本服的组＝货回来，对岸的组＝货留对面，两种名字长得一样、只有颜色不同，
+                // 选错了要到货出来才发现。把服务器名写进框里，选的是什么就一直看得见。
+                String name = remote.display();
                 receivingGroup.setValue(name);
                 committedGroup = name;
                 net.neoforged.neoforge.network.PacketDistributor.sendToServer(

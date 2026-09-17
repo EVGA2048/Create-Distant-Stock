@@ -252,7 +252,10 @@ public final class RequesterMenu extends AbstractContainerMenu {
             var remote = dev.distantstock.routing.RemoteGroups.get(player.level().getServer())
                     .findByName(trimmed).orElse(null);
             if (remote != null) {
-                setCarriedGroup(player, stack, remote.group(), remote.name());
+                // 名字带上服务器：这个框决定货从哪台服务器出来，而"远仓B · 仓库"和"仓库"在框里
+                // 长得一样是不行的。存进去的是显示形式，查找照样认（RemoteGroups.findByName
+                // 两个都匹配），所以重新打开终端时框里还是完整的那个目的地。
+                setCarriedGroup(player, stack, remote.group(), remote.display());
                 sendGroupList(player, stack);
                 return;
             }

@@ -296,7 +296,7 @@
   "gui.distantstock.tower.on": "on",
   "gui.distantstock.tower.off": "off",
   "gui.distantstock.group.default": "Default receiving group",
-  "gui.distantstock.route.group.hint": "Type a system name; a new one is made if it does not exist",
+  "gui.distantstock.route.group.hint": "your own group = goods come home; \"server · group\" = goods stay on that server",
   "gui.distantstock.group.closed": "That system is closed to you",
   "gui.distantstock.manual.h6": "Interlink towers",
   "gui.distantstock.manual.p6": "互通塔",
@@ -375,5 +375,9 @@
   "gui.distantstock.route.home.hint": "blank = keep its address after crossing",
   "item.distantstock.remote_package.home_address": "Rewritten on arrival to: %s",
   "message.distantstock.dock.address": "Receiving address: %s",
-  "message.distantstock.dock.address.any": "blank (accepts anything)"
+  "message.distantstock.dock.address.any": "blank (accepts anything)",
+  "gui.distantstock.group.unknown": "That receiving group no longer exists: pick another one",
+  "gui.distantstock.queued_at": "Ordered: the goods come out of %s",
+  "gui.distantstock.where.local": "this server · %s",
+  "gui.distantstock.where.remote": "%s (the far side)"
 }

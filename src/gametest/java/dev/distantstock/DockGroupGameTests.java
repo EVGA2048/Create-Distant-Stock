@@ -184,6 +184,46 @@ public final class DockGroupGameTests {
         h.succeed();
     }
 
+    /**
+     * 下单时那个组去哪个服务器：本服的组＝货回来，配对码引进来的组＝货留对面。
+     *
+     * <p>这条规则以前有个静默分支：**谁都不认识的组 id 会被当成默认组** —— 而默认组意味着
+     * "地址空的港谁都收"。于是一个还揣着已删除组的终端，会把货悄悄投给随便哪个港。这条用例
+     * 就是钉住"不认识就拒绝"，因为它的失败方式在生产环境里是"货不见了"。
+     */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void anOrderGoesWhereItsGroupLivesAndIsRefusedWhenNobodyKnowsIt(GameTestHelper h) {
+        DockGroupDirectory directory = DockGroupDirectory.get(h.getLevel().getServer());
+        UUID owner = UUID.randomUUID();
+
+        DockGroup mine = directory.createFor("下单组 " + UUID.randomUUID().toString().substring(0, 8), owner);
+        var here = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, mine.id());
+        h.assertTrue(here.allowed() && here.group().equals(mine.id()), "本服的组没有被认成本服的");
+        h.assertTrue(here.kind() == dev.distantstock.routing.OrderDestination.Kind.HERE,
+                "本服的组被判成了别的去向");
+
+        // 别人锁着的组：拒绝，且要说得出理由（界面用 REFUSED 那条文案）。
+        DockGroup theirs = directory.createFor("别人组 " + UUID.randomUUID().toString().substring(0, 8), UUID.randomUUID());
+        var refused = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, theirs.id());
+        h.assertFalse(refused.allowed(), "别人锁着的组被放行了");
+        h.assertTrue(refused.kind() == dev.distantstock.routing.OrderDestination.Kind.REFUSED,
+                "别人锁着的组没有报成 REFUSED");
+
+        // 一个谁也不认识的 id：必须是 UNKNOWN，绝不能变成默认组。
+        UUID ghost = UUID.randomUUID();
+        var unknown = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, ghost);
+        h.assertFalse(unknown.allowed(), "不存在的组被放行了（这正是货会悄悄落到别人港里的那条路）");
+        h.assertTrue(unknown.kind() == dev.distantstock.routing.OrderDestination.Kind.UNKNOWN,
+                "不存在的组没有报成 UNKNOWN");
+
+        // 空 id 与默认组仍然是"本服的默认组"，这条不能一起收紧掉。
+        var fallback = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, null);
+        h.assertTrue(fallback.allowed()
+                        && fallback.group().equals(DockGroupDirectory.DEFAULT_GROUP_ID),
+                "没有指定组的订单不再落到默认组了");
+        h.succeed();
+    }
+
     private DockGroupGameTests() {
     }
 

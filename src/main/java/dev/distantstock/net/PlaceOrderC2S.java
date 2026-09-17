@@ -6,6 +6,7 @@ import dev.distantstock.link.LinkQueues;
 import dev.distantstock.link.OrderService;
 import dev.distantstock.menu.RequesterMenu;
 import dev.distantstock.routing.DockGroup;
+import dev.distantstock.routing.OrderDestination;
 import dev.distantstock.routing.DockGroupDirectory;
 import dev.distantstock.routing.TowerActivation;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -48,38 +49,50 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
     }
 
     /**
-     * The group an order may be delivered into, or null when the player may not reach the one asked
-     * for.
-     *
-     * <p>Three answers, because three things can be true of the id in the packet:
-     *
-     * <ul>
-     *   <li>It names a system and the player is in it — the order goes there.
-     *   <li>It names nothing at all. A requester made before the system was deleted still holds its
-     *       id, and an unconfigured requester holds none, so both fall back to the default system.
-     *       Nobody owns the default, so this is not a door being opened.
-     *   <li>It names a system the player is not in. That is the case a lock exists for, and it is
-     *       refused: a closed system is not a place to push goods into.
-     *   <li>It names a system on another server, learned from a pairing code. Nothing here can
-     *       check it — the directory that holds it and every dock that answers to it are on the far
-     *       end — so it is passed through as it stands. See {@code TranserverOrderService} for what
-     *       the receiving server does with a group that turns out to be one of its own.
-     * </ul>
+     * The group the order goes to, or the reason there is not one, through {@link OrderDestination} —
+     * where the rule lives rather than here, so it can be tested without a player clicking a screen.
+     * See that class for what each answer means, including why an id nobody recognises is refused
+     * instead of falling back to the default group.
      */
-    private static UUID resolveGroup(Player p, UUID asked) {
+    private static Resolution resolveGroup(Player p, UUID asked) {
         if (p == null || p.level().getServer() == null) {
-            return null;
+            return new Resolution(null, "gui.distantstock.order_fail");
         }
-        if (asked == null || asked.equals(DockGroupDirectory.DEFAULT_GROUP_ID)) {
-            return DockGroupDirectory.DEFAULT_GROUP_ID;
-        }
-        DockGroup group = DockGroupDirectory.get(p.level().getServer()).find(asked).orElse(null);
-        if (group == null) {
-            return dev.distantstock.routing.RemoteGroups.get(p.level().getServer()).find(asked).isPresent()
-                    ? asked : DockGroupDirectory.DEFAULT_GROUP_ID;
-        }
-        return group.admits(p.getUUID()) ? group.id() : null;
+        OrderDestination.Answer answer = OrderDestination.resolve(
+                p.level().getServer(), p.getUUID(), asked);
+        return switch (answer.kind()) {
+            case UNKNOWN -> new Resolution(null, "gui.distantstock.group.unknown");
+            case REFUSED -> new Resolution(null, "gui.distantstock.group.closed");
+            default -> new Resolution(answer.group(), "");
+        };
     }
+
+    /**
+     * Where the goods will come out, in words, for the player who just ordered them.
+     *
+     * <p>Which server a group lives on decides which server the goods are delivered on, and that is
+     * the one thing about a cross-server order the player cannot see anywhere else: the field holds
+     * a name, both kinds of name look alike, and the difference only shows up when the goods come
+     * out somewhere they were not expected. Said out loud at the one moment it is still free to say.
+     */
+    private static Component describeDestination(Player p, UUID group) {
+        if (p.level().getServer() == null) {
+            return Component.literal("");
+        }
+        DockGroup local = DockGroupDirectory.get(p.level().getServer()).find(group).orElse(null);
+        if (local != null) {
+            return Component.translatable("gui.distantstock.where.local", local.name());
+        }
+        return dev.distantstock.routing.RemoteGroups.get(p.level().getServer()).find(group)
+                .map(remote -> (Component) Component.translatable("gui.distantstock.where.remote",
+                        remote.display()))
+                .orElseGet(() -> Component.literal(""));
+    }
+
+    /** 一个目的地，或者没有目的地的理由：error 为空串表示这个组能用。 */
+    private record Resolution(UUID group, String error) {
+    }
+
 
     public static void handle(PlaceOrderC2S msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
@@ -105,13 +118,15 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
                 p.displayClientMessage(Component.translatable("gui.distantstock.uncharged"), true);
                 return;
             }
-            UUID group = resolveGroup(p, msg.receivingDockGroupId);
+            Resolution resolved = resolveGroup(p, msg.receivingDockGroupId);
+            UUID group = resolved.group();
             if (group == null) {
                 // The field on the screen and this packet can disagree: the screen only offers
                 // groups the player may reach, a packet offers whatever it was built with. The one
-                // that decides is this side, so an order naming a system the player is not in is
-                // refused rather than quietly turned into a delivery somewhere else.
-                p.displayClientMessage(Component.translatable("gui.distantstock.group.closed"), true);
+                // that decides is this side, so an order naming a system the player is not in — or
+                // one nobody has ever heard of — is refused rather than quietly turned into a
+                // delivery somewhere else.
+                p.displayClientMessage(Component.translatable(resolved.error()), true);
                 return;
             }
             UUID freq = menu.freq(p);
@@ -132,12 +147,13 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
             if (be != null) {
                 be.lastOrder(result);
             }
-            p.displayClientMessage(Component.translatable(switch (result) {
-                case QUEUED -> "gui.distantstock.queued";
-                case EMPTY -> "gui.distantstock.need_item";
-                case NO_PEER -> "gui.distantstock.no_peer";
-                case FAIL -> "gui.distantstock.order_fail";
-            }), true);
+            p.displayClientMessage(result == OrderService.Result.QUEUED
+                    ? Component.translatable("gui.distantstock.queued_at", describeDestination(p, group))
+                    : Component.translatable(switch (result) {
+                        case EMPTY -> "gui.distantstock.need_item";
+                        case NO_PEER -> "gui.distantstock.no_peer";
+                        default -> "gui.distantstock.order_fail";
+                    }), true);
         });
     }
 }
