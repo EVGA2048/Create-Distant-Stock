@@ -279,6 +279,15 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
             // An empty hand takes whatever is in the dock: what arrived, or what is stuck in it and
             // cannot leave. The second half was missing, which left a refused parcel with no way out
             // short of breaking the block.
+            String someoneElse = !level.isClientSide && !player.isShiftKeyDown()
+                    ? be.heldForSomeoneElse(player) : null;
+            if (someoneElse != null) {
+                // 拿不走就说清楚是给谁的。地址写成 @名字 的包裹只有那个人能取 —— 一句"没反应"
+                // 会让人以为港坏了。
+                player.displayClientMessage(Component.translatable(
+                        "message.distantstock.parcel.for_other", someoneElse), true);
+                return ItemInteractionResult.sidedSuccess(level.isClientSide);
+            }
             if (!level.isClientSide && !player.isShiftKeyDown()
                     && (be.takeReceived(player) || be.takeStuck(player))) {
                 return ItemInteractionResult.sidedSuccess(false);

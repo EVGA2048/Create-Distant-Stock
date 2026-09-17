@@ -16,6 +16,7 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.GameType;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -164,6 +165,61 @@ public final class ParcelEscrowGameTests {
                     "落地的包裹还穿着对岸的门牌：" + PackageItem.getAddress(landed));
             h.assertTrue(dev.distantstock.routing.RemoteRouteData.homeAddress(landed).isEmpty(),
                     "换过的地址还留在标签里，会被再换一次");
+            h.succeed();
+        });
+    }
+
+    /**
+     * 地址里的两套语法：Create 的 `*` 通配符，和 `@名字`（指名给某个玩家）。
+     *
+     * <p>通配符是 Create 自己的规矩（蛙港地址栏写着"使用 * 作为文本通配符"），我们找港走的
+     * 就是它的 {@code matchAddress}，所以这里钉住的是"我们确实还在用它" —— 哪天有人图省事改成
+     * 字符串相等，这条会立刻红。
+     *
+     * <p>`@名字` 是我们加的那一层，它的全部意义在"只有那个人能取走"：一条只会让包裹显示得好看
+     * 一点的语法不值得存在，而一条没人测的所有权规则不值得信任。
+     */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void addressesCarryCreateWildcardsAndPlayerNames(GameTestHelper h) {
+        // 通配符：两边都可以是模式，这是 Create 的语义。
+        h.assertTrue(PackageItem.matchAddress("工厂/铁锭", "工厂/*"), "Create 的通配符没有生效");
+        h.assertTrue(PackageItem.matchAddress("任意地址", "*"), "* 不匹配任何东西");
+        h.assertTrue(PackageItem.matchAddress("甲站", "甲站"), "同一个地址反而不匹配了");
+        h.assertFalse(PackageItem.matchAddress("甲站", "乙站"), "不该匹配的地址匹配上了");
+
+        // @名字：取出来的是名字，不是原串。
+        ItemStack named = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        PackageItem.addAddress(named, "@张三");
+        h.assertTrue("@张三".equals(PackageItem.getAddress(named)), "地址没写进去");
+        h.assertTrue("张三".equals(dev.distantstock.routing.ParcelAddressing.addressee(named)),
+                "@名字 没有被解析成名字");
+        h.assertTrue(dev.distantstock.routing.ParcelAddressing.addressee(
+                        new ItemStack(ModItems.REMOTE_PACKAGE.get())).isEmpty(),
+                "没写地址的包裹被解析出了收件人");
+        ItemStack plain = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        PackageItem.addAddress(plain, "厂区门口");
+        h.assertTrue(dev.distantstock.routing.ParcelAddressing.addressee(plain).isEmpty(),
+                "普通地址被当成了收件人");
+
+        // 所有权：没指名的谁都能拿；指名的只有本人。
+        var level = h.getLevel();
+        net.minecraft.world.entity.player.Player stranger = h.makeMockPlayer(GameType.SURVIVAL);
+        h.assertTrue(dev.distantstock.routing.ParcelAddressing.mayTake(level.getServer(), plain, stranger),
+                "没指名的包裹被拦下了");
+        h.assertFalse(dev.distantstock.routing.ParcelAddressing.mayTake(level.getServer(), named, stranger),
+                "指名给别人的包裹被陌生人拿走了");
+
+        // 港里那件包裹：陌生人取不出来，而且港能说出是给谁的。
+        DockGroup group = DockGroupDirectory.get(level.getServer())
+                .create("指名组 " + java.util.UUID.randomUUID().toString().substring(0, 8));
+        DockBlockEntity dock = placeDock(h, TARGET_X, group.id());
+        dock.setImport("@张三");
+        h.runAfterDelay(2, () -> {
+            h.assertTrue(dock.insert(named), "港没有收下这包裹");
+            h.assertFalse(dock.takeReceived(stranger), "陌生人把指名给别人的包裹取走了");
+            // 返回的是解析出来的名字，不是带 @ 的原串。
+            h.assertTrue("张三".equals(dock.heldForSomeoneElse(stranger)),
+                    "港说不出这件包裹是给谁的：" + dock.heldForSomeoneElse(stranger));
             h.succeed();
         });
     }

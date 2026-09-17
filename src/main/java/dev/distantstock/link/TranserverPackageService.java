@@ -93,6 +93,19 @@ public final class TranserverPackageService {
             return DeliveryResult.RETRY;
         }
         ledger.markApplied(dispatch.parcelId());
+        // 指名给某个玩家的包裹，落地时告诉那个人一声。他可能正在别处忙，而这件货只有他能取走 ——
+        // 不说的话就是"寄了但没人知道到了"。
+        String addressee = dev.distantstock.routing.ParcelAddressing.addressee(parcel);
+        if (!addressee.isEmpty()) {
+            net.minecraft.server.level.ServerPlayer target =
+                    server.getPlayerList().getPlayerByName(addressee);
+            if (target != null) {
+                target.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                        "message.distantstock.parcel.arrived",
+                        dock.getBlockPos().getX() + ", " + dock.getBlockPos().getY()
+                                + ", " + dock.getBlockPos().getZ()), false);
+            }
+        }
         LOG.info("[DistantStock/Parcel] applied parcel={} source={} group={} dock={} dimension={}",
                 dispatch.parcelId(), sourceNode, dispatch.receivingDockGroupId(), dock.getBlockPos(),
                 dock.getLevel() == null ? "unknown" : dock.getLevel().dimension().location());

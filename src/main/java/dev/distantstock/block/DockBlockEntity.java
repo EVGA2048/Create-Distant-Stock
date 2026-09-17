@@ -402,6 +402,12 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         for (int slot = 0; slot < receivedInv.getSlots(); slot++) {
             ItemStack parcel = receivedInv.getStackInSlot(slot);
             if (parcel.isEmpty() || !canFit(player, parcel)) continue;
+            // 指名给人的包裹只有那个人能拿走。见 ParcelAddressing：地址写 @名字 就是"给某人的"，
+            // 这也是这个语法唯一真正的用处 —— 否则它只是又一个名字。
+            if (!dev.distantstock.routing.ParcelAddressing.mayTake(level == null ? null : level.getServer(),
+                    parcel, player)) {
+                continue;
+            }
             ItemStack taken = receivedInv.extractItem(slot, 1, false);
             if (taken.isEmpty()) return false;
             if (player.getInventory().add(taken)) {
@@ -432,15 +438,46 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         if (status() != DockStatus.BLOCKED && status() != DockStatus.FAULT) {
             return false;
         }
-        return handOver(outboundInv, player) || handOver(fallbackInv, player);
+        var server = level == null ? null : level.getServer();
+        // 卡住的包裹同一个规矩：指名给谁的，只有谁能拿走 —— 但不指名的那种仍然谁都能救出来，
+        // 一台卡住的机器不该因为多了一个语法就变得没人能修。
+        if (handOver(outboundInv, player, server) ) {
+            return true;
+        }
+        return handOver(fallbackInv, player, server);
+    }
+
+    /**
+     * 这个港里有没有一件指名给别人、因此你拿不走的包裹；有就返回那个名字，没有返回 null。
+     *
+     * <p>只用来把话说清楚：拿不走这件事本身已经在 {@link #takeReceived} 里发生了，玩家需要知道
+     * 的是"为什么"，而不是面对一个没反应的空手右键。
+     */
+    public String heldForSomeoneElse(net.minecraft.world.entity.player.Player player) {
+        var server = level == null ? null : level.getServer();
+        for (ItemStackHandler inventory : new ItemStackHandler[]{receivedInv, outboundInv, fallbackInv}) {
+            for (int slot = 0; slot < inventory.getSlots(); slot++) {
+                ItemStack parcel = inventory.getStackInSlot(slot);
+                String name = dev.distantstock.routing.ParcelAddressing.addressee(parcel);
+                if (!name.isEmpty()
+                        && !dev.distantstock.routing.ParcelAddressing.mayTake(server, parcel, player)) {
+                    return name;
+                }
+            }
+        }
+        return null;
     }
 
     /** One slot's worth, into the player's inventory, or nothing if it does not fit. */
     private static boolean handOver(ItemStackHandler inventory,
-                                    net.minecraft.world.entity.player.Player player) {
+                                    net.minecraft.world.entity.player.Player player,
+                                    net.minecraft.server.MinecraftServer server) {
         for (int slot = 0; slot < inventory.getSlots(); slot++) {
             ItemStack parcel = inventory.getStackInSlot(slot);
             if (parcel.isEmpty() || !canFit(player, parcel)) {
+                continue;
+            }
+            if (!dev.distantstock.routing.ParcelAddressing.mayTake(server, parcel, player)) {
                 continue;
             }
             ItemStack taken = inventory.extractItem(slot, 1, false);

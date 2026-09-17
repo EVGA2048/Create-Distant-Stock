@@ -39,8 +39,11 @@ public final class PlayerNames {
         if (online != null) {
             return Optional.of(online.getGameProfile());
         }
+        // 档案缓存可能是 null：game test 的服务器没有它，正式服务器在起来的那一小段也还没有。
+        // 这不是"查不到这个人"，只是"这里没有档可查"，所以返回空而不是炸。
+        var cache = server.getProfileCache();
         // 名字查档，不区分大小写以外的花活：服务器自己就是这么认人的。
-        return server.getProfileCache().get(name);
+        return cache == null ? Optional.empty() : cache.get(name);
     }
 
     /** What to call an account: the name if anything here knows it, a short id if nothing does. */
@@ -53,7 +56,8 @@ public final class PlayerNames {
             if (online != null) {
                 return online.getGameProfile().getName();
             }
-            Optional<GameProfile> remembered = server.getProfileCache().get(player);
+            var cache = server.getProfileCache();
+            Optional<GameProfile> remembered = cache == null ? Optional.empty() : cache.get(player);
             if (remembered.isPresent()) {
                 return remembered.get().getName();
             }

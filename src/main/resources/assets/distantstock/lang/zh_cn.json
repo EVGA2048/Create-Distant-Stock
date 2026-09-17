@@ -379,5 +379,7 @@
   "gui.distantstock.group.unknown": "这个收货港组不存在了：重新选一个再下单",
   "gui.distantstock.queued_at": "已下单：货从 %s 出来",
   "gui.distantstock.where.local": "本服 · %s",
-  "gui.distantstock.where.remote": "%s（对岸）"
+  "gui.distantstock.where.remote": "%s（对岸）",
+  "message.distantstock.parcel.for_other": "这是给 %s 的包裹，只有他能取走",
+  "message.distantstock.parcel.arrived": "你的包裹到了：%s"
 }
