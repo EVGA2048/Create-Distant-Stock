@@ -204,4 +204,37 @@ public final class DockGameTests {
         h.succeed();
     }
 
+
+    /**
+     * 卡住的和退回去的东西，溜槽拿得走。
+     *
+     * <p>报的是"没有收货港组的包裹应该能被下方的交互取走，我放了智能溜槽但是没有"。原因是对外的
+     * 那个接口只有一个格子、而且只从"收到"那一格取 —— 卡在发出格里的包裹和回退面上的东西，
+     * 自动化根本看不见。修机器不该比玩家手动能做的更少。
+     */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void aStuckParcelCanBePulledOutFromBelow(GameTestHelper h) {
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        h.getLevel().setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        dev.distantstock.block.DockBlockEntity dock =
+                (dev.distantstock.block.DockBlockEntity) h.getLevel().getBlockEntity(pos);
+        h.assertTrue(dock != null, "港没有出现");
+
+        // 能力问的是"哪个方块的哪一面"：港自己，朝下的那一面。
+        var below = h.getLevel().getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
+                pos, Direction.DOWN);
+        h.assertTrue(below != null, "港的下面读不到物品接口 —— 溜槽就是这么接的");
+
+        ItemStack parcel = new ItemStack(dev.distantstock.item.ModItems.REMOTE_PACKAGE.get());
+        com.simibubi.create.content.logistics.box.PackageItem.addAddress(parcel, "没有这个港");
+        h.assertTrue(below.insertItem(0, parcel, false).isEmpty(), "包裹塞不进港（0 号格应该是「交给它发」）");
+
+        // 收货模式的港永远不会发这件包裹：它在这里没有出路，所以现在就该能拿走。
+        h.assertTrue(!dock.transmitting(), "没有网络也没有传输出口，却被判成正在传输");
+        h.assertTrue(!below.extractItem(1, 1, true).isEmpty(),
+                "收货模式港里的包裹从下面取不走 —— 智能溜槽就是这么接的");
+        h.assertTrue(dock.takeStuck(h.makeMockPlayer(GameType.SURVIVAL)),
+                "手动能拿走的包裹，溜槽却拿不走 —— 两条路的规矩不一致");
+        h.succeed();
+    }
 }

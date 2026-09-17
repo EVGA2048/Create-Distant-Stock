@@ -65,17 +65,33 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     /** Items and parcels the dock cannot handle, waiting for room below the fallback face. */
     private final ItemStackHandler fallbackInv = fallbackInventory(this::contentsChanged);
 
-    /** One exposed package slot; received parcels may be extracted, outgoing parcels inserted. */
+    /**
+     * 三个格子朝外：收到的一件、卡住的发出件、回退面上的东西。
+     *
+     * <p>以前只有一个格子，而且只能从「收到」那一格取 —— 于是**卡住的包裹和回退面上的东西，
+     * 溜槽和漏斗都看不见也拿不走**，只能玩家自己空手右键。玩家把智能溜槽放在下面想自动回收，
+     * 结果什么也拿不到，报的正是这个。
+     *
+     * <p>插入仍然只有 0 号格（等于「交给这个港发出去」），行为和以前一模一样；多出来的是可以取走
+     * 的东西 —— 修机器的自动化不该比玩家手动能做的更少。
+     */
     final IItemHandler automation = new IItemHandler() {
+        /** 0 收到 / 1 发出 / 2 回退面。 */
+        private static final int SLOTS = 3;
+
         @Override
         public int getSlots() {
-            return 1;
+            return SLOTS;
         }
 
         @Override
         public ItemStack getStackInSlot(int slot) {
-            return slot == 0 ? (receivedInv.getStackInSlot(0).isEmpty()
-                    ? outboundInv.getStackInSlot(0) : receivedInv.getStackInSlot(0)) : ItemStack.EMPTY;
+            return switch (slot) {
+                case 0 -> receivedInv.getStackInSlot(0);
+                case 1 -> outboundIsStranded() ? outboundInv.getStackInSlot(0) : ItemStack.EMPTY;
+                case 2 -> fallbackInv.getStackInSlot(0);
+                default -> ItemStack.EMPTY;
+            };
         }
 
         @Override
@@ -88,10 +104,14 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
 
         @Override
         public ItemStack extractItem(int slot, int amount, boolean simulate) {
-            if (slot != 0 || !canReceive() || receiving()) {
-                return ItemStack.EMPTY;
-            }
-            return receivedInv.extractItem(0, amount, simulate);
+            return switch (slot) {
+                case 0 -> canReceive() && !receiving()
+                        ? receivedInv.extractItem(0, amount, simulate) : ItemStack.EMPTY;
+                case 1 -> outboundIsStranded()
+                        ? outboundInv.extractItem(0, amount, simulate) : ItemStack.EMPTY;
+                case 2 -> fallbackInv.extractItem(0, amount, simulate);
+                default -> ItemStack.EMPTY;
+            };
         }
 
         @Override
@@ -104,6 +124,30 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             return slot == 0 && PackageItem.isPackage(stack);
         }
     };
+
+    /**
+     * 发出格里那件东西是不是"走不了"了 —— 手动取件和溜槽取件共用这一条规矩。
+     *
+     * <p>"卡住"以前只认 BLOCKED/FAULT 两种灯，太窄了：**收货模式的港永远不会发它**（玩家把包裹
+     * 塞进一个收货港），**没接网络的港也发不出去**（灯是 INACTIVE），这两种情况下包裹就那样躺在
+     * 里面，玩家空手右键拿不出来、溜槽也拿不走 —— 报的就是"异常包裹取不走"。
+     *
+     * <p>真正要保护的是另一件事：一件**正在等港发出去**的包裹不能被顺走，否则"放进去、它自己会走"
+     * 这件事就不成立了，而且传输窗口里取走会复制。所以判据是"它还有没有机会出去"，不是"灯是什么
+     * 颜色"。两处调用必须是同一个判断：手动能拿、溜槽拿不走，是比"都拿不走"更让人困惑的状态。
+     */
+    public boolean outboundIsStranded() {
+        if (transmitting() || outboundInv.getStackInSlot(0).isEmpty()) {
+            return false;
+        }
+        if (!canSend()) {
+            // 收货（或只收货）的港：这个包裹在这里没有出路。
+            return true;
+        }
+        DockStatus status = status();
+        return status == DockStatus.BLOCKED || status == DockStatus.FAULT
+                || status == DockStatus.INACTIVE;
+    }
 
     /** Takes one parcel into the bay, answering whether it fit. The bay holds exactly one. */
     public boolean acceptParcel(ItemStack stack) {
@@ -147,7 +191,9 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         }
     };
 
-    @Override public int getContainerSize() { return 1; }
+    // 原版漏斗走的是 Container 这条路，视图必须和上面那个 IItemHandler 是同一个 —— 否则
+    // 智能溜槽能拿走的、普通漏斗拿不走，同一台机器两种脾气。
+    @Override public int getContainerSize() { return automation.getSlots(); }
     @Override public boolean isEmpty() { return !occupied(); }
     @Override public ItemStack getItem(int slot) { return automation.getStackInSlot(slot); }
     @Override public ItemStack removeItem(int slot, int amount) { return automation.extractItem(slot, amount, false); }
@@ -164,13 +210,14 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         outboundInv.setStackInSlot(0, ItemStack.EMPTY);
         fallbackInv.setStackInSlot(0, ItemStack.EMPTY);
     }
-    @Override public int[] getSlotsForFace(Direction side) { return new int[]{0}; }
+    @Override public int[] getSlotsForFace(Direction side) { return new int[]{0, 1, 2}; }
     @Override public boolean canPlaceItem(int slot, ItemStack stack) { return automation.isItemValid(slot, stack); }
     @Override public boolean canPlaceItemThroughFace(int slot, ItemStack stack, Direction side) {
         return canPlaceItem(slot, stack);
     }
     @Override public boolean canTakeItemThroughFace(int slot, ItemStack stack, Direction side) {
-        return slot == 0 && canReceive() && !receiving() && !receivedInv.getStackInSlot(0).isEmpty();
+        // 直接问那一格：能模拟取出就是能取。写死条件的话，三个格子就要写三遍，而且迟早漏一个。
+        return !automation.extractItem(slot, 1, true).isEmpty();
     }
 
     private UUID freq;
@@ -349,6 +396,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         return used(outboundInv);
     }
 
+    /** 发出格里那件包裹（动画和读数都用它）。 */
     public ItemStack transmittingStack() {
         for (int slot = 0; slot < outboundInv.getSlots(); slot++) {
             ItemStack stack = outboundInv.getStackInSlot(slot);
@@ -357,6 +405,20 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             }
         }
         return ItemStack.EMPTY;
+    }
+
+    /**
+     * 现在是不是正把它交出去 —— 传输窗口开着。
+     *
+     * <p>**不要拿 {@link #transmittingStack()} 当这个用**：它只是"发出格里有没有东西"，而一件刚
+     * 放进去、还没轮到结算的包裹也在那一格里。以前两处取件（手动和溜槽）都拿它当"传输中"，于是
+     * 一件躺在发出格里的卡住包裹**永远取不出来** —— 玩家报的"智能溜槽取不走异常包裹"就是这个，
+     * 而手动那一侧其实也一样坏，只是没人试。
+     *
+     * <p>窗口本身的定义在 {@code transmitStartedAt >= 0}，和状态灯、动画用的是同一个判断。
+     */
+    public boolean transmitting() {
+        return transmitStartedAt >= 0 && !transmittingStack().isEmpty();
     }
 
     public float transmitProgress(float partialTicks) {
@@ -432,10 +494,11 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
      * transport, and pulling it out mid-handover is how a parcel gets duplicated.
      */
     public boolean takeStuck(net.minecraft.world.entity.player.Player player) {
-        if (player == null || !transmittingStack().isEmpty()) {
+        if (player == null || transmitting()) {
             return false;
         }
-        if (status() != DockStatus.BLOCKED && status() != DockStatus.FAULT) {
+        if (!outboundIsStranded() && fallbackInv.getStackInSlot(0).isEmpty()) {
+            // 没有走不了的发出件，也没有回退面上的东西：没什么可救的。
             return false;
         }
         var server = level == null ? null : level.getServer();
