@@ -24,6 +24,7 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
     private UUID freq;
     private RemoteNetworkId networkId;
     private String address = "";
+    private String homeAddress = "";
     /**
      * Where a desk's orders come out, as a dock group id; null means the default group.
      *
@@ -75,6 +76,16 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
     /** Points this desk at a group, or back at the default when given null. */
     public void setReceivingGroup(UUID group) {
         this.receivingGroup = group;
+        sync();
+    }
+
+    /** 货回到本端以后要穿的地址；空白 = 这件货不换门牌。见 RequesterData.HOME_ADDRESS。 */
+    public String homeAddress() {
+        return homeAddress;
+    }
+
+    public void setHomeAddress(String homeAddress) {
+        this.homeAddress = homeAddress == null ? "" : homeAddress;
         sync();
     }
 
@@ -170,6 +181,7 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
             tag.put("RemoteNetwork", networkId.save());
         }
         tag.putString("Address", address);
+        tag.putString("HomeAddress", homeAddress);
         if (receivingGroup != null) {
             tag.putUUID("ReceivingGroup", receivingGroup);
         }
@@ -188,6 +200,8 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
         networkId = tag.contains("RemoteNetwork")
                 ? RemoteNetworkId.read(tag.getCompound("RemoteNetwork")).orElse(null) : null;
         address = tag.getString("Address");
+        // 缺键读回空串：老存档里的请求台只有一个地址，这正是它当时的样子。
+        homeAddress = tag.getString("HomeAddress");
         receivingGroup = tag.hasUUID("ReceivingGroup") ? tag.getUUID("ReceivingGroup") : null;
         if (tag.contains("LastOrder")) {
             try {

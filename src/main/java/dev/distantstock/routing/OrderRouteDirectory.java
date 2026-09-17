@@ -25,12 +25,22 @@ public final class OrderRouteDirectory extends SavedData {
     private static final class Entry {
         final RemoteRoute route;
         final long createdAt;
+        /**
+         * The address the parcels of this order must wear once they are home, or "".
+         *
+         * <p>Kept beside the route because it is decided with it — from the same order request, at
+         * the same moment — and because the packager that stamps the route onto a parcel needs both.
+         * Blank for an order whose goods stay on this server, and for one from a build that had only
+         * one address to give.
+         */
+        final String homeAddress;
         final Map<Integer, java.util.Set<Integer>> received = new LinkedHashMap<>();
         final Map<Integer, Integer> lastPackage = new LinkedHashMap<>();
         int lastLink = -1;
 
-        Entry(RemoteRoute route, long createdAt) {
+        Entry(RemoteRoute route, String homeAddress, long createdAt) {
             this.route = route;
+            this.homeAddress = homeAddress == null ? "" : homeAddress;
             this.createdAt = createdAt;
         }
         RemoteRoute route() { return route; }
@@ -44,6 +54,11 @@ public final class OrderRouteDirectory extends SavedData {
     }
 
     public void remember(Collection<PackagingRequest> requests, RemoteRoute route) {
+        remember(requests, route, "");
+    }
+
+    /** The same, for an order whose parcels have to wear a different address once they are home. */
+    public void remember(Collection<PackagingRequest> requests, RemoteRoute route, String homeAddress) {
         long now = System.currentTimeMillis();
         var newIds = new java.util.HashSet<Integer>();
         for (PackagingRequest request : requests) {
@@ -57,7 +72,7 @@ public final class OrderRouteDirectory extends SavedData {
         if (routes.size() + newIds.size() > MAX_ENTRIES) {
             throw new IllegalStateException("Too many unfinished routed orders");
         }
-        for (Integer id : newIds) routes.put(id, new Entry(route, now));
+        for (Integer id : newIds) routes.put(id, new Entry(route, homeAddress, now));
         if (!newIds.isEmpty()) setDirty();
     }
 
@@ -91,6 +106,18 @@ public final class OrderRouteDirectory extends SavedData {
         return entry == null ? Optional.empty() : Optional.of(entry.route());
     }
 
+    /**
+     * The address an order's parcels wear once they are home, or "" when there is none.
+     *
+     * <p>Asked separately from the route because the packager writes the route onto every parcel of
+     * the order and the address onto the same ones — one lookup would be nicer, and this is the same
+     * map read twice, so the cost of two is one hash.
+     */
+    public String homeAddress(int createOrderId) {
+        Entry entry = routes.get(createOrderId);
+        return entry == null ? "" : entry.homeAddress;
+    }
+
     /** Removes a completely accounted-for order, never just its first parcel. */
     public boolean consume(int createOrderId) {
         if (routes.remove(createOrderId) != null) {
@@ -113,6 +140,10 @@ public final class OrderRouteDirectory extends SavedData {
             saved.putUUID("ReceivingDockGroup", route.receivingDockGroupId());
             saved.putUUID("Correlation", route.correlationId());
             saved.putUUID("ChildOrder", route.childOrderId());
+            // 只在有东西可写的时候写：老存档读回来仍是「没有第二个地址」，而不是空字符串。
+            if (!row.getValue().homeAddress.isEmpty()) {
+                saved.putString("HomeAddress", row.getValue().homeAddress);
+            }
             saved.putInt("LastLink", row.getValue().lastLink);
             ListTag progress = new ListTag();
             row.getValue().received.forEach((link, indexes) -> {
@@ -149,7 +180,8 @@ public final class OrderRouteDirectory extends SavedData {
                         saved.getUUID("ReceivingDockGroup"),
                         saved.getUUID("Correlation"),
                         saved.getUUID("ChildOrder"));
-                Entry entry = new Entry(route, saved.getLong("CreatedAt"));
+                // 缺键 = 这个订单只有一个地址（老存档，或者货根本不过海），读回来是空串。
+                Entry entry = new Entry(route, saved.getString("HomeAddress"), saved.getLong("CreatedAt"));
                 entry.lastLink = saved.contains("LastLink", Tag.TAG_INT) ? saved.getInt("LastLink") : -1;
                 ListTag progress = saved.getList("Progress", Tag.TAG_COMPOUND);
                 for (int j = 0; j < progress.size(); j++) {

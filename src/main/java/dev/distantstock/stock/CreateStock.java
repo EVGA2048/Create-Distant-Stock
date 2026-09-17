@@ -160,6 +160,18 @@ public final class CreateStock {
 
     public static boolean request(UUID freq, List<StockCache.Entry> items, String address,
                                   MinecraftServer server, RemoteRoute route) {
+        return request(freq, items, address, server, route, "");
+    }
+
+    /**
+     * The same, for an order whose parcels must wear a different address once they are home.
+     *
+     * <p>{@code homeAddress} is written onto every parcel of this order and applied on the far side
+     * of the crossing — see {@link dev.distantstock.routing.RemoteRouteData#applyHomeAddress}. Blank
+     * is the ordinary case: goods that stay on this server never need a second address.
+     */
+    public static boolean request(UUID freq, List<StockCache.Entry> items, String address,
+                                  MinecraftServer server, RemoteRoute route, String homeAddress) {
         if (!hasNetwork(freq) || items == null || items.isEmpty()) {
             return false;
         }
@@ -193,7 +205,7 @@ public final class CreateStock {
             }
         }
         try {
-            OrderRouteDirectory.get(server).remember(requests.values(), route);
+            OrderRouteDirectory.get(server).remember(requests.values(), route, homeAddress);
         } catch (IllegalStateException exception) {
             org.apache.logging.log4j.LogManager.getLogger().warn(
                     "[DistantStock/Order] refused before packaging: {}", exception.getMessage());

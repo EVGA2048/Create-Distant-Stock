@@ -81,6 +81,39 @@ public final class SignalLampGameTests {
         h.assertTrue(RequesterData.address(requester).equals("收货点"), "address lost");
         RequesterData.setFreq(requester, UUID.randomUUID());
         h.assertTrue(RequesterData.tuned(requester), "requester cannot rebind");
+        // 解绑不该碰两个地址里的任何一个：绑定是网络，地址是门口。
+        RequesterData.setHomeAddress(requester, "本端收货口");
+        requester.getItem().use(level, player, InteractionHand.OFF_HAND);
+        h.assertTrue(RequesterData.address(requester).equals("收货点"),
+                "解绑弄丢了对端的地址");
+        h.assertTrue(RequesterData.homeAddress(requester).equals("本端收货口"),
+                "解绑弄丢了本端的地址");
+        h.succeed();
+    }
+
+    /**
+     * 港的过滤条件问的是「落进我这里的包裹身上写着什么」，所以它答的是这一侧的地址。
+     *
+     * <p>两个地址都填了就用本端那个：货过海回来时穿的正是它。只填了一个（老终端、或者货根本
+     * 不过海）就还是那一个 —— 这条退路是给已经配好的存档留的，多出一个框不该让谁家的港突然
+     * 改成什么都收。
+     */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void aDockAnswersToThisSidesAddress(GameTestHelper h) {
+        var terminal = new ItemStack(ModItems.REQUESTER.get());
+        RequesterData.setAddress(terminal, "乙站发货口");
+        h.assertTrue(RequesterData.localAddress(terminal).equals("乙站发货口"),
+                "只有一个地址时港答的不是它");
+        RequesterData.setHomeAddress(terminal, "甲站收货口");
+        h.assertTrue(RequesterData.localAddress(terminal).equals("甲站收货口"),
+                "填了本端地址以后港还在答对面那个地址");
+        RequesterData.setHomeAddress(terminal, "");
+        h.assertTrue(RequesterData.localAddress(terminal).equals("乙站发货口"),
+                "清掉本端地址以后没有退回那唯一的地址");
+        // 两个都空 = 谁都收，这正是港的 `*` 通配。
+        RequesterData.setAddress(terminal, "");
+        h.assertTrue(RequesterData.localAddress(terminal).isEmpty(),
+                "两个地址都空的时候港还是答了一个地址");
         h.succeed();
     }
 

@@ -44,11 +44,22 @@ public final class TranserverOrderService {
                 for (LinkQueues.Line line : record.request().lines()) {
                     items.add(new StockCache.Entry(line.itemId(), line.count()));
                 }
+                UUID destination = destinationNode(server, record);
                 RemoteRoute route = new RemoteRoute(RemoteRoute.CURRENT_SCHEMA,
-                        destinationNode(server, record), record.request().receivingDockGroupId(),
+                        destination, record.request().receivingDockGroupId(),
                         record.request().correlationId(), record.request().childOrderId());
+                // The second address is for a parcel that crosses, and only for one. An order the
+                // packing server keeps — the group it names is one of its own — is packed, sorted and
+                // delivered on one machine, and writing a home address onto it would put a note on a
+                // parcel about a journey it is not taking. Compare against this node: the sentinel is
+                // what "here" means on a save with no Transerver attached.
+                UUID here = TranserverBridge.nodeId();
+                boolean crosses = here == null
+                        ? !destination.toString().equals(TranserverBridge.localNodeId())
+                        : !here.equals(destination);
                 boolean applied = CreateStock.request(record.request().networkId().createFrequency(), items,
-                        record.request().address(), server, route);
+                        record.request().address(), server, route,
+                        crosses ? record.request().homeAddress() : "");
                 inbox.state(record.childOrderId(), applied ? InboundOrderInbox.State.APPLIED
                         : InboundOrderInbox.State.RECEIVED, applied ? "" : "network busy or stock unavailable");
                 if (applied) {

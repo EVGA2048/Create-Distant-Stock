@@ -63,6 +63,14 @@ public final class RemotePackageItem extends PackageItem {
                             ? shortId(route.destinationNodeId()) + " · " + shortId(route.receivingDockGroupId())
                             : label).withStyle(ChatFormatting.LIGHT_PURPLE));
         });
+        // 第二个地址。上面那一行和 Create 自己那行说的是这件包裹现在在哪、要穿谁的门牌；这一行
+        // 说的是它过海以后要换成什么 —— 也就是「摸一下能看见两个地址」里的第二个。落地的那一刻
+        // 标签就被用掉并清掉了，所以到达以后只剩本端地址。
+        String home = RemoteRouteData.homeAddress(stack);
+        if (!home.isEmpty()) {
+            tip.add(Component.translatable("item.distantstock.remote_package.home_address", home)
+                    .withStyle(ChatFormatting.AQUA));
+        }
     }
 
     private static String shortId(java.util.UUID id) {

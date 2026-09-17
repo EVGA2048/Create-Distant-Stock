@@ -94,6 +94,33 @@ public final class RequesterMenu extends AbstractContainerMenu {
         return RequesterData.address(device(player));
     }
 
+    /**
+     * The address the goods wear once they are back on this side, or "".
+     *
+     * <p>Blank is the ordinary setting and means the parcel keeps whatever address it was packed
+     * with — which is right for everything that never crosses, and for a crossing where both servers
+     * happen to call the door the same thing.
+     */
+    public String homeAddress(Player player) {
+        GaugeBlockEntity be = gauge(player);
+        if (be != null) {
+            return be.homeAddress();
+        }
+        return RequesterData.homeAddress(device(player));
+    }
+
+    public void writeHomeAddress(Player player, String homeAddress) {
+        GaugeBlockEntity be = gauge(player);
+        if (be != null) {
+            be.setHomeAddress(homeAddress);
+            return;
+        }
+        ItemStack stack = device(player);
+        if (!stack.isEmpty()) {
+            RequesterData.setHomeAddress(stack, homeAddress);
+        }
+    }
+
     public RemoteNetworkId networkId(Player player) {
         GaugeBlockEntity be = gauge(player);
         if (be != null) {

@@ -116,6 +116,8 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
             }
             UUID freq = menu.freq(p);
             String address = menu.address(p);
+            // 第二个地址跟着订单走：它在对面写不到包裹上，只能由下单这一侧带过去。
+            String homeAddress = menu.homeAddress(p);
             List<LinkQueues.Line> items = new ArrayList<>();
             for (Line line : msg.lines) {
                 if (line.count > 0 && line.itemId != null && !line.itemId.isBlank()) {
@@ -124,7 +126,7 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
             }
             OrderService.Result result = p instanceof ServerPlayer serverPlayer
                     ? OrderService.place(serverPlayer.getServer(), menu.networkId(p), freq, address,
-                    group, items)
+                    group, items, homeAddress)
                     : OrderService.Result.FAIL;
             GaugeBlockEntity be = menu.gauge(p);
             if (be != null) {

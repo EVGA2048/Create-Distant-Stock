@@ -10,6 +10,7 @@ import dev.distantstock.link.ParcelLedger;
 import dev.distantstock.link.TranserverBridge;
 import dev.distantstock.routing.DockGroup;
 import dev.distantstock.routing.DockGroupDirectory;
+import com.simibubi.create.content.logistics.box.PackageItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -117,6 +118,84 @@ public final class ParcelEscrowGameTests {
                     "包裹没有落进地址对上的那个港");
             h.assertTrue(open.displayedStack().isEmpty(),
                     "包裹落进了同组里地址不对的那个港（乙站）");
+            h.succeed();
+        });
+    }
+
+    /**
+     * 过海那一刻换地址：包裹从对面带来的门牌，到这边就换成这边的。
+     *
+     * <p>这条用例的全部意义在这个布置上：港认的是「本端地址」，而包裹身上写的是对面那台服务器
+     * 的地址。除了过海那一下的替换，没有任何东西能让它对上 —— 所以包裹落进港，就等于证明替换
+     * 发生在找港之前；落地以后标签被清掉，也就等于证明它不会再被换第二次。
+     */
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void aCrossingSwapsTheParcelsAddress(GameTestHelper h) {
+        var level = h.getLevel();
+        MinecraftServer server = level.getServer();
+        DockGroup group = DockGroupDirectory.get(server)
+                .create("过海组 " + java.util.UUID.randomUUID().toString().substring(0, 8));
+        DockBlockEntity dock = placeDock(h, TARGET_X, group.id());
+        dock.setImport("甲站收货口");
+
+        h.runAfterDelay(2, () -> {
+            ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+            PackageItem.addAddress(parcel, "乙站发货口");
+            dev.distantstock.routing.RemoteRouteData.write(parcel,
+                    new dev.distantstock.routing.RemoteRoute(
+                            dev.distantstock.routing.RemoteRoute.CURRENT_SCHEMA,
+                            java.util.UUID.fromString(TranserverBridge.localNodeId()),
+                            group.id(), java.util.UUID.randomUUID(), java.util.UUID.randomUUID()),
+                    "本服 · " + group.name(), "甲站收货口");
+            h.assertTrue("甲站收货口".equals(dev.distantstock.routing.RemoteRouteData.homeAddress(parcel)),
+                    "本端地址没写到包裹上，后面的断言就没有意义了");
+
+            ParcelEscrow escrow = ParcelEscrow.get(server);
+            escrow.hold(parcel, "乙站发货口", TranserverBridge.localNodeId(), group.id(),
+                    level.dimension().location().toString(),
+                    h.absolutePos(new BlockPos(OTHER_X, Y, Z)), level.getGameTime(),
+                    level.registryAccess());
+            ParcelEscrowPump.tick(server);
+
+            ItemStack landed = dock.displayedStack();
+            h.assertTrue(landed.is(ModItems.REMOTE_PACKAGE.get()),
+                    "包裹没有落进港：地址没有在对的时候换成这一侧的");
+            h.assertTrue("甲站收货口".equals(PackageItem.getAddress(landed)),
+                    "落地的包裹还穿着对岸的门牌：" + PackageItem.getAddress(landed));
+            h.assertTrue(dev.distantstock.routing.RemoteRouteData.homeAddress(landed).isEmpty(),
+                    "换过的地址还留在标签里，会被再换一次");
+            h.succeed();
+        });
+    }
+
+    /**
+     * 只有过一个地址的包裹（老版本发的，或者货根本不过海）不许被凭空改地址。
+     *
+     * <p>没有本端地址时什么都不做，正是「不猜」这条规矩：发送方没说过的事，代码不能替它编。
+     */
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void aParcelWithoutAHomeAddressKeepsItsOwn(GameTestHelper h) {
+        var level = h.getLevel();
+        MinecraftServer server = level.getServer();
+        DockGroup group = DockGroupDirectory.get(server)
+                .create("单地址组 " + java.util.UUID.randomUUID().toString().substring(0, 8));
+        DockBlockEntity dock = placeDock(h, TARGET_X, group.id());
+        dock.setImport("");   // 空 = 谁都收，所以落地不靠地址，这条用例只测「没被动过」
+
+        h.runAfterDelay(2, () -> {
+            ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+            PackageItem.addAddress(parcel, "旧版地址");
+            ParcelEscrow escrow = ParcelEscrow.get(server);
+            escrow.hold(parcel, "旧版地址", TranserverBridge.localNodeId(), group.id(),
+                    level.dimension().location().toString(),
+                    h.absolutePos(new BlockPos(OTHER_X, Y, Z)), level.getGameTime(),
+                    level.registryAccess());
+            ParcelEscrowPump.tick(server);
+
+            ItemStack landed = dock.displayedStack();
+            h.assertTrue(landed.is(ModItems.REMOTE_PACKAGE.get()), "包裹没有落进港");
+            h.assertTrue("旧版地址".equals(PackageItem.getAddress(landed)),
+                    "没有本端地址的包裹被换了地址：" + PackageItem.getAddress(landed));
             h.succeed();
         });
     }

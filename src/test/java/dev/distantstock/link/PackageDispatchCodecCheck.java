@@ -52,6 +52,17 @@ public final class PackageDispatchCodecCheck {
         byte[] orderTrailing = Arrays.copyOf(orderBytes, orderBytes.length + 1);
         rejectsOrder(orderTrailing, "order trailing data was accepted");
 
+        // 第二个地址跟着订单过海，所以它也必须原样回来。
+        OrderRequestCodec.Request twoAddresses = new OrderRequestCodec.Request(network, groupId,
+                UUID.randomUUID(), UUID.randomUUID(), "甲站发货口", "甲站收货口", List.of(
+                new LinkQueues.Line("minecraft:iron_ingot", 8)));
+        require(OrderRequestCodec.decode(OrderRequestCodec.encode(twoAddresses)).equals(twoAddresses),
+                "order request lost its second address");
+        // 空的本端地址是常事（货不过海），往返之后不能变成别的什么东西。
+        require(OrderRequestCodec.decode(OrderRequestCodec.encode(order)).homeAddress().isEmpty(),
+                "an order that named no home address came back with one");
+        acceptsVersionOneOrder();
+
         List<NetworkDirectory.Entry> directory = List.of(
                 new NetworkDirectory.Entry(network.createFrequency(), "仓库服", 4, network, false));
         // False, because that is what an announcement is: another server's networks, decoded on
@@ -137,6 +148,51 @@ public final class PackageDispatchCodecCheck {
         require(DockSelection.select(List.of(new DockSelection.Candidate(0, false)), 0) == 0,
                 "a full group must report its first dock so the stall can be explained");
         require(DockSelection.select(List.of(), 0) == -1, "an empty group must report no dock");
+    }
+
+    /**
+     * 老版本发来的订单还要能读。
+     *
+     * <p>配对的两台服务器是一台一台重启的，所以「一台已经会写第二个地址、另一台还不会」是
+     * 升级当天的常态，不是异常。版本 1 的载荷里没有那段字符串，按版本号跳过它 —— 跳过而不是
+     * 读一个空串，因为读空串会把后面的行数当成地址吃掉，整张订单从此错位。
+     */
+    private static void acceptsVersionOneOrder() throws Exception {
+        RemoteNetworkId network = new RemoteNetworkId(1, UUID.randomUUID(), UUID.randomUUID(),
+                "minecraft:overworld", UUID.randomUUID());
+        UUID group = UUID.randomUUID();
+        UUID correlation = UUID.randomUUID();
+        UUID child = UUID.randomUUID();
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
+        out.writeInt(0x44534f52);
+        out.writeInt(1);
+        for (UUID id : List.of(network.nodeId(), network.worldId())) {
+            out.writeLong(id.getMostSignificantBits());
+            out.writeLong(id.getLeastSignificantBits());
+        }
+        writeString(out, network.dimensionId());
+        out.writeLong(network.createFrequency().getMostSignificantBits());
+        out.writeLong(network.createFrequency().getLeastSignificantBits());
+        for (UUID id : List.of(group, correlation, child)) {
+            out.writeLong(id.getMostSignificantBits());
+            out.writeLong(id.getLeastSignificantBits());
+        }
+        writeString(out, "旧版地址");
+        out.writeInt(1);
+        writeString(out, "minecraft:iron_ingot");
+        out.writeInt(16);
+        OrderRequestCodec.Request decoded = OrderRequestCodec.decode(bytes.toByteArray());
+        require(decoded.address().equals("旧版地址"), "a version 1 order lost its address");
+        require(decoded.homeAddress().isEmpty(), "a version 1 order invented a home address");
+        require(decoded.lines().size() == 1 && decoded.lines().getFirst().count() == 16,
+                "a version 1 order lost its lines behind the missing field");
+    }
+
+    private static void writeString(java.io.DataOutputStream out, String value) throws Exception {
+        byte[] raw = value.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        out.writeInt(raw.length);
+        out.write(raw);
     }
 
     private static void rejectsOrder(byte[] payload, String message) throws Exception {

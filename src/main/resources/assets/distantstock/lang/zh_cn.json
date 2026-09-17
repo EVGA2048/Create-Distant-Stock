@@ -3,7 +3,7 @@
   "item.distantstock.requester.unbind_hint": "潜行并对空气右键：解除网络绑定（保留地址）",
   "item.distantstock.requester.unbound": "已解除网络绑定，可以重新选择网络",
   "gui.distantstock.route.group": "接收港组",
-  "gui.distantstock.route.remote": "远程地址",
+  "gui.distantstock.route.remote": "远端地址",
   "gui.distantstock.route.pending": "待接入港组目录",
   "item.distantstock.requester": "便携式远仓终端",
   "item.distantstock.manual": "远仓说明书",
@@ -354,7 +354,7 @@
   "item.distantstock.remote_package.crossing": "跨服寄往 %s",
   "gui.distantstock.pair.mint_row.not_owner": "＋ 生成配对码 —— 只有组主能发（这个组不是你建的）",
   "gui.distantstock.pair.mint_row.new_group": "＋ 生成配对码 —— 先对「%s」按回车建组",
-  "create.gui.stock_keeper.package_address.hint": "包裹上写的地址；收货侧的港/蛙港要收这个地址",
+  "create.gui.stock_keeper.package_address.hint": "包裹在对面被认领用的地址；对面的港/蛙港要收这个地址",
   "gui.distantstock.member.title": "成员 · %s",
   "gui.distantstock.member.owner_tag": "组主",
   "gui.distantstock.member.nobody": "（服务器建的，没有组主）",
@@ -371,5 +371,10 @@
   "gui.distantstock.member.added": "已把 %s 加入港组「%s」：他能用这个组，改不了它",
   "gui.distantstock.member.not_member": "「%s」不在这个组的名单里",
   "gui.distantstock.member.removed": "已把 %s 移出港组「%s」",
-  "gui.distantstock.group.locked_hint": "已锁定：只有组主和成员能用"
+  "gui.distantstock.group.locked_hint": "已锁定：只有组主和成员能用",
+  "gui.distantstock.route.home": "本端地址",
+  "gui.distantstock.route.home.hint": "留空＝过海后不改地址",
+  "item.distantstock.remote_package.home_address": "过海后改用地址：%s",
+  "message.distantstock.dock.address": "收件地址：%s",
+  "message.distantstock.dock.address.any": "空（什么都收）"
 }

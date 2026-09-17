@@ -45,6 +45,13 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     private EditBox search;
     private EditBox address;
+    /**
+     * 货回到本端以后要穿的地址。
+     *
+     * <p>终端上这一个和下面那个是一对：下面那个是对面分拣用的（包裹就是在那边被认领的），
+     * 这个是过海以后本端分拣用的。两边的门牌经常不是同一个名字，所以必须分开填。
+     */
+    private EditBox homeAddress;
     private EditBox receivingGroup;
     private net.minecraft.client.gui.components.Button renameButton;
     private final List<CartLine> cart = new ArrayList<>();
@@ -89,14 +96,27 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         address.setMaxLength(40);
         address.setTextColor(0x714A40);
         address.setValue(keepAddr);
-        address.setResponder(v -> PacketDistributor.sendToServer(new SetAddressC2S(v)));
+        address.setResponder(v -> sendAddresses());
         addRenderableWidget(address);
+
 
 
         // The field stops short of the plate's right edge so the rename button beside it has
         // somewhere to sit: it used to hang twenty pixels off the end of the artwork, which is
         // what "突兀且错位" was about.
         int groupField = Math.max(60, imageWidth - 144);
+
+        // 本端地址：和收货港组同一套版式的一行，紧挨在它上面。放在这里是因为它和港组回答的是
+        // 同一个问题（货落在哪一边），而底下那个地址回答的是另一个（包裹在对面被谁认领）。
+        String keepHome = homeAddress == null ? menu.homeAddress(minecraft.player) : homeAddress.getValue();
+        homeAddress = new EditBox(font, leftPos + 82, topPos + imageHeight - 119, groupField - 2, 10,
+                Component.translatable("gui.distantstock.route.home"));
+        homeAddress.setBordered(false);
+        homeAddress.setTextColor(INK);
+        homeAddress.setMaxLength(40);
+        homeAddress.setValue(keepHome == null ? "" : keepHome);
+        homeAddress.setResponder(v -> sendAddresses());
+        addRenderableWidget(homeAddress);
         receivingGroup = new EditBox(font, leftPos + 82, topPos + imageHeight - 87,
                 groupField, 10,
                 Component.translatable("gui.distantstock.route.group"));
@@ -151,6 +171,20 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             uiSound(SoundEvents.WOOD_HIT, 0.5f, 1.5f);
             uiSound(SoundEvents.BOOK_PAGE_TURN, 1f, 1f);
         }
+    }
+
+    /**
+     * Sends both addresses to the server, whichever one was just typed in.
+     *
+     * <p>Together because they are one record on the item: sending only the edited field would make
+     * each keystroke a claim about the other one, and the claim would be whatever this screen last
+     * saw rather than what the server holds.
+     */
+    private void sendAddresses() {
+        if (address == null || homeAddress == null) {
+            return;
+        }
+        PacketDistributor.sendToServer(new SetAddressC2S(address.getValue(), homeAddress.getValue()));
     }
 
     /**
@@ -885,6 +919,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         boolean tuned = menu.tuned(minecraft.player);
         search.setVisible(tuned);
         address.setVisible(tuned);
+        homeAddress.setVisible(tuned);
         receivingGroup.setVisible(tuned);
         if (renameButton != null) {
             renameButton.visible = tuned;
@@ -933,6 +968,23 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (!menu.tuned(minecraft.player)) {
             renderNetworks(g, x, y);
             return;
+        }
+
+        // 本端地址那一行：和收货港组同一套版式、同一个位置关系，因为它和港组回答的是同一类
+        // 问题 —— 出的货在「这一侧」落在哪。底下那个地址回答的是另一类问题 —— 包裹在对面被谁认领。
+        renderRouteRow(g, imageHeight - 130, "gui.distantstock.route.home");
+        int homeX = homeAddress.getX();
+        int homeY = homeAddress.getY();
+        g.fill(homeX - 3, homeY - 2, homeX + homeAddress.getWidth() + 3,
+                homeY + homeAddress.getHeight() + 2, homeAddress.isFocused() ? 0x66FFFFFF : 0x33000000);
+        g.fill(homeX - 3, homeY + homeAddress.getHeight() + 2,
+                homeX + homeAddress.getWidth() + 3, homeY + homeAddress.getHeight() + 3,
+                homeAddress.isFocused() ? 0xFFFFFFFF : 0xAA8A7250);
+        if (homeAddress.getValue().isBlank() && !homeAddress.isFocused()) {
+            // 留空是常事（货不过海，或者两边门牌正好同名），所以空格子里写的是留空的后果，
+            // 不是一个像必填项一样的标签。
+            g.drawString(font, Component.translatable("gui.distantstock.route.home.hint")
+                    .withStyle(ChatFormatting.ITALIC), homeX, homeY, HINT, false);
         }
 
         renderRouteRow(g, imageHeight - 98, "gui.distantstock.route.group");
@@ -1186,6 +1238,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (address.isFocused() && !address.isHovered()) {
             address.setFocused(false);
         }
+        if (homeAddress.isFocused() && !homeAddress.isHovered()) {
+            homeAddress.setFocused(false);
+        }
         if (search.isFocused() && !search.isHovered()) {
             search.setFocused(false);
         }
@@ -1293,7 +1348,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     /** Whether any of this screen's text fields is taking keys. */
     private boolean typing() {
-        return (search != null && search.isFocused())
+        return (homeAddress != null && homeAddress.isFocused())
+                || (search != null && search.isFocused())
                 || (receivingGroup != null && receivingGroup.isFocused())
                 || (memberInput != null && memberInput.isFocused())
                 || (address != null && address.isFocused());

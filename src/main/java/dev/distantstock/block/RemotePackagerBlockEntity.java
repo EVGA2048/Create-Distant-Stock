@@ -75,9 +75,12 @@ public final class RemotePackagerBlockEntity extends PackagerBlockEntity {
                 || !PackageItem.hasOrderData(stack) || RemoteRouteData.read(stack).isPresent()) {
             return;
         }
-        OrderRouteDirectory.get(level.getServer()).find(PackageItem.getOrderId(stack))
-                .ifPresent(route -> RemoteRouteData.write(stack, route,
-                        dev.distantstock.link.RouteLabels.describe(level.getServer(), route)));
+        var directory = OrderRouteDirectory.get(level.getServer());
+        int orderId = PackageItem.getOrderId(stack);
+        directory.find(orderId).ifPresent(route -> RemoteRouteData.write(stack, route,
+                dev.distantstock.link.RouteLabels.describe(level.getServer(), route),
+                // 过海以后要穿的地址。留空 = 这件货不过海，或者发它的那版只有一个地址。
+                directory.homeAddress(orderId)));
     }
 
     @Override

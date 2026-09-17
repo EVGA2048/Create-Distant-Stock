@@ -12,6 +12,10 @@ import dev.distantstock.routing.RemoteNetworkId;
 public final class RequesterData {
     public static final String FREQ = "Freq";
     public static final String ADDRESS = "Address";
+    /**
+     * 货回到本端以后要穿的地址。空白 = 只有上面那一个地址，也就是这件货不需要换门牌。
+     */
+    public static final String HOME_ADDRESS = "HomeAddress";
     public static final String NETWORK = "RemoteNetwork";
     public static final String RECEIVING_GROUP = "ReceivingDockGroup";
     /** The carried system's name, cached on the item so the screen can draw it offline. */
@@ -57,6 +61,42 @@ public final class RequesterData {
 
     public static void setAddress(ItemStack stack, String address) {
         update(stack, tag -> tag.putString(ADDRESS, address == null ? "" : address));
+    }
+
+    /**
+     * The address the goods wear once they are back on this side, or "".
+     *
+     * <p>Stored on the requester rather than sent with each order so the setting survives closing the
+     * screen, the way the address beside it does: a player who has to retype both every time they
+     * open a terminal would stop using the second one.
+     */
+    public static String homeAddress(ItemStack stack) {
+        return tag(stack).getString(HOME_ADDRESS);
+    }
+
+    /**
+     * The address a dock on <em>this</em> side answers to, as this requester is set up.
+     *
+     * <p>A dock's filter asks one question: what does a parcel landing here have written on it? A
+     * parcel packed on this server wears {@link #address}; one that crossed and came home wears
+     * {@link #HOME_ADDRESS} — because the crossing swapped them. So the answer is the home address
+     * when there is one, and the only address when there is not. That second half is what keeps a
+     * requester set up before home addresses existed writing exactly what it always wrote.
+     */
+    public static String localAddress(ItemStack stack) {
+        String home = homeAddress(stack);
+        return home.isEmpty() ? address(stack) : home;
+    }
+
+    public static void setHomeAddress(ItemStack stack, String homeAddress) {
+        String value = homeAddress == null ? "" : homeAddress;
+        update(stack, tag -> {
+            if (value.isEmpty()) {
+                tag.remove(HOME_ADDRESS);
+            } else {
+                tag.putString(HOME_ADDRESS, value);
+            }
+        });
     }
 
     public static Optional<RemoteNetworkId> network(ItemStack stack) {

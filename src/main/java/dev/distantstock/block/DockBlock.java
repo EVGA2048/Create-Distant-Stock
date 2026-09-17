@@ -135,7 +135,12 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
             if (!level.isClientSide) {
                 if (player.isShiftKeyDown()) {
                     // Sneak + requester: apply the requester's dock group and address to this dock.
-                    be.setImport(RequesterData.address(stack));
+                    //
+                    // 写进去的是「这一侧的地址」：本端地址填了就用它，没填就用那个唯一的地址。
+                    // 港的过滤条件问的是「落进我这里的包裹身上写着什么」，而包裹到这边时穿的正是
+                    // 本端地址 —— 只有过一个地址的玩家，两个地址本来就是同一个，于是这条规则退化成
+                    // 原来的行为，已经配好的存档不会因为多了一个框而失灵。
+                    be.setImport(RequesterData.localAddress(stack));
                     RequesterData.receivingGroup(stack).ifPresent(group -> {
                         // Joining someone else's group means their parcels come out of this dock.
                         // A closed group refuses, and says so out loud: a click that is silently
@@ -154,6 +159,15 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                                     Component.translatable("gui.distantstock.group.closed"), true);
                         }
                     });
+                    // 两个地址都填了的时候，玩家必须知道刚才写进去的是哪一个 —— 这一下同时改了
+                    // 港的过滤条件和它的组，而过滤条件看不见（要戴护目镜），选错了就是「包裹到了
+                    // 却停在外面」。空地址也说出来：那等于什么都收，是另一件需要知道的事。
+                    String written = be.address();
+                    player.displayClientMessage(Component.translatable(
+                            "message.distantstock.dock.address",
+                            written.isBlank()
+                                    ? Component.translatable("message.distantstock.dock.address.any")
+                                    : Component.literal(written)), true);
                 } else if (!RequesterData.tuned(stack)) {
                     // Untuned terminal, plain click: say so rather than doing nothing. Sneak-click
                     // still works — writing an address and joining a group need no network, and a

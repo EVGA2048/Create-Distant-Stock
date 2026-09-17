@@ -55,6 +55,21 @@ public final class OrderService {
 
     public static Result place(MinecraftServer server, RemoteNetworkId networkId, UUID legacyFrequency,
                                String address, UUID receivingDockGroupId, List<LinkQueues.Line> lines) {
+        return place(server, networkId, legacyFrequency, address, receivingDockGroupId, lines, "");
+    }
+
+    /**
+     * The same, with the address the goods must wear once they are back on this side.
+     *
+     * <p>Two addresses because a parcel needs one on each side and the two servers name their doors
+     * differently: the one it is packed with is the one the packing server sorts it by, and this one
+     * is applied the moment it arrives here. Blank when the goods stay where they are packed — an
+     * order into this server's own network never crosses, and neither does one that the packing side
+     * keeps.
+     */
+    public static Result place(MinecraftServer server, RemoteNetworkId networkId, UUID legacyFrequency,
+                               String address, UUID receivingDockGroupId, List<LinkQueues.Line> lines,
+                               String homeAddress) {
         if (networkId == null) {
             return placeLocal(server, legacyFrequency, address, receivingDockGroupId, lines);
         }
@@ -69,7 +84,8 @@ public final class OrderService {
         UUID childOrderId = UUID.randomUUID();
         try {
             OrderRequestCodec.Request request = new OrderRequestCodec.Request(networkId, receivingDockGroupId,
-                    correlationId, childOrderId, address == null ? "" : address, lines);
+                    correlationId, childOrderId, address == null ? "" : address,
+                    homeAddress == null ? "" : homeAddress, lines);
             UUID messageId = TranserverBridge.send(networkId.nodeId().toString(), RoutingChannels.ORDER_REQUEST,
                     OrderRequestCodec.encode(request), correlationId.toString());
             if (messageId != null) {

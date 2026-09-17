@@ -354,7 +354,7 @@
   "item.distantstock.remote_package.crossing": "Crossing to %s",
   "gui.distantstock.pair.mint_row.not_owner": "+ Mint a code — only the group's owner can",
   "gui.distantstock.pair.mint_row.new_group": "+ Mint a code — press Enter on \"%s\" first to create it",
-  "create.gui.stock_keeper.package_address.hint": "The address the parcel carries; the receiving port must accept it",
+  "create.gui.stock_keeper.package_address.hint": "the address the parcel is claimed by on the far side; a dock or frogport over there must accept it",
   "gui.distantstock.member.title": "Members · %s",
   "gui.distantstock.member.owner_tag": "owner",
   "gui.distantstock.member.nobody": "(server-made, nobody owns it)",
@@ -371,5 +371,10 @@
   "gui.distantstock.member.added": "%s was added to \"%s\": they may use it, not change it",
   "gui.distantstock.member.not_member": "\"%s\" is not on this group's list",
   "gui.distantstock.member.removed": "%s was removed from \"%s\"",
-  "gui.distantstock.group.locked_hint": "Locked: only the owner and members may use it"
+  "gui.distantstock.group.locked_hint": "Locked: only the owner and members may use it",
+  "gui.distantstock.route.home": "Home address",
+  "gui.distantstock.route.home.hint": "blank = keep its address after crossing",
+  "item.distantstock.remote_package.home_address": "Rewritten on arrival to: %s",
+  "message.distantstock.dock.address": "Receiving address: %s",
+  "message.distantstock.dock.address.any": "blank (accepts anything)"
 }

@@ -26,6 +26,19 @@ public final class RemoteRouteData {
      */
     private static final String LABEL = "DestinationLabel";
     private static final int MAX_LABEL = 96;
+    /**
+     * The address the parcel wears once it is on the other side — its address at home.
+     *
+     * <p>One address cannot serve both ends of a crossing. A parcel leaving a warehouse on B is
+     * sorted on B by the address written on it, and sorted again on A by the same field, and the two
+     * servers have their own door names: the B-side frogport it was claimed by and the A-side dock it
+     * has to land in are rarely called the same thing. So the order carries both, this one rides
+     * along while the parcel is on B, and the crossing swaps them.
+     *
+     * <p>Absent on a parcel that never crosses, and on one from a build that had only one address.
+     */
+    private static final String HOME_ADDRESS = "HomeAddress";
+    private static final int MAX_ADDRESS = 128;
 
     public static Optional<RemoteRoute> read(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
@@ -87,6 +100,51 @@ public final class RemoteRouteData {
                 ? custom.getCompound(ROOT).getString(LABEL) : "";
     }
 
+    /** The address this parcel will wear once it is on the other side, or empty. */
+    public static String homeAddress(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "";
+        }
+        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        return custom.contains(ROOT, CompoundTag.TAG_COMPOUND)
+                ? custom.getCompound(ROOT).getString(HOME_ADDRESS) : "";
+    }
+
+    /**
+     * Gives the parcel the address it uses on this side, and forgets the one it crossed with.
+     *
+     * <p>This is the crossing. A parcel arrives wearing the address of the server it came from —
+     * that is the only address it could have been sorted by over there — and the first thing that
+     * has to happen on this side is that it wears this side's, or the dock it was sent to will not
+     * recognise it. The old one is not kept: it names a door on a server this parcel will not visit
+     * again, and a tooltip that went on offering it would be offering a journey that is over.
+     *
+     * <p>Does nothing and reports false when the parcel carries no home address — which is the
+     * ordinary case for a parcel that never crosses, and for one packed by a build that had only
+     * one address to give it. Nothing is guessed in that case: an address the sender did not name
+     * is not one this code may invent.
+     */
+    public static boolean applyHomeAddress(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return false;
+        }
+        String home = homeAddress(stack);
+        if (home.isEmpty()) {
+            return false;
+        }
+        com.simibubi.create.content.logistics.box.PackageItem.addAddress(stack, home);
+        stack.update(DataComponents.CUSTOM_DATA, CustomData.EMPTY, current -> {
+            CompoundTag custom = current.copyTag();
+            if (custom.contains(ROOT, CompoundTag.TAG_COMPOUND)) {
+                CompoundTag route = custom.getCompound(ROOT);
+                route.remove(HOME_ADDRESS);
+                custom.put(ROOT, route);
+            }
+            return CustomData.of(custom);
+        });
+        return true;
+    }
+
     /** Whether this parcel is on its way to another server, as far as this side can tell. */
     public static boolean crossServer(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
@@ -98,7 +156,7 @@ public final class RemoteRouteData {
     }
 
     public static void write(ItemStack stack, RemoteRoute value) {
-        write(stack, value, "");
+        write(stack, value, "", "");
     }
 
     /**
@@ -108,14 +166,25 @@ public final class RemoteRouteData {
      * nothing to say leaves the parcel exactly as the id-only version would have.
      */
     public static void write(ItemStack stack, RemoteRoute value, String label) {
+        write(stack, value, label, "");
+    }
+
+    /**
+     * The whole of what a parcel can be told about where it is going: the route, the destination in
+     * words, and the address it should wear on the other side.
+     *
+     * <p>One writer for all of it because all of it is decided at the same moment — when the parcel
+     * is packed, on the server that packs it, from the order that asked for it. Splitting it into
+     * several calls would give a caller the chance to write a route without the address that makes
+     * the route usable.
+     */
+    public static void write(ItemStack stack, RemoteRoute value, String label, String homeAddress) {
         if (stack == null || stack.isEmpty()) {
             throw new IllegalArgumentException("Cannot route an empty item stack");
         }
-        String described = label == null ? "" : label.trim();
-        if (described.length() > MAX_LABEL) {
-            described = described.substring(0, MAX_LABEL);
-        }
-        String written = described;
+        String described = bounded(label, MAX_LABEL);
+        // 地址原样保留两端空白以外的部分：空白地址与「没有地址」是同一件事，都不写。
+        String home = bounded(homeAddress, MAX_ADDRESS);
         stack.update(DataComponents.CUSTOM_DATA, CustomData.EMPTY, current -> {
             CompoundTag custom = current.copyTag();
             CompoundTag route = new CompoundTag();
@@ -124,12 +193,23 @@ public final class RemoteRouteData {
             route.putUUID(RECEIVING_GROUP, value.receivingDockGroupId());
             route.putUUID(CORRELATION, value.correlationId());
             route.putUUID(CHILD_ORDER, value.childOrderId());
-            if (!written.isEmpty()) {
-                route.putString(LABEL, written);
+            if (!described.isEmpty()) {
+                route.putString(LABEL, described);
+            }
+            if (!home.isEmpty()) {
+                route.putString(HOME_ADDRESS, home);
             }
             custom.put(ROOT, route);
             return CustomData.of(custom);
         });
+    }
+
+    private static String bounded(String text, int limit) {
+        if (text == null) {
+            return "";
+        }
+        String trimmed = text.trim();
+        return trimmed.length() > limit ? trimmed.substring(0, limit) : trimmed;
     }
 
     public static void clear(ItemStack stack) {

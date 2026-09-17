@@ -72,6 +72,14 @@ public final class TranserverPackageService {
                     dispatch.parcelId(), sourceNode, dispatch.receivingDockGroupId());
             return DeliveryResult.REJECTED;
         }
+        // 过海。包裹从对面来，身上穿的还是对面那台服务器的门牌 —— 在这边认不出任何一台港，
+        // 所以先换上这一侧的地址，再去找港。这就是「两个地址」里交换的那一下，也是为什么
+        // 包裹到了以后只剩一个地址：旧的那个指的是它不会再去的服务器。
+        if (dev.distantstock.routing.RemoteRouteData.applyHomeAddress(parcel)) {
+            LOG.info("[DistantStock/Parcel] home address applied parcel={} source={} address={}",
+                    dispatch.parcelId(), sourceNode,
+                    com.simibubi.create.content.logistics.box.PackageItem.getAddress(parcel));
+        }
         DockBlockEntity dock = LoadedDocks.importFor(parcel, dispatch.receivingDockGroupId());
         if (dock == null || dock.isFull()) {
             LOG.debug("[DistantStock/Parcel] waiting parcel={} source={} group={} reason={}",
