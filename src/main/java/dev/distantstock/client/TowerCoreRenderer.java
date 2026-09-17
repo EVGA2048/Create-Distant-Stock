@@ -28,16 +28,23 @@ import org.joml.Matrix4f;
  * 机壳与贯穿的轴，透视进去只会看到它们；而玩家要的是「一眼看到还剩多少」。
  */
 public final class TowerCoreRenderer implements BlockEntityRenderer<TowerCoreBlockEntity> {
-    /** 玻璃芯在贴图里占第 4..12 像素；窗口画在方块坐标 3..13，所以一格贴图 = 10/16 个单位。 */
-    private static final float GLASS_LOW = 3f + 4f * (10f / 16f);
-    private static final float GLASS_HIGH = 3f + 12f * (10f / 16f);
     /**
-     * 液面贴在玻璃芯外面一丁点。
+     * 模型用 0..16 像素，方块实体渲染器用 0..1 方块 —— 这里按像素写，出口处除一次。
      *
-     * <p>必须在**外面**：玻璃芯不透明、机壳那一格又是实心方块，画在里面等于画在墙后。步长和模型
-     * 里那四片观察窗一致，两者不会打架。
+     * <p>上一版忘了除：五像素高的窗口变成了五格高，四片液面飘在天上，被玩家一眼看见
+     * （"天上莫名其妙出来一堆流体"）。数字本身没错，单位错了。
      */
-    private static final float PROUD = 0.0625f;
+    private static final float PIXEL = 1f / 16f;
+    /** 玻璃芯在贴图里占第 4..12 像素；窗口画在方块坐标 3..13，所以一格贴图 = 10/16 像素。 */
+    private static final float GLASS_LOW = (3f + 4f * (10f / 16f)) * PIXEL;   // 5.5px
+    private static final float GLASS_HIGH = (3f + 12f * (10f / 16f)) * PIXEL; // 10.5px
+    /**
+     * 液面贴在玻璃芯外面一丁点（1/16 像素）。
+     *
+     * <p>必须在**外面**：玻璃芯不透明、机壳那一格又是实心方块，画在里面等于画在墙后。步长比模型
+     * 里那四片观察窗（0.02 像素）大，两者不会打架。
+     */
+    private static final float PROUD = 0.0625f * PIXEL;
 
     public TowerCoreRenderer(BlockEntityRendererProvider.Context context) {
     }

@@ -264,25 +264,23 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
             GoggleText.line(tip, "goggle.distantstock.tower.carrying.idle", tier.devices());
         }
         GoggleText.line(tip, "goggle.distantstock.tower.chunks", tier.chunkSide(), tier.chunkSide());
-        // 余量永远显示，它是这个读数里最该有的一行。上面那一版在计费关掉时把整行换成了
-        // 「以太：未启用（tower.chargeParcels 为关）」—— 于是关掉计费的存档永远看不到罐里还剩
-        // 多少，而玩家问的正是「里面还有多少」。计费是另一件事，说在同一个句子里就够了。
-        if (TowerBilling.enabled()) {
-            GoggleText.line(tip, "goggle.distantstock.tower.ether",
-                    tank.getFluidAmount(), ETHER_CAPACITY, TowerBilling.parcelCost());
-        } else {
-            // 关掉计费时不说「每个邮包多少」：那是一个正在生效的价格，这里没有价格在生效。
-            GoggleText.line(tip, "goggle.distantstock.tower.ether.off",
-                    tank.getFluidAmount(), ETHER_CAPACITY);
+        // 储罐那样的写法：和 Create 的流体容器读数同一套 —— 表头是它自己的键，下面一行
+        // 「流体名 数量 / 容量 mB」。以前这里写自创的「以太 4000 / 4000 mB（不计费）」，名字是
+        // 简称、格式也自成一格；玩家在储罐上看惯的是前者，那就该是前者。
+        //
+        // 余量永远显示。上一版在计费关掉时把整行换成「以太：未启用」，于是关掉计费的存档永远
+        // 看不到罐里还剩多少 —— 而玩家问的正是这个。计费是另一件事，另起一行低声说。
+        FluidStack stored = tank.getFluid();
+        GoggleText.line(tip, "create.gui.goggles.fluid_container");
+        GoggleText.line(tip, "goggle.distantstock.tower.ether",
+                stored.isEmpty() ? ModFluids.ETHER.get().getFluidType().getDescription()
+                        : stored.getHoverName(),
+                tank.getFluidAmount(), ETHER_CAPACITY);
+        if (!TowerBilling.enabled()) {
+            GoggleText.line(tip, "goggle.distantstock.tower.ether.off");
         }
-        if (tank.getFluidAmount() >= ETHER_CAPACITY) {
-            // A full tank is indistinguishable from a port that does not work: a pump pushing
-            // into a full container simply stops, the pipes go quiet, and the operator who just
-            // built the inlet reads that as "it is not accepting". It cost one of them an
-            // afternoon. The tower only drinks when it moves a parcel, so a full tank is the
-            // normal resting state of a tower nobody is using.
-            GoggleText.value(tip, "goggle.distantstock.tower.ether_full", ChatFormatting.GOLD);
-        }
+        // 罐满时不再单独喊一句「已满」：储罐的读数是 4000 / 4000 mB，谁都看得懂，而那一行金色
+        // 的标语是这里唯一一处和储罐不像的地方。
         if (!isRunning()) {
             GoggleText.value(tip, "goggle.distantstock.tower.stalled", ChatFormatting.RED);
             // Why is the first question asked of a tower that will not turn, and the answer is
