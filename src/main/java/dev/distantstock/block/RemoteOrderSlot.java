@@ -64,6 +64,7 @@ public final class RemoteOrderSlot {
         // A remote summary is only refreshed for networks something is watching, and the goggle
         // line that reads it is the only reason this device needs it.
         StockCache.watch(next.network());
+        StockCache.clearRefusal(next.network());
         changed();
     }
 

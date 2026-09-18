@@ -110,6 +110,8 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
         StockCache.watch(freq);
         if (networkId != null) {
             StockCache.watch(networkId);
+            // 刚设过或刚换过网络：把「对面说不认识它」的退避清掉，下一次就问。
+            StockCache.clearRefusal(networkId);
         }
         catalog = networkId == null ? StockCache.size(freq) : StockCache.size(networkId);
         dataLocal = StockCache.isLocal(freq);

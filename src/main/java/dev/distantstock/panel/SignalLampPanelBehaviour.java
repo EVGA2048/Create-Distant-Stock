@@ -234,6 +234,20 @@ public class SignalLampPanelBehaviour extends AbstractPanelBehaviour {
         return lampStack.isEmpty() ? super.getItemDrops() : List.of(lampStack);
     }
 
+    /**
+     * 手上拿着终端时，这一下是**绑定**而不是开界面 —— 和港、请求器、远仓仪表同一套手势。
+     *
+     * <p>灯和仪表一样是"指着某台仓库的设备"，而它一旦装在别人的板子上，方块那条路就走不到，
+     * 只剩界面这一条 —— 界面里又没有调谐的地方。所以这一句是它在别人板子上唯一能被配置的入口。
+     */
+    @Override
+    public void displayScreen(net.minecraft.world.entity.player.Player player) {
+        if (dev.distantstock.client.TerminalPanelGesture.bindInsteadOfScreen(player, blockEntity, slot)) {
+            return;
+        }
+        super.displayScreen(player);
+    }
+
     // ------------------------------------------------------------------ persistence
 
     @Override

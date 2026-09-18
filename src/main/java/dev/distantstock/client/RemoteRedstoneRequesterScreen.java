@@ -35,7 +35,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
  *
  * <p>上面那个框仍然是 Create 自己的送货地址 —— 三个框各管一件事，不重复。
  */
-public final class RemoteRedstoneRequesterScreen extends RedstoneRequesterScreen {
+public final class RemoteRedstoneRequesterScreen extends RedstoneRequesterScreen
+        implements GroupListSink {
     private static final ResourceLocation TEX = ResourceLocation.fromNamespaceAndPath(
             dev.distantstock.DistantStock.MODID, "textures/gui/remote_requester.png");
 
@@ -55,17 +56,20 @@ public final class RemoteRedstoneRequesterScreen extends RedstoneRequesterScreen
      */
     private static final int ROW_INSET = 10;
     private static final int ROW_INSET_RIGHT = 14;
-    /** 灰按钮条（加长后 146..177）里我们那两样东西的位置：Create 自己的图标在 12..48 和 202..220。 */
-    private static final int BAR_Y = 153;
-    private static final int CONFIRM_X = 54;
-    private static final int CONFIRM_W = 44;
-    private static final int CONFIRM_H = 18;
-    private static final int HINT_X = 104;
-    /** 只读说明那一行的 y（相对窗口），和 Create 的图标同一行。 */
-    private static final int HINT_Y = 158;
+    /**
+     * 灰按钮条（加长后 146..177）里那两行只读说明的位置。Create 自己的图标在 12..48 和 202..220，
+     * 空出来的正好是中间这一块 —— 两行字都放在这儿，一行说这块机器指着哪台仓库，一行说关掉即保存。
+     */
+    private static final int HINT_X = 54;
+    private static final int HINT_Y = 151;
+    private static final int NOTE_Y = 162;
+    /** 那一块空处有多宽（右边那个勾是 Create 的，别压上去）。 */
+    private static final int HINT_ROOM = WINDOW_W - HINT_X - 32;
 
     private AddressEditBox group;
     private AddressEditBox homeAddress;
+    /** 接收港组的清单：点一行就把名字填进框里，和终端那个下拉是同一份数据。 */
+    private final GroupPicker picker = new GroupPicker();
 
     public RemoteRedstoneRequesterScreen(RedstoneRequesterMenu menu, Inventory inventory,
                                          Component title) {
@@ -98,13 +102,63 @@ public final class RemoteRedstoneRequesterScreen extends RedstoneRequesterScreen
         homeAddress.setHint(Component.translatable("gui.distantstock.route.home.hint"));
         addRenderableWidget(homeAddress);
 
-        // 确认放在灰按钮条里，和自己那两行底纸分开：底纸整条留给自己，字才写得下。
-        addRenderableWidget(net.minecraft.client.gui.components.Button
-                .builder(Component.translatable("gui.distantstock.confirm"), button -> send())
-                .bounds(leftPos + WINDOW_X + CONFIRM_X, topPos + BAR_Y, CONFIRM_W, CONFIRM_H)
-                .build());
-
         moveBottomBar();
+        // 清单是服务器推的，而推的那一次可以和界面创建抢跑 —— 抢输了这份就永远缺着，表现是
+        // "点开是空的"。要一次比赌它送到便宜（终端那条注释里写的就是这个教训）。
+        PacketDistributor.sendToServer(new dev.distantstock.net.SetDockGroupC2S(
+                "", dev.distantstock.net.SetDockGroupC2S.REFRESH));
+    }
+
+    /** 本服的清单到了。 */
+    @Override
+    public void acceptGroups(dev.distantstock.net.DockGroupsS2C groups) {
+        picker.accept(groups);
+        nameTheGroup();
+    }
+
+    /** 对面公告过来的那张也到了 —— 远端组和本服的组在同一个列表里选。 */
+    @Override
+    public void acceptRemotes(dev.distantstock.net.RemoteGroupsS2C remotes) {
+        picker.accept(remotes);
+        nameTheGroup();
+    }
+
+    /**
+     * 框里写回这个组**真正的名字**。
+     *
+     * <p>这台机器显示的组名是从服务端同步过来的，而服务端只在**本服目录**里查得到名字 —— 组在对面
+     * 服务器时它退回去写一句 uuid 前八位（{@code RequesterData.shortFreq}）。那句话看着像个名字，
+     * 其实谁也认不出，而且玩家一按保存就会被"没有这个港组"顶回来（他根本没法知道自己打的是什么）。
+     * 清单到了以后按 id 反查真名，写回去 —— 玩家看到的、能改的、服务端认的，从此是同一个字符串。
+     */
+    private void nameTheGroup() {
+        if (group == null || group.isFocused()) {
+            return;
+        }
+        RemoteRedstoneRequesterBlockEntity requester = requester();
+        if (requester == null || requester.binding() == null
+                || requester.binding().receivingGroup() == null) {
+            return;
+        }
+        String real = picker.nameOf(requester.binding().receivingGroup());
+        if (!real.isEmpty() && !real.equals(group.getValue())) {
+            group.setValue(real);
+        }
+    }
+
+    /**
+     * 关界面就落盘 —— **没有「确认」按钮**。
+     *
+     * <p>玩家 2026-09-17 问"确认键是做什么的"：它和 Create 自己的那个勾并排，谁也说不清分工。既然
+     * Create 的工厂面板本来就是关掉才保存、请求器那个勾也是"保存并关屏"，那这两行跟着一起走最省事 ——
+     * 玩家按哪个都是关界面，按哪个都会存下来。
+     *
+     * <p>断开连接时这个屏幕也会被移除，那时候连接已经没了，所以先确认还能发包。
+     */
+    @Override
+    public void removed() {
+        send();
+        super.removed();
     }
 
     /**
@@ -132,7 +186,12 @@ public final class RemoteRedstoneRequesterScreen extends RedstoneRequesterScreen
 
     private void send() {
         RemoteRedstoneRequesterBlockEntity requester = requester();
-        if (requester == null) {
+        if (requester == null || group == null || homeAddress == null) {
+            return;
+        }
+        // 关界面的时候连接可能已经断了（退出存档/被踢），这时候发包会 NPE。
+        net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.getConnection() == null) {
             return;
         }
         PacketDistributor.sendToServer(new SetRequesterTargetC2S(requester.getBlockPos(),
@@ -175,15 +234,36 @@ public final class RemoteRedstoneRequesterScreen extends RedstoneRequesterScreen
         // 一行只读的绑定说明，画在灰按钮条中间那一块空处：这一条只能在别处改（拿调谐过的终端右键它），
         // 不写出来玩家会以为屏幕上少了一个框。**画在背景这一层**：再晚一步就会被物品提示盖住。
         RemoteRedstoneRequesterBlockEntity requester = requester();
-        Component line = requester == null || requester.binding() == null
-                ? Component.translatable("goggle.distantstock.remote_requester.unbound")
+        boolean unbound = requester == null || requester.binding() == null;
+        // 没绑定的时候说**该做的那一步**（去终端里调谐再右键它），而不是"这台是普通请求器"：
+        // 没绑定时这两行根本存不下来（绑定本身就是存它们的地方），玩家 2026-09-18 报的"填了没用"
+        // 就是这个。灰条里地方窄，长了会被截断，但"还没绑定 + 终端"这几个字一定在前半句里。
+        Component line = unbound
+                ? Component.translatable("gui.distantstock.remote_requester.binding")
                 : Component.translatable("gui.distantstock.remote_requester.source",
                         requester.binding().network().shortLabel());
-        // 灰条里从「确认」到 Create 那个勾之间的地方，宽度有限 —— 长了就截断，宁可少几个字也不要
-        // 压到隔壁的图标上。
-        int room = WINDOW_W - HINT_X - 32;
-        graphics.drawString(font, font.plainSubstrByWidth(line.getString(), room),
-                leftPos + WINDOW_X + HINT_X, topPos + HINT_Y, 0x3D3D3D, false);
+        // 灰条里这一块地方宽度有限 —— 长了就截断，宁可少几个字也不要压到隔壁的图标上。
+        graphics.drawString(font, font.plainSubstrByWidth(line.getString(), HINT_ROOM),
+                leftPos + WINDOW_X + HINT_X, topPos + HINT_Y, unbound ? 0x9A4A38 : 0x3D3D3D, false);
+        // 没有「确认」按钮了，所以得说出来：这两行是关掉界面时才送出去的。
+        Component note = Component.translatable("gui.distantstock.save_on_close");
+        graphics.drawString(font, note, leftPos + WINDOW_X + HINT_X, topPos + NOTE_Y,
+                0x6A6A6A, false);
+    }
+
+    /**
+     * 清单一律**最后**画。
+     *
+     * <p>它是一块浮在界面上的东西：先画就会被后面的控件和物品栏盖住，看起来像两张纸叠在一起
+     * （终端那边踩过同一个坑）。
+     */
+    @Override
+    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.render(graphics, mouseX, mouseY, partialTick);
+        if (picker.isOpen()) {
+            picker.render(graphics, font, pickerX(), pickerY(), pickerW(), mouseX, mouseY,
+                    group == null ? "" : group.getValue());
+        }
     }
 
     /** 地址补全跟着框一起活；父类只照顾它自己那个框。 */
@@ -201,16 +281,61 @@ public final class RemoteRedstoneRequesterScreen extends RedstoneRequesterScreen
     /**
      * 两个框在 Create 的窗口里，而它的 {@code mouseClicked} 先把面板自己的命中测试做完 ——
      * 点在我们框上的那一击到不了框里，焦点永远拿不到。先给我们的框一次机会，再交给它。
+     *
+     * <p>**{@code setFocused(box)} 这一句不能省。** {@code box.mouseClicked(...)} 只把**控件自己的**
+     * 聚焦标志置上（那是画高亮用的），屏幕自己不认；而 {@code Screen.getFocused()} 返回的是屏幕那个
+     * 字段。少了这一句，框看着是聚焦的、字却一个也打不进去 —— {@link #keyPressed} 里那个
+     * {@code getFocused() instanceof AddressEditBox} 永远不成立，键全部落到 super。玩家 2026-09-17
+     * 报的"两条框只能被选蓝、打不进字"就是这个。
      */
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // 清单先来：它画在框上面，点它的时候该落到行里，而不是落到底下那个输入框上。
+        if (picker.isOpen()) {
+            String picked = picker.hit(mouseX, mouseY, pickerX(), pickerY(), pickerW());
+            if (picked != null) {
+                group.setValue(picked);
+                picker.close();
+                return true;
+            }
+            // 点在这一块里但不是某一行（边框上）也算我们的，别顺手把它关掉又开一次。
+            if (onPicker(mouseX, mouseY)) {
+                return true;
+            }
+            picker.close();
+        }
         for (AddressEditBox box : new AddressEditBox[]{group, homeAddress}) {
             if (box != null && box.isMouseOver(mouseX, mouseY)
                     && box.mouseClicked(mouseX, mouseY, button)) {
+                setFocused(box);
+                if (box == group) {
+                    // 点「接收港组」那一行就把清单打开 —— 这个框的答案是一串已知的名字，让玩家自己
+                    // 背下来是不必要的（终端那边早就这样了）。
+                    picker.toggle();
+                }
                 return true;
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private int pickerX() {
+        return leftPos + WINDOW_X + ROW_INSET;
+    }
+
+    private int pickerY() {
+        return topPos + ROW_TOP + AddressStrip.HEIGHT - 2;
+    }
+
+    private int pickerW() {
+        return WINDOW_W - ROW_INSET - ROW_INSET_RIGHT;
+    }
+
+    /** 点是不是落在清单那一块上（含边框）。 */
+    private boolean onPicker(double mouseX, double mouseY) {
+        int height = picker.height();
+        return height > 0 && mouseX >= pickerX() - 2 && mouseX < pickerX() + pickerW() + 2
+                && mouseY >= pickerY() - 2 && mouseY < pickerY() + height + 2;
     }
 
     @Override

@@ -55,12 +55,15 @@ public record BindGaugePanelC2S(BlockPos pos, int slot, String destination, Stri
      */
     private static boolean rebind(FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot,
                                   java.util.UUID group, String address) {
+        // group == null 表示"保持原来那个组"：界面上的目的地可以是空的（没选）或者认不出来的名字，
+        // 那两种情况都不该连累同一个包里的地址（玩家 2026-09-18：「UI 里面保留的设置也都没了」）。
         if (board instanceof dev.distantstock.block.RemoteGaugeBlockEntity gauge) {
             var current = gauge.binding(slot);
             if (current == null) {
                 return false;
             }
-            gauge.bind(slot, current.network(), group, address);
+            gauge.bind(slot, current.network(), group == null ? current.receivingGroup() : group,
+                    address);
             return true;
         }
         if (board instanceof dev.distantstock.block.SignalPanelBlockEntity signal) {
@@ -68,7 +71,8 @@ public record BindGaugePanelC2S(BlockPos pos, int slot, String destination, Stri
             if (current == null) {
                 return false;
             }
-            signal.bind(slot, current.network(), group, address);
+            signal.bind(slot, current.network(), group == null ? current.receivingGroup() : group,
+                    address);
             return true;
         }
         return net.neoforged.fml.ModList.get().isLoaded("deployer")
@@ -91,47 +95,48 @@ public record BindGaugePanelC2S(BlockPos pos, int slot, String destination, Stri
             }
             DockGroupDirectory directory = DockGroupDirectory.get(player.level().getServer());
             String wanted = msg.destination == null ? "" : msg.destination.trim();
-            if (wanted.isEmpty()) {
-                // An empty destination is the one thing that cannot mean "create a group": it would
-                // make a nameless system nobody could ever address again.
-                player.displayClientMessage(
-                        Component.translatable("gui.distantstock.remote_gauge.no_destination"), true);
-                return;
-            }
-            DockGroup existing = directory.findByName(wanted).orElse(null);
-            if (existing != null && !existing.admits(player.getUUID())) {
-                // Same refusal as the desk and the dock: pointing at somebody's system fills their
-                // docks with your parcels, which is theirs to allow.
-                player.displayClientMessage(
-                        Component.translatable("gui.distantstock.group.closed"), true);
-                return;
-            }
-            if (existing == null) {
-                // A destination on another server, learned from that server's announcement. It is
-                // passed through as it stands — the directory holding it, and every dock answering
-                // to it, are on the far end — and it is never turned into a group here: a local copy
-                // would be a group with no docks whose name shadows the real one.
-                var remote = dev.distantstock.routing.RemoteGroups.get(player.level().getServer())
-                        .findByName(wanted).orElse(null);
-                if (remote != null) {
-                    if (!remote.admits(player.getUUID())) {
+            // 目的地是空的、或者名字认不出来，都只表示"这一格没改" —— **组保持原样，地址照存**。
+            //
+            // 以前这两种情况都是整包丢掉，于是玩家改完地址一关界面，地址也没了（2026-09-18
+            // 「UI 里面保留的设置也都没了」）。而"认不出来"最常见的原因恰恰是刚重启过：对面的公告
+            // 还没到，RemoteGroups 里还没有那一行。
+            java.util.UUID group = null;
+            if (!wanted.isEmpty()) {
+                DockGroup existing = directory.findByName(wanted).orElse(null);
+                if (existing != null && existing.id().equals(DockGroupDirectory.DEFAULT_GROUP_ID)) {
+                    // 玩家把「默认收货港组」这个名字打进来了。它不是目的地，是"还没选组"那个占位 ——
+                    // 选了它等于没选，货出去谁都不认（玩家报的"进虚空"）。界面上那一行已经点不出来
+                    // 了（GroupPicker 里滤掉），这里再拦一道：两侧同一条规则。
+                    player.displayClientMessage(
+                            Component.translatable("gui.distantstock.group.none"), true);
+                } else if (existing != null && !existing.admits(player.getUUID())) {
+                    // Same refusal as the desk and the dock: pointing at somebody's system fills their
+                    // docks with your parcels, which is theirs to allow.
+                    player.displayClientMessage(
+                            Component.translatable("gui.distantstock.group.closed"), true);
+                } else if (existing != null) {
+                    group = existing.id();
+                } else {
+                    // A destination on another server, learned from that server's announcement. It is
+                    // passed through as it stands — the directory holding it, and every dock answering
+                    // to it, are on the far end — and it is never turned into a group here: a local copy
+                    // would be a group with no docks whose name shadows the real one.
+                    var remote = dev.distantstock.routing.RemoteGroups.get(player.level().getServer())
+                            .findByName(wanted).orElse(null);
+                    if (remote == null) {
+                        player.displayClientMessage(Component.translatable(
+                                "gui.distantstock.group.unknown_name", wanted), true);
+                    } else if (!remote.admits(player.getUUID())) {
                         // 和本服的组同一句拒绝。客户端已经把那行画灰了，这一句是给改过的客户端准备的：
                         // 名单是随公告过来的，而这是**唯一**判得了的地方（订单上没有玩家，对面判不了）。
                         player.displayClientMessage(Component.translatable(
                                 "gui.distantstock.group.not_admitted", remote.name()), true);
-                        return;
+                    } else {
+                        group = remote.group();
                     }
-                    if (rebind(board, slot, remote.group(), msg.address)) {
-                        return;
-                    }
-                    player.displayClientMessage(
-                            Component.translatable("gui.distantstock.remote_gauge.needs_terminal"), true);
-                    return;
                 }
             }
-            DockGroup group = existing != null ? existing
-                    : directory.createFor(wanted, player.getUUID());
-            if (rebind(board, slot, group.id(), msg.address)) {
+            if (rebind(board, slot, group, msg.address)) {
                 return;
             }
             // Nothing here carries a warehouse yet. The gesture is what names one — it is a real

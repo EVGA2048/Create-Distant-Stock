@@ -310,11 +310,17 @@ public final class DockGroupGameTests {
         h.assertTrue(unknown.kind() == dev.distantstock.routing.OrderDestination.Kind.UNKNOWN,
                 "不存在的组没有报成 UNKNOWN");
 
-        // 空 id 与默认组仍然是"本服的默认组"，这条不能一起收紧掉。
-        var fallback = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, null);
-        h.assertTrue(fallback.allowed()
-                        && fallback.group().equals(DockGroupDirectory.DEFAULT_GROUP_ID),
-                "没有指定组的订单不再落到默认组了");
+        // 没选组（空 id，或那个"默认收货港组"占位）必须被拒。
+        //
+        // 这条 2026-09-18 反过来了：以前它断言"落在本服默认组"，那是"货进虚空"那条路的入口 ——
+        // 默认组等于没有收件人，发出去谁都不认。玩家拍板「必须新建或加入一个港组而不是默认的」。
+        var none = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, null);
+        h.assertFalse(none.allowed(), "没选组的订单被放行了（这正是货会进虚空的那条路）");
+        h.assertTrue(none.kind() == dev.distantstock.routing.OrderDestination.Kind.NO_GROUP,
+                "没选组没有报成 NO_GROUP");
+        var placeholder = dev.distantstock.routing.OrderDestination.resolve(
+                h.getLevel().getServer(), owner, DockGroupDirectory.DEFAULT_GROUP_ID);
+        h.assertFalse(placeholder.allowed(), "默认组那个占位被当成目的地放行了");
         h.succeed();
     }
 

@@ -104,6 +104,22 @@ public final class NetworkDirectory {
         return visible(false).stream().filter(entry -> networkId.equals(entry.networkId())).findFirst();
     }
 
+    /**
+     * 这个频率是哪张网络，本服的和对面的都找。
+     *
+     * <p>给"只记得频率、没记住网络 id"的那些设备用：便携终端可能是从更早的版本一路带过来的，身上
+     * 只有那个旧的 UUID。而**只按频率去 watch 是没用的** —— 跨服那条链路问的是"网络 id"
+     * （{@code TranserverStockService} 只遍历网络 id 那份监视表），于是没人去问对面，终端里那张网络
+     * 的库存就永远是空的。玩家 2026-09-18 报的「重启服务器后已绑定网络的远仓终端看不到远程库存，
+     * 必须重新加入才行」就是它：重新加入会把网络 id 写到物品上，于是才开始有人问。
+     */
+    public static Optional<Entry> findByFreq(UUID freq) {
+        if (freq == null) {
+            return Optional.empty();
+        }
+        return visible(false).stream().filter(entry -> freq.equals(entry.freq())).findFirst();
+    }
+
     private static List<Entry> aggregatePeers() {
         long cutoff = System.currentTimeMillis() - 5 * 60_000L;
         List<Entry> result = new java.util.ArrayList<>();

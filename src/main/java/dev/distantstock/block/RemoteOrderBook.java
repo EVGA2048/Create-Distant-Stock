@@ -67,6 +67,19 @@ final class RemoteOrderBook {
         slots.get(slot).bind(new RemoteBinding(network, receivingGroup, address));
     }
 
+    /**
+     * 同一件事，但整份绑定一起写。
+     *
+     * <p>手势那条路（手持终端点面板）从终端身上一次拿到四个字段，包括"过海以后换哪个门牌"；用上面
+     * 那个三参版本会把 homeAddress 清掉 —— 而玩家只是把面板重新指一台仓库，不该顺手丢掉另一个设置。
+     */
+    void bind(FactoryPanelBlock.PanelSlot slot, RemoteBinding binding) {
+        if (binding == null || slot == null) {
+            return;
+        }
+        slots.get(slot).bind(binding);
+    }
+
     void unbind(FactoryPanelBlock.PanelSlot slot) {
         if (slot != null) {
             slots.get(slot).unbind();

@@ -190,9 +190,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     /**
      * What to put in the group field before the player has typed anything.
      *
-     * <p>The name the requester carries, falling back to the default system's name: a requester that
-     * has never been pointed anywhere is pointing at the default group, and showing an empty box
-     * would suggest it is pointing at nothing.
+     * <p>The name the requester carries, and **空 when it carries none**.
+     *
+     * <p>以前这里回退到默认系统的名字。玩家 2026-09-18 拍板把这条路封了：默认组不是一间仓库，是
+     * "还没加入任何组"那个占位，选中它等于没选 ——「默认港组容易出事，发的东西都进虚空了」。填一个
+     * 名字进去，玩家就会以为已经选好了。空着配一句"必须新建或加入一个组"，说的才是实话。
      */
     private String defaultGroupName() {
         var menu = this.getMenu();
@@ -204,8 +206,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             }
         }
         // A requester made before names were stored carries an id and nothing else. The list the
-        // server just sent has the name for that id, so the field can show the truth rather than
-        // the default group's name, which would be a different system entirely.
+        // server just sent has the name for that id, so the field can show the truth.
         if (groups != null && groups.carried() != null) {
             for (var entry : groups.groups()) {
                 if (entry.id().equals(groups.carried())) {
@@ -213,8 +214,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 }
             }
         }
-        return net.minecraft.network.chat.Component
-                .translatable("gui.distantstock.group.default").getString();
+        return "";
     }
 
     /**
@@ -295,8 +295,17 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
      * supposed to do.
      */
     private int dropdownY(int rows) {
-        return topPos + this.imageHeight - 89 - rows * 10;
+        return topPos + this.imageHeight - 89 - rows * DROPDOWN_ROW_H;
     }
+
+    /**
+     * 列表的行高。
+     *
+     * <p>原来是 10：字高 9 像素（中文字形更是顶到边），两行之间只剩 1 像素 —— 玩家说的是
+     * 「选项栏和输入框字体重合」，看着像两行叠在一起。12 像素给出行距，中文也读得清。
+     * 画、点、算高度都用这一个数，改一处不会漏另一处。
+     */
+    private static final int DROPDOWN_ROW_H = 12;
 
     /**
      * How many rows the open list has.
@@ -317,7 +326,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     /** Which row of the open dropdown, if any, is under the mouse. */
     private boolean dropdownHit(double mx, double my, int index, int x, int y, int w) {
-        return mx >= x && mx < x + w && my >= y + index * 10 && my < y + index * 10 + 10;
+        return mx >= x && mx < x + w && my >= y + index * DROPDOWN_ROW_H
+                && my < y + index * DROPDOWN_ROW_H + DROPDOWN_ROW_H;
     }
 
     /**
@@ -400,12 +410,12 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         }
         // 不透明的一整块 + 边框。底下的输入框和标签比它先画，所以这一块真正压住它们 ——
         // 玩家报的"下拉挡不住主页面的字"就是这里看着像两张纸叠在一起。
-        g.fill(x - 2, y - 2, x + w + 2, y + rows * 10 + 2, 0xFF16242A);
-        g.fill(x - 1, y - 1, x + w + 1, y + rows * 10 + 1, 0xFF24343A);
+        g.fill(x - 2, y - 2, x + w + 2, y + rows * DROPDOWN_ROW_H + 2, 0xFF16242A);
+        g.fill(x - 1, y - 1, x + w + 1, y + rows * DROPDOWN_ROW_H + 1, 0xFF24343A);
         int local = groups.groups().size();
         for (int i = 0; i < rows; i++) {
             boolean over = dropdownHit(mouseX, mouseY, i, x, y, w);
-            int rowY = y + i * 10;
+            int rowY = y + i * DROPDOWN_ROW_H;
             if (i < local) {
                 var entry = groups.groups().get(i);
                 boolean doomed = entry.name().equals(pendingDelete);
@@ -782,6 +792,13 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (address.getValue().isBlank() && !address.isFocused()) {
             g.drawString(font, Component.translatable("gui.distantstock.route.remote")
                     .withStyle(ChatFormatting.ITALIC), address.getX(), address.getY(), HINT, false);
+        }
+        if (receivingGroup.getValue().isBlank() && !receivingGroup.isFocused()) {
+            // 空的这一格现在是真的"没选"，而没选就发不出去（默认组那条路 2026-09-18 关了）。所以
+            // 空格子里写的不是"随便挑"，是"必须选一个"。
+            g.drawString(font, Component.translatable("gui.distantstock.route.group.required")
+                    .withStyle(ChatFormatting.ITALIC), receivingGroup.getX(), receivingGroup.getY(),
+                    HINT, false);
         }
 
         PoseStack ms = g.pose();

@@ -76,6 +76,10 @@ public record JoinNetworkC2S(UUID freq, RemoteNetworkId networkId) implements Cu
                 }
             }
             menu.selectedFreq = msg.freq;
+            if (entry.networkId() != null) {
+                // 玩家又选了一次这张网络：之前「对面说不认识它」的退避作废，马上去问。
+                dev.distantstock.stock.StockCache.clearRefusal(entry.networkId());
+            }
             menu.refresh(player);
             PacketDistributor.sendToPlayer(player, StockSyncS2C.of(menu.demo, menu.stock));
         });

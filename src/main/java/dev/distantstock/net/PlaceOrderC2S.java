@@ -63,6 +63,8 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
         return switch (answer.kind()) {
             case UNKNOWN -> new Resolution(null, "gui.distantstock.group.unknown");
             case REFUSED -> new Resolution(null, "gui.distantstock.group.closed");
+            // 没选组：以前这一档是"发到本服的默认组"，也就是发出去谁都不认 —— 玩家报的"进虚空"。
+            case NO_GROUP -> new Resolution(null, "gui.distantstock.group.none");
             default -> new Resolution(answer.group(), "");
         };
     }

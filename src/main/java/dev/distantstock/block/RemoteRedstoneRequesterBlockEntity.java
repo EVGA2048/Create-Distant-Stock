@@ -60,6 +60,8 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
             // The far stock is only refreshed for networks something is watching, and the partial
             // check below is the only reason this machine reads it.
             StockCache.watch(next.network());
+            // 玩家亲手把它指到这张网络上：之前「对面说不认识它」的退避作废，下一次就去问。
+            StockCache.clearRefusal(next.network());
         }
         setChanged();
         sendData();

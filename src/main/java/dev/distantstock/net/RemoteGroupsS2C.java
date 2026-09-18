@@ -85,7 +85,11 @@ public record RemoteGroupsS2C(List<Entry> groups) implements CustomPacketPayload
 
     public static void handle(RemoteGroupsS2C msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
+            // 和本服那份清单一样，谁开着界面就给谁：终端、以及两张要选接收港组的设备界面。
             if (net.minecraft.client.Minecraft.getInstance().screen
+                    instanceof dev.distantstock.client.GroupListSink sink) {
+                sink.acceptRemotes(msg);
+            } else if (net.minecraft.client.Minecraft.getInstance().screen
                     instanceof dev.distantstock.client.RequesterScreen screen) {
                 screen.applyRemoteGroups(msg);
             }

@@ -14,7 +14,22 @@ import java.util.Locale;
 /** 固定像素布局的 Create 风链路仪表板。 */
 public final class MonitorScreen extends Screen {
     private static final int W = 272;
+    /** 链路页的高度。那张底图是手绘的，一个像素都不动。 */
     private static final int H = 190;
+    /**
+     * 塔页的高度，和 {@code scripts/gen_monitor_tower_bg.py} 是一份。
+     *
+     * <p>两页各用各的底图：链路页那张（{@code monitor.png}）下半张是给两个大读数和五个计数器画的
+     * 家具，塔页把一行行塔画上去，那些空框就露在下面 —— 玩家说的是「背景是为链路页设计的，塔页
+     * 完全不适配」。塔页那张是照着同一张图的页眉和底边另拼的，中间是平的，四行塔正好放得下。
+     */
+    private static final int TOWER_H = 256;
+    /** 塔页的行位置：摘要（在页签下面）、第一行塔、四行塔的下界、溢出说明、区块选区。 */
+    private static final int TOWER_SUMMARY_Y = 52;
+    private static final int TOWER_ROWS_Y = 68;
+    private static final int TOWER_ROWS_BOTTOM = TOWER_H - 40;
+    private static final int TOWER_MORE_Y = TOWER_H - 38;
+    private static final int TOWER_SELECTION_Y = TOWER_H - 26;
     private static final int INK = 0x263B43;
     private static final int MUTED = 0x68828A;
     private static final int HEADER = 0xF4FBF8;
@@ -37,6 +52,9 @@ public final class MonitorScreen extends Screen {
     }
     private static final ResourceLocation PANEL =
             ResourceLocation.fromNamespaceAndPath("distantstock", "textures/gui/monitor.png");
+    /** 塔页那张：同一套页眉和底边，中间是平的，见 {@link #TOWER_H}。 */
+    private static final ResourceLocation PANEL_TOWER =
+            ResourceLocation.fromNamespaceAndPath("distantstock", "textures/gui/monitor_tower.png");
 
     /** Rows are built during render and read back on click, so the two cannot disagree. */
     private final java.util.List<Hit> hits = new java.util.ArrayList<>();
@@ -86,17 +104,28 @@ public final class MonitorScreen extends Screen {
             flipTicks--;
         }
     }
+    /** 当前这一页的底图有多高。切页时整块要重新居中 —— 塔页比链路页高 66 像素。 */
+    private int panelH() {
+        return towerPage ? TOWER_H : H;
+    }
+
+    private void layout() {
+        left = (width - W) / 2;
+        top = (height - panelH()) / 2;
+    }
+
     @Override
     protected void init() {
-        left = (width - W) / 2;
-        top = (height - H) / 2;
+        layout();
     }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
+        // 每一帧都重算：点一下页签换的是另一张（更高）的底图，位置必须跟着走，否则塔页会顶到屏幕外。
+        layout();
         // A machinery panel should remain part of the world, not open Minecraft's blurred menu backdrop.
         g.fill(0, 0, width, height, 0x4208171B);
-        g.blit(PANEL, left, top, 0, 0, W, H, W, H);
+        g.blit(towerPage ? PANEL_TOWER : PANEL, left, top, 0, 0, W, panelH(), W, panelH());
 
         Component title = Component.translatable("gui.distantstock.monitor");
         g.drawString(font, title, left + 14, top + 13, HEADER, false);
@@ -288,16 +317,18 @@ public final class MonitorScreen extends Screen {
             // towers, no radius and no budget, and showing those as numbers would read as a fault
             // in the machine rather than as a monitor standing nowhere in particular.
             Component none = Component.translatable("gui.distantstock.tower.none");
-            g.drawString(font, none, left + W / 2 - font.width(none) / 2, top + 90, BAD, false);
+            g.drawString(font, none, left + W / 2 - font.width(none) / 2, top + TOWER_H / 2, BAD, false);
             return;
         }
 
+        // 摘要从 44 挪到 52：页签那一条一直到 46 才结束，44 会让这一行压在页签的下边框上，
+        // 玩家截图里"标题被切"就是这个。塔页有自己的高度，不必再挤。
         Component summary = Component.translatable("gui.distantstock.tower.summary",
                 tower.members().size(), tower.carried(), tower.limit());
-        g.drawString(font, summary, left + 14, top + 44, BRASS, false);
+        g.drawString(font, summary, left + 14, top + TOWER_SUMMARY_Y, BRASS, false);
         Component stress = Component.translatable("gui.distantstock.tower.stress",
                 (int) tower.stress(), (int) tower.speed());
-        g.drawString(font, stress, left + W - 14 - font.width(stress), top + 44,
+        g.drawString(font, stress, left + W - 14 - font.width(stress), top + TOWER_SUMMARY_Y,
                 tower.speed() <= 0 ? BAD : MUTED, false);
 
         // The square the system actually keeps loaded, against the largest one any of its members
@@ -312,17 +343,18 @@ public final class MonitorScreen extends Screen {
                 tower.maxSide(), tower.maxSide())
                 : Component.translatable("gui.distantstock.tower.selection",
                 tower.selectedSide(), tower.selectedSide(), tower.maxSide(), tower.maxSide());
-        g.drawString(font, selection, left + 14, top + H - 15,
+        g.drawString(font, selection, left + 14, top + TOWER_SELECTION_Y,
                 tower.selectedSide() <= 0 ? MUTED : AETHER, false);
 
-        int y = top + 58;
+        int y = top + TOWER_ROWS_Y;
         for (TowerReadout.Member member : tower.members()) {
-            if (y + ROW_H > top + H - 4) {
+            if (y + ROW_H > top + TOWER_ROWS_BOTTOM) {
                 Component more = Component.translatable("gui.distantstock.tower.more",
-                        tower.members().size() - (y - top - 58) / ROW_H);
+                        tower.members().size() - (y - top - TOWER_ROWS_Y) / ROW_H);
                 // Right-aligned: the selection line sits along the bottom too, and two strings
                 // starting at the same x on consecutive lines read as one broken sentence.
-                g.drawString(font, more, left + W - 14 - font.width(more), y, MUTED, false);
+                g.drawString(font, more, left + W - 14 - font.width(more), top + TOWER_MORE_Y,
+                        MUTED, false);
                 return;
             }
             drawTowerRow(g, member, y);
@@ -432,7 +464,7 @@ public final class MonitorScreen extends Screen {
     }
 
     private boolean inside(double x, double y) {
-        return x >= left && x <= left + W && y >= top && y <= top + H;
+        return x >= left && x <= left + W && y >= top && y <= top + panelH();
     }
 
     @Override

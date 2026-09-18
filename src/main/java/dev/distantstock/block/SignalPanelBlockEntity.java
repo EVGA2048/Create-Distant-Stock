@@ -408,6 +408,14 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
         return true;
     }
 
+    /**
+     * 同一件事，但整份绑定一起写 —— 手势那条路（手持终端点面板）从终端拿到的是四个字段，见
+     * {@code BindPanelFromTerminalC2S}。
+     */
+    public void bind(FactoryPanelBlock.PanelSlot slot, RemoteBinding binding) {
+        orders.bind(slot, binding);
+    }
+
     public void unbind(FactoryPanelBlock.PanelSlot slot) {
         orders.unbind(slot);
     }

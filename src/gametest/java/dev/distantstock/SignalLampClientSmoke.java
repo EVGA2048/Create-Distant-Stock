@@ -146,6 +146,7 @@ public final class SignalLampClientSmoke {
             }
             LogUtils.getLogger().info("DISTANTSTOCK_PONDER_OK: {} scenes have a structure and their text", scenes);
             checkDockGroupPage(mc);
+            checkMonitorPages(mc);
             if (checkTerminalClick()) {
                 LogUtils.getLogger().info("DISTANTSTOCK_TERMINAL_CLICK_OK: 点一下就有反应");
             }
@@ -182,6 +183,38 @@ public final class SignalLampClientSmoke {
         stranger.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
         stranger.render(graphics, 0, 0, 0f);
         LogUtils.getLogger().info("DISTANTSTOCK_GROUP_PAGE_OK: 港组页面开得出、画得出来");
+    }
+
+    /**
+     * 监视器两页都画得出来，而且**切页之后整块要重新居中**。
+     *
+     * <p>塔页比链路页高 66 像素、用的是另一张底图（见 {@code gen_monitor_tower_bg.py}）：切页时
+     * 屏幕顶点的位置得跟着变，否则高的那一页会顶到屏幕外面 —— 玩家截的图里"底部那行区块选区被切掉"
+     * 就是这么来的。这里画一遍链路页、点一下页签、再画一遍塔页；两张底图少一张、或者切页后没重算
+     * 位置，这里都会抛出来。
+     */
+    private static void checkMonitorPages(Minecraft mc) {
+        var graphics = new net.minecraft.client.gui.GuiGraphics(mc, mc.renderBuffers().bufferSource());
+        long base = net.minecraft.core.BlockPos.asLong(12, 104, 31);
+        var tower = new dev.distantstock.routing.TowerReadout(true, base, "minecraft:overworld",
+                6, 16, 512, 120, 5, 3,
+                java.util.List.of(new dev.distantstock.routing.TowerReadout.Member(base, "II",
+                        40, 16, true, 120, 4000, 512, false, 1, true, true, 3, 5)));
+        var view = new dev.distantstock.link.LinkSnapshot.View("A", "B", 20, 5, 1, 2, 0,
+                true, 19.5, 6, true, 12, 0, 1, 1,
+                true, true, "node", "A服", "", 0, 0, 0, 0, tower);
+
+        var monitor = new dev.distantstock.client.MonitorScreen(
+                new net.minecraft.core.BlockPos(0, 0, 0), view);
+        monitor.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+        monitor.render(graphics, 0, 0, 0f);
+
+        // 点一下「塔」那个页签：位置和 MonitorScreen.drawPageToggle 里写的一致。
+        int left = (mc.getWindow().getGuiScaledWidth() - 272) / 2;
+        int top = (mc.getWindow().getGuiScaledHeight() - 190) / 2;
+        monitor.mouseClicked(left + 55 + 20, top + 27 + 6, 0);
+        monitor.render(graphics, 0, 0, 0f);
+        LogUtils.getLogger().info("DISTANTSTOCK_MONITOR_PAGES_OK: 监视器链路页与塔页都画得出来");
     }
 
     /**

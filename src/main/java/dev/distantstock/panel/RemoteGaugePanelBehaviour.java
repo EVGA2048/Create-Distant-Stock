@@ -93,6 +93,12 @@ public class RemoteGaugePanelBehaviour extends AbstractPanelBehaviour {
      */
     @Override
     public void displayScreen(net.minecraft.world.entity.player.Player player) {
+        // 手上拿着终端时这一下是**绑定**，不是开界面 —— 港、请求器、我们自己的仪表板都是这么分的。
+        // 少了这一句，装在别人板子上的这一格面板就永远配不了：它的界面会先弹出来，而终端那条路
+        // （方块自己的 {@code useItemOn}）根本走不到这儿。玩家 2026-09-17 报的就是这个。
+        if (dev.distantstock.client.TerminalPanelGesture.bindInsteadOfScreen(player, blockEntity, slot)) {
+            return;
+        }
         dev.distantstock.client.RemoteGaugeScreen.open(this);
     }
 

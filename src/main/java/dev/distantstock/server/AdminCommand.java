@@ -113,6 +113,7 @@ public final class AdminCommand {
                                         .executes(AdminCommand::quarantineDiscard))))
                 .then(Commands.literal("help").executes(AdminCommand::help))
                 .then(Commands.literal("tower").executes(AdminCommand::towerStatus))
+                .then(Commands.literal("stock").executes(AdminCommand::stockStatus))
                 .then(Commands.literal("group")
                         .executes(AdminCommand::groupList)
                         .then(Commands.literal("list").executes(AdminCommand::groupList))
@@ -424,6 +425,58 @@ public final class AdminCommand {
      * <p>报的是两个分开的问题：「哪个塔罩着它」和「哪个塔带着它」。前者是几何，建好了就成立；后者
      * 还要那座塔在转、而且没被操作员关掉带载开关。混成一句话说，玩家会去拆一座本来没问题的塔。
      */
+    /**
+     * 跨服库存这条链，逐节打出来。
+     *
+     * <p>玩家 2026-09-18 报的「重启服务器后已绑定网络的远仓终端看不到远程服务器的库存，必须拆掉
+     * 请求台或重新加入才行」有四种长得一模一样的失败：这张网络不在本服目录里（公告还没到）、在目录里
+     * 但没人在看、在看着却还没问出去、问了对面说没有（退避中）。界面在这四种下都是"空"，所以得有这么
+     * 一条命令把中间那几节读出来 —— 和 {@code /distantstock tower} 是同一个道理。
+     */
+    private static int stockStatus(CommandContext<CommandSourceStack> ctx) {
+        MinecraftServer server = ctx.getSource().getServer();
+        var directory = dev.distantstock.stock.NetworkDirectory.local();
+        var peers = dev.distantstock.stock.NetworkDirectory.peer();
+        ctx.getSource().sendSuccess(() -> Component.literal("本服网络 " + directory.size()
+                + " 张 · 对面公告过来 " + peers.size() + " 张"), false);
+        for (var entry : directory) {
+            ctx.getSource().sendSuccess(() -> Component.literal("· 本服 " + shortFreq(entry.freq())
+                    + " · 端口 " + entry.links() + " 个 · " + (entry.packable() ? "能打包" : "没打包机")), false);
+        }
+        for (var entry : peers) {
+            ctx.getSource().sendSuccess(() -> Component.literal("· 对面 " + shortFreq(entry.freq())
+                    + " · " + entry.server() + " · " + (entry.packable() ? "能打包" : "没打包机")
+                    + (entry.networkId() == null ? " · 没有网络 id" : "")), false);
+        }
+
+        // 正在看的那些，才是"终端里那张网络"：没人在看就不会有人去问，界面自然是空的。
+        var watched = dev.distantstock.stock.StockCache.watchedNetworks(5 * 60_000L);
+        ctx.getSource().sendSuccess(() -> Component.literal("正在问的 " + watched.size() + " 张："), false);
+        for (var network : watched) {
+            long age = dev.distantstock.stock.StockCache.ageMs(network);
+            long pending = dev.distantstock.link.TranserverStockService.pendingAgeMs(network);
+            long refusal = dev.distantstock.stock.StockCache.refusalWaitMs(network);
+            int size = dev.distantstock.stock.StockCache.size(network);
+            ctx.getSource().sendSuccess(() -> Component.literal("· " + shortFreq(network.createFrequency())
+                    + " · 节点 " + network.nodeId().toString().substring(0, 8)
+                    + " · 缓存 " + size + " 条"
+                    + " · 上次答复 " + (age < 0 ? "从没有过" : age / 1000 + " 秒前")
+                    + (pending < 0 ? "" : " · 有一问没回音（" + pending / 1000 + " 秒）")
+                    + (refusal <= 0 ? "" : " · 对面说没有过，还要等 " + refusal / 1000 + " 秒")), false);
+        }
+        var recent = dev.distantstock.link.TranserverStockService.recentQueries();
+        ctx.getSource().sendSuccess(() -> Component.literal(recent.isEmpty()
+                ? "别人来问过库存吗：一次都没有" : "最近别人来问库存，我们这样答的（最新在前）："), false);
+        for (String line : recent) {
+            ctx.getSource().sendSuccess(() -> Component.literal("· " + line), false);
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static String shortFreq(java.util.UUID freq) {
+        return freq == null ? "—" : freq.toString().substring(0, 8);
+    }
+
     private static int towerStatus(CommandContext<CommandSourceStack> ctx) {
         MinecraftServer server = ctx.getSource().getServer();
         List<dev.distantstock.block.TowerCoreBlockEntity> towers =

@@ -375,7 +375,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
 
     public void refresh(Player player) {
         UUID freq = freq(player);
-        RemoteNetworkId networkId = networkId(player);
+        // 只记得频率的设备也要能看见对面那张网络：从目录里把网络 id 补出来。少了这一步，
+        // 这台终端只会按频率 watch，而跨服那条链路问的是网络 id —— 没人去问，库存永远是空的。
+        RemoteNetworkId networkId = MenuSync.resolve(networkId(player), freq);
         MenuSync.warm(networkId, freq);
         stock = new ArrayList<>(networkId == null ? StockCache.get(freq) : StockCache.get(networkId));
         demo = StockConfig.DEMO_STOCK.get();

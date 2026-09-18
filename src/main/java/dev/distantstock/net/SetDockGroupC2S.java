@@ -58,6 +58,19 @@ public record SetDockGroupC2S(String name, int action) implements CustomPacketPa
             Player player = ctx.player();
             if (player.containerMenu instanceof RequesterMenu menu) {
                 menu.writeDockGroup(player, msg.name, msg.action);
+                return;
+            }
+            // **"要一份清单"这件事和菜单无关。**
+            //
+            // 以前这一条只在玩家开着终端菜单时才做事，于是远仓红石请求器和远仓仪表发出的 REFRESH
+            // 石沉大海 —— 它们根本没有 RequesterMenu（远仓仪表那个界面连菜单都没有），点那一格
+            // 什么都不会弹出来。玩家 2026-09-18 报的「点一下依旧没有出现选项栏」就是这个：包发出去
+            // 了，服务端看了一眼菜单不是终端的，就放下了。
+            //
+            // 其余动作（选中/改名/上锁/删除）仍然只认终端的菜单：那些改的是"这台设备带着哪个组"，
+            // 只有终端那套界面说得清。
+            if (msg.action == REFRESH) {
+                RequesterMenu.sendGroupList(player, net.minecraft.world.item.ItemStack.EMPTY);
             }
         });
     }

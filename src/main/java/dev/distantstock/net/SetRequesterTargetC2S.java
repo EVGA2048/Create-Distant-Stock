@@ -44,6 +44,42 @@ public record SetRequesterTargetC2S(BlockPos pos, String group, String homeAddre
         return TYPE;
     }
 
+    /** 名字解析出来的组；{@code null} 表示这个名字不能用（理由已经告诉过玩家了）。 */
+    private record Resolution(java.util.UUID group) {
+    }
+
+    /**
+     * 把一个名字变成组：先问本服的目录，再问对面公告过来的。
+     *
+     * <p>两边都要过一遍 {@code admits}：一个人的机器不该能往别人的仓库里灌东西。这一句判断只能在这儿
+     * 做，因为过海的订单上没有玩家，对面判不了。
+     */
+    private static Resolution resolve(net.minecraft.world.entity.player.Player player,
+                                      net.minecraft.server.MinecraftServer server, String typed) {
+        DockGroup local = DockGroupDirectory.get(server).findByName(typed).orElse(null);
+        if (local != null) {
+            if (!local.admits(player.getUUID())) {
+                player.displayClientMessage(Component.translatable(
+                        "gui.distantstock.group.closed"), true);
+                return new Resolution(null);
+            }
+            return new Resolution(local.id());
+        }
+        var remote = RemoteGroups.get(server).findByName(typed).orElse(null);
+        if (remote == null) {
+            // 一个谁都不认识的名字。留着旧的不动，但要说话：静默丢弃会让玩家以为改成功了。
+            player.displayClientMessage(Component.translatable(
+                    "gui.distantstock.group.unknown_name", typed), true);
+            return new Resolution(null);
+        }
+        if (!remote.admits(player.getUUID())) {
+            player.displayClientMessage(Component.translatable(
+                    "gui.distantstock.group.not_admitted", remote.name()), true);
+            return new Resolution(null);
+        }
+        return new Resolution(remote.group());
+    }
+
     public static void handle(SetRequesterTargetC2S msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             var player = ctx.player();
@@ -67,35 +103,29 @@ public record SetRequesterTargetC2S(BlockPos pos, String group, String homeAddre
             }
 
             String typed = msg.group().trim();
-            java.util.UUID group = null;
-            if (!typed.isEmpty()) {
-                DockGroup local = DockGroupDirectory.get(server).findByName(typed).orElse(null);
-                if (local != null) {
-                    if (!local.admits(player.getUUID())) {
-                        player.displayClientMessage(Component.translatable(
-                                "gui.distantstock.group.closed"), true);
-                        return;
-                    }
-                    group = local.id();
+            // 默认**保留这台机器现在的组**。
+            //
+            // 玩家 2026-09-18 报的「UI 里面保留的设置也都没了」就出在这里：以前每一条拒绝都是
+            // `return`，整包作废 —— 于是"组名没认出来"会连同一个包里的本端地址一起丢掉。而组名认
+            // 不出来最常见的原因恰恰是刚重启过（对面的公告还没到，RemoteGroups 里还没有那一行），
+            // 所以重启一次，玩家改的地址也跟着没了。现在只有"换组"这件事被拒，地址照存。
+            java.util.UUID group = requester.binding().receivingGroup();
+            boolean groupSet = true;
+            if (typed.isEmpty()) {
+                // 清空这一格 = 不指定组（这样发不出去，见 OrderDestination）。
+                group = null;
+            } else {
+                Resolution resolution = resolve(player, server, typed);
+                if (resolution.group() != null) {
+                    group = resolution.group();
                 } else {
-                    var remote = RemoteGroups.get(server).findByName(typed).orElse(null);
-                    if (remote == null) {
-                        // 一个谁都不认识的名字。留着旧的不动，但要说话：静默丢弃会让玩家以为改成功了。
-                        player.displayClientMessage(Component.translatable(
-                                "gui.distantstock.group.unknown_name", typed), true);
-                        return;
-                    }
-                    if (!remote.admits(player.getUUID())) {
-                        player.displayClientMessage(Component.translatable(
-                                "gui.distantstock.group.not_admitted", remote.name()), true);
-                        return;
-                    }
-                    group = remote.group();
+                    groupSet = false;
                 }
             }
             requester.retarget(group, msg.homeAddress().trim());
-            player.displayClientMessage(Component.translatable(
-                    "gui.distantstock.remote_requester.saved"), true);
+            player.displayClientMessage(Component.translatable(groupSet
+                    ? "gui.distantstock.remote_requester.saved"
+                    : "gui.distantstock.remote_requester.saved_address_only"), true);
         });
     }
 }

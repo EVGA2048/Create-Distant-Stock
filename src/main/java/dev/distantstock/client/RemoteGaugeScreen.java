@@ -4,8 +4,6 @@ import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBehaviour;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockEntity;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelScreen;
-import com.simibubi.create.foundation.gui.AllIcons;
-import com.simibubi.create.foundation.gui.widget.IconButton;
 import dev.distantstock.block.RemoteBinding;
 import dev.distantstock.net.BindGaugePanelC2S;
 import net.createmod.catnip.gui.ScreenOpener;
@@ -39,7 +37,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * be asking the player to type a UUID. The band says which one this panel is pointed at, or says
  * plainly that it is not pointed at one.
  */
-public final class RemoteGaugeScreen extends FactoryPanelScreen {
+public final class RemoteGaugeScreen extends FactoryPanelScreen implements GroupListSink {
     private static final ResourceLocation BAND_TEX = ResourceLocation.fromNamespaceAndPath(
             dev.distantstock.DistantStock.MODID, "textures/gui/remote_gauge_band.png");
 
@@ -62,15 +60,18 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen {
      */
     private static final int INSET_L = 10;
     private static final int INSET_R = 19;
-    /** 确认按钮：Create 自己的图标按钮，18x18。 */
-    private static final int BUTTON = 18;
-    private static final int BUTTON_GAP = 4;
     /** 木头上的字色：窗口里那条羊皮纸的浅色，压在木纹上读得清。 */
     private static final int HINT_COLOR = 0xE6D3AE;
+    /** 旁边那句"关掉即保存"淡一点：它是说明，不是读数。 */
+    private static final int HINT_COLOR_NOTE = 0xB9A88A;
+    /** 没仓库时那句提示是警告：它说的是"你现在填的东西存不下来"。 */
+    private static final int HINT_COLOR_WARN = 0xE8A18C;
 
     private final FactoryPanelBehaviour behaviour;
     private com.simibubi.create.content.logistics.AddressEditBox destination;
     private com.simibubi.create.content.logistics.AddressEditBox address;
+    /** 接收港组的清单：点一行就把名字填进框里，和终端那个下拉是同一份数据。 */
+    private final GroupPicker picker = new GroupPicker();
 
     private RemoteGaugeScreen(FactoryPanelBehaviour behaviour) {
         super(behaviour);
@@ -95,15 +96,16 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen {
         super.init();
 
         int left = guiLeft + INSET_L;
-        int wide = windowWidth - INSET_L - INSET_R - BUTTON - BUTTON_GAP;
+        int wide = windowWidth - INSET_L - INSET_R;
         int top = rowTop();
 
         destination = AddressStrip.create(this, font, left, top, wide);
         destination.setMaxLength(dev.distantstock.routing.DockGroup.MAX_NAME_LENGTH);
-        // Left empty rather than prefilled: the destination is a group *id* wherever it is stored,
-        // and this side has no name table to turn one back into a name. An empty box with a hint
-        // that says "leave it alone to keep what is there" is honest; a wrong name is not.
-        destination.setValue("");
+        // 框里填的是**组名**，而存下来的是组 id —— 客户端没有目录，本来查不出名字。现在这一页自己
+        // 就带着一份组清单（见 {@link GroupPicker}），于是能反查了：填上当前那个组的名字，而不是
+        // 空着。空着的问题是玩家每次都以为"上次填的丢了"（2026-09-18 玩家原话："输入完再打开会
+        // 变回去"）—— 其实存下来了，只是没显示。清单还没到就先空着，到了再补（见 acceptGroups）。
+        destination.setValue(currentDestination());
         destination.setHint(Component.translatable("gui.distantstock.remote_gauge.destination.hint"));
         addRenderableWidget(destination);
 
@@ -113,11 +115,79 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen {
         address.setHint(Component.translatable("gui.distantstock.remote_gauge.address.hint"));
         addRenderableWidget(address);
 
-        IconButton confirm = new IconButton(left + wide + BUTTON_GAP, top + ROW_STEP + 4,
-                AllIcons.I_CONFIRM);
-        confirm.withCallback(this::send);
-        confirm.setToolTip(Component.translatable("gui.distantstock.confirm"));
-        addRenderableWidget(confirm);
+        // 清单是服务器推的，推的那一次可以和界面创建抢跑 —— 要一次比赌它送到便宜。
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new dev.distantstock.net.SetDockGroupC2S("",
+                        dev.distantstock.net.SetDockGroupC2S.REFRESH));
+    }
+
+    /** 本服的清单到了。 */
+    @Override
+    public void acceptGroups(dev.distantstock.net.DockGroupsS2C groups) {
+        picker.accept(groups);
+        nameTheDestination();
+    }
+
+    /** 对面公告过来的那张也到了。 */
+    @Override
+    public void acceptRemotes(dev.distantstock.net.RemoteGroupsS2C remotes) {
+        picker.accept(remotes);
+        nameTheDestination();
+    }
+
+    /**
+     * 清单到了以后把当前这个组的名字补进框里（玩家正在打字就不动他）。
+     *
+     * <p>界面是 {@code init()} 时建的，那时候清单还没到 —— 所以这一步不能只在 init 里做。
+     */
+    private void nameTheDestination() {
+        if (destination == null || destination.isFocused()) {
+            return;
+        }
+        String name = currentDestination();
+        if (!name.isEmpty() && !name.equals(destination.getValue())) {
+            destination.setValue(name);
+        }
+    }
+
+    /** 这一格现在指着的组叫什么，查不到就是空串。 */
+    private String currentDestination() {
+        RemoteBinding binding = knownBinding(behaviour);
+        return binding == null ? "" : picker.nameOf(binding.receivingGroup());
+    }
+
+    private int pickerX() {
+        return guiLeft + INSET_L;
+    }
+
+    private int pickerY() {
+        return rowTop() + AddressStrip.HEIGHT - 2;
+    }
+
+    private int pickerW() {
+        return windowWidth - INSET_L - INSET_R;
+    }
+
+    /** 点是不是落在清单那一块上（含边框）。 */
+    private boolean onPicker(double mouseX, double mouseY) {
+        int height = picker.height();
+        return height > 0 && mouseX >= pickerX() - 2 && mouseX < pickerX() + pickerW() + 2
+                && mouseY >= pickerY() - 2 && mouseY < pickerY() + height + 2;
+    }
+
+    /**
+     * 关界面就落盘 —— **没有自己的「确认」按钮**。
+     *
+     * <p>玩家 2026-09-17 问"确认键是做什么的"。这块屏幕本来就是 Create 的工厂面板：数值、过滤器、
+     * 连接都是关掉才存，它自己那个勾也是"保存并关屏"。我们的两行跟着一起走最省事，也少一个和勾
+     * 并排、谁也说不清分工的按钮。
+     *
+     * <p>断开连接时这个屏幕也会被移除，那时候连接已经没了，所以先确认还能发包。
+     */
+    @Override
+    public void removed() {
+        send();
+        super.removed();
     }
 
     /** 两行地址条的顶端在屏幕上哪儿 —— 延长段顶端再加 {@link #ROW_TOP}。 */
@@ -131,6 +201,14 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen {
     }
 
     private void send() {
+        if (destination == null || address == null) {
+            return;
+        }
+        // 关界面的时候连接可能已经断了（退出存档/被踢），这时候发包会 NPE。
+        net.minecraft.client.Minecraft minecraft = net.minecraft.client.Minecraft.getInstance();
+        if (minecraft.player == null || minecraft.getConnection() == null) {
+            return;
+        }
         FactoryPanelBlock.PanelSlot slot = behaviour.slot;
         PacketDistributor.sendToServer(new BindGaugePanelC2S(
                 behaviour.blockEntity.getBlockPos(), slot.ordinal(),
@@ -151,34 +229,79 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen {
         if (address != null) {
             AddressStrip.renderUnder(graphics, address);
         }
+        // 这一行只说一件事：这块仪表指着哪台仓库。右边补一句"关掉即保存"—— 没有确认按钮了，
+        // 不说的话玩家不知道该什么时候离开这个界面。仓库名太长时**先让着右边那句**，宁可截仓库名。
+        Component note = Component.translatable("gui.distantstock.save_on_close");
+        int noteW = font.width(note);
+        graphics.drawString(font, note, guiLeft + windowWidth - INSET_R - noteW, top + HINT_TOP,
+                HINT_COLOR_NOTE, false);
         Component line = sourceLine(behaviour);
+        // 没仓库时那句话说白了是"你现在填的东西存不下来"，用警告色 —— 玩家上一次就是没注意到它。
+        int lineColor = knownBinding(behaviour) == null ? HINT_COLOR_WARN : HINT_COLOR;
         if (line != null) {
-            // 木头区就到 187 列为止，仓库名太长的截断 —— 压到窗口的黑边上比少几个字难看得多。
-            graphics.drawString(font,
-                    font.plainSubstrByWidth(line.getString(), windowWidth - INSET_L - INSET_R),
-                    guiLeft + INSET_L, top + HINT_TOP, HINT_COLOR, false);
+            int room = Math.max(0, windowWidth - INSET_L - INSET_R - noteW - 8);
+            graphics.drawString(font, font.plainSubstrByWidth(line.getString(), room),
+                    guiLeft + INSET_L, top + HINT_TOP, lineColor, false);
         }
     }
 
     /**
      * 我们这两个框在 Create 的窗口**里面**，而它的 {@code mouseClicked} 会先把面板自己的命中测试
      * 做完 —— 点在我们框上的那一击到不了框里，于是焦点永远拿不到，框看着在那儿、却一个字也打不进去。
-     * 这就是玩家说的"下面的框不能用"。
      *
      * <p>先给我们的框一次机会，再交给 Create：顺序反过来的话，落在框上的点击会被它当成"点空白处"
      * 而先清掉焦点。
+     *
+     * <p>**{@code setFocused(box)} 这一句不能省。** {@code box.mouseClicked(...)} 只把**控件自己的**
+     * 聚焦标志置上（那是画高亮用的），屏幕自己不认；而 {@code Screen.getFocused()} 返回的是屏幕那个
+     * 字段。少了这一句，框看着是聚焦的、字却一个也打不进去 —— {@link #keyPressed} 里那个
+     * {@code getFocused() instanceof AddressEditBox} 永远不成立，键全部落到 super。玩家 2026-09-17
+     * 报的"两条框只能被选蓝、打不进字"就是这个。
      */
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // 清单先来：它画在框上面，点它的时候该落到行里，而不是落到底下那个输入框上。
+        if (picker.isOpen()) {
+            String picked = picker.hit(mouseX, mouseY, pickerX(), pickerY(), pickerW());
+            if (picked != null) {
+                destination.setValue(picked);
+                picker.close();
+                return true;
+            }
+            if (onPicker(mouseX, mouseY)) {
+                return true;
+            }
+            picker.close();
+        }
         if (destination != null && destination.isMouseOver(mouseX, mouseY)
                 && destination.mouseClicked(mouseX, mouseY, button)) {
+            setFocused(destination);
+            // 点「接收港组」那一行就把清单打开 —— 这个框的答案是一串已知的名字。
+            picker.toggle();
             return true;
         }
         if (address != null && address.isMouseOver(mouseX, mouseY)
                 && address.mouseClicked(mouseX, mouseY, button)) {
+            setFocused(address);
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    /**
+     * 清单一律**最后**画。
+     *
+     * <p>catnip 是先 {@code renderWindow} 再画所有控件，所以在 {@code renderWindow} 里画会被输入框
+     * 盖住 —— 这个钩子是那之后。
+     */
+    @Override
+    protected void renderWindowForeground(GuiGraphics graphics, int mouseX, int mouseY,
+                                           float partialTicks) {
+        super.renderWindowForeground(graphics, mouseX, mouseY, partialTicks);
+        if (picker.isOpen()) {
+            picker.render(graphics, font, pickerX(), pickerY(), pickerW(), mouseX, mouseY,
+                    destination == null ? "" : destination.getValue());
+        }
     }
 
     /**
@@ -237,7 +360,10 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen {
         }
         if (behaviour.blockEntity instanceof dev.distantstock.block.RemoteGaugeBlockEntity
                 || behaviour.blockEntity instanceof dev.distantstock.block.SignalPanelBlockEntity) {
-            return Component.translatable("gui.distantstock.remote_gauge.binding.none");
+            // **说能做的那一步**，而不是"未绑定"。没仓库时这两行根本存不下来（绑定本身是存它们的地方），
+            // 玩家 2026-09-18 报的"填了没用、关掉再开又变回去"就是这个 —— 界面当时只写了"未绑定"，
+            // 没写"所以你填了也白填"。
+            return Component.translatable("gui.distantstock.remote_gauge.needs_terminal");
         }
         return null;
     }

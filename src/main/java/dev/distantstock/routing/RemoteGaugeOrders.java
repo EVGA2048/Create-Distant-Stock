@@ -110,6 +110,16 @@ public final class RemoteGaugeOrders {
         if (server == null || network == null || lines == null || lines.isEmpty()) {
             return false;
         }
+        // 没选接收港组的订单不出去：默认组等于没有收件人，货发出去谁都不认（玩家 2026-09-18 报的
+        // 「发的东西都进虚空了」）。面板是自动下单的，没人看着，所以这里必须自己拦住。
+        //
+        // **这里只判"选没选组"，不判权限**：面板的绑定是玩家当初站在终端前绑的，而这一单上根本没有
+        // 玩家，拿 {@code OrderDestination} 去问会得到"你不是组主"那种与订单无关的答案 —— 本地组是
+        // 别人建的时候，那会让面板永远下不了单。
+        if (receivingGroup == null
+                || receivingGroup.equals(dev.distantstock.routing.DockGroupDirectory.DEFAULT_GROUP_ID)) {
+            return false;
+        }
         OrderService.Result result = OrderService.place(server, network, network.createFrequency(),
                 address == null ? "" : address, receivingGroup, List.copyOf(lines),
                 homeAddress == null ? "" : homeAddress);

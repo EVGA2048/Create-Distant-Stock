@@ -137,11 +137,15 @@ public final class TranserverOrderService {
         if (level == null) {
             return DeliveryResult.RETRY;
         }
-        if (!WorldIdentity.get(level).equals(request.networkId().worldId())) {
-            return DeliveryResult.REJECTED;
-        }
         if (!CreateStock.hasNetwork(request.networkId().createFrequency())) {
-            return DeliveryResult.RETRY;
+            // 网络不在这儿。世界 id 对得上 = 它只是还没加载（服务器刚起来、区块还没打开）→ RETRY；
+            // 对不上 = 这个世界被换过了，那张网络真的没了 → REJECTED。
+            //
+            // **先看频率、后看世界 id**，和 TranserverStockService.validateLocal 同一条规则：频率才是
+            // 这张网络的名字，世界 id 只是对面**记着的我们**长什么样 —— 它可以是上一次开机的（那次身份
+            // 没落盘，见 WorldIdentity）。反过来判的话，重启一次跨服下单就全断了。
+            return WorldIdentity.get(level).equals(request.networkId().worldId())
+                    ? DeliveryResult.RETRY : DeliveryResult.REJECTED;
         }
         InboundOrderInbox inbox = InboundOrderInbox.get(server);
         InboundOrderInbox.Record record = inbox.receive(sourceNode, request);

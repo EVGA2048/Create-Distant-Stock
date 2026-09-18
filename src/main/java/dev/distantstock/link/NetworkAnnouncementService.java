@@ -102,6 +102,11 @@ public final class NetworkAnnouncementService {
         List<NetworkAnnouncementCodec.Group> out = new java.util.ArrayList<>();
         for (dev.distantstock.routing.DockGroup group
                 : dev.distantstock.routing.DockGroupDirectory.get(server).all()) {
+            if (group.id().equals(dev.distantstock.routing.DockGroupDirectory.DEFAULT_GROUP_ID)) {
+                // 默认组不公告。它不是谁能选的去处 —— 它是"这个港还没加入任何组"那个占位，选它等于
+                // 没选（货发出去没有收件人）。对面看到它只会多一行点不得的名字。
+                continue;
+            }
             List<NetworkAnnouncementCodec.Group.Member> members = new java.util.ArrayList<>();
             group.members().forEach((id, name) -> members.add(
                     new NetworkAnnouncementCodec.Group.Member(id, name)));

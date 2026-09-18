@@ -32,8 +32,14 @@ import java.util.UUID;
  */
 public final class OrderDestination {
     public enum Kind {
-        /** No group asked for: the default group, on this server. */
-        HERE_DEFAULT,
+        /**
+         * 没选组 —— 空的 id，或者那个"默认收货港组"占位。
+         *
+         * <p>以前这一档是放行的：落在本服的默认组，也就是"哪个港没加入组就哪个港收"。玩家
+         * 2026-09-18 报的就是它 ——「默认港组容易出事，发的东西都进虚空了」：默认组等于没有收件人，
+         * 货发出去谁都不认，最后就没了。现在**必须新建或加入一个组**才发得出去，这一档改成拒绝。
+         */
+        NO_GROUP,
         /** A group of this server's, and the player may use it. */
         HERE,
         /** A group on another server, learned from its announcement, that this player may use. */
@@ -47,7 +53,7 @@ public final class OrderDestination {
     public record Answer(Kind kind, UUID group) {
         /** Whether the order may be placed at all. */
         public boolean allowed() {
-            return kind != Kind.REFUSED && kind != Kind.UNKNOWN;
+            return kind == Kind.HERE || kind == Kind.THERE;
         }
     }
 
@@ -56,7 +62,8 @@ public final class OrderDestination {
             return new Answer(Kind.UNKNOWN, null);
         }
         if (asked == null || asked.equals(DockGroupDirectory.DEFAULT_GROUP_ID)) {
-            return new Answer(Kind.HERE_DEFAULT, DockGroupDirectory.DEFAULT_GROUP_ID);
+            // 没选组不放行 —— 见 {@link Kind#NO_GROUP}。这是"货进虚空"那条路的入口。
+            return new Answer(Kind.NO_GROUP, null);
         }
         DockGroup group = DockGroupDirectory.get(server).find(asked).orElse(null);
         if (group == null) {

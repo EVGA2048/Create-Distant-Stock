@@ -122,10 +122,13 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
         // Straight to the screen that asked, the way the other client payloads do: the list is
         // only meaningful to a requester screen, and there is at most one open.
         ctx.enqueueWork(() -> {
-            // Two screens draw this list: the terminal's dropdown and the page opened from it. Each
-            // is sent whichever part it draws — they are never both open, because the page replaces
-            // the terminal rather than floating over it.
+            // Four screens draw this list now: the terminal's dropdown, the page opened from it, and
+            // the two device screens that pick a receiving group (远程红石请求器 / 远仓仪表). Each is
+            // sent whichever part it draws — only one is open at a time.
             if (net.minecraft.client.Minecraft.getInstance().screen
+                    instanceof dev.distantstock.client.GroupListSink sink) {
+                sink.acceptGroups(msg);
+            } else if (net.minecraft.client.Minecraft.getInstance().screen
                     instanceof dev.distantstock.client.RequesterScreen screen) {
                 screen.applyGroups(msg);
             } else if (net.minecraft.client.Minecraft.getInstance().screen
@@ -147,6 +150,12 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
                                    java.util.function.Function<UUID, String> nameOf) {
         List<Entry> out = new ArrayList<>();
         for (DockGroup group : directory.all()) {
+            if (group.id().equals(DockGroupDirectory.DEFAULT_GROUP_ID)) {
+                // 默认组不进列表。玩家 2026-09-18：「默认港组容易出事，发的东西都进虚空了 / 改为必须
+                // 新建或加入一个港组而不是默认的」。它不是一间仓库，是"这个港还没加入任何组"那个占位，
+                // 选中它等于没选 —— 而列表里有一行、点得下去，就是在请玩家选它。
+                continue;
+            }
             boolean admitted = group.admits(player);
             if (!admitted && !group.open()) {
                 // 锁着的、又不是给我的：画一行点不动的名字比不画更糟。

@@ -202,8 +202,25 @@ public final class DeployerPanels {
         if (current == null) {
             return false;
         }
-        remote.orders().bind(new dev.distantstock.block.RemoteBinding(
-                current.network(), receivingGroup, address));
+        // receivingGroup == null = 保持原来那个组（界面上那一格空的，或者名字认不出来）。
+        remote.orders().bind(new dev.distantstock.block.RemoteBinding(current.network(),
+                receivingGroup == null ? current.receivingGroup() : receivingGroup, address,
+                current.homeAddress()));
+        return true;
+    }
+
+    /**
+     * 把手势那一下绑上去：整份绑定一起写，网络也算数。
+     *
+     * <p>和 {@link #rebind} 的区别是那个只改"港组 + 地址"—— 界面上的两个框只能表达这两样。手持终端
+     * 那条路不一样：终端身上带着完整的四个字段（网络、港组、两个地址），玩家换仓库是整台换掉。
+     */
+    public static boolean bind(FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot,
+                               dev.distantstock.block.RemoteBinding binding) {
+        if (!(board.panels.get(slot) instanceof RemoteGaugePanelBehaviour remote)) {
+            return false;
+        }
+        remote.orders().bind(binding);
         return true;
     }
 

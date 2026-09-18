@@ -88,8 +88,19 @@ public final class RemoteGaugeBlockEntity extends FactoryPanelBlockEntity implem
             super(be, slot);
         }
 
+        /**
+         * 开界面 —— 除非手上拿着终端，那这一下是**绑定**（见 {@code TerminalPanelGesture}）。
+         *
+         * <p>方块自己那条路（{@code RemoteGaugeBlock.useItemOn}）已经分好了，但面板的界面也会从
+         * Deployer 那边被叫起来（面板行为的 {@code displayScreen}），那条路不看玩家手里拿着什么。
+         * 两道门都得挂同一把锁。
+         */
         @Override
         public void displayScreen(net.minecraft.world.entity.player.Player player) {
+            if (dev.distantstock.client.TerminalPanelGesture.bindInsteadOfScreen(
+                    player, blockEntity, slot)) {
+                return;
+            }
             dev.distantstock.client.RemoteGaugeScreen.open(this);
         }
     }
@@ -103,6 +114,14 @@ public final class RemoteGaugeBlockEntity extends FactoryPanelBlockEntity implem
     public void bind(FactoryPanelBlock.PanelSlot slot, RemoteNetworkId network, UUID receivingGroup,
                      String address) {
         orders.bind(slot, network, receivingGroup, address);
+    }
+
+    /**
+     * 同一件事，但整份绑定一起写 —— 手势那条路从终端拿到的是四个字段，见
+     * {@code BindPanelFromTerminalC2S}。
+     */
+    public void bind(FactoryPanelBlock.PanelSlot slot, RemoteBinding binding) {
+        orders.bind(slot, binding);
     }
 
     public void unbind(FactoryPanelBlock.PanelSlot slot) {
