@@ -22,6 +22,7 @@ public final class DistantStock {
         ModBlocks.BLOCKS.register(bus);
         ModBlockEntities.BES.register(bus);
         ModItems.ITEMS.register(bus);
+        ModSounds.SOUNDS.register(bus);
         ModItems.TABS.register(bus);
         ModMenus.MENUS.register(bus);
         /*

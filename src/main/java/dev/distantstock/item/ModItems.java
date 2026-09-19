@@ -33,6 +33,10 @@ public final class ModItems {
             () -> new BlockItem(ModBlocks.MONITOR.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> LOGGER = ITEMS.register("logger",
             () -> new BlockItem(ModBlocks.LOGGER.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, BlockItem> STACK_LIGHT = ITEMS.register("stack_light",
+            () -> new BlockItem(ModBlocks.STACK_LIGHT.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, ConditionLinkerItem> CONDITION_LINKER = ITEMS.register("condition_linker",
+            () -> new ConditionLinkerItem(ModBlocks.CONDITION_LINKER.get(), new Item.Properties().stacksTo(1)));
     public static final DeferredHolder<Item, BlockItem> REMOTE_PACKAGER = ITEMS.register("remote_packager",
             () -> new BlockItem(ModBlocks.REMOTE_PACKAGER.get(), new Item.Properties()));
     public static final DeferredHolder<Item, SignalLampPanelItem> CYAN_INDICATOR_LAMP = lamp("cyan_indicator_lamp", SignalLampPanelItem.Color.CYAN);
@@ -92,6 +96,8 @@ public final class ModItems {
                 out.accept(REMOTE_REDSTONE_REQUESTER.get());
                 out.accept(MONITOR.get());
                 out.accept(LOGGER.get());
+                out.accept(STACK_LIGHT.get());
+                out.accept(CONDITION_LINKER.get());
                 out.accept(REMOTE_PACKAGER.get());
                 out.accept(CYAN_INDICATOR_LAMP.get());
                 out.accept(ORANGE_INDICATOR_LAMP.get());

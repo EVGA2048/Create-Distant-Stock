@@ -1,0 +1,8 @@
+{
+  "stack_light_buzzer": {
+    "subtitle": "subtitle.distantstock.stack_light_buzzer",
+    "sounds": [
+      { "name": "distantstock:stack_light_buzzer_v8", "stream": false }
+    ]
+  }
+}

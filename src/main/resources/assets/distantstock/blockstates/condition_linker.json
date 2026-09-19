@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "distantstock:block/condition_linker"
+    },
+    "facing=east": {
+      "model": "distantstock:block/condition_linker",
+      "y": 90
+    },
+    "facing=south": {
+      "model": "distantstock:block/condition_linker",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "distantstock:block/condition_linker",
+      "y": 270
+    }
+  }
+}

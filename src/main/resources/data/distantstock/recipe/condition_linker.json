@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": {
+    "D": {"item": "create:display_link"},
+    "L": {"item": "create:redstone_link"},
+    "A": {"item": "create:andesite_alloy"}
+  },
+  "pattern": [" D ", "ALA", " A "],
+  "result": {"count": 1, "id": "distantstock:condition_linker"}
+}

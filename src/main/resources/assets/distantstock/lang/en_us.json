@@ -463,5 +463,19 @@
   "item.distantstock.event_receipt.count": "Occurrences: %s",
   "item.distantstock.event_receipt.event": "Event: %s",
   "item.distantstock.event_receipt.acknowledged": "Printed and acknowledged by a logger",
-  "gui.distantstock.logger.print": "Print"
+  "gui.distantstock.logger.print": "Print",
+  "block.distantstock.stack_light": "Stack Light",
+  "block.distantstock.condition_linker": "Condition Linker",
+  "message.distantstock.condition_linker.select_light": "Select a Stack Light with the Condition Linker first",
+  "message.distantstock.condition_linker.selected": "Selected Stack Light: %s, %s, %s",
+  "message.distantstock.condition_linker.cleared": "Cleared Stack Light target",
+  "message.distantstock.condition_linker.too_far": "Stack Light is out of range (maximum %s blocks)",
+  "message.distantstock.condition_linker.linked": "Condition Linker connected",
+  "goggle.distantstock.condition_linker.red": "Red side: fault lamp input",
+  "goggle.distantstock.condition_linker.yellow": "Yellow side: warning lamp input",
+  "goggle.distantstock.condition_linker.green": "Green side: running lamp input",
+  "goggle.distantstock.condition_linker.buzzer": "Plain side: buzzer enable",
+  "goggle.distantstock.stack_light.buzzer_enabled": "Buzzer: enabled",
+  "goggle.distantstock.stack_light.buzzer_disabled": "Buzzer: disabled",
+  "subtitle.distantstock.stack_light_buzzer": "Stack Light buzzes"
 }

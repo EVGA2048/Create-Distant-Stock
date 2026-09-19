@@ -54,6 +54,18 @@ public final class SignalLampClientSmoke {
                     states++;
                 }
             }
+            for (var block : java.util.List.of(ModBlocks.STACK_LIGHT.get(), ModBlocks.CONDITION_LINKER.get())) {
+                for (var state : block.getStateDefinition().getPossibleStates()) {
+                    try {
+                        verify(mc.getBlockRenderer().getBlockModel(state), mc);
+                    } catch (AssertionError failure) {
+                        throw new AssertionError("Condition model: " + state, failure);
+                    }
+                    states++;
+                }
+            }
+            LogUtils.getLogger().info("DISTANTSTOCK_CONDITION_MODELS_OK: stack-light/linker states baked");
+
             var partials = dev.distantstock.block.SignalLampModels.all();
             for (var entry : partials.entrySet()) {
                 try { verify(((PartialModel) entry.getValue()).get(), mc); }

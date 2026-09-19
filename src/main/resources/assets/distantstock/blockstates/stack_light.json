@@ -1,0 +1,348 @@
+{
+  "variants": {
+    "face=floor,facing=north,green=false,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_000"
+    },
+    "face=floor,facing=north,green=true,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_001"
+    },
+    "face=floor,facing=north,green=false,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_010"
+    },
+    "face=floor,facing=north,green=true,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_011"
+    },
+    "face=floor,facing=north,green=false,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_100"
+    },
+    "face=floor,facing=north,green=true,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_101"
+    },
+    "face=floor,facing=north,green=false,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_110"
+    },
+    "face=floor,facing=north,green=true,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_111"
+    },
+    "face=floor,facing=east,green=false,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_000"
+    },
+    "face=floor,facing=east,green=true,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_001"
+    },
+    "face=floor,facing=east,green=false,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_010"
+    },
+    "face=floor,facing=east,green=true,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_011"
+    },
+    "face=floor,facing=east,green=false,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_100"
+    },
+    "face=floor,facing=east,green=true,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_101"
+    },
+    "face=floor,facing=east,green=false,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_110"
+    },
+    "face=floor,facing=east,green=true,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_111"
+    },
+    "face=floor,facing=south,green=false,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_000"
+    },
+    "face=floor,facing=south,green=true,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_001"
+    },
+    "face=floor,facing=south,green=false,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_010"
+    },
+    "face=floor,facing=south,green=true,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_011"
+    },
+    "face=floor,facing=south,green=false,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_100"
+    },
+    "face=floor,facing=south,green=true,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_101"
+    },
+    "face=floor,facing=south,green=false,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_110"
+    },
+    "face=floor,facing=south,green=true,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_111"
+    },
+    "face=floor,facing=west,green=false,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_000"
+    },
+    "face=floor,facing=west,green=true,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_001"
+    },
+    "face=floor,facing=west,green=false,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_010"
+    },
+    "face=floor,facing=west,green=true,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_011"
+    },
+    "face=floor,facing=west,green=false,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_100"
+    },
+    "face=floor,facing=west,green=true,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_floor_101"
+    },
+    "face=floor,facing=west,green=false,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_110"
+    },
+    "face=floor,facing=west,green=true,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_floor_111"
+    },
+    "face=ceiling,facing=north,green=false,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_000",
+      "x": 180
+    },
+    "face=ceiling,facing=north,green=true,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_001",
+      "x": 180
+    },
+    "face=ceiling,facing=north,green=false,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_010",
+      "x": 180
+    },
+    "face=ceiling,facing=north,green=true,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_011",
+      "x": 180
+    },
+    "face=ceiling,facing=north,green=false,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_100",
+      "x": 180
+    },
+    "face=ceiling,facing=north,green=true,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_101",
+      "x": 180
+    },
+    "face=ceiling,facing=north,green=false,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_110",
+      "x": 180
+    },
+    "face=ceiling,facing=north,green=true,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_111",
+      "x": 180
+    },
+    "face=ceiling,facing=east,green=false,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_000",
+      "x": 180
+    },
+    "face=ceiling,facing=east,green=true,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_001",
+      "x": 180
+    },
+    "face=ceiling,facing=east,green=false,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_010",
+      "x": 180
+    },
+    "face=ceiling,facing=east,green=true,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_011",
+      "x": 180
+    },
+    "face=ceiling,facing=east,green=false,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_100",
+      "x": 180
+    },
+    "face=ceiling,facing=east,green=true,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_101",
+      "x": 180
+    },
+    "face=ceiling,facing=east,green=false,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_110",
+      "x": 180
+    },
+    "face=ceiling,facing=east,green=true,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_111",
+      "x": 180
+    },
+    "face=ceiling,facing=south,green=false,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_000",
+      "x": 180
+    },
+    "face=ceiling,facing=south,green=true,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_001",
+      "x": 180
+    },
+    "face=ceiling,facing=south,green=false,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_010",
+      "x": 180
+    },
+    "face=ceiling,facing=south,green=true,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_011",
+      "x": 180
+    },
+    "face=ceiling,facing=south,green=false,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_100",
+      "x": 180
+    },
+    "face=ceiling,facing=south,green=true,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_101",
+      "x": 180
+    },
+    "face=ceiling,facing=south,green=false,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_110",
+      "x": 180
+    },
+    "face=ceiling,facing=south,green=true,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_111",
+      "x": 180
+    },
+    "face=ceiling,facing=west,green=false,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_000",
+      "x": 180
+    },
+    "face=ceiling,facing=west,green=true,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_001",
+      "x": 180
+    },
+    "face=ceiling,facing=west,green=false,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_010",
+      "x": 180
+    },
+    "face=ceiling,facing=west,green=true,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_011",
+      "x": 180
+    },
+    "face=ceiling,facing=west,green=false,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_100",
+      "x": 180
+    },
+    "face=ceiling,facing=west,green=true,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_ceiling_101",
+      "x": 180
+    },
+    "face=ceiling,facing=west,green=false,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_110",
+      "x": 180
+    },
+    "face=ceiling,facing=west,green=true,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_ceiling_111",
+      "x": 180
+    },
+    "face=wall,facing=north,green=false,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_000"
+    },
+    "face=wall,facing=north,green=true,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_001"
+    },
+    "face=wall,facing=north,green=false,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_010"
+    },
+    "face=wall,facing=north,green=true,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_011"
+    },
+    "face=wall,facing=north,green=false,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_100"
+    },
+    "face=wall,facing=north,green=true,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_101"
+    },
+    "face=wall,facing=north,green=false,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_110"
+    },
+    "face=wall,facing=north,green=true,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_111"
+    },
+    "face=wall,facing=east,green=false,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_000",
+      "y": 90
+    },
+    "face=wall,facing=east,green=true,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_001",
+      "y": 90
+    },
+    "face=wall,facing=east,green=false,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_010",
+      "y": 90
+    },
+    "face=wall,facing=east,green=true,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_011",
+      "y": 90
+    },
+    "face=wall,facing=east,green=false,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_100",
+      "y": 90
+    },
+    "face=wall,facing=east,green=true,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_101",
+      "y": 90
+    },
+    "face=wall,facing=east,green=false,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_110",
+      "y": 90
+    },
+    "face=wall,facing=east,green=true,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_111",
+      "y": 90
+    },
+    "face=wall,facing=south,green=false,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_000",
+      "y": 180
+    },
+    "face=wall,facing=south,green=true,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_001",
+      "y": 180
+    },
+    "face=wall,facing=south,green=false,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_010",
+      "y": 180
+    },
+    "face=wall,facing=south,green=true,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_011",
+      "y": 180
+    },
+    "face=wall,facing=south,green=false,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_100",
+      "y": 180
+    },
+    "face=wall,facing=south,green=true,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_101",
+      "y": 180
+    },
+    "face=wall,facing=south,green=false,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_110",
+      "y": 180
+    },
+    "face=wall,facing=south,green=true,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_111",
+      "y": 180
+    },
+    "face=wall,facing=west,green=false,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_000",
+      "y": 270
+    },
+    "face=wall,facing=west,green=true,red=false,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_001",
+      "y": 270
+    },
+    "face=wall,facing=west,green=false,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_010",
+      "y": 270
+    },
+    "face=wall,facing=west,green=true,red=false,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_011",
+      "y": 270
+    },
+    "face=wall,facing=west,green=false,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_100",
+      "y": 270
+    },
+    "face=wall,facing=west,green=true,red=true,yellow=false": {
+      "model": "distantstock:block/stack_light_wall_101",
+      "y": 270
+    },
+    "face=wall,facing=west,green=false,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_110",
+      "y": 270
+    },
+    "face=wall,facing=west,green=true,red=true,yellow=true": {
+      "model": "distantstock:block/stack_light_wall_111",
+      "y": 270
+    }
+  }
+}

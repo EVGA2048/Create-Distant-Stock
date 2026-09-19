@@ -463,5 +463,19 @@
   "item.distantstock.event_receipt.count": "重复次数：%s",
   "item.distantstock.event_receipt.event": "Event：%s",
   "item.distantstock.event_receipt.acknowledged": "已由日志台打印确认",
-  "gui.distantstock.logger.print": "打印"
+  "gui.distantstock.logger.print": "打印",
+  "block.distantstock.stack_light": "工况灯",
+  "block.distantstock.condition_linker": "工况链接器",
+  "message.distantstock.condition_linker.select_light": "先用工况链接器右键选择一盏工况灯",
+  "message.distantstock.condition_linker.selected": "已选择工况灯：%s, %s, %s",
+  "message.distantstock.condition_linker.cleared": "已清除工况灯目标",
+  "message.distantstock.condition_linker.too_far": "工况灯超出连接距离（最大 %s 格）",
+  "message.distantstock.condition_linker.linked": "工况链接器已连接",
+  "goggle.distantstock.condition_linker.red": "红侧：故障灯输入",
+  "goggle.distantstock.condition_linker.yellow": "黄侧：警告灯输入",
+  "goggle.distantstock.condition_linker.green": "绿侧：运行灯输入",
+  "goggle.distantstock.condition_linker.buzzer": "无色侧：蜂鸣器使能",
+  "goggle.distantstock.stack_light.buzzer_enabled": "蜂鸣器：已使能",
+  "goggle.distantstock.stack_light.buzzer_disabled": "蜂鸣器：未使能",
+  "subtitle.distantstock.stack_light_buzzer": "工况灯蜂鸣"
 }

@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": {
+    "R": {"item": "minecraft:red_stained_glass_pane"},
+    "Y": {"item": "minecraft:yellow_stained_glass_pane"},
+    "G": {"item": "minecraft:green_stained_glass_pane"},
+    "A": {"item": "create:andesite_alloy"},
+    "I": {"item": "minecraft:iron_nugget"}
+  },
+  "pattern": [" R ", " Y ", "IGA"],
+  "result": {"count": 1, "id": "distantstock:stack_light"}
+}

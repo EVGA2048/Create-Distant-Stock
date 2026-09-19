@@ -38,6 +38,12 @@ public final class ModBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<LoggerBlockEntity>> LOGGER =
             BES.register("logger", () -> BlockEntityType.Builder.of(LoggerBlockEntity::new,
                     ModBlocks.LOGGER.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<StackLightBlockEntity>> STACK_LIGHT =
+            BES.register("stack_light", () -> BlockEntityType.Builder.of(StackLightBlockEntity::new,
+                    ModBlocks.STACK_LIGHT.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ConditionLinkerBlockEntity>> CONDITION_LINKER =
+            BES.register("condition_linker", () -> BlockEntityType.Builder.of(ConditionLinkerBlockEntity::new,
+                    ModBlocks.CONDITION_LINKER.get()).build(null));
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RemotePackagerBlockEntity>> REMOTE_PACKAGER =
             BES.register("remote_packager", () -> BlockEntityType.Builder.of(RemotePackagerBlockEntity::new,
                     ModBlocks.REMOTE_PACKAGER.get()).build(null));
