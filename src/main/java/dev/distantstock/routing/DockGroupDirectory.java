@@ -51,15 +51,28 @@ public final class DockGroupDirectory extends SavedData {
         return create(name, owner, false);
     }
 
+    /** Creates one receiving address inside a real Distant Stock network. */
+    public DockGroup createForNetwork(String name, UUID owner, UUID distantNetworkId,
+                                      DockGroup.Visibility visibility) {
+        return create(name, owner, false, distantNetworkId, visibility);
+    }
+
     public DockGroup create(String name, UUID owner, boolean open) {
-        DockGroup group = new DockGroup(UUID.randomUUID(), name, owner, open);
+        return create(name, owner, open, DistantNetworkDirectory.LEGACY_NETWORK_ID,
+                DockGroup.Visibility.PUBLIC);
+    }
+
+    public DockGroup create(String name, UUID owner, boolean open, UUID distantNetworkId,
+                            DockGroup.Visibility visibility) {
+        DockGroup group = new DockGroup(UUID.randomUUID(), name, owner, open, Map.of(),
+                distantNetworkId, visibility);
         // Refused rather than added. Two groups sharing a name are two groups no lookup, readout
         // or command can tell apart, and the failure would be silent and permanent — the file would
         // hold both and every later lookup would return whichever came first.
         //
         // Thrown, not quietly returned as the existing one: a create that returns somebody else's
         // group is how a player ends up adding their docks to a stranger's warehouse.
-        if (findByName(group.name()).isPresent()) {
+        if (!named(group.distantNetworkId(), group.name()).isEmpty()) {
             throw new IllegalArgumentException("Dock group already exists: " + group.name());
         }
         groups.put(group.id(), group);
@@ -76,16 +89,32 @@ public final class DockGroupDirectory extends SavedData {
      * readout, so the second one is refused rather than silently created.
      */
     public Optional<DockGroup> findByName(String name) {
+        List<DockGroup> matches = named(DistantNetworkDirectory.LEGACY_NETWORK_ID, name);
+        return matches.size() == 1 ? Optional.of(matches.getFirst()) : Optional.empty();
+    }
+
+    /** Every legacy local group carrying this player-facing name. */
+    public List<DockGroup> named(String name) {
+        return named(DistantNetworkDirectory.LEGACY_NETWORK_ID, name);
+    }
+
+    public Optional<DockGroup> findByName(UUID distantNetworkId, String name) {
+        List<DockGroup> matches = named(distantNetworkId, name);
+        return matches.size() == 1 ? Optional.of(matches.getFirst()) : Optional.empty();
+    }
+
+    /** Every local address carrying this name inside one Distant Stock network. */
+    public List<DockGroup> named(UUID distantNetworkId, String name) {
         if (name == null || name.isBlank()) {
-            return Optional.empty();
+            return List.of();
         }
+        UUID scope = distantNetworkId == null
+                ? DistantNetworkDirectory.LEGACY_NETWORK_ID : distantNetworkId;
         String wanted = name.trim();
-        for (DockGroup group : groups.values()) {
-            if (group.name().equalsIgnoreCase(wanted)) {
-                return Optional.of(group);
-            }
-        }
-        return Optional.empty();
+        return groups.values().stream()
+                .filter(group -> group.distantNetworkId().equals(scope))
+                .filter(group -> group.name().equalsIgnoreCase(wanted))
+                .toList();
     }
 
     public Optional<DockGroup> find(UUID id) {
@@ -102,6 +131,11 @@ public final class DockGroupDirectory extends SavedData {
             throw new IllegalArgumentException("Unknown dock group: " + id);
         }
         DockGroup renamed = current.rename(name);
+        boolean takenByAnother = named(current.distantNetworkId(), renamed.name()).stream()
+                .anyMatch(existing -> !existing.id().equals(id));
+        if (takenByAnother) {
+            throw new IllegalArgumentException("Dock group already exists: " + renamed.name());
+        }
         groups.put(id, renamed);
         setDirty();
         return renamed;
@@ -120,6 +154,33 @@ public final class DockGroupDirectory extends SavedData {
             throw new IllegalArgumentException("Unknown dock group: " + id);
         }
         DockGroup next = current.withOpen(open);
+        groups.put(id, next);
+        setDirty();
+        return next;
+    }
+
+    public DockGroup setVisibility(UUID id, DockGroup.Visibility visibility) {
+        DockGroup current = groups.get(id);
+        if (current == null) {
+            throw new IllegalArgumentException("Unknown dock group: " + id);
+        }
+        DockGroup next = current.withVisibility(visibility);
+        groups.put(id, next);
+        setDirty();
+        return next;
+    }
+
+    public DockGroup setDistantNetwork(UUID id, UUID distantNetworkId) {
+        DockGroup current = groups.get(id);
+        if (current == null) {
+            throw new IllegalArgumentException("Unknown dock group: " + id);
+        }
+        if (!named(distantNetworkId, current.name()).stream()
+                .allMatch(group -> group.id().equals(id))) {
+            throw new IllegalArgumentException("Receiving address already exists in target network: "
+                    + current.name());
+        }
+        DockGroup next = current.inDistantNetwork(distantNetworkId);
         groups.put(id, next);
         setDirty();
         return next;
@@ -184,6 +245,8 @@ public final class DockGroupDirectory extends SavedData {
             CompoundTag entry = new CompoundTag();
             entry.putUUID("Id", group.id());
             entry.putString("Name", group.name());
+            entry.putUUID("DistantNetwork", group.distantNetworkId());
+            entry.putString("Visibility", group.visibility().name());
             // Written only when there is something to write, so a file made before groups had
             // owners loads back as the same open, ownerless groups it was saved as.
             if (group.owner() != null) {
@@ -232,8 +295,16 @@ public final class DockGroupDirectory extends SavedData {
                         members.put(member.getUUID("Id"), member.getString("Name"));
                     }
                 }
+                UUID distantNetworkId = entry.hasUUID("DistantNetwork")
+                        ? entry.getUUID("DistantNetwork") : DistantNetworkDirectory.LEGACY_NETWORK_ID;
+                DockGroup.Visibility visibility;
+                try {
+                    visibility = DockGroup.Visibility.valueOf(entry.getString("Visibility"));
+                } catch (IllegalArgumentException ignored) {
+                    visibility = DockGroup.Visibility.PUBLIC;
+                }
                 DockGroup group = new DockGroup(entry.getUUID("Id"), entry.getString("Name"),
-                        owner, open, members);
+                        owner, open, members, distantNetworkId, visibility);
                 directory.groups.put(group.id(), group);
             } catch (IllegalArgumentException ignored) {
             }

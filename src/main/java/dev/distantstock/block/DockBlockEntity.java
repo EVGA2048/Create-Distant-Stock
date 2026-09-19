@@ -5,6 +5,7 @@ import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
 import com.simibubi.create.content.logistics.box.PackageItem;
 import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
+import dev.distantstock.event.EventRegistry;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.link.LinkQueues;
 import dev.distantstock.link.LinkSnapshot;
@@ -629,6 +630,81 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         return true;
     }
 
+    /**
+     * Moves one parcel that never left this dock from the outbound bay to the bottom fallback bay.
+     *
+     * <p>This is deliberately an internal move rather than {@link #offerFallback}: while the parcel
+     * still occupies the outbound bay, {@code offerFallback} quite correctly reports the dock as
+     * occupied. Here we already own both inventories and can make the handoff atomically. The
+     * fallback insert is simulated before the outbound parcel is extracted, so a full/invalid
+     * fallback can never turn a routing error into item loss.
+     */
+    private boolean returnOutboundToFallback(int outboundSlot, String note, String eventCode) {
+        ItemStack parcel = outboundInv.getStackInSlot(outboundSlot);
+        if (parcel.isEmpty()) {
+            return true;
+        }
+        ItemStack probe = fallbackInv.insertItem(0, parcel.copyWithCount(1), true);
+        if (!probe.isEmpty()) {
+            noteReleaseRefused();
+            return false;
+        }
+        ItemStack taken = outboundInv.extractItem(outboundSlot, 1, false);
+        if (taken.isEmpty()) {
+            return false;
+        }
+        ItemStack remaining = fallbackInv.insertItem(0, taken, false);
+        if (!remaining.isEmpty()) {
+            // Should be impossible after the simulation above, but restoring the parcel is cheaper
+            // than trusting an inventory implementation with the one thing this mod must not lose.
+            outboundInv.insertItem(outboundSlot, remaining, false);
+            noteReleaseRefused();
+            return false;
+        }
+        sendError = "";
+        noteFallback(note);
+        raiseEvent(EventRegistry.Severity.WARN, eventCode, note);
+        return true;
+    }
+
+    private void raiseEvent(EventRegistry.Severity severity, String code, String detail) {
+        if (level == null || level.isClientSide || level.getServer() == null) {
+            return;
+        }
+        UUID distantNetwork = null;
+        if (networkId != null) {
+            distantNetwork = dev.distantstock.stock.NetworkDirectory.find(networkId)
+                    .map(dev.distantstock.stock.NetworkDirectory.Entry::distantNetworkId)
+                    .orElseGet(() -> dev.distantstock.routing.DistantNetworkDirectory
+                            .get(level.getServer()).scopeOf(networkId));
+        } else if (freq != null) {
+            distantNetwork = dev.distantstock.stock.NetworkDirectory.findByFreq(freq)
+                    .map(dev.distantstock.stock.NetworkDirectory.Entry::distantNetworkId)
+                    .orElse(null);
+        }
+        EventRegistry.get(level.getServer()).raise(severity, code, "dock",
+                EventRegistry.blockSource(level, worldPosition), detail, freq, distantNetwork,
+                System.currentTimeMillis());
+    }
+
+    private void clearEvent(String code) {
+        if (level == null || level.isClientSide || level.getServer() == null) {
+            return;
+        }
+        EventRegistry.get(level.getServer()).clear(code, "dock",
+                EventRegistry.blockSource(level, worldPosition), System.currentTimeMillis());
+    }
+
+    private void clearFallbackRouteEvent() {
+        switch (fallbackNote) {
+            case "goggle.distantstock.fallback.no_route" -> clearEvent(EventRegistry.Codes.DOCK_NO_ROUTE);
+            case "goggle.distantstock.fallback.no_address" -> clearEvent(EventRegistry.Codes.DOCK_NO_ADDRESS);
+            case "goggle.distantstock.fallback.address_conflict" -> clearEvent(EventRegistry.Codes.ADDRESS_CONFLICT);
+            default -> {
+            }
+        }
+    }
+
     private boolean insertOutbound(ItemStack pkg) {
         return canSend() && !occupied() && pkg.getCount() == 1 && insertInto(outboundInv, pkg);
     }
@@ -743,6 +819,8 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         if (level != null) {
             refusedAt = level.getGameTime();
         }
+        raiseEvent(EventRegistry.Severity.WARN, EventRegistry.Codes.DOCK_RETURN_BLOCKED,
+                "goggle.distantstock.fallback.slots");
     }
 
     /** True while the fallback face holds something that cannot leave the dock. */
@@ -870,10 +948,16 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     private void drainFallback(Level level, BlockPos pos) {
         if (fallbackEmpty()) {
             pushStalled = false;
+            clearEvent(EventRegistry.Codes.DOCK_RETURN_BLOCKED);
+            clearFallbackRouteEvent();
             return;
         }
         var below = level.getCapability(Capabilities.ItemHandler.BLOCK, pos.below(), Direction.UP);
         if (below == null) {
+            if (!pushStalled) {
+                raiseEvent(EventRegistry.Severity.WARN, EventRegistry.Codes.DOCK_RETURN_BLOCKED,
+                        "goggle.distantstock.fallback.slots");
+            }
             pushStalled = true;
             return;
         }
@@ -892,7 +976,16 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                 fallbackInv.setStackInSlot(slot, remaining);
             }
         }
-        pushStalled = !moved && !fallbackEmpty();
+        boolean nextStalled = !moved && !fallbackEmpty();
+        if (nextStalled && !pushStalled) {
+            raiseEvent(EventRegistry.Severity.WARN, EventRegistry.Codes.DOCK_RETURN_BLOCKED,
+                    "goggle.distantstock.fallback.slots");
+        }
+        pushStalled = nextStalled;
+        if (fallbackEmpty()) {
+            clearEvent(EventRegistry.Codes.DOCK_RETURN_BLOCKED);
+            clearFallbackRouteEvent();
+        }
     }
 
     private void ship(Level level) {
@@ -945,8 +1038,12 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                     }
                     break;
                 }
-                // No route at all: hold the parcel and report it. A target is never guessed.
-                sendError = "goggle.distantstock.send.no_route";
+                // No route at all: this parcel never belonged to the transport. Return it through
+                // the physical fallback face instead of leaving it wedged in the sending bay.
+                if (!returnOutboundToFallback(slot, "goggle.distantstock.fallback.no_route",
+                        EventRegistry.Codes.DOCK_NO_ROUTE)) {
+                    sendError = "goggle.distantstock.send.no_route";
+                }
                 break;
             }
             // A route that names no group is not a destination either, and this is the case the old
@@ -963,7 +1060,24 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             // named no group wants its goods back where they came from.
             if (!dev.distantstock.link.TranserverBridge.isLocal(route.get().destinationNodeId().toString())
                     && DockGroupDirectory.DEFAULT_GROUP_ID.equals(route.get().receivingDockGroupId())) {
-                sendError = "goggle.distantstock.send.no_group";
+                if (!returnOutboundToFallback(slot, "goggle.distantstock.fallback.no_address",
+                        EventRegistry.Codes.DOCK_NO_ADDRESS)) {
+                    sendError = "goggle.distantstock.send.no_group";
+                }
+                break;
+            }
+            if (level.getServer() != null
+                    && dev.distantstock.routing.ReceivingAddressResolver.conflicted(
+                    level.getServer(), route.get().receivingDockGroupId())) {
+                // The parcel still belongs to this dock. A name conflict is a routing failure, not
+                // permission to guess which same-named address the UUID was meant to represent.
+                // Keep it in the outbound slot so the bottom face / player can recover it exactly
+                // like every other stranded parcel. A dedicated conflict sentence can replace this
+                // existing safe wording when the language PR lands.
+                if (!returnOutboundToFallback(slot, "goggle.distantstock.fallback.address_conflict",
+                        EventRegistry.Codes.ADDRESS_CONFLICT)) {
+                    sendError = "goggle.distantstock.send.no_route";
+                }
                 break;
             }
             if (!route.equals(packageRoute)) {

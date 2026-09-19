@@ -61,19 +61,39 @@ public final class PackageDispatchCodecCheck {
         // 空的本端地址是常事（货不过海），往返之后不能变成别的什么东西。
         require(OrderRequestCodec.decode(OrderRequestCodec.encode(order)).homeAddress().isEmpty(),
                 "an order that named no home address came back with one");
+        UUID thirdNode = UUID.randomUUID();
+        UUID orderScope = UUID.randomUUID();
+        OrderRequestCodec.Request threeNodeOrder = new OrderRequestCodec.Request(
+                network, orderScope, groupId, thirdNode, UUID.randomUUID(), UUID.randomUUID(),
+                "乙服打包地址", "丙服落地地址",
+                List.of(new LinkQueues.Line("minecraft:copper_ingot", 12)));
+        OrderRequestCodec.Request threeNodeDecoded =
+                OrderRequestCodec.decode(OrderRequestCodec.encode(threeNodeOrder));
+        require(threeNodeDecoded.equals(threeNodeOrder),
+                "a version 4 order changed during round trip");
+        require(thirdNode.equals(threeNodeDecoded.destinationNodeId()),
+                "an A -> B -> C order lost node C");
+        require(orderScope.equals(threeNodeDecoded.distantNetworkId()),
+                "an A -> B -> C order lost its Distant Stock network");
         acceptsVersionOneOrder();
+        acceptsVersionTwoOrder();
+        acceptsVersionThreeOrder();
 
+        UUID distantNetwork = UUID.randomUUID();
         List<NetworkDirectory.Entry> directory = List.of(
-                new NetworkDirectory.Entry(network.createFrequency(), "仓库服", 4, network, false, false));
+                new NetworkDirectory.Entry(network.createFrequency(), "仓库服", 4, network, false, false,
+                        distantNetwork));
         // False for local, because that is what an announcement is: another server's networks,
         // decoded on this side. The flag is not on the wire — the receiver is what makes them
         // remote. False for packable is a fact about the sender and does travel.
         UUID owner = UUID.randomUUID();
         UUID member = UUID.randomUUID();
         List<NetworkAnnouncementCodec.Group> groups = List.of(
-                new NetworkAnnouncementCodec.Group(groupId, "乙服仓库", owner, true, 3,
+                new NetworkAnnouncementCodec.Group(groupId, distantNetwork, "乙服仓库", false,
+                        owner, true, 3,
                         List.of(new NetworkAnnouncementCodec.Group.Member(member, "Iris_Aria0"))),
-                new NetworkAnnouncementCodec.Group(UUID.randomUUID(), "无主", null, false, 0, List.of()));
+                new NetworkAnnouncementCodec.Group(UUID.randomUUID(), distantNetwork, "无主", true,
+                        null, false, 0, List.of()));
         byte[] announcement = NetworkAnnouncementCodec.encode(directory, 19.75, 4.25, groups);
         List<NetworkDirectory.Entry> readBack = NetworkAnnouncementCodec.decode(announcement);
         require(readBack.size() == 1, "the announcement came back with " + readBack.size() + " networks");
@@ -81,6 +101,8 @@ public final class PackageDispatchCodecCheck {
                 "the announcement came back with a different network");
         require(!readBack.getFirst().packable(),
                 "a network the sender cannot pack for came back saying it could");
+        require(readBack.getFirst().distantNetworkId().equals(distantNetwork),
+                "the announcement lost the Distant Stock network membership");
         // The metrics ride in the same payload, so the round trip has to bring those back too —
         // they are what the monitor draws for the other server.
         NetworkAnnouncementCodec.Metrics carried = NetworkAnnouncementCodec.metrics(announcement);
@@ -111,6 +133,51 @@ public final class PackageDispatchCodecCheck {
         require(NetworkAnnouncementCodec.metrics(
                 announcementVersionTwo(directory, 12.5, 3.5)).tps() == 12.5,
                 "a version 2 payload lost its metrics");
+
+        // Version 3 knew groups and packability but did not know Distant Stock network scopes.
+        // Every such row must land in the hidden legacy scope rather than disappear.
+        byte[] v3 = announcementVersionThree(directory, owner, member, groupId);
+        List<NetworkDirectory.Entry> v3Networks = NetworkAnnouncementCodec.decode(v3);
+        require(v3Networks.getFirst().distantNetworkId().equals(
+                        dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID),
+                "a version 3 network did not migrate into the legacy Distant Stock network");
+        List<NetworkAnnouncementCodec.Group> v3Groups = NetworkAnnouncementCodec.groups(v3);
+        require(v3Groups.size() == 1
+                        && v3Groups.getFirst().distantNetworkId().equals(
+                        dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID)
+                        && v3Groups.getFirst().listed(),
+                "a version 3 receiving address did not migrate into the public legacy scope");
+
+        UUID joinRequestId = UUID.randomUUID();
+        DistantNetworkJoinCodec.Request joinRequest = new DistantNetworkJoinCodec.Request(
+                joinRequestId, "1F2A-5B7G", network);
+        require(DistantNetworkJoinCodec.decodeRequest(
+                        DistantNetworkJoinCodec.encodeRequest(joinRequest)).equals(joinRequest),
+                "Distant Stock network join request changed during round trip");
+        DistantNetworkJoinCodec.Accept joinAccept = new DistantNetworkJoinCodec.Accept(
+                joinRequestId, distantNetwork, "Nexus", network.nodeId(), network);
+        require(DistantNetworkJoinCodec.decodeAccept(
+                        DistantNetworkJoinCodec.encodeAccept(joinAccept)).equals(joinAccept),
+                "Distant Stock network join acceptance changed during round trip");
+
+        // A peer leaving a Distant Stock network must replace, not merge with, its previous
+        // membership. This is what makes the next announcement after /leave authoritative.
+        String membershipPeer = network.nodeId().toString();
+        NetworkDirectory.Entry inNexus = new NetworkDirectory.Entry(network.createFrequency(),
+                "仓库服", 4, network, false, true, distantNetwork);
+        NetworkDirectory.replacePeer(membershipPeer, List.of(inNexus));
+        require(NetworkDirectory.find(network).map(NetworkDirectory.Entry::distantNetworkId)
+                        .filter(distantNetwork::equals).isPresent(),
+                "the peer's Distant Stock membership was not published");
+        NetworkDirectory.Entry backToLegacy = new NetworkDirectory.Entry(network.createFrequency(),
+                "仓库服", 4, network, false, true,
+                dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID);
+        NetworkDirectory.replacePeer(membershipPeer, List.of(backToLegacy));
+        require(NetworkDirectory.find(network).map(NetworkDirectory.Entry::distantNetworkId)
+                        .filter(dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID::equals)
+                        .isPresent(),
+                "a peer leaving its Distant Stock network left a stale membership snapshot");
+        NetworkDirectory.replacePeer(membershipPeer, List.of());
 
         StockWireCodec.Query stockQuery = new StockWireCodec.Query(UUID.randomUUID(), network);
         require(StockWireCodec.decodeQuery(StockWireCodec.encodeQuery(stockQuery)).equals(stockQuery),
@@ -215,8 +282,96 @@ public final class PackageDispatchCodecCheck {
         OrderRequestCodec.Request decoded = OrderRequestCodec.decode(bytes.toByteArray());
         require(decoded.address().equals("旧版地址"), "a version 1 order lost its address");
         require(decoded.homeAddress().isEmpty(), "a version 1 order invented a home address");
+        require(decoded.destinationNodeId() == null,
+                "a version 1 order invented a receiving-address node");
+        require(decoded.distantNetworkId() == null,
+                "a version 1 order invented a Distant Stock network");
         require(decoded.lines().size() == 1 && decoded.lines().getFirst().count() == 16,
                 "a version 1 order lost its lines behind the missing field");
+    }
+
+    /** Version 2 has the post-crossing address, but predates the explicit receiving-address node. */
+    private static void acceptsVersionTwoOrder() throws Exception {
+        RemoteNetworkId network = new RemoteNetworkId(1, UUID.randomUUID(), UUID.randomUUID(),
+                "minecraft:overworld", UUID.randomUUID());
+        UUID group = UUID.randomUUID();
+        UUID correlation = UUID.randomUUID();
+        UUID child = UUID.randomUUID();
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
+        out.writeInt(0x44534f52);
+        out.writeInt(2);
+        for (UUID id : List.of(network.nodeId(), network.worldId())) {
+            out.writeLong(id.getMostSignificantBits());
+            out.writeLong(id.getLeastSignificantBits());
+        }
+        writeString(out, network.dimensionId());
+        out.writeLong(network.createFrequency().getMostSignificantBits());
+        out.writeLong(network.createFrequency().getLeastSignificantBits());
+        for (UUID id : List.of(group, correlation, child)) {
+            out.writeLong(id.getMostSignificantBits());
+            out.writeLong(id.getLeastSignificantBits());
+        }
+        writeString(out, "乙站发货口");
+        writeString(out, "甲站收货口");
+        out.writeInt(1);
+        writeString(out, "minecraft:gold_ingot");
+        out.writeInt(7);
+        OrderRequestCodec.Request decoded = OrderRequestCodec.decode(bytes.toByteArray());
+        require(decoded.address().equals("乙站发货口"), "a version 2 order lost its source-side address");
+        require(decoded.homeAddress().equals("甲站收货口"),
+                "a version 2 order lost its post-crossing address");
+        require(decoded.destinationNodeId() == null,
+                "a version 2 order invented a receiving-address node");
+        require(decoded.distantNetworkId() == null,
+                "a version 2 order invented a Distant Stock network");
+        require(decoded.lines().size() == 1 && decoded.lines().getFirst().count() == 7,
+                "a version 2 order lost its lines behind the missing destination-node field");
+    }
+
+    /** Version 3 knew the destination node, but not the Distant Stock network scope. */
+    private static void acceptsVersionThreeOrder() throws Exception {
+        RemoteNetworkId network = new RemoteNetworkId(1, UUID.randomUUID(), UUID.randomUUID(),
+                "minecraft:overworld", UUID.randomUUID());
+        UUID group = UUID.randomUUID();
+        UUID destinationNode = UUID.randomUUID();
+        UUID correlation = UUID.randomUUID();
+        UUID child = UUID.randomUUID();
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
+        out.writeInt(0x44534f52);
+        out.writeInt(3);
+        for (UUID id : List.of(network.nodeId(), network.worldId())) {
+            out.writeLong(id.getMostSignificantBits());
+            out.writeLong(id.getLeastSignificantBits());
+        }
+        writeString(out, network.dimensionId());
+        out.writeLong(network.createFrequency().getMostSignificantBits());
+        out.writeLong(network.createFrequency().getLeastSignificantBits());
+        out.writeLong(group.getMostSignificantBits());
+        out.writeLong(group.getLeastSignificantBits());
+        out.writeBoolean(true);
+        out.writeLong(destinationNode.getMostSignificantBits());
+        out.writeLong(destinationNode.getLeastSignificantBits());
+        for (UUID id : List.of(correlation, child)) {
+            out.writeLong(id.getMostSignificantBits());
+            out.writeLong(id.getLeastSignificantBits());
+        }
+        writeString(out, "乙服打包口");
+        writeString(out, "丙服落地口");
+        out.writeInt(1);
+        writeString(out, "minecraft:copper_ingot");
+        out.writeInt(9);
+
+        OrderRequestCodec.Request decoded = OrderRequestCodec.decode(bytes.toByteArray());
+        require(destinationNode.equals(decoded.destinationNodeId()),
+                "a version 3 order lost its destination node");
+        require(decoded.distantNetworkId() == null,
+                "a version 3 order invented a Distant Stock network");
+        require(decoded.homeAddress().equals("丙服落地口"),
+                "a version 3 order lost its post-crossing address");
+        require(decoded.lines().size() == 1 && decoded.lines().getFirst().count() == 9,
+                "a version 3 order lost its lines behind the missing Distant-network field");
     }
 
     /**
@@ -248,6 +403,44 @@ public final class PackageDispatchCodecCheck {
         }
         out.writeDouble(tps);
         out.writeDouble(mspt);
+        return bytes.toByteArray();
+    }
+
+    private static byte[] announcementVersionThree(List<NetworkDirectory.Entry> entries, UUID owner,
+                                                   UUID member, UUID group) throws Exception {
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
+        out.writeInt(0x44534e41);
+        out.writeInt(3);
+        out.writeInt(entries.size());
+        for (NetworkDirectory.Entry entry : entries) {
+            RemoteNetworkId id = entry.networkId();
+            out.writeLong(id.nodeId().getMostSignificantBits());
+            out.writeLong(id.nodeId().getLeastSignificantBits());
+            out.writeLong(id.worldId().getMostSignificantBits());
+            out.writeLong(id.worldId().getLeastSignificantBits());
+            writeString(out, id.dimensionId());
+            out.writeLong(id.createFrequency().getMostSignificantBits());
+            out.writeLong(id.createFrequency().getLeastSignificantBits());
+            writeString(out, entry.server());
+            out.writeInt(entry.links());
+            out.writeBoolean(entry.packable());
+        }
+        out.writeDouble(20.0);
+        out.writeDouble(2.5);
+        out.writeInt(1);
+        out.writeLong(group.getMostSignificantBits());
+        out.writeLong(group.getLeastSignificantBits());
+        writeString(out, "旧版接收地址");
+        out.writeBoolean(true);
+        out.writeLong(owner.getMostSignificantBits());
+        out.writeLong(owner.getLeastSignificantBits());
+        out.writeBoolean(true);
+        out.writeInt(2);
+        out.writeInt(1);
+        out.writeLong(member.getMostSignificantBits());
+        out.writeLong(member.getLeastSignificantBits());
+        writeString(out, "Tomori");
         return bytes.toByteArray();
     }
 

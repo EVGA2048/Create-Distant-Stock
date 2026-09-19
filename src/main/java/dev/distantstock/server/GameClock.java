@@ -2,6 +2,7 @@ package dev.distantstock.server;
 
 import dev.distantstock.DistantStock;
 import dev.distantstock.block.LoadedDocks;
+import dev.distantstock.event.AlarmSampler;
 import dev.distantstock.config.StockConfig;
 import dev.distantstock.link.LinkQueues;
 import dev.distantstock.link.LinkServer;
@@ -21,6 +22,7 @@ import dev.distantstock.stock.StockScanner;
 import dev.distantstock.routing.WorldIdentity;
 import dev.distantstock.link.NetworkAnnouncementService;
 import dev.distantstock.link.TranserverStockService;
+import dev.distantstock.link.DistantNetworkJoinService;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -54,6 +56,7 @@ public final class GameClock {
             PackageStripService.register();
             NetworkAnnouncementService.register();
             TranserverStockService.register();
+            DistantNetworkJoinService.register();
             TranserverBridge.start(e.getServer());
             LOG.info("[DistantStock] Transerver channels registered, bridge started");
         }
@@ -66,7 +69,9 @@ public final class GameClock {
 
     @SubscribeEvent
     public static void stopping(ServerStoppingEvent e) {
+        AlarmSampler.stop();
         if (transerverActive) {
+            DistantNetworkJoinService.stop();
             TranserverBridge.stop();
         }
         if (legacyActive) {
@@ -123,6 +128,7 @@ public final class GameClock {
             }
             if (ticks % 20 == 0) {
                 NetworkAnnouncementService.publish();
+                DistantNetworkJoinService.tick(e.getServer());
             }
             if (ticks % 40 == 0) {
                 TranserverStockService.tick();
@@ -132,6 +138,7 @@ public final class GameClock {
         // 一秒一次，和 Create 自己那份近似汇总的刷新节拍一致（见 CreateStock.summary）：
         // 更快没有意义（读到的还是同一份缓存），更慢则让终端里的库存显得迟钝。
         if (ticks % 20 == 0) {
+            AlarmSampler.tick(e.getServer(), transerverActive);
             StockScanner.scan(e.getServer());
         }
 

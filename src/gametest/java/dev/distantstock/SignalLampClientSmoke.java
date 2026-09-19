@@ -146,6 +146,8 @@ public final class SignalLampClientSmoke {
             }
             LogUtils.getLogger().info("DISTANTSTOCK_PONDER_OK: {} scenes have a structure and their text", scenes);
             checkDockGroupPage(mc);
+            checkDistantNetworkPage(mc);
+            checkLoggerPage(mc);
             checkMonitorPages(mc);
             if (checkTerminalClick()) {
                 LogUtils.getLogger().info("DISTANTSTOCK_TERMINAL_CLICK_OK: 点一下就有反应");
@@ -172,7 +174,7 @@ public final class SignalLampClientSmoke {
     private static void checkDockGroupPage(Minecraft mc) {
         var graphics = new net.minecraft.client.gui.GuiGraphics(mc, mc.renderBuffers().bufferSource());
         var mine = new dev.distantstock.net.DockGroupsS2C.Entry(java.util.UUID.randomUUID(),
-                "测试网络", true, true, 2, "某人", java.util.List.of("甲", "乙"), true);
+                "测试地址", true, true, 2, "某人", java.util.List.of("甲", "乙"), true, false);
         var page = new dev.distantstock.client.DockGroupScreen(null, mine);
         page.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
         page.render(graphics, 0, 0, 0f);
@@ -183,6 +185,54 @@ public final class SignalLampClientSmoke {
         stranger.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
         stranger.render(graphics, 0, 0, 0f);
         LogUtils.getLogger().info("DISTANTSTOCK_GROUP_PAGE_OK: 港组页面开得出、画得出来");
+    }
+
+    /** New Distant Stock network page: unjoined, joined member and authoritative owner all render. */
+    private static void checkDistantNetworkPage(Minecraft mc) {
+        var graphics = new net.minecraft.client.gui.GuiGraphics(mc, mc.renderBuffers().bufferSource());
+        var page = new dev.distantstock.client.DistantNetworkScreen(null, false);
+        page.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+
+        page.apply(new dev.distantstock.net.DistantNetworkStateS2C(
+                true, null, "", false, ""));
+        page.render(graphics, 0, 0, 0f);
+
+        var networkId = java.util.UUID.randomUUID();
+        page.apply(new dev.distantstock.net.DistantNetworkStateS2C(
+                true, networkId, "Nexus", false, ""));
+        page.render(graphics, 0, 0, 0f);
+
+        page.apply(new dev.distantstock.net.DistantNetworkStateS2C(
+                true, networkId, "Nexus", true, "1F2A-5B7G"));
+        page.render(graphics, 0, 0, 0f);
+        LogUtils.getLogger().info(
+                "DISTANTSTOCK_DISTANT_NETWORK_PAGE_OK: 未加入、成员、创建者三种状态均可绘制");
+    }
+
+    /** Logger screen renders active, acknowledged and cleared rows without a world/menu. */
+    private static void checkLoggerPage(Minecraft mc) {
+        var graphics = new net.minecraft.client.gui.GuiGraphics(mc, mc.renderBuffers().bufferSource());
+        var source = new net.minecraft.core.BlockPos(4, 70, 9);
+        long now = System.currentTimeMillis();
+        var rows = java.util.List.of(
+                new dev.distantstock.net.OpenLoggerS2C.Row(java.util.UUID.randomUUID(), now - 5000, now,
+                        dev.distantstock.event.EventRegistry.Severity.ERROR, "PARCEL_QUARANTINED",
+                        "parcel", "deadbeef", "ownership conflict", true, false, 2),
+                new dev.distantstock.net.OpenLoggerS2C.Row(java.util.UUID.randomUUID(), now - 9000, now - 3000,
+                        dev.distantstock.event.EventRegistry.Severity.WARN, "DOCK_NO_ADDRESS",
+                        "dock", "minecraft:overworld@1,2,3", "no receiving address", true, true, 1),
+                new dev.distantstock.net.OpenLoggerS2C.Row(java.util.UUID.randomUUID(), now - 12000, now - 6000,
+                        dev.distantstock.event.EventRegistry.Severity.INFO, "TEST_CLEARED",
+                        "test", "smoke", "cleared event", false, false, 1));
+        var snapshot = new dev.distantstock.net.OpenLoggerS2C(source,
+                dev.distantstock.event.EventRegistry.Severity.INFO, java.util.UUID.randomUUID(), rows);
+        var page = new dev.distantstock.client.LoggerScreen(snapshot);
+        page.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+        page.render(graphics, 0, 0, 0f);
+        page.update(new dev.distantstock.net.OpenLoggerS2C(source,
+                dev.distantstock.event.EventRegistry.Severity.WARN, null, rows));
+        page.render(graphics, 0, 0, 0f);
+        LogUtils.getLogger().info("DISTANTSTOCK_LOGGER_PAGE_OK: 活动、已确认、已恢复事件均可绘制");
     }
 
     /**

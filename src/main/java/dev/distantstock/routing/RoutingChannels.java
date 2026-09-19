@@ -11,10 +11,13 @@ public final class RoutingChannels {
     public static final String ORDER_RESULT = "distantstock:v1.order.result";
     public static final String PACKAGE_DISPATCH = "distantstock:v1.package.dispatch";
     public static final String PACKAGE_STRIP = "distantstock:v1.package.strip";
+    public static final String DISTANT_NETWORK_JOIN_REQUEST = "distantstock:v1.network.join.request";
+    public static final String DISTANT_NETWORK_JOIN_ACCEPT = "distantstock:v1.network.join.accept";
 
     private static final List<String> ALL = List.of(
             NETWORK_ANNOUNCE, STOCK_QUERY, STOCK_RESULT,
-            ORDER_REQUEST, ORDER_RESULT, PACKAGE_DISPATCH, PACKAGE_STRIP);
+            ORDER_REQUEST, ORDER_RESULT, PACKAGE_DISPATCH, PACKAGE_STRIP,
+            DISTANT_NETWORK_JOIN_REQUEST, DISTANT_NETWORK_JOIN_ACCEPT);
 
     public static List<String> all() {
         return ALL;

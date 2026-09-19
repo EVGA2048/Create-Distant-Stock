@@ -46,6 +46,8 @@ public final class OrderDestination {
         THERE,
         /** A group of this server's that the player is not in. */
         REFUSED,
+        /** The same player-facing address name currently identifies more than one group. */
+        CONFLICT,
         /** A group nobody can name. */
         UNKNOWN
     }
@@ -58,12 +60,19 @@ public final class OrderDestination {
     }
 
     public static Answer resolve(MinecraftServer server, UUID player, UUID asked) {
+        return resolve(server, player, DistantNetworkDirectory.LEGACY_NETWORK_ID, asked);
+    }
+
+    public static Answer resolve(MinecraftServer server, UUID player, UUID distantNetworkId, UUID asked) {
         if (server == null) {
             return new Answer(Kind.UNKNOWN, null);
         }
         if (asked == null || asked.equals(DockGroupDirectory.DEFAULT_GROUP_ID)) {
             // 没选组不放行 —— 见 {@link Kind#NO_GROUP}。这是"货进虚空"那条路的入口。
             return new Answer(Kind.NO_GROUP, null);
+        }
+        if (ReceivingAddressResolver.conflicted(server, asked)) {
+            return new Answer(Kind.CONFLICT, null);
         }
         DockGroup group = DockGroupDirectory.get(server).find(asked).orElse(null);
         if (group == null) {
@@ -73,13 +82,19 @@ public final class OrderDestination {
             if (remote == null) {
                 return new Answer(Kind.UNKNOWN, null);
             }
-            return remote.admits(player)
-                    ? new Answer(Kind.THERE, asked)
-                    : new Answer(Kind.REFUSED, null);
+            if (!remote.distantNetworkId().equals(distantNetworkId)
+                    && !remote.distantNetworkId().equals(DistantNetworkDirectory.LEGACY_NETWORK_ID)) {
+                return new Answer(Kind.UNKNOWN, null);
+            }
+            // PUBLIC / UNLISTED controls discovery, not delivery permission. Once a player knows
+            // the exact receiving address (or already carries its UUID), the address may be used.
+            return new Answer(Kind.THERE, asked);
         }
-        return group.admits(player)
-                ? new Answer(Kind.HERE, group.id())
-                : new Answer(Kind.REFUSED, null);
+        if (!group.distantNetworkId().equals(distantNetworkId)
+                && !group.distantNetworkId().equals(DistantNetworkDirectory.LEGACY_NETWORK_ID)) {
+            return new Answer(Kind.UNKNOWN, null);
+        }
+        return new Answer(Kind.HERE, group.id());
     }
 
     private OrderDestination() {

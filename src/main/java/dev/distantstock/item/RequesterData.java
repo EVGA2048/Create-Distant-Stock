@@ -17,6 +17,8 @@ public final class RequesterData {
      */
     public static final String HOME_ADDRESS = "HomeAddress";
     public static final String NETWORK = "RemoteNetwork";
+    /** The Distant Stock network containing {@link #NETWORK}; persisted so a quiet peer stays scoped. */
+    public static final String DISTANT_NETWORK = "DistantNetwork";
     public static final String RECEIVING_GROUP = "ReceivingDockGroup";
     /** The carried system's name, cached on the item so the screen can draw it offline. */
     public static final String RECEIVING_GROUP_NAME = "ReceivingDockGroupName";
@@ -40,6 +42,7 @@ public final class RequesterData {
     public static void setFreq(ItemStack stack, UUID freq) {
         update(stack, tag -> {
             tag.remove(NETWORK);
+            tag.remove(DISTANT_NETWORK);
             tag.putUUID(FREQ, freq);
         });
     }
@@ -55,6 +58,7 @@ public final class RequesterData {
         // group's id — a label that looks like an answer and is not one.
         tag.remove(FREQ);
         tag.remove(NETWORK);
+        tag.remove(DISTANT_NETWORK);
         tag.remove(RECEIVING_GROUP);
         tag.remove(RECEIVING_GROUP_NAME);
     }
@@ -91,10 +95,26 @@ public final class RequesterData {
     }
 
     public static void setNetwork(ItemStack stack, RemoteNetworkId network) {
+        setNetwork(stack, network, null);
+    }
+
+    public static void setNetwork(ItemStack stack, RemoteNetworkId network, UUID distantNetworkId) {
         update(stack, tag -> {
             tag.put(NETWORK, network.save());
             tag.putUUID(FREQ, network.createFrequency());
+            if (distantNetworkId == null) {
+                tag.remove(DISTANT_NETWORK);
+            } else {
+                tag.putUUID(DISTANT_NETWORK, distantNetworkId);
+            }
         });
+    }
+
+    /** Saved Distant Stock scope of the selected warehouse, when written by a scope-aware build. */
+    public static Optional<UUID> distantNetwork(ItemStack stack) {
+        CompoundTag root = tag(stack);
+        return root.hasUUID(DISTANT_NETWORK)
+                ? Optional.of(root.getUUID(DISTANT_NETWORK)) : Optional.empty();
     }
 
     public static Optional<UUID> receivingGroup(ItemStack stack) {

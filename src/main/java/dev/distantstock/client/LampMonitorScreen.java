@@ -147,7 +147,7 @@ public final class LampMonitorScreen extends AbstractContainerScreen<MonitorMenu
             case IDLE, ALL_GOOD -> 0xFF6FBF63;
             case ACT -> 0xFF4FBFCB;
             case WARN -> 0xFFE0A040;
-            case WARN_URGENT, FATAL -> 0xFFD4504A;
+            case WARN_URGENT, FATAL, FATAL_ACK -> 0xFFD4504A;
         };
     }
 

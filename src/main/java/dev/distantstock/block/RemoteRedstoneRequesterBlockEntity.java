@@ -109,7 +109,8 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
         // 终端抄下来的快照，之后再没更新过。一个看得见、能改、而且显然在问"送到哪"的框填了等于
         // 没填。现在它是唯一说了算的：绑定剩下的只是"从哪台服务器的哪张网络发货"。
         boolean ok = RemoteGaugeOrders.orderAll(level == null ? null : level.getServer(),
-                bound.network(), encodedTargetAdress, bound.receivingGroup(), bound.homeAddress(), lines);
+                bound.network(), bound.distantNetworkId(), bound.distantNetworkKnown(), encodedTargetAdress,
+                bound.receivingGroup(), bound.homeAddress(), lines);
         lastRequestSucceeded = ok;
         playEffect(ok);
     }
@@ -252,7 +253,9 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
         if (binding == null) {
             return;
         }
-        bind(new RemoteBinding(binding.network(), group, binding.address(), homeAddress));
+        bind(new RemoteBinding(binding.network(), binding.distantNetworkId(),
+                binding.distantNetworkKnown(), group,
+                binding.address(), homeAddress));
     }
 
     /**

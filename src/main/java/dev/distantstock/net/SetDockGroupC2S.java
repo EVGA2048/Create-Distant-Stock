@@ -39,6 +39,8 @@ public record SetDockGroupC2S(String name, int action) implements CustomPacketPa
      * 赌它送到便宜得多。
      */
     public static final int REFRESH = 4;
+    /** Switch the receiving address between PUBLIC and UNLISTED discovery. */
+    public static final int TOGGLE_VISIBILITY = 5;
 
     public static final Type<SetDockGroupC2S> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "set_dock_group"));

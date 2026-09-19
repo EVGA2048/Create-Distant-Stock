@@ -3,9 +3,9 @@ package dev.distantstock.block;
 /**
  * Andon severity shown by a brass signal lamp, in the vocabulary of a machine stack light.
  *
- * The constant order is the severity order, so {@link #worst} is a plain ordinal comparison and a
- * board with several inputs reports its most urgent one. Colour is deliberately not part of this
- * enum; the renderer owns that mapping.
+ * Existing constants keep their original ordinals because panel state is persisted by ordinal in
+ * old saves. New states therefore cannot rely on declaration order for urgency; {@link #worst}
+ * uses an explicit rank.
  */
 public enum LampState {
     /** Stocked and nothing on order: the line is ready but has no work. */
@@ -19,7 +19,9 @@ public enum LampState {
     /** Short and the network is not answering, so someone has to look at it. */
     WARN_URGENT,
     /** Misconfigured, or forced from outside. */
-    FATAL;
+    FATAL,
+    /** An ERROR alarm that an operator has acknowledged but that is still active. */
+    FATAL_ACK;
 
     /** How loudly a state asks to be noticed. */
     public enum Blink {
@@ -46,6 +48,18 @@ public enum LampState {
         if (b == null) {
             return a;
         }
-        return a.ordinal() >= b.ordinal() ? a : b;
+        return rank(a) >= rank(b) ? a : b;
+    }
+
+    private static int rank(LampState state) {
+        return switch (state) {
+            case IDLE -> 0;
+            case ALL_GOOD -> 1;
+            case ACT -> 2;
+            case WARN -> 3;
+            case WARN_URGENT -> 4;
+            case FATAL_ACK -> 5;
+            case FATAL -> 6;
+        };
     }
 }

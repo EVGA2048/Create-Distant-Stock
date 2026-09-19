@@ -15,8 +15,17 @@ import java.util.UUID;
 /** Versioned, bounded order request wire format. Sending waits for a durable target inbox. */
 public final class OrderRequestCodec {
     private static final int MAGIC = 0x44534f52;
-    /** Version 1 carried one address; 2 appends the address the parcel wears once it is home. */
-    private static final int VERSION = 2;
+    /**
+     * Version 1 carried one package address; 2 appended the post-crossing address; 3 carries the
+     * node that owns the receiving address; 4 carries the Distant Stock network scope as well.
+     * The packing server must not infer either from "local vs source" — a Distant Stock network may
+     * have three or more server nodes, and the source warehouse must be able to reject a request
+     * arriving from a different Distant Stock network without trusting the ordering client.
+     */
+    private static final int VERSION = 4;
+    private static final int VERSION_WITH_DISTANT_NETWORK = 4;
+    private static final int VERSION_WITH_DESTINATION_NODE = 3;
+    private static final int VERSION_WITH_HOME_ADDRESS = 2;
     private static final int VERSION_WITHOUT_HOME_ADDRESS = 1;
     private static final int MAX_LINES = 512;
     private static final int MAX_TEXT_BYTES = 512;
@@ -31,7 +40,8 @@ public final class OrderRequestCodec {
      * on the ordering side; blank when the goods are staying where they were packed, which is a
      * perfectly ordinary order and the reason this field is optional rather than required.
      */
-    public record Request(RemoteNetworkId networkId, UUID receivingDockGroupId,
+    public record Request(RemoteNetworkId networkId, UUID distantNetworkId,
+                          UUID receivingDockGroupId, UUID destinationNodeId,
                           UUID correlationId, UUID childOrderId, String address, String homeAddress,
                           List<LinkQueues.Line> lines) {
         public Request {
@@ -40,10 +50,27 @@ public final class OrderRequestCodec {
             lines = List.copyOf(lines);
         }
 
+        /** Version-3-shaped constructor retained for source compatibility. */
+        public Request(RemoteNetworkId networkId, UUID receivingDockGroupId, UUID destinationNodeId,
+                       UUID correlationId, UUID childOrderId, String address, String homeAddress,
+                       List<LinkQueues.Line> lines) {
+            this(networkId, null, receivingDockGroupId, destinationNodeId, correlationId,
+                    childOrderId, address, homeAddress, lines);
+        }
+
+        /** Version-2-shaped constructor retained for source compatibility. */
+        public Request(RemoteNetworkId networkId, UUID receivingDockGroupId, UUID correlationId,
+                       UUID childOrderId, String address, String homeAddress,
+                       List<LinkQueues.Line> lines) {
+            this(networkId, null, receivingDockGroupId, null, correlationId, childOrderId,
+                    address, homeAddress, lines);
+        }
+
         /** An order with one address: what a build before home addresses sent, and still sends. */
         public Request(RemoteNetworkId networkId, UUID receivingDockGroupId, UUID correlationId,
                        UUID childOrderId, String address, List<LinkQueues.Line> lines) {
-            this(networkId, receivingDockGroupId, correlationId, childOrderId, address, "", lines);
+            this(networkId, null, receivingDockGroupId, null, correlationId, childOrderId,
+                    address, "", lines);
         }
     }
 
@@ -60,7 +87,15 @@ public final class OrderRequestCodec {
         writeUuid(out, id.worldId());
         writeString(out, id.dimensionId());
         writeUuid(out, id.createFrequency());
+        out.writeBoolean(request.distantNetworkId() != null);
+        if (request.distantNetworkId() != null) {
+            writeUuid(out, request.distantNetworkId());
+        }
         writeUuid(out, request.receivingDockGroupId());
+        out.writeBoolean(request.destinationNodeId() != null);
+        if (request.destinationNodeId() != null) {
+            writeUuid(out, request.destinationNodeId());
+        }
         writeUuid(out, request.correlationId());
         writeUuid(out, request.childOrderId());
         writeString(out, request.address());
@@ -89,12 +124,16 @@ public final class OrderRequestCodec {
             throw new IOException("Unsupported order request format");
         }
         int version = in.readInt();
-        if (version != VERSION && version != VERSION_WITHOUT_HOME_ADDRESS) {
+        if (version < VERSION_WITHOUT_HOME_ADDRESS || version > VERSION) {
             throw new IOException("Unsupported order request format");
         }
         RemoteNetworkId networkId = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA,
                 readUuid(in), readUuid(in), readString(in), readUuid(in));
+        UUID distantNetworkId = version >= VERSION_WITH_DISTANT_NETWORK && in.readBoolean()
+                ? readUuid(in) : null;
         UUID group = readUuid(in);
+        UUID destinationNode = version >= VERSION_WITH_DESTINATION_NODE && in.readBoolean()
+                ? readUuid(in) : null;
         UUID correlation = readUuid(in);
         UUID child = readUuid(in);
         String address = readString(in);
@@ -102,7 +141,7 @@ public final class OrderRequestCodec {
         // to give, and reading a field that is not there would eat the line count. Both this server
         // and the sender are usually the same build, but a rolling restart is exactly when this
         // matters — the two halves of a pair are restarted one at a time.
-        String homeAddress = version >= VERSION ? readString(in) : "";
+        String homeAddress = version >= VERSION_WITH_HOME_ADDRESS ? readString(in) : "";
         int count = in.readInt();
         if (count <= 0 || count > MAX_LINES) {
             throw new IOException("Order line count is invalid");
@@ -119,7 +158,8 @@ public final class OrderRequestCodec {
         if (in.available() != 0) {
             throw new IOException("Order payload contains trailing data");
         }
-        return new Request(networkId, group, correlation, child, address, homeAddress, lines);
+        return new Request(networkId, distantNetworkId, group, destinationNode, correlation, child,
+                address, homeAddress, lines);
     }
 
     private static void writeString(DataOutputStream out, String value) throws IOException {

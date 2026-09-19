@@ -48,7 +48,7 @@ public final class DockGroupScreen extends Screen {
     private boolean confirmingDelete;
 
     public DockGroupScreen(RequesterScreen parent, DockGroupsS2C.Entry entry) {
-        super(Component.translatable("gui.distantstock.net.title", entry.name()));
+        super(Component.literal("接收港地址：" + entry.name()));
         this.parent = parent;
         this.entry = entry;
     }
@@ -105,11 +105,6 @@ public final class DockGroupScreen extends Screen {
         return entry.mine();
     }
 
-    /** 组主：能加人、能锁、能删。名单里的人：能走。没进名单的：能进（如果它没锁）。 */
-    private boolean canJoin() {
-        return !entry.admitted() && entry.open();
-    }
-
     private boolean canLeave() {
         return !mine() && entry.admitted();
     }
@@ -148,32 +143,32 @@ public final class DockGroupScreen extends Screen {
         g.fill(x - 2, y - 2, x + w + 2, y + h + 2, FRAME);
         g.fill(x - 1, y - 1, x + w + 1, y + h + 1, PAPER);
 
-        // 标题：网络：<名字>
-        g.drawString(font, trim(Component.translatable("gui.distantstock.net.title", entry.name())
-                .getString(), w - 24), x + 5, y + 4, INK, false);
+        g.drawString(font, trim("接收港地址：" + entry.name(), w - 24), x + 5, y + 4, INK, false);
         boolean overClose = mouseX >= x + w - 12 && mouseX < x + w && mouseY >= y && mouseY < y + TITLE_H;
         g.drawString(font, "×", x + w - 10, y + 4, overClose ? 0xFFFFD0D0 : HINT, false);
         g.fill(x + 3, y + TITLE_H - 2, x + w - 3, y + TITLE_H - 1, BAR);
 
         int rowY = y + TITLE_H;
-        // 所有者那一行，右边是锁：锁着的网络只有名单里的人能用，而这是组主唯一能改的东西。
+        // Visibility is discovery only. UNLISTED hides the address from ordinary lists; somebody
+        // who already knows the exact name may still send to it.
         g.drawString(font, trim(Component.translatable("gui.distantstock.net.owner",
                         entry.owner().isEmpty()
                                 ? Component.translatable("gui.distantstock.member.nobody").getString()
                                 : entry.owner()).getString(), w - 60),
                 x + 5, rowY + 1, OWNER, false);
         if (mine()) {
-            int bw = 44;
+            int bw = 50;
             int bx = x + w - bw - 5;
-            boolean overLock = mouseX >= bx && mouseX < bx + bw && mouseY >= rowY && mouseY < rowY + ROW_H;
-            g.fill(bx, rowY, bx + bw, rowY + ROW_H - 1, overLock ? BAR : 0xFF2E444B);
-            g.drawString(font, Component.translatable(entry.open()
-                                    ? "gui.distantstock.net.unlock" : "gui.distantstock.net.lock").getString(),
-                    bx + 4, rowY + 1, INK, false);
+            boolean overVisibility = mouseX >= bx && mouseX < bx + bw
+                    && mouseY >= rowY && mouseY < rowY + ROW_H;
+            g.fill(bx, rowY, bx + bw, rowY + ROW_H - 1,
+                    overVisibility ? BAR : 0xFF2E444B);
+            String visibility = entry.listed() ? "公开" : "不公开";
+            g.drawString(font, visibility, bx + (bw - font.width(visibility)) / 2,
+                    rowY + 1, INK, false);
         } else {
-            g.drawString(font, Component.translatable(entry.open()
-                            ? "gui.distantstock.net.open" : "gui.distantstock.net.locked").getString(),
-                    x + w - 55, rowY + 1, HINT, false);
+            String visibility = entry.listed() ? "公开" : "不公开";
+            g.drawString(font, visibility, x + w - 5 - font.width(visibility), rowY + 1, HINT, false);
         }
         rowY += ROW_H;
 
@@ -212,10 +207,7 @@ public final class DockGroupScreen extends Screen {
             }
             button(g, x + w - 42, fy, 40, FIELD_H - 1, "gui.distantstock.net.add", mouseX, mouseY, true);
         } else if (!mine()) {
-            g.drawString(font, Component.translatable(entry.admitted()
-                            ? "gui.distantstock.net.is_member" : entry.open()
-                            ? "gui.distantstock.net.not_member_open"
-                            : "gui.distantstock.net.not_member_locked").getString(),
+            g.drawString(font, entry.admitted() ? "你是此地址的协作者" : "知道准确地址即可投递",
                     x + 5, fieldY() + 2, HINT, false);
         }
 
@@ -227,8 +219,6 @@ public final class DockGroupScreen extends Screen {
                     mouseX, mouseY, true);
         } else if (canLeave()) {
             button(g, x + w - 62, by, 58, BUTTON_H - 1, "gui.distantstock.net.leave", mouseX, mouseY, true);
-        } else if (canJoin()) {
-            button(g, x + w - 62, by, 58, BUTTON_H - 1, "gui.distantstock.net.join", mouseX, mouseY, true);
         }
     }
 
@@ -254,9 +244,9 @@ public final class DockGroupScreen extends Screen {
             return true;
         }
         int rowY = y + TITLE_H;
-        if (mine() && mouseX >= x + w - 49 && mouseX < x + w - 5
+        if (mine() && mouseX >= x + w - 55 && mouseX < x + w - 5
                 && mouseY >= rowY && mouseY < rowY + ROW_H) {
-            send(new SetDockGroupC2S(entry.name(), SetDockGroupC2S.TOGGLE_OPEN));
+            send(new SetDockGroupC2S(entry.name(), SetDockGroupC2S.TOGGLE_VISIBILITY));
             return true;
         }
         rowY += ROW_H;
@@ -289,10 +279,6 @@ public final class DockGroupScreen extends Screen {
             }
             if (canLeave()) {
                 send(new GroupMemberC2S(entry.name(), "", GroupMemberC2S.LEAVE));
-                return true;
-            }
-            if (canJoin()) {
-                send(new GroupMemberC2S(entry.name(), "", GroupMemberC2S.JOIN));
                 return true;
             }
         }

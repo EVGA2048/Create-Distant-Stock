@@ -28,7 +28,7 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
      *                 cannot, rather than letting a player place an order that will never be filled.
      */
     public record NetworkLine(java.util.UUID freq, String server, int links, RemoteNetworkId networkId,
-                              boolean local, boolean packable) {
+                              boolean local, boolean packable, java.util.UUID distantNetworkId) {
     }
 
     public static final Type<StockSyncS2C> TYPE = new Type<>(
@@ -60,7 +60,7 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
         List<NetworkLine> networks = new ArrayList<>();
         for (NetworkDirectory.Entry entry : NetworkDirectory.visible(StockConfig.isHost())) {
             networks.add(new NetworkLine(entry.freq(), entry.server(), entry.links(), entry.networkId(),
-                    entry.local(), entry.packable()));
+                    entry.local(), entry.packable(), entry.distantNetworkId()));
         }
         return new StockSyncS2C(demo, lines, networks);
     }
@@ -79,7 +79,7 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
             List<NetworkDirectory.Entry> networks = new ArrayList<>();
             for (NetworkLine line : msg.networks) {
                 networks.add(new NetworkDirectory.Entry(line.freq, line.server, line.links, line.networkId,
-                        line.local, line.packable));
+                        line.local, line.packable, line.distantNetworkId));
             }
             menu.networks = networks;
         });
@@ -95,6 +95,9 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
         }
         buf.writeBoolean(line.local());
         buf.writeBoolean(line.packable());
+        buf.writeUUID(line.distantNetworkId() == null
+                ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID
+                : line.distantNetworkId());
     }
 
     private static NetworkLine readNetwork(RegistryFriendlyByteBuf buf) {
@@ -105,6 +108,7 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
                 ? RemoteNetworkId.read(buf.readNbt()).orElse(null) : null;
         boolean local = buf.readBoolean();
         boolean packable = buf.readBoolean();
-        return new NetworkLine(freq, server, links, networkId, local, packable);
+        java.util.UUID distantNetworkId = buf.readUUID();
+        return new NetworkLine(freq, server, links, networkId, local, packable, distantNetworkId);
     }
 }

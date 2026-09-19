@@ -84,7 +84,10 @@ public record GroupMemberC2S(String group, String player, int action) implements
                 return;
             }
             DockGroupDirectory directory = DockGroupDirectory.get(server);
-            DockGroup group = directory.findByName(msg.group).orElse(null);
+            java.util.UUID scope = player.containerMenu instanceof RequesterMenu menu
+                    ? menu.distantNetworkId(player)
+                    : dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
+            DockGroup group = directory.findByName(scope, msg.group).orElse(null);
             if (group == null) {
                 player.displayClientMessage(
                         Component.translatable("gui.distantstock.group.unknown_name", msg.group), false);

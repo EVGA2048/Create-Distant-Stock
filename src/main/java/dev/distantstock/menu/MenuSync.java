@@ -58,6 +58,9 @@ public final class MenuSync {
             // periodic sync, because this is the packet that fills the list the moment the screen
             // opens — without it the first thing a player sees is a network drawn as working.
             buf.writeBoolean(entry.packable());
+            buf.writeUUID(entry.distantNetworkId() == null
+                    ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID
+                    : entry.distantNetworkId());
         }
     }
 
@@ -79,7 +82,9 @@ public final class MenuSync {
                     ? dev.distantstock.routing.RemoteNetworkId.read(buf.readNbt()).orElse(null) : null;
             boolean local = buf.readBoolean();
             boolean packable = buf.readBoolean();
-            directory.add(new NetworkDirectory.Entry(freq, server, links, networkId, local, packable));
+            UUID distantNetworkId = buf.readUUID();
+            directory.add(new NetworkDirectory.Entry(freq, server, links, networkId, local, packable,
+                    distantNetworkId));
         }
         menu.networks = directory;
     }

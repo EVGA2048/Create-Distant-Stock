@@ -329,6 +329,9 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
         if (level.getServer() == null) {
             return false;
         }
+        if (dev.distantstock.routing.ReceivingAddressResolver.conflicted(level.getServer(), group)) {
+            return false;
+        }
         dev.distantstock.routing.DockGroup found = DockGroupDirectory.get(level.getServer()).find(group).orElse(null);
         // A group that is gone cannot be joined, and saying yes would leave a dock pointed at
         // nothing while reporting success.

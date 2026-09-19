@@ -51,7 +51,11 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
      * player (they simply have not joined yet) — which is exactly the row that needs a way in.
      */
     public record Entry(UUID id, String name, boolean open, boolean mine, int docks,
-                        String owner, List<String> members, boolean admitted) {
+                        String owner, List<String> members, boolean admitted, boolean listed) {
+        public Entry(UUID id, String name, boolean open, boolean mine, int docks,
+                     String owner, List<String> members, boolean admitted) {
+            this(id, name, open, mine, docks, owner, members, admitted, true);
+        }
     }
 
     public static final Type<DockGroupsS2C> TYPE = new Type<>(
@@ -72,6 +76,7 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
             buf.writeBoolean(entry.open());
             buf.writeBoolean(entry.mine());
             buf.writeBoolean(entry.admitted());
+            buf.writeBoolean(entry.listed());
             buf.writeVarInt(entry.docks());
             buf.writeUtf(entry.owner() == null ? "" : entry.owner(), 64);
             buf.writeVarInt(entry.members().size());
@@ -99,6 +104,7 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
             boolean open = buf.readBoolean();
             boolean mine = buf.readBoolean();
             boolean admitted = buf.readBoolean();
+            boolean listed = buf.readBoolean();
             int docks = buf.readVarInt();
             String owner = buf.readUtf(64);
             int memberCount = buf.readVarInt();
@@ -112,7 +118,8 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
             for (int m = 0; m < memberCount; m++) {
                 members.add(buf.readUtf(64));
             }
-            groups.add(new Entry(id, name, open, mine, docks, owner, List.copyOf(members), admitted));
+            groups.add(new Entry(id, name, open, mine, docks, owner, List.copyOf(members),
+                    admitted, listed));
         }
         UUID carried = buf.readBoolean() ? buf.readUUID() : null;
         return new DockGroupsS2C(groups, carried);
@@ -146,6 +153,7 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
      * cache, with the online list in front of it — is the one place that answers.
      */
     public static DockGroupsS2C of(DockGroupDirectory directory, UUID player, UUID carried,
+                                   UUID distantNetworkId,
                                    java.util.function.ToIntFunction<UUID> dockCount,
                                    java.util.function.Function<UUID, String> nameOf) {
         List<Entry> out = new ArrayList<>();
@@ -156,20 +164,24 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
                 // 选中它等于没选 —— 而列表里有一行、点得下去，就是在请玩家选它。
                 continue;
             }
-            boolean admitted = group.admits(player);
-            if (!admitted && !group.open()) {
-                // 锁着的、又不是给我的：画一行点不动的名字比不画更糟。
-                //
-                // An open group this player is not in is a different case and does get sent, because
-                // there is something to do with it — that is the one they can join. A closed one
-                // they are not in has nothing on it for them but the fact that it exists, and a list
-                // of names that refuse to be picked is a list a player learns to stop reading.
+            if (!group.distantNetworkId().equals(distantNetworkId)
+                    && !group.distantNetworkId().equals(
+                    dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID)) {
                 continue;
             }
+            if (group.visibility() == DockGroup.Visibility.UNLISTED
+                    && !group.id().equals(carried) && !group.ownedBy(player)) {
+                continue;
+            }
+            // Address visibility is the only discovery gate. Legacy owner/member rows are still
+            // sent for management UI compatibility, but they no longer decide whether parcels may
+            // be addressed here.
+            boolean admitted = group.admits(player);
             out.add(new Entry(group.id(), group.name(), group.open(),
                     group.ownedBy(player), dockCount.applyAsInt(group.id()),
                     group.owner() == null ? "" : nameOf.apply(group.owner()),
-                    List.copyOf(group.members().values()), admitted));
+                    List.copyOf(group.members().values()), admitted,
+                    group.visibility() == DockGroup.Visibility.PUBLIC));
             if (out.size() >= MAX_ENTRIES) {
                 break;
             }

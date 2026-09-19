@@ -26,12 +26,18 @@ public final class ModNet {
         r.playToServer(SetRequesterTargetC2S.TYPE, SetRequesterTargetC2S.STREAM_CODEC,
                 SetRequesterTargetC2S::handle);
         r.playToServer(GroupMemberC2S.TYPE, GroupMemberC2S.STREAM_CODEC, GroupMemberC2S::handle);
+        r.playToServer(DistantNetworkActionC2S.TYPE, DistantNetworkActionC2S.STREAM_CODEC,
+                DistantNetworkActionC2S::handle);
+        r.playToServer(LoggerActionC2S.TYPE, LoggerActionC2S.STREAM_CODEC, LoggerActionC2S::handle);
         r.playToClient(RemoteGroupsS2C.TYPE, RemoteGroupsS2C.STREAM_CODEC, RemoteGroupsS2C::handle);
         r.playToClient(OpenMonitorS2C.TYPE, OpenMonitorS2C.STREAM_CODEC, OpenMonitorS2C::handle);
         r.playToClient(LinkSnapshotS2C.TYPE, LinkSnapshotS2C.STREAM_CODEC, LinkSnapshotS2C::handle);
         r.playToClient(StockSyncS2C.TYPE, StockSyncS2C.STREAM_CODEC, StockSyncS2C::handle);
         r.playToClient(AdminConfigS2C.TYPE, AdminConfigS2C.STREAM_CODEC, AdminConfigS2C::handle);
         r.playToClient(DockGroupsS2C.TYPE, DockGroupsS2C.STREAM_CODEC, DockGroupsS2C::handle);
+        r.playToClient(DistantNetworkStateS2C.TYPE, DistantNetworkStateS2C.STREAM_CODEC,
+                DistantNetworkStateS2C::handle);
+        r.playToClient(OpenLoggerS2C.TYPE, OpenLoggerS2C.STREAM_CODEC, OpenLoggerS2C::handle);
     }
 
     private ModNet() {

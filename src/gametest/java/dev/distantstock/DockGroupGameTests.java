@@ -44,6 +44,40 @@ public final class DockGroupGameTests {
         h.succeed();
     }
 
+    /** A legacy save containing duplicate names is ambiguous until one row is renamed. */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void legacyDuplicateNamesAreRefusedInsteadOfPickingTheFirstRow(GameTestHelper h) {
+        String name = "Legacy Duplicate " + UUID.randomUUID().toString().substring(0, 8);
+        UUID firstId = UUID.randomUUID();
+        UUID secondId = UUID.randomUUID();
+        CompoundTag root = new CompoundTag();
+        net.minecraft.nbt.ListTag rows = new net.minecraft.nbt.ListTag();
+        for (UUID id : java.util.List.of(firstId, secondId)) {
+            CompoundTag row = new CompoundTag();
+            row.putUUID("Id", id);
+            row.putString("Name", name);
+            row.putBoolean("Open", true);
+            rows.add(row);
+        }
+        root.put("Groups", rows);
+
+        DockGroupDirectory directory = DockGroupDirectory.load(root, h.getLevel().registryAccess());
+        h.assertTrue(directory.named(name).size() == 2, "the legacy duplicate rows were not loaded");
+        h.assertTrue(directory.findByName(name).isEmpty(),
+                "an ambiguous legacy name silently selected one row");
+        try {
+            directory.create(name);
+            h.fail("a third group was created on top of an ambiguous legacy name");
+        } catch (IllegalArgumentException expected) {
+            // expected
+        }
+
+        directory.rename(firstId, name + " A");
+        h.assertTrue(directory.findByName(name).orElseThrow().id().equals(secondId),
+                "renaming one legacy duplicate did not make the remaining address usable");
+        h.succeed();
+    }
+
     /**
      * 开放的网络：谁都能自己加入，但**加入之前谁都用不了**。
      *
@@ -296,12 +330,13 @@ public final class DockGroupGameTests {
         h.assertTrue(here.kind() == dev.distantstock.routing.OrderDestination.Kind.HERE,
                 "本服的组被判成了别的去向");
 
-        // 别人锁着的组：拒绝，且要说得出理由（界面用 REFUSED 那条文案）。
+        // 公开 / 私密现在只控制“能不能被发现”，不是投递白名单。只要已经知道准确地址，
+        // 即使它仍带着旧版的 owner/member/lock 元数据，也应该能作为目的地。
         DockGroup theirs = directory.createFor("别人组 " + UUID.randomUUID().toString().substring(0, 8), UUID.randomUUID());
-        var refused = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, theirs.id());
-        h.assertFalse(refused.allowed(), "别人锁着的组被放行了");
-        h.assertTrue(refused.kind() == dev.distantstock.routing.OrderDestination.Kind.REFUSED,
-                "别人锁着的组没有报成 REFUSED");
+        var known = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, theirs.id());
+        h.assertTrue(known.allowed(), "知道准确接收地址后仍被旧成员权限拒绝");
+        h.assertTrue(known.kind() == dev.distantstock.routing.OrderDestination.Kind.HERE,
+                "已知本地接收地址没有被判成 HERE");
 
         // 一个谁也不认识的 id：必须是 UNKNOWN，绝不能变成默认组。
         UUID ghost = UUID.randomUUID();
@@ -340,6 +375,33 @@ public final class DockGroupGameTests {
             h.assertTrue(directory.findByName(name).orElseThrow().ownedBy(OWNER),
                     "the duplicate attempt disturbed the group that already had the name");
         }
+        h.succeed();
+    }
+
+    /** Renaming must obey the same uniqueness rule as creating. */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void aGroupMayNotBeRenamedOntoAnExistingName(GameTestHelper h) {
+        DockGroupDirectory directory = DockGroupDirectory.get(h.getLevel().getServer());
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        DockGroup first = directory.createFor("North " + suffix, OWNER);
+        DockGroup second = directory.createFor("South " + suffix, STRANGER);
+
+        try {
+            directory.rename(second.id(), "  " + first.name().toLowerCase(java.util.Locale.ROOT) + "  ");
+            h.fail("a group was renamed onto a name that was already taken");
+        } catch (IllegalArgumentException expected) {
+            h.assertTrue(directory.require(first.id()).name().equals(first.name()),
+                    "the existing group changed during the refused rename");
+            h.assertTrue(directory.require(second.id()).name().equals(second.name()),
+                    "the refused rename still changed the group");
+        }
+
+        // Renaming a group to its own spelling/case-normalized name is harmless and must not
+        // collide with itself.
+        DockGroup same = directory.rename(first.id(), "  " + first.name().toLowerCase(java.util.Locale.ROOT) + "  ");
+        h.assertTrue(same.id().equals(first.id()), "renaming a group to its own name changed its identity");
+        h.assertTrue(same.name().equals(first.name().toLowerCase(java.util.Locale.ROOT)),
+                "the group's requested display spelling was not kept");
         h.succeed();
     }
 

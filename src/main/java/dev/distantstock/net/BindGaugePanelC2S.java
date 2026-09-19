@@ -62,8 +62,10 @@ public record BindGaugePanelC2S(BlockPos pos, int slot, String destination, Stri
             if (current == null) {
                 return false;
             }
-            gauge.bind(slot, current.network(), group == null ? current.receivingGroup() : group,
-                    address);
+            gauge.bind(slot, new dev.distantstock.block.RemoteBinding(
+                    current.network(), current.distantNetworkId(), current.distantNetworkKnown(),
+                    group == null ? current.receivingGroup() : group,
+                    address, current.homeAddress()));
             return true;
         }
         if (board instanceof dev.distantstock.block.SignalPanelBlockEntity signal) {
@@ -71,12 +73,26 @@ public record BindGaugePanelC2S(BlockPos pos, int slot, String destination, Stri
             if (current == null) {
                 return false;
             }
-            signal.bind(slot, current.network(), group == null ? current.receivingGroup() : group,
-                    address);
+            signal.bind(slot, new dev.distantstock.block.RemoteBinding(
+                    current.network(), current.distantNetworkId(), current.distantNetworkKnown(),
+                    group == null ? current.receivingGroup() : group,
+                    address, current.homeAddress()));
             return true;
         }
         return net.neoforged.fml.ModList.get().isLoaded("deployer")
                 && dev.distantstock.panel.DeployerPanels.rebind(board, slot, group, address);
+    }
+
+    private static dev.distantstock.block.RemoteBinding currentBinding(
+            FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot) {
+        if (board instanceof dev.distantstock.block.RemoteGaugeBlockEntity gauge) {
+            return gauge.binding(slot);
+        }
+        if (board instanceof dev.distantstock.block.SignalPanelBlockEntity signal) {
+            return signal.binding(slot);
+        }
+        return net.neoforged.fml.ModList.get().isLoaded("deployer")
+                ? dev.distantstock.panel.DeployerPanels.bindingOf(board, slot) : null;
     }
 
     public static void handle(BindGaugePanelC2S msg, IPayloadContext ctx) {
@@ -101,39 +117,38 @@ public record BindGaugePanelC2S(BlockPos pos, int slot, String destination, Stri
             // 「UI 里面保留的设置也都没了」）。而"认不出来"最常见的原因恰恰是刚重启过：对面的公告
             // 还没到，RemoteGroups 里还没有那一行。
             java.util.UUID group = null;
+            dev.distantstock.block.RemoteBinding current = currentBinding(board, slot);
+            java.util.UUID distantNetworkId = current == null
+                    ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID
+                    : dev.distantstock.stock.NetworkDirectory.find(current.network())
+                    .map(dev.distantstock.stock.NetworkDirectory.Entry::distantNetworkId)
+                    .orElse(current.distantNetworkId());
             if (!wanted.isEmpty()) {
-                DockGroup existing = directory.findByName(wanted).orElse(null);
-                if (existing != null && existing.id().equals(DockGroupDirectory.DEFAULT_GROUP_ID)) {
+                var match = dev.distantstock.routing.ReceivingAddressResolver.resolve(
+                        player.level().getServer(), distantNetworkId, wanted);
+                DockGroup existing = match.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.LOCAL
+                        ? match.local() : null;
+                if (match.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.CONFLICT) {
+                    player.displayClientMessage(Component.translatable(
+                            "gui.distantstock.group.unknown_name", wanted), true);
+                } else if (existing != null && existing.id().equals(DockGroupDirectory.DEFAULT_GROUP_ID)) {
                     // 玩家把「默认收货港组」这个名字打进来了。它不是目的地，是"还没选组"那个占位 ——
                     // 选了它等于没选，货出去谁都不认（玩家报的"进虚空"）。界面上那一行已经点不出来
                     // 了（GroupPicker 里滤掉），这里再拦一道：两侧同一条规则。
                     player.displayClientMessage(
                             Component.translatable("gui.distantstock.group.none"), true);
-                } else if (existing != null && !existing.admits(player.getUUID())) {
-                    // Same refusal as the desk and the dock: pointing at somebody's system fills their
-                    // docks with your parcels, which is theirs to allow.
-                    player.displayClientMessage(
-                            Component.translatable("gui.distantstock.group.closed"), true);
                 } else if (existing != null) {
                     group = existing.id();
-                } else {
+                } else if (match.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.REMOTE) {
                     // A destination on another server, learned from that server's announcement. It is
                     // passed through as it stands — the directory holding it, and every dock answering
                     // to it, are on the far end — and it is never turned into a group here: a local copy
                     // would be a group with no docks whose name shadows the real one.
-                    var remote = dev.distantstock.routing.RemoteGroups.get(player.level().getServer())
-                            .findByName(wanted).orElse(null);
-                    if (remote == null) {
-                        player.displayClientMessage(Component.translatable(
-                                "gui.distantstock.group.unknown_name", wanted), true);
-                    } else if (!remote.admits(player.getUUID())) {
-                        // 和本服的组同一句拒绝。客户端已经把那行画灰了，这一句是给改过的客户端准备的：
-                        // 名单是随公告过来的，而这是**唯一**判得了的地方（订单上没有玩家，对面判不了）。
-                        player.displayClientMessage(Component.translatable(
-                                "gui.distantstock.group.not_admitted", remote.name()), true);
-                    } else {
-                        group = remote.group();
-                    }
+                    var remote = match.remote();
+                    group = remote.group();
+                } else {
+                    player.displayClientMessage(Component.translatable(
+                            "gui.distantstock.group.unknown_name", wanted), true);
                 }
             }
             if (rebind(board, slot, group, msg.address)) {

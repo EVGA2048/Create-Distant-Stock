@@ -114,6 +114,18 @@ public final class AdminCommand {
                 .then(Commands.literal("help").executes(AdminCommand::help))
                 .then(Commands.literal("tower").executes(AdminCommand::towerStatus))
                 .then(Commands.literal("stock").executes(AdminCommand::stockStatus))
+                .then(Commands.literal("network")
+                        .executes(AdminCommand::distantNetworkList)
+                        .then(Commands.literal("list").executes(AdminCommand::distantNetworkList))
+                        .then(Commands.literal("create")
+                                .then(Commands.argument("name", StringArgumentType.string())
+                                        .executes(AdminCommand::distantNetworkCreate)))
+                        .then(Commands.literal("code").executes(AdminCommand::distantNetworkCode))
+                        .then(Commands.literal("reset-code").executes(AdminCommand::distantNetworkResetCode))
+                        .then(Commands.literal("join")
+                                .then(Commands.argument("code", StringArgumentType.word())
+                                        .executes(AdminCommand::distantNetworkJoin)))
+                        .then(Commands.literal("leave").executes(AdminCommand::distantNetworkLeave)))
                 .then(Commands.literal("group")
                         .executes(AdminCommand::groupList)
                         .then(Commands.literal("list").executes(AdminCommand::groupList))
@@ -176,6 +188,11 @@ public final class AdminCommand {
                 "  /distantstock status                传输模式与队列",
                 "  /distantstock help                  这一页",
                 "  /distantstock tower                 每座塔的状态 + 哪些设备没被带载、为什么",
+                "  /distantstock network create <名字>  用当前终端绑定的本地仓储网络创建远仓网络",
+                "  /distantstock network code           查看自己当前远仓网络的长期加入码",
+                "  /distantstock network join <加入码>  把当前本地仓储网络加入远仓网络",
+                "  /distantstock network reset-code     重置加入码，现有成员不掉线",
+                "  /distantstock network leave          让当前仓储网络退出并回到 Legacy 域",
                 "  /distantstock group list            列出所有系统（港组）",
                 "  /distantstock group create <名字>    新建一个系统",
                 "  /distantstock group delete <名字>    删除（要再输一次 confirm）",
@@ -190,6 +207,186 @@ public final class AdminCommand {
                 "  /distantstock quarantine list|give|export|discard 隔离的包裹"
         ))), false);
         return Command.SINGLE_SUCCESS;
+    }
+
+    private static int distantNetworkList(CommandContext<CommandSourceStack> ctx) {
+        MinecraftServer server = ctx.getSource().getServer();
+        var directory = dev.distantstock.routing.DistantNetworkDirectory.get(server);
+        UUID player = ctx.getSource().getEntity() instanceof ServerPlayer sp ? sp.getUUID() : null;
+        List<String> lines = new ArrayList<>();
+        for (var network : directory.all()) {
+            if (network.legacy()) {
+                continue;
+            }
+            long localMembers = dev.distantstock.stock.NetworkDirectory.local().stream()
+                    .filter(entry -> network.id().equals(entry.distantNetworkId()))
+                    .count();
+            String suffix = network.ownedBy(player) ? " · 你创建的" : "";
+            lines.add("  " + network.name() + " · " + network.id().toString().substring(0, 8)
+                    + " · 本机仓储成员 " + localMembers + suffix);
+        }
+        if (lines.isEmpty()) {
+            lines.add("  暂无远仓网络");
+        }
+        ctx.getSource().sendSuccess(() -> Component.literal("远仓网络：\n" + String.join("\n", lines)), false);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int distantNetworkCreate(CommandContext<CommandSourceStack> ctx)
+            throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        var member = localTerminalNetwork(ctx, player);
+        if (member == null) {
+            return 0;
+        }
+        var directory = dev.distantstock.routing.DistantNetworkDirectory.get(player.getServer());
+        var existing = directory.networkOf(member).flatMap(directory::find).orElse(null);
+        if (existing != null && !existing.legacy()) {
+            return failure(ctx, "这张 Create 仓储网络已经属于远仓网络「" + existing.name()
+                    + "」。请先退出再加入其它网络。");
+        }
+        String name = StringArgumentType.getString(ctx, "name");
+        UUID localNode = dev.distantstock.link.TranserverBridge.nodeId();
+        if (localNode == null) {
+            return failure(ctx, "Transerver 尚未连接，无法创建可跨服加入的远仓网络。");
+        }
+        try {
+            var created = directory.create(name, localNode, player.getUUID(), member);
+            // The periodic scanner will publish the membership on the next beat. Updating the
+            // in-memory row now makes the command result visible immediately.
+            refreshLocalNetworkMembership(player.getServer(), member, created.id());
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "已创建远仓网络「" + created.name() + "」\n加入码：" + created.joinCode()), false);
+            return Command.SINGLE_SUCCESS;
+        } catch (IllegalArgumentException exception) {
+            return failure(ctx, exception.getMessage());
+        }
+    }
+
+    private static int distantNetworkCode(CommandContext<CommandSourceStack> ctx)
+            throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        var member = localTerminalNetwork(ctx, player);
+        if (member == null) return 0;
+        var directory = dev.distantstock.routing.DistantNetworkDirectory.get(player.getServer());
+        var network = directory.networkForOwnedMember(member, player.getUUID()).orElse(null);
+        if (network == null || network.joinCode().isEmpty()) {
+            return failure(ctx, "只有远仓网络的创建者能查看加入码。");
+        }
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                network.name() + " · 加入码 " + network.joinCode()), false);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int distantNetworkResetCode(CommandContext<CommandSourceStack> ctx)
+            throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        var member = localTerminalNetwork(ctx, player);
+        if (member == null) return 0;
+        var directory = dev.distantstock.routing.DistantNetworkDirectory.get(player.getServer());
+        var network = directory.networkForOwnedMember(member, player.getUUID()).orElse(null);
+        UUID localNode = dev.distantstock.link.TranserverBridge.nodeId();
+        if (network == null || localNode == null) {
+            return failure(ctx, "只有远仓网络的创建者能重置加入码。");
+        }
+        try {
+            String code = directory.resetJoinCode(network.id(), player.getUUID(), localNode);
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "已重置「" + network.name() + "」的加入码：" + code
+                            + "\n已加入的仓储成员不受影响。"), false);
+            return Command.SINGLE_SUCCESS;
+        } catch (IllegalArgumentException exception) {
+            return failure(ctx, exception.getMessage());
+        }
+    }
+
+    private static int distantNetworkJoin(CommandContext<CommandSourceStack> ctx)
+            throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        var member = localTerminalNetwork(ctx, player);
+        if (member == null) return 0;
+        var directory = dev.distantstock.routing.DistantNetworkDirectory.get(player.getServer());
+        var existing = directory.networkOf(member).flatMap(directory::find).orElse(null);
+        if (existing != null && !existing.legacy()) {
+            return failure(ctx, "这张 Create 仓储网络已经属于远仓网络「" + existing.name()
+                    + "」。请先退出再加入其它网络。");
+        }
+        String code = StringArgumentType.getString(ctx, "code");
+        boolean sent = dev.distantstock.link.DistantNetworkJoinService.request(
+                player.getServer(), player.getUUID(), member, code);
+        if (!sent) {
+            return failure(ctx, "加入请求没有发出去：请检查加入码和 Transerver 连接。");
+        }
+        ctx.getSource().sendSuccess(() -> Component.literal("已发送远仓网络加入请求。"), false);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int distantNetworkLeave(CommandContext<CommandSourceStack> ctx)
+            throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        var member = localTerminalNetwork(ctx, player);
+        if (member == null) return 0;
+        var directory = dev.distantstock.routing.DistantNetworkDirectory.get(player.getServer());
+        var current = directory.networkOf(member).flatMap(directory::find).orElse(null);
+        if (current == null || current.legacy()) {
+            return failure(ctx, "这张 Create 仓储网络当前没有加入正式远仓网络。");
+        }
+        if (directory.wouldOrphanAuthority(member, player.getUUID(),
+                dev.distantstock.link.TranserverBridge.nodeId())) {
+            return failure(ctx, "当前版本中，创建者必须在权威节点保留至少一张仓储网络。");
+        }
+        directory.detach(member);
+        refreshLocalNetworkMembership(player.getServer(), member,
+                dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID);
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "已退出远仓网络「" + current.name() + "」，当前回到 Legacy 域。"), false);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * The Create network carried by the terminal in this player's inventory, but only if that
+     * network physically lives on this server. Joining a remote row from here would make ownership
+     * ambiguous: the membership has to be written where the Create network actually exists.
+     */
+    private static dev.distantstock.routing.RemoteNetworkId localTerminalNetwork(
+            CommandContext<CommandSourceStack> ctx, ServerPlayer player) {
+        ItemStack terminal = dev.distantstock.item.RequesterFind.find(player);
+        if (terminal.isEmpty()) {
+            failure(ctx, "请先携带一台已调谐到本地 Create 仓储网络的远仓终端。");
+            return null;
+        }
+        dev.distantstock.routing.RemoteNetworkId stored =
+                dev.distantstock.item.RequesterData.network(terminal).orElse(null);
+        UUID freq = dev.distantstock.item.RequesterData.freq(terminal);
+        dev.distantstock.routing.RemoteNetworkId local = dev.distantstock.stock.NetworkDirectory.local().stream()
+                .filter(entry -> freq != null && freq.equals(entry.freq()))
+                .map(dev.distantstock.stock.NetworkDirectory.Entry::networkId)
+                .filter(java.util.Objects::nonNull)
+                .findFirst().orElse(null);
+        if (local == null && stored != null
+                && stored.nodeId().toString().equals(dev.distantstock.link.TranserverBridge.localNodeId())) {
+            local = stored;
+        }
+        if (local == null) {
+            failure(ctx, "终端当前没有绑定本服的 Create 仓储网络；远端仓库必须在它自己的服务器上加入。");
+            return null;
+        }
+        return local;
+    }
+
+    private static void refreshLocalNetworkMembership(MinecraftServer server,
+                                                       dev.distantstock.routing.RemoteNetworkId member,
+                                                       UUID distantNetworkId) {
+        List<dev.distantstock.stock.NetworkDirectory.Entry> next = new ArrayList<>();
+        for (var entry : dev.distantstock.stock.NetworkDirectory.local()) {
+            if (member.equals(entry.networkId())) {
+                next.add(new dev.distantstock.stock.NetworkDirectory.Entry(entry.freq(), entry.server(),
+                        entry.links(), entry.networkId(), entry.local(), entry.packable(), distantNetworkId));
+            } else {
+                next.add(entry);
+            }
+        }
+        dev.distantstock.stock.NetworkDirectory.replaceLocal(next);
     }
 
     /**
@@ -372,6 +569,9 @@ public final class AdminCommand {
         }
         player.getInventory().placeItemBackInInventory(parcel);
         library.remove(record.id());
+        dev.distantstock.event.EventRegistry.get(server).clear(
+                dev.distantstock.event.EventRegistry.Codes.PARCEL_QUARANTINED,
+                "parcel", record.parcelId().toString(), System.currentTimeMillis());
         ctx.getSource().sendSuccess(() -> Component.literal("已把隔离包裹 " + shortId(record.id())
                 + " 交给 " + player.getName().getString()), false);
         return Command.SINGLE_SUCCESS;
@@ -410,6 +610,9 @@ public final class AdminCommand {
         }
         ParcelQuarantine.Record record = found.get();
         library.remove(record.id());
+        dev.distantstock.event.EventRegistry.get(ctx.getSource().getServer()).clear(
+                dev.distantstock.event.EventRegistry.Codes.PARCEL_QUARANTINED,
+                "parcel", record.parcelId().toString(), System.currentTimeMillis());
         ctx.getSource().sendSuccess(() -> Component.literal("已删除隔离记录 " + shortId(record.id())
                 + "，原始数据不再保留（建议先 export）").withStyle(ChatFormatting.YELLOW), false);
         return Command.SINGLE_SUCCESS;
@@ -675,6 +878,10 @@ public final class AdminCommand {
     private static int groupCreate(CommandContext<CommandSourceStack> ctx) {
         MinecraftServer server = ctx.getSource().getServer();
         String name = StringArgumentType.getString(ctx, "name");
+        var existing = dev.distantstock.routing.ReceivingAddressResolver.resolve(server, name);
+        if (existing.kind() != dev.distantstock.routing.ReceivingAddressResolver.Kind.UNKNOWN) {
+            return failure(ctx, "接收港地址已存在或发生同名冲突：" + name);
+        }
         final DockGroup created;
         try {
             created = DockGroupDirectory.get(server).create(name);
@@ -755,14 +962,13 @@ public final class AdminCommand {
     private static int dockSendTo(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
         String token = StringArgumentType.getString(ctx, "group");
-        // A destination on another server first, and only if this one has no group by that name:
-        // the two live in different files, and a name that means something here must not be
-        // shadowed by a copy of it from elsewhere. This is the command that sends parcels across —
-        // a dock pointed at a remote group and a remote node ships to the machine that answers to
-        // it over there.
-        var remote = dev.distantstock.routing.RemoteGroups
-                .get(ctx.getSource().getServer()).findByName(token).orElse(null);
-        if (remote != null) {
+        var address = dev.distantstock.routing.ReceivingAddressResolver.resolve(
+                ctx.getSource().getServer(), token);
+        if (address.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.CONFLICT) {
+            return failure(ctx, "接收港地址「" + token + "」发生同名冲突，先重命名其中一个地址");
+        }
+        if (address.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.REMOTE) {
+            var remote = address.remote();
             DockBlockEntity target = lookedAtDock(player);
             if (target == null) {
                 return failure(ctx, "没有瞄到远仓港：请把准星正对一个港方块再执行这条命令");
@@ -776,7 +982,9 @@ public final class AdminCommand {
             }
             return Command.SINGLE_SUCCESS;
         }
-        Optional<DockGroup> group = resolveGroup(ctx, token);
+        Optional<DockGroup> group = address.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.LOCAL
+                ? Optional.of(address.local())
+                : resolveGroup(ctx, token);
         if (group.isEmpty()) {
             return Command.SINGLE_SUCCESS;
         }

@@ -24,8 +24,13 @@ public final class StockScanner {
     }
 
     public static void scan(MinecraftServer server) {
+        var distantNetworks = dev.distantstock.routing.DistantNetworkDirectory.get(server);
         List<NetworkDirectory.Entry> local = CreateStock.openNetworks(
-                server, StockConfig.selfId(), TranserverBridge.nodeId());
+                server, StockConfig.selfId(), TranserverBridge.nodeId()).stream()
+                .map(entry -> new NetworkDirectory.Entry(entry.freq(), entry.server(), entry.links(),
+                        entry.networkId(), entry.local(), entry.packable(),
+                        distantNetworks.scopeOf(entry.networkId())))
+                .toList();
         NetworkDirectory.replaceLocal(local);
         for (NetworkDirectory.Entry entry : local) {
             if (entry.networkId() != null) {

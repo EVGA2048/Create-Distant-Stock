@@ -110,8 +110,10 @@ public final class NetworkAnnouncementService {
             List<NetworkAnnouncementCodec.Group.Member> members = new java.util.ArrayList<>();
             group.members().forEach((id, name) -> members.add(
                     new NetworkAnnouncementCodec.Group.Member(id, name)));
-            out.add(new NetworkAnnouncementCodec.Group(group.id(), group.name(), group.owner(),
-                    group.open(), dev.distantstock.block.LoadedDocks.allInGroup(group.id()).size(),
+            out.add(new NetworkAnnouncementCodec.Group(group.id(), group.distantNetworkId(),
+                    group.name(), group.visibility() == dev.distantstock.routing.DockGroup.Visibility.PUBLIC,
+                    group.owner(), group.open(),
+                    dev.distantstock.block.LoadedDocks.allInGroup(group.id()).size(),
                     List.copyOf(members)));
             if (out.size() >= 64) {
                 break;
@@ -135,7 +137,9 @@ public final class NetworkAnnouncementService {
     private static CompletableFuture<DeliveryResult> receive(ReceivedMessage message) {
         try {
             UUID source = UUID.fromString(message.source());
-            List<NetworkDirectory.Entry> entries = NetworkAnnouncementCodec.decode(message.payload());
+            NetworkAnnouncementCodec.Announcement announcement =
+                    NetworkAnnouncementCodec.decodeAnnouncement(message.payload());
+            List<NetworkDirectory.Entry> entries = announcement.entries();
             if (entries.stream().anyMatch(entry -> !entry.networkId().nodeId().equals(source))) {
                 return CompletableFuture.completedFuture(DeliveryResult.REJECTED);
             }
@@ -143,10 +147,8 @@ public final class NetworkAnnouncementService {
             if (server == null || !server.isRunning()) {
                 return CompletableFuture.completedFuture(DeliveryResult.RETRY);
             }
-            NetworkAnnouncementCodec.Metrics metrics = NetworkAnnouncementCodec.metrics(message.payload());
-            // Read out of the codec's last-decode slot, the same way the metrics are: one walk of
-            // the payload, and the fields a caller may want are kept beside the list it returns.
-            List<NetworkAnnouncementCodec.Group> groups = NetworkAnnouncementCodec.groups(message.payload());
+            NetworkAnnouncementCodec.Metrics metrics = announcement.metrics();
+            List<NetworkAnnouncementCodec.Group> groups = announcement.groups();
             CompletableFuture<DeliveryResult> result = new CompletableFuture<>();
             server.execute(() -> {
                 NetworkDirectory.replacePeer(message.source(), entries);
@@ -198,7 +200,8 @@ public final class NetworkAnnouncementService {
                 members.put(member.id(), member.name());
             }
             rows.add(new dev.distantstock.routing.RemoteGroups.Entry(node, group.id(), group.name(),
-                    label, 0, group.open(), group.owner(), Map.copyOf(members), group.docks()));
+                    label, 0, group.open(), group.owner(), Map.copyOf(members), group.docks(),
+                    group.distantNetworkId(), group.listed()));
         }
         directory.replaceFrom(node, rows, System.currentTimeMillis());
     }

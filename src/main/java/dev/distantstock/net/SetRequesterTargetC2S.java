@@ -55,28 +55,31 @@ public record SetRequesterTargetC2S(BlockPos pos, String group, String homeAddre
      * 做，因为过海的订单上没有玩家，对面判不了。
      */
     private static Resolution resolve(net.minecraft.world.entity.player.Player player,
-                                      net.minecraft.server.MinecraftServer server, String typed) {
-        DockGroup local = DockGroupDirectory.get(server).findByName(typed).orElse(null);
-        if (local != null) {
-            if (!local.admits(player.getUUID())) {
-                player.displayClientMessage(Component.translatable(
-                        "gui.distantstock.group.closed"), true);
-                return new Resolution(null);
-            }
+                                      net.minecraft.server.MinecraftServer server,
+                                      dev.distantstock.routing.RemoteNetworkId sourceNetwork,
+                                      String typed) {
+        java.util.UUID distantNetworkId = dev.distantstock.stock.NetworkDirectory.find(sourceNetwork)
+                .map(dev.distantstock.stock.NetworkDirectory.Entry::distantNetworkId)
+                .orElseGet(() -> dev.distantstock.routing.DistantNetworkDirectory.get(server)
+                        .scopeOf(sourceNetwork));
+        var match = dev.distantstock.routing.ReceivingAddressResolver.resolve(
+                server, distantNetworkId, typed);
+        if (match.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.CONFLICT) {
+            player.displayClientMessage(Component.translatable(
+                    "gui.distantstock.group.unknown_name", typed), true);
+            return new Resolution(null);
+        }
+        if (match.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.LOCAL) {
+            DockGroup local = match.local();
             return new Resolution(local.id());
         }
-        var remote = RemoteGroups.get(server).findByName(typed).orElse(null);
-        if (remote == null) {
+        if (match.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.UNKNOWN) {
             // 一个谁都不认识的名字。留着旧的不动，但要说话：静默丢弃会让玩家以为改成功了。
             player.displayClientMessage(Component.translatable(
                     "gui.distantstock.group.unknown_name", typed), true);
             return new Resolution(null);
         }
-        if (!remote.admits(player.getUUID())) {
-            player.displayClientMessage(Component.translatable(
-                    "gui.distantstock.group.not_admitted", remote.name()), true);
-            return new Resolution(null);
-        }
+        var remote = match.remote();
         return new Resolution(remote.group());
     }
 
@@ -115,7 +118,7 @@ public record SetRequesterTargetC2S(BlockPos pos, String group, String homeAddre
                 // 清空这一格 = 不指定组（这样发不出去，见 OrderDestination）。
                 group = null;
             } else {
-                Resolution resolution = resolve(player, server, typed);
+                Resolution resolution = resolve(player, server, requester.binding().network(), typed);
                 if (resolution.group() != null) {
                     group = resolution.group();
                 } else {

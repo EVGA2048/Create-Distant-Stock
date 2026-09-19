@@ -82,9 +82,13 @@ public record BindPanelFromTerminalC2S(BlockPos pos, int slot, boolean unbind, i
             if (network == null) {
                 return;
             }
+            java.util.UUID distantNetworkId = dev.distantstock.stock.NetworkDirectory.find(network)
+                    .map(dev.distantstock.stock.NetworkDirectory.Entry::distantNetworkId)
+                    .orElseGet(() -> RequesterData.distantNetwork(held).orElse(
+                            dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID));
             // 终端身上带的不止网络：货从哪个港出来、包裹写什么门牌，都在这儿。缺了港组的面板会往
             // 没人接的地方下单，所以这四个一起写。
-            RemoteBinding binding = new RemoteBinding(network,
+            RemoteBinding binding = new RemoteBinding(network, distantNetworkId,
                     RequesterData.receivingGroup(held).orElse(null),
                     RequesterData.address(held), RequesterData.homeAddress(held));
             if (bind(board, slot, binding)) {

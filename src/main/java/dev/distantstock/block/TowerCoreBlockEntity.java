@@ -342,6 +342,8 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
             if (serverLevel.getServer() != null) {
                 dev.distantstock.routing.TowerDirectory.get(serverLevel.getServer())
                         .clear(TowerSystem.TowerId.of(serverLevel.dimension(), worldPosition));
+                dev.distantstock.event.AlarmSampler.clearTower(
+                        serverLevel.getServer(), serverLevel, worldPosition);
             }
         }
         TowerActivation.markDirty();
@@ -351,6 +353,10 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
     @Override
     public void destroy() {
         LoadedTowers.remove(this);
+        if (level instanceof ServerLevel serverLevel && serverLevel.getServer() != null) {
+            dev.distantstock.event.AlarmSampler.clearTower(
+                    serverLevel.getServer(), serverLevel, worldPosition);
+        }
         TowerActivation.markDirty();
         super.destroy();
     }

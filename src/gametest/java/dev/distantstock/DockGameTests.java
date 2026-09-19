@@ -47,11 +47,11 @@ public final class DockGameTests {
 
     /**
      * A parcel with neither a route of its own nor a configured default has no destination at all.
-     * The dock has to keep it and report the missing target instead of handing it to the transport
-     * queue, where it would be dropped.
+     * It belongs on the physical fallback face, not in the transport queue and not wedged forever in
+     * the sending bay.
      */
     @GameTest(template = "empty", timeoutTicks = 140)
-    public static void routelessPackageStaysInDock(GameTestHelper h) {
+    public static void routelessPackageMovesToFallback(GameTestHelper h) {
         var level = h.getLevel();
         BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
         level.setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
@@ -65,9 +65,11 @@ public final class DockGameTests {
         // Long enough for the dock to reach the end of its transmit window and try to ship.
         h.runAfterDelay(100, () -> {
             h.assertTrue(!dock.displayedStack().isEmpty(),
-                    "routeless parcel was sent away instead of being held");
+                    "routeless parcel vanished instead of being returned");
+            h.assertTrue(dock.fallbackSlots() == 1,
+                    "routeless parcel stayed in the outbound bay instead of moving to fallback");
             h.assertTrue(dock.status() == DockStatus.BLOCKED,
-                    "routeless parcel did not raise the blocked lamp, got " + dock.status());
+                    "undrained fallback did not raise the blocked lamp, got " + dock.status());
             h.succeed();
         });
     }
@@ -164,8 +166,66 @@ public final class DockGameTests {
         h.runAfterDelay(100, () -> {
             h.assertTrue(!dock.displayedStack().isEmpty(),
                     "a parcel with an address and no group was sent to another node anyway");
+            h.assertTrue(dock.fallbackSlots() == 1,
+                    "a parcel with no receiving address was not moved to the bottom fallback");
             h.assertTrue(dock.status() == DockStatus.BLOCKED,
                     "a parcel with no group did not raise the blocked lamp, got " + dock.status());
+            String source = dev.distantstock.event.EventRegistry.blockSource(level, pos);
+            var events = dev.distantstock.event.EventRegistry.get(level.getServer());
+            h.assertTrue(events.active(dev.distantstock.event.EventRegistry.Codes.DOCK_NO_ADDRESS,
+                            "dock", source).isPresent(),
+                    "missing receiving address did not raise a shared WARN event");
+            h.assertTrue(events.active(dev.distantstock.event.EventRegistry.Codes.DOCK_RETURN_BLOCKED,
+                            "dock", source).isPresent(),
+                    "blocked fallback did not raise a shared WARN event");
+            h.succeed();
+        });
+    }
+
+    /** A hopper/chute-equivalent inventory below the dock receives an invalid outbound parcel. */
+    @GameTest(template = "empty", timeoutTicks = 160)
+    public static void noAddressParcelIsAutomaticallyReturnedBelow(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 3, 2));
+        BlockPos below = pos.below();
+        level.setBlock(below, net.minecraft.world.level.block.Blocks.CHEST.defaultBlockState(), 3);
+        level.setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        DockBlockEntity dock = (DockBlockEntity) level.getBlockEntity(pos);
+        TestTowers.carried(h, pos);
+        dock.setExport(UUID.randomUUID());
+        dock.setDefaultDestination(UUID.randomUUID(),
+                dev.distantstock.routing.DockGroupDirectory.DEFAULT_GROUP_ID);
+
+        ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        com.simibubi.create.content.logistics.box.PackageItem.addAddress(parcel, "111");
+        var handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, Direction.UP);
+        h.assertTrue(handler != null && handler.insertItem(0, parcel, false).isEmpty(),
+                "parcel did not enter the outgoing bay");
+
+        h.runAfterDelay(120, () -> {
+            var chest = level.getBlockEntity(below);
+            h.assertTrue(chest instanceof net.minecraft.world.Container,
+                    "the return container disappeared");
+            net.minecraft.world.Container inventory = (net.minecraft.world.Container) chest;
+            boolean found = false;
+            for (int i = 0; i < inventory.getContainerSize(); i++) {
+                if (inventory.getItem(i).is(ModItems.REMOTE_PACKAGE.get())) {
+                    found = true;
+                    break;
+                }
+            }
+            h.assertTrue(found, "the invalid parcel was not returned into the inventory below");
+            h.assertTrue(dock.displayedStack().isEmpty(),
+                    "the dock kept a duplicate after returning the parcel below");
+            String source = dev.distantstock.event.EventRegistry.blockSource(level, pos);
+            var events = dev.distantstock.event.EventRegistry.get(level.getServer());
+            h.assertTrue(events.active(dev.distantstock.event.EventRegistry.Codes.DOCK_NO_ADDRESS,
+                            "dock", source).isEmpty(),
+                    "resolved no-address return stayed active in the event registry");
+            h.assertTrue(events.recent(64).stream().anyMatch(event ->
+                            event.code().equals(dev.distantstock.event.EventRegistry.Codes.DOCK_NO_ADDRESS)
+                                    && event.sourceId().equals(source) && !event.active()),
+                    "resolved no-address return disappeared instead of remaining in history");
             h.succeed();
         });
     }

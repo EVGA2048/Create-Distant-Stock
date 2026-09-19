@@ -1,6 +1,8 @@
 package dev.distantstock.link;
 
 import dev.distantstock.routing.DockGroupDirectory;
+import dev.distantstock.routing.DistantNetworkDirectory;
+import dev.distantstock.routing.RemoteGroups;
 import dev.distantstock.routing.RemoteRoute;
 import dev.distantstock.routing.RoutingChannels;
 import dev.distantstock.routing.WorldIdentity;
@@ -29,6 +31,23 @@ public final class TranserverOrderService {
         TranserverBridge.handler(RoutingChannels.ORDER_REQUEST, TranserverOrderService::receive);
     }
 
+    private static UUID knownDestinationScope(MinecraftServer server, UUID group) {
+        var local = DockGroupDirectory.get(server).find(group).orElse(null);
+        if (local != null) {
+            return local.distantNetworkId();
+        }
+        return RemoteGroups.get(server).find(group)
+                .map(RemoteGroups.Entry::distantNetworkId).orElse(null);
+    }
+
+    private static UUID knownDestinationNode(MinecraftServer server, UUID group) {
+        if (DockGroupDirectory.get(server).find(group).isPresent()) {
+            UUID local = TranserverBridge.nodeId();
+            return local == null ? UUID.fromString(TranserverBridge.localNodeId()) : local;
+        }
+        return RemoteGroups.get(server).find(group).map(RemoteGroups.Entry::node).orElse(null);
+    }
+
     public static void tick(MinecraftServer server) {
         InboundOrderInbox inbox = InboundOrderInbox.get(server);
         int processed = 0;
@@ -45,6 +64,14 @@ public final class TranserverOrderService {
                     items.add(new StockCache.Entry(line.itemId(), line.count()));
                 }
                 UUID destination = destinationNode(server, record);
+                if (destination == null) {
+                    // Old v1/v2 requests do not carry the destination node. Wait until this server
+                    // has learned the receiving address rather than guessing that it means "source".
+                    inbox.state(record.childOrderId(), InboundOrderInbox.State.RECEIVED,
+                            "receiving-address node is not known yet");
+                    inbox.flush(server);
+                    continue;
+                }
                 RemoteRoute route = new RemoteRoute(RemoteRoute.CURRENT_SCHEMA,
                         destination, record.request().receivingDockGroupId(),
                         record.request().correlationId(), record.request().childOrderId());
@@ -78,32 +105,21 @@ public final class TranserverOrderService {
         }
     }
 
-    /**
-     * Which node the goods are finally delivered on: this one, or the one that placed the order.
-     *
-     * <p>A group named in this server's own directory is a group here, so the parcel stays here and
-     * comes out of a dock on this server — that is what a destination on somebody else's server
-     * announcement means, and the only way to order from their warehouse and have the goods handed
-     * to a player standing next to it. Anything else names a group this server has never heard of: the
-     * order goes home, and the goods come out of the dock the ordering player chose there.
-     *
-     * <p>The default group is excluded on purpose. It exists in every directory, including this
-     * one, so it would otherwise read as "deliver here" — and it means the opposite: an order that
-     * named no group is an order that wants its goods back where it came from.
-     */
+    /** Resolve old requests conservatively; v3 carries this answer explicitly from the ordering node. */
     private static UUID destinationNode(MinecraftServer server,
                                         InboundOrderInbox.Record record) {
+        if (record.request().destinationNodeId() != null) {
+            return record.request().destinationNodeId();
+        }
         UUID group = record.request().receivingDockGroupId();
         if (group == null || group.equals(DockGroupDirectory.DEFAULT_GROUP_ID)) {
-            return record.sourceNodeId();
+            return null;
         }
-        if (!DockGroupDirectory.get(server).find(group).isPresent()) {
-            return record.sourceNodeId();
+        if (DockGroupDirectory.get(server).find(group).isPresent()) {
+            UUID local = TranserverBridge.nodeId();
+            return local == null ? UUID.fromString(TranserverBridge.localNodeId()) : local;
         }
-        UUID local = TranserverBridge.nodeId();
-        // Without a Transerver attached this save is the only node there is; the sentinel is what
-        // every other record in the mod uses to mean "here".
-        return local == null ? UUID.fromString(TranserverBridge.localNodeId()) : local;
+        return RemoteGroups.get(server).find(group).map(RemoteGroups.Entry::node).orElse(null);
     }
 
     private static CompletableFuture<DeliveryResult> receive(ReceivedMessage message) {
@@ -128,6 +144,34 @@ public final class TranserverOrderService {
         UUID localNode = TranserverBridge.nodeId();
         if (localNode == null || !localNode.equals(request.networkId().nodeId())) {
             return DeliveryResult.REJECTED;
+        }
+        if (request.distantNetworkId() != null) {
+            UUID localScope = DistantNetworkDirectory.get(server).scopeOf(request.networkId());
+            if (!request.distantNetworkId().equals(localScope)) {
+                // This Create warehouse is not a member of the Distant Stock network named by the
+                // request. Never let the ordering node move a warehouse across network boundaries.
+                return DeliveryResult.REJECTED;
+            }
+        }
+        if (request.receivingDockGroupId() == null
+                || request.receivingDockGroupId().equals(DockGroupDirectory.DEFAULT_GROUP_ID)) {
+            return DeliveryResult.REJECTED;
+        }
+        // When this node already knows the receiving address, an explicit v3 destination must agree
+        // with that directory entry. If the address announcement is merely late, the explicit node
+        // from the ordering server is still sufficient and avoids the old A/B-only inference.
+        UUID knownDestination = knownDestinationNode(server, request.receivingDockGroupId());
+        if (request.destinationNodeId() != null && knownDestination != null
+                && !request.destinationNodeId().equals(knownDestination)) {
+            return DeliveryResult.REJECTED;
+        }
+        if (request.distantNetworkId() != null) {
+            UUID knownScope = knownDestinationScope(server, request.receivingDockGroupId());
+            if (knownScope != null
+                    && !knownScope.equals(request.distantNetworkId())
+                    && !knownScope.equals(DistantNetworkDirectory.LEGACY_NETWORK_ID)) {
+                return DeliveryResult.REJECTED;
+            }
         }
         ResourceLocation dimensionId = ResourceLocation.tryParse(request.networkId().dimensionId());
         if (dimensionId == null) {

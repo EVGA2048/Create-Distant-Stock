@@ -105,13 +105,21 @@ public record RemoteGroupsS2C(List<Entry> groups) implements CustomPacketPayload
      * stored label stays as the fallback for a node that is quiet.
      */
     public static RemoteGroupsS2C of(RemoteGroups directory, net.minecraft.server.MinecraftServer server,
-                                     java.util.UUID player) {
+                                     java.util.UUID player, java.util.UUID distantNetworkId) {
         List<Entry> out = new ArrayList<>();
         for (RemoteGroups.Entry entry : directory.all()) {
+            if (!entry.distantNetworkId().equals(distantNetworkId)
+                    && !entry.distantNetworkId().equals(
+                    dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID)) {
+                continue;
+            }
+            if (!entry.listed() && (entry.owner() == null || !entry.owner().equals(player))) {
+                continue;
+            }
             String live = dev.distantstock.routing.PeerNames.label(server, entry.node());
             out.add(new Entry(entry.group(), entry.name(),
                     live == null || live.isEmpty() ? entry.label() : live,
-                    entry.admits(player), entry.docks()));
+                    true, entry.docks()));
         }
         return new RemoteGroupsS2C(List.copyOf(out));
     }

@@ -8,11 +8,13 @@ public final class RequesterUnbindCheck {
         CompoundTag tag = new CompoundTag();
         tag.putUUID(RequesterData.FREQ, UUID.randomUUID());
         tag.put(RequesterData.NETWORK, new CompoundTag());
+        tag.putUUID(RequesterData.DISTANT_NETWORK, UUID.randomUUID());
         tag.putUUID(RequesterData.RECEIVING_GROUP, UUID.randomUUID());
         tag.putString(RequesterData.ADDRESS, "车间一号");
         tag.putString("UnrelatedData", "preserve");
         RequesterData.clearBindingTag(tag);
         require(!tag.contains(RequesterData.FREQ) && !tag.contains(RequesterData.NETWORK)
+                && !tag.contains(RequesterData.DISTANT_NETWORK)
                 && !tag.contains(RequesterData.RECEIVING_GROUP), "stale binding remains");
         require(tag.getString(RequesterData.ADDRESS).equals("车间一号")
                 && tag.getString("UnrelatedData").equals("preserve"), "unrelated data was lost");

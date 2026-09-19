@@ -88,8 +88,13 @@ public final class SignalPanelBlock extends FactoryPanelBlock implements IWrench
                             Component.translatable("gui.distantstock.remote_gauge.unbound"), true);
                 } else {
                     var network = RequesterData.network(stack).get();
-                    be.bind(slot, network, RequesterData.receivingGroup(stack).orElse(null),
-                            RequesterData.address(stack));
+                    java.util.UUID distantNetworkId = dev.distantstock.stock.NetworkDirectory.find(network)
+                            .map(dev.distantstock.stock.NetworkDirectory.Entry::distantNetworkId)
+                            .orElseGet(() -> RequesterData.distantNetwork(stack).orElse(
+                                    dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID));
+                    be.bind(slot, new RemoteBinding(network, distantNetworkId,
+                            RequesterData.receivingGroup(stack).orElse(null),
+                            RequesterData.address(stack), RequesterData.homeAddress(stack)));
                     player.displayClientMessage(
                             Component.translatable("gui.distantstock.remote_gauge.bound",
                                     network.shortLabel()), true);

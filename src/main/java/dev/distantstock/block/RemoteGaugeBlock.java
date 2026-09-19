@@ -119,8 +119,13 @@ public final class RemoteGaugeBlock extends FactoryPanelBlock {
         }
         // A requester carries where its goods come from and where they come out, and both are
         // needed: a panel bound to a warehouse but to no group would order into nowhere.
-        be.bind(slot, network, RequesterData.receivingGroup(stack).orElse(null),
-                RequesterData.address(stack));
+        java.util.UUID distantNetworkId = dev.distantstock.stock.NetworkDirectory.find(network)
+                .map(dev.distantstock.stock.NetworkDirectory.Entry::distantNetworkId)
+                .orElseGet(() -> RequesterData.distantNetwork(stack).orElse(
+                        dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID));
+        be.bind(slot, new RemoteBinding(network, distantNetworkId,
+                RequesterData.receivingGroup(stack).orElse(null),
+                RequesterData.address(stack), RequesterData.homeAddress(stack)));
         player.displayClientMessage(Component.translatable("gui.distantstock.remote_gauge.bound",
                 network.shortLabel()), true);
         return ItemInteractionResult.sidedSuccess(false);

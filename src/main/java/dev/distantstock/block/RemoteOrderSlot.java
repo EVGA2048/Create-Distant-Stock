@@ -116,8 +116,12 @@ public final class RemoteOrderSlot {
         if (count <= 0) {
             return;
         }
-        if (RemoteGaugeOrders.order(level.getServer(), binding.network(), binding.address(),
-                binding.receivingGroup(), filter, count)) {
+        if (RemoteGaugeOrders.orderAll(level.getServer(), binding.network(),
+                binding.distantNetworkId(), binding.distantNetworkKnown(),
+                binding.address(), binding.receivingGroup(),
+                binding.homeAddress(), java.util.List.of(new dev.distantstock.link.LinkQueues.Line(
+                        net.minecraft.core.registries.BuiltInRegistries.ITEM
+                                .getKey(filter.getItem()).toString(), count)))) {
             outstanding = count;
             since = level.getGameTime();
             changed();

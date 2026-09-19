@@ -68,7 +68,12 @@ public final class RemoteRedstoneRequesterBlock extends RedstoneRequesterBlock {
         if (network == null) {
             return ItemInteractionResult.sidedSuccess(false);
         }
-        be.bind(new RemoteBinding(network, RequesterData.receivingGroup(stack).orElse(null),
+        java.util.UUID distantNetworkId = dev.distantstock.stock.NetworkDirectory.find(network)
+                .map(dev.distantstock.stock.NetworkDirectory.Entry::distantNetworkId)
+                .orElseGet(() -> RequesterData.distantNetwork(stack).orElse(
+                        dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID));
+        be.bind(new RemoteBinding(network, distantNetworkId,
+                RequesterData.receivingGroup(stack).orElse(null),
                 RequesterData.address(stack), RequesterData.homeAddress(stack)));
         player.displayClientMessage(Component.translatable("gui.distantstock.remote_gauge.bound",
                 network.shortLabel()), true);

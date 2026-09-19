@@ -18,13 +18,17 @@ public final class NetworkAnnouncementCodec {
     /**
      * Version 1 carried only the network list; 2 appends the sender's own tick metrics; 3 adds
      * whether each network has a machine that can pack for it, and the sender's dock groups.
+     * Version 4 adds the Distant Stock network that contains each Create network and receiving
+     * address. Peers on 3 are treated as members of the hidden legacy network.
      *
      * <p>Older payloads are still read: every field added since 1 is read only when the version
      * says it is there, and a peer that speaks 2 leaves the newer answers at their defaults. The
      * defaults are the permissive ones — "can pack" and "no opinion about who may use this group" —
      * so a mixed pair of versions loses a warning, never an order.
      */
-    private static final int VERSION = 3;
+    private static final int VERSION = 4;
+    private static final int VERSION_WITH_DISTANT_NETWORK = 4;
+    private static final int VERSION_WITH_GROUPS = 3;
     private static final int VERSION_WITH_METRICS = 2;
     private static final int VERSION_WITHOUT_METRICS = 1;
     private static final int MAX_NETWORKS = 256;
@@ -68,12 +72,18 @@ public final class NetworkAnnouncementCodec {
             string(out, entry.server());
             out.writeInt(Math.max(0, entry.links()));
             out.writeBoolean(entry.packable());
+            out.writeBoolean(entry.distantNetworkId() != null);
+            if (entry.distantNetworkId() != null) {
+                uuid(out, entry.distantNetworkId());
+            }
         }
         out.writeDouble(tps);
         out.writeDouble(mspt);
         out.writeInt(groups.size());
         for (Group group : groups) {
             uuid(out, group.id());
+            uuid(out, group.distantNetworkId());
+            out.writeBoolean(group.listed());
             string(out, group.name());
             out.writeBoolean(group.owner() != null);
             if (group.owner() != null) {
@@ -99,8 +109,14 @@ public final class NetworkAnnouncementCodec {
      * @param docks how many receiving docks the group has, which is the difference between a
      *              destination and a name
      */
-    public record Group(UUID id, String name, UUID owner, boolean open, int docks,
+    public record Group(UUID id, UUID distantNetworkId, String name, boolean listed,
+                        UUID owner, boolean open, int docks,
                         List<Member> members) {
+        public Group(UUID id, String name, UUID owner, boolean open, int docks, List<Member> members) {
+            this(id, dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID,
+                    name, true, owner, open, docks, members);
+        }
+
         public record Member(UUID id, String name) {
         }
     }
@@ -115,22 +131,38 @@ public final class NetworkAnnouncementCodec {
         }
     }
 
-    /** The metrics from the last {@link #decode}. */
+    /** One self-contained decode result. Safe when several peers announce concurrently. */
+    public record Announcement(List<NetworkDirectory.Entry> entries, Metrics metrics,
+                               List<Group> groups) {
+        public Announcement {
+            entries = List.copyOf(entries);
+            groups = List.copyOf(groups);
+        }
+    }
+
+    /** Convenience accessor retained for diagnostics/tests. */
     public static Metrics metrics(byte[] payload) {
-        return lastMetrics;
+        try {
+            return decodeAnnouncement(payload).metrics();
+        } catch (IOException exception) {
+            return Metrics.UNKNOWN;
+        }
     }
 
-    /** The dock groups from the last {@link #decode}. See {@link #lastMetrics} for the pattern. */
+    /** Convenience accessor retained for diagnostics/tests. */
     public static List<Group> groups(byte[] payload) {
-        return lastGroups;
+        try {
+            return decodeAnnouncement(payload).groups();
+        } catch (IOException exception) {
+            return List.of();
+        }
     }
-
-    private static Metrics lastMetrics = Metrics.UNKNOWN;
-    private static List<Group> lastGroups = List.of();
 
     public static List<NetworkDirectory.Entry> decode(byte[] payload) throws IOException {
-        lastMetrics = Metrics.UNKNOWN;
-        lastGroups = List.of();
+        return decodeAnnouncement(payload).entries();
+    }
+
+    public static Announcement decodeAnnouncement(byte[] payload) throws IOException {
         if (payload == null || payload.length < 12 || payload.length > 256 * 1024) {
             throw new IOException("Network announcement size is invalid");
         }
@@ -159,26 +191,29 @@ public final class NetworkAnnouncementCodec {
             }
             // "Can pack" is new in 3, and a peer that does not send it means "no opinion" — which
             // is the permissive answer, so the terminal draws no warning about it.
-            boolean packable = version < VERSION || in.readBoolean();
+            boolean packable = version < 3 || in.readBoolean();
+            UUID distantNetworkId = version >= VERSION_WITH_DISTANT_NETWORK && in.readBoolean()
+                    ? uuid(in) : dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
             RemoteNetworkId id = new RemoteNetworkId(1, node, world, dimension, frequency);
             // False by definition: this is a list that arrived from another node.
-            entries.add(new NetworkDirectory.Entry(frequency, alias, links, id, false, packable));
+            entries.add(new NetworkDirectory.Entry(frequency, alias, links, id, false, packable,
+                    distantNetworkId));
         }
+        Metrics metrics = Metrics.UNKNOWN;
         if (version >= VERSION_WITH_METRICS && in.available() >= 16) {
-            // Kept as the last thing read rather than returned: the network list is what every
-            // caller is here for, and a caller that also wants the numbers asks for them.
-            lastMetrics = new Metrics(in.readDouble(), in.readDouble());
+            metrics = new Metrics(in.readDouble(), in.readDouble());
         }
-        if (version >= VERSION) {
-            lastGroups = readGroups(in);
+        List<Group> groups = List.of();
+        if (version >= VERSION_WITH_GROUPS) {
+            groups = readGroups(in, version);
         }
         if (in.available() != 0) {
             throw new IOException("Network announcement contains trailing data");
         }
-        return List.copyOf(entries);
+        return new Announcement(entries, metrics, groups);
     }
 
-    private static List<Group> readGroups(DataInputStream in) throws IOException {
+    private static List<Group> readGroups(DataInputStream in, int version) throws IOException {
         int count = in.readInt();
         if (count < 0 || count > MAX_GROUPS) {
             throw new IOException("Announced dock group count is invalid");
@@ -186,7 +221,19 @@ public final class NetworkAnnouncementCodec {
         List<Group> groups = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             UUID id = uuid(in);
-            String name = string(in);
+            UUID distantNetworkId;
+            boolean listed;
+            String name;
+            if (version >= VERSION_WITH_DISTANT_NETWORK) {
+                distantNetworkId = uuid(in);
+                listed = in.readBoolean();
+                name = string(in);
+            } else {
+                // v3 wrote the name immediately after the group id.
+                distantNetworkId = dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
+                listed = true;
+                name = string(in);
+            }
             UUID owner = in.readBoolean() ? uuid(in) : null;
             boolean open = in.readBoolean();
             int docks = in.readInt();
@@ -198,7 +245,8 @@ public final class NetworkAnnouncementCodec {
             for (int m = 0; m < members; m++) {
                 named.add(new Group.Member(uuid(in), string(in)));
             }
-            groups.add(new Group(id, name, owner, open, docks, List.copyOf(named)));
+            groups.add(new Group(id, distantNetworkId, name, listed, owner, open, docks,
+                    List.copyOf(named)));
         }
         return List.copyOf(groups);
     }

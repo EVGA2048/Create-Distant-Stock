@@ -20,6 +20,8 @@ public final class ModBlocks {
             BLOCKS.register("remote_gauge", () -> new RemoteGaugeBlock(panel()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, MonitorBlock> MONITOR =
             BLOCKS.register("monitor", () -> new MonitorBlock(panel()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, LoggerBlock> LOGGER =
+            BLOCKS.register("logger", () -> new LoggerBlock(panel()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, RemotePackagerBlock> REMOTE_PACKAGER =
             BLOCKS.register("remote_packager", () -> new RemotePackagerBlock(
                     BlockBehaviour.Properties.ofFullCopy(net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(

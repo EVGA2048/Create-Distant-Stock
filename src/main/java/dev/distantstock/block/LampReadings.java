@@ -75,7 +75,7 @@ public final class LampReadings {
             case IDLE, ALL_GOOD -> SignalLampPanelItem.Color.GREEN;
             case ACT -> SignalLampPanelItem.Color.CYAN;
             case WARN, WARN_URGENT -> SignalLampPanelItem.Color.ORANGE;
-            case FATAL -> SignalLampPanelItem.Color.RED;
+            case FATAL, FATAL_ACK -> SignalLampPanelItem.Color.RED;
         };
     }
 }

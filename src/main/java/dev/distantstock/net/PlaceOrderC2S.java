@@ -54,14 +54,18 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
      * See that class for what each answer means, including why an id nobody recognises is refused
      * instead of falling back to the default group.
      */
-    private static Resolution resolveGroup(Player p, UUID asked) {
+    private static Resolution resolveGroup(Player p, UUID distantNetworkId, UUID asked) {
         if (p == null || p.level().getServer() == null) {
             return new Resolution(null, "gui.distantstock.order_fail");
         }
         OrderDestination.Answer answer = OrderDestination.resolve(
-                p.level().getServer(), p.getUUID(), asked);
+                p.level().getServer(), p.getUUID(), distantNetworkId, asked);
         return switch (answer.kind()) {
             case UNKNOWN -> new Resolution(null, "gui.distantstock.group.unknown");
+            // Language work is on a separate branch right now. Until it supplies a dedicated
+            // conflict sentence, reuse the safe "destination unavailable" wording rather than
+            // inventing a hard-coded chat string here.
+            case CONFLICT -> new Resolution(null, "gui.distantstock.group.unknown");
             case REFUSED -> new Resolution(null, "gui.distantstock.group.closed");
             // 没选组：以前这一档是"发到本服的默认组"，也就是发出去谁都不认 —— 玩家报的"进虚空"。
             case NO_GROUP -> new Resolution(null, "gui.distantstock.group.none");
@@ -120,7 +124,8 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
                 p.displayClientMessage(Component.translatable("gui.distantstock.uncharged"), true);
                 return;
             }
-            Resolution resolved = resolveGroup(p, msg.receivingDockGroupId);
+            UUID distantNetworkId = menu.distantNetworkId(p);
+            Resolution resolved = resolveGroup(p, distantNetworkId, msg.receivingDockGroupId);
             UUID group = resolved.group();
             if (group == null) {
                 // The field on the screen and this packet can disagree: the screen only offers
@@ -142,8 +147,8 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
                 }
             }
             OrderService.Result result = p instanceof ServerPlayer serverPlayer
-                    ? OrderService.place(serverPlayer.getServer(), menu.networkId(p), freq, address,
-                    group, items, homeAddress)
+                    ? OrderService.place(serverPlayer.getServer(), menu.networkId(p), freq,
+                    distantNetworkId, address, group, items, homeAddress)
                     : OrderService.Result.FAIL;
             GaugeBlockEntity be = menu.gauge(p);
             if (be != null) {

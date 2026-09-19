@@ -31,6 +31,8 @@ public final class ModItems {
                             ModBlocks.REMOTE_REDSTONE_REQUESTER.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> MONITOR = ITEMS.register("monitor",
             () -> new BlockItem(ModBlocks.MONITOR.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, BlockItem> LOGGER = ITEMS.register("logger",
+            () -> new BlockItem(ModBlocks.LOGGER.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> REMOTE_PACKAGER = ITEMS.register("remote_packager",
             () -> new BlockItem(ModBlocks.REMOTE_PACKAGER.get(), new Item.Properties()));
     public static final DeferredHolder<Item, SignalLampPanelItem> CYAN_INDICATOR_LAMP = lamp("cyan_indicator_lamp", SignalLampPanelItem.Color.CYAN);
@@ -48,6 +50,8 @@ public final class ModItems {
     public static final DeferredHolder<Item, BlockItem> ETHER_RESONATOR = block("ether_resonator", ModBlocks.ETHER_RESONATOR);
     public static final DeferredHolder<Item, RemotePackageItem> REMOTE_PACKAGE = ITEMS.register("remote_package",
             () -> new RemotePackageItem(new Item.Properties()));
+    public static final DeferredHolder<Item, EventReceiptItem> EVENT_RECEIPT = ITEMS.register("event_receipt",
+            () -> new EventReceiptItem(new Item.Properties().stacksTo(16)));
     public static final DeferredHolder<Item, Item> MANUAL = ITEMS.register("manual",
             () -> new ManualItem(new Item.Properties().stacksTo(1)));
 
@@ -87,6 +91,7 @@ public final class ModItems {
                 out.accept(REMOTE_GAUGE.get());
                 out.accept(REMOTE_REDSTONE_REQUESTER.get());
                 out.accept(MONITOR.get());
+                out.accept(LOGGER.get());
                 out.accept(REMOTE_PACKAGER.get());
                 out.accept(CYAN_INDICATOR_LAMP.get());
                 out.accept(ORANGE_INDICATOR_LAMP.get());

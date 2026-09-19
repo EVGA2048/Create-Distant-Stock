@@ -21,13 +21,21 @@ public final class NetworkDirectory {
      *                 and a warning that appears where nothing is wrong is worse than a missing one.
      */
     public record Entry(UUID freq, String server, int links, RemoteNetworkId networkId,
-                        boolean local, boolean packable) {
+                        boolean local, boolean packable, UUID distantNetworkId) {
         public Entry(UUID freq, String server, int links) {
-            this(freq, server, links, null, true, true);
+            this(freq, server, links, null, true, true,
+                    dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID);
         }
 
         public Entry(UUID freq, String server, int links, RemoteNetworkId networkId, boolean local) {
-            this(freq, server, links, networkId, local, true);
+            this(freq, server, links, networkId, local, true,
+                    dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID);
+        }
+
+        public Entry(UUID freq, String server, int links, RemoteNetworkId networkId,
+                     boolean local, boolean packable) {
+            this(freq, server, links, networkId, local, packable,
+                    dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID);
         }
 
         /**
@@ -40,6 +48,16 @@ public final class NetworkDirectory {
         public boolean remote() {
             return !local;
         }
+    }
+
+    /** Every visible Create network in one Distant Stock network. */
+    public static List<Entry> visibleIn(UUID distantNetworkId) {
+        UUID scope = distantNetworkId == null
+                ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID
+                : distantNetworkId;
+        return visible(false).stream()
+                .filter(entry -> scope.equals(entry.distantNetworkId()))
+                .toList();
     }
 
     private static volatile List<Entry> local = List.of();

@@ -91,6 +91,43 @@ public final class SignalLampGameTests {
         h.succeed();
     }
 
+    /** Event alarms use the same Andon ladder, with ACK changing blink but not severity colour. */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void eventAlarmAcknowledgementChangesBlinkNotSeverity(GameTestHelper h) {
+        var registry = new dev.distantstock.event.EventRegistry();
+        UUID freq = UUID.randomUUID();
+        var warning = registry.raise(dev.distantstock.event.EventRegistry.Severity.WARN,
+                "WARN_TEST", "dock", "one", "", freq, null, 1);
+        h.assertTrue(SignalPanelBlockEntity.eventLevel(registry.activeForFrequency(freq))
+                        == LampState.WARN_URGENT,
+                "an unacknowledged WARN did not map to orange flashing");
+        registry.acknowledge(warning.id(), 2);
+        h.assertTrue(SignalPanelBlockEntity.eventLevel(registry.activeForFrequency(freq))
+                        == LampState.WARN,
+                "an acknowledged WARN did not become steady orange");
+
+        var error = registry.raise(dev.distantstock.event.EventRegistry.Severity.ERROR,
+                "ERROR_TEST", "dock", "two", "", freq, null, 3);
+        h.assertTrue(SignalPanelBlockEntity.eventLevel(registry.activeForFrequency(freq))
+                        == LampState.FATAL,
+                "an unacknowledged ERROR did not map to red flashing");
+        registry.acknowledge(error.id(), 4);
+        h.assertTrue(SignalPanelBlockEntity.eventLevel(registry.activeForFrequency(freq))
+                        == LampState.FATAL_ACK,
+                "an acknowledged ERROR did not remain steady red");
+        h.assertTrue(LampReadings.colorFor(LampState.FATAL_ACK)
+                        == dev.distantstock.item.SignalLampPanelItem.Color.RED,
+                "acknowledging an ERROR changed its red severity colour");
+
+        // A second unacknowledged ERROR at the same severity must make the network flash again.
+        registry.raise(dev.distantstock.event.EventRegistry.Severity.ERROR,
+                "ERROR_TEST_2", "dock", "three", "", freq, null, 5);
+        h.assertTrue(SignalPanelBlockEntity.eventLevel(registry.activeForFrequency(freq))
+                        == LampState.FATAL,
+                "one acknowledged ERROR hid another unacknowledged ERROR");
+        h.succeed();
+    }
+
     /**
      * 两个地址各自独立：写一个不动另一个，清一个不动另一个。
      *
@@ -555,6 +592,7 @@ public final class SignalLampGameTests {
                 "a forced gauge should be FATAL, got " + board.lampState(slot));
         h.assertTrue(LampState.FATAL.blink() == LampState.Blink.FAST
                 && LampState.WARN_URGENT.blink() == LampState.Blink.FAST
+                && LampState.FATAL_ACK.blink() == LampState.Blink.NONE
                 && LampState.IDLE.blink() == LampState.Blink.SLOW
                 && LampState.ALL_GOOD.blink() == LampState.Blink.NONE, "blink mapping is wrong");
         h.assertTrue(LampState.worst(LampState.ALL_GOOD, LampState.WARN) == LampState.WARN

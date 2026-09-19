@@ -19,8 +19,9 @@ import java.util.UUID;
  *
  * <p>This is what the pairing code used to be, and the tests that stood here checked the code —
  * that it was well formed, single use, and expired. All of that is gone with the codes. What is
- * left is the part that was always the real question: a destination on another server is a name, an
- * id, and a member list, and the member list is the only one of the three that decides anything.
+ * left is the part that was always the real question: a destination on another server is a stable
+ * id plus player-facing address metadata. The old member list is retained only for management
+ * compatibility; delivery itself is intentionally not an ACL.
  *
  * <p>Runs without a world, the way the pairing cases did: everything here is arithmetic on a file,
  * and a case that wrote into the live save's own directory would be handing its rows to whatever
@@ -97,17 +98,7 @@ public final class RemoteGroupsGameTests {
         h.succeed();
     }
 
-    /**
-     * The member list is what decides whether a player may name a remote group in an order.
-     *
-     * <p>This is the whole reason the list crosses at all. The receiving server cannot check it —
-     * an order arrives with no player on it — so the judgement has to happen on the side the player
-     * is standing on, and it can only happen if the far side said who was in the group.
-     *
-     * <p>The ownerless case is the one that must not regress: every row written before members
-     * existed, and every group an admin made, has no owner and admits everybody. Reading "no owner"
-     * as "nobody" would lock players out of destinations that worked the day before.
-     */
+    /** Legacy collaborator metadata still round-trips for address management. */
     @GameTest(template = "empty", timeoutTicks = 20)
     public static void theMemberListDecidesWhoMayNameIt(GameTestHelper h) {
         RemoteGroups groups = new RemoteGroups();
@@ -132,12 +123,10 @@ public final class RemoteGroupsGameTests {
     }
 
     /**
-     * The same judgement, at the one place an order is placed.
+     * Delivery permission is deliberately not the old member-list permission.
      *
-     * <p>{@code OrderDestination} is where a group id becomes a destination, and until now it asked
-     * the member list only for this server's own groups. A remote group was accepted on the
-     * strength of existing — which is how a player could order into somebody else's private
-     * warehouse and be told the order succeeded.
+     * <p>PUBLIC / UNLISTED controls discovery. Once somebody knows the exact receiving address,
+     * naming it is enough to send there; the legacy member list remains management metadata only.
      */
     @GameTest(template = "empty", timeoutTicks = 20)
     public static void anOrderToARemoteGroupAsksThatServersList(GameTestHelper h) {
@@ -152,9 +141,9 @@ public final class RemoteGroupsGameTests {
             h.assertTrue(mine.kind() == OrderDestination.Kind.THERE,
                     "a listed player was not allowed to name the remote group: " + mine.kind());
             var stranger = OrderDestination.resolve(h.getLevel().getServer(), STRANGER, group);
-            h.assertTrue(stranger.kind() == OrderDestination.Kind.REFUSED,
-                    "a stranger could name a remote group they are not in: " + stranger.kind());
-            h.assertFalse(stranger.allowed(), "a refused destination reported that it was allowed");
+            h.assertTrue(stranger.kind() == OrderDestination.Kind.THERE,
+                    "knowing the exact receiving address was not enough to send: " + stranger.kind());
+            h.assertTrue(stranger.allowed(), "a known receiving address reported that it was refused");
         } finally {
             // 这一步写的是这份存档真正的远端组目录，别的用例也会读它。收尾必须是"把这一行拿掉"，
             // 不是"清空整张表"：gametest 是并行跑在同一个 JVM 里的。
@@ -247,6 +236,77 @@ public final class RemoteGroupsGameTests {
         h.assertTrue(entry != null, "an older file's row was dropped");
         h.assertFalse(entry.owner() != null, "an older row invented an owner");
         h.assertTrue(entry.admits(STRANGER), "an older row locked somebody out");
+        h.succeed();
+    }
+
+    /** Two remote nodes using the same receiving-address name are a conflict, not two choices. */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void duplicateRemoteAddressNamesAreNeverSilentlyDisambiguated(GameTestHelper h) {
+        RemoteGroups groups = new RemoteGroups();
+        UUID firstNode = UUID.randomUUID();
+        UUID secondNode = UUID.randomUUID();
+        UUID firstGroup = UUID.randomUUID();
+        UUID secondGroup = UUID.randomUUID();
+        String name = "工业区-" + UUID.randomUUID().toString().substring(0, 8);
+        groups.replaceFrom(firstNode, List.of(new RemoteGroups.Entry(
+                firstNode, firstGroup, name, "甲服", 0L, true, null, Map.of(), 1)), 1_000L);
+        groups.replaceFrom(secondNode, List.of(new RemoteGroups.Entry(
+                secondNode, secondGroup, name, "乙服", 0L, true, null, Map.of(), 1)), 1_000L);
+
+        h.assertTrue(groups.named(name).size() == 2, "the duplicate remote address was not detected");
+        h.assertTrue(groups.findByName(name).isEmpty(),
+                "a bare duplicate address silently picked one remote server");
+        h.assertTrue(groups.findByName("甲服·" + name).isEmpty(),
+                "the legacy server prefix bypassed the global address conflict");
+        h.succeed();
+    }
+
+    /**
+     * A local address and a remote announcement with the same name block both ids until one side
+     * changes its name.
+     */
+    @GameTest(template = "empty", timeoutTicks = 30)
+    public static void localAndRemoteSameNameBlockNewRoutesUntilTheConflictClears(GameTestHelper h) {
+        var server = h.getLevel().getServer();
+        DockGroupDirectory locals = DockGroupDirectory.get(server);
+        RemoteGroups remotes = RemoteGroups.get(server);
+        UUID remoteNode = UUID.randomUUID();
+        UUID remoteGroup = UUID.randomUUID();
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String name = "全局地址-" + suffix;
+        DockGroup local = locals.createFor(name, OWNER);
+        DockGroup other = locals.createFor("另一个地址-" + suffix, OWNER);
+
+        try {
+            remotes.replaceFrom(remoteNode, List.of(new RemoteGroups.Entry(
+                    remoteNode, remoteGroup, name, "远端", 0L, true, null, Map.of(), 1)), 1_000L);
+
+            var lookup = dev.distantstock.routing.ReceivingAddressResolver.resolve(server, name);
+            h.assertTrue(lookup.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.CONFLICT,
+                    "local+remote duplicate name did not become a conflict: " + lookup.kind());
+            h.assertTrue(OrderDestination.resolve(server, OWNER, local.id()).kind()
+                            == OrderDestination.Kind.CONFLICT,
+                    "the local UUID bypassed the name conflict");
+            h.assertTrue(OrderDestination.resolve(server, OWNER, remoteGroup).kind()
+                            == OrderDestination.Kind.CONFLICT,
+                    "the remote UUID bypassed the name conflict");
+            h.assertFalse(dev.distantstock.routing.ReceivingAddressResolver.mayClaimLocalName(
+                            server, other.id(), name),
+                    "a second local group could rename itself onto a remote-conflicted address");
+
+            // The far side changes its name: the original address immediately becomes unambiguous.
+            remotes.replaceFrom(remoteNode, List.of(new RemoteGroups.Entry(
+                    remoteNode, remoteGroup, "远端地址-" + suffix, "远端", 0L,
+                    true, null, Map.of(), 1)), 2_000L);
+            var cleared = dev.distantstock.routing.ReceivingAddressResolver.resolve(server, name);
+            h.assertTrue(cleared.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.LOCAL
+                            && cleared.local().id().equals(local.id()),
+                    "renaming the remote copy did not clear the conflict");
+        } finally {
+            remotes.replaceFrom(remoteNode, List.of(), 3_000L);
+            locals.delete(local.id());
+            locals.delete(other.id());
+        }
         h.succeed();
     }
 

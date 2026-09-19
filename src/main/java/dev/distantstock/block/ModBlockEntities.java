@@ -35,6 +35,9 @@ public final class ModBlockEntities {
                     ModBlocks.REMOTE_GAUGE.get()).build(null));
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MonitorBlockEntity>> MONITOR =
             BES.register("monitor", () -> BlockEntityType.Builder.of(MonitorBlockEntity::new, ModBlocks.MONITOR.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<LoggerBlockEntity>> LOGGER =
+            BES.register("logger", () -> BlockEntityType.Builder.of(LoggerBlockEntity::new,
+                    ModBlocks.LOGGER.get()).build(null));
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RemotePackagerBlockEntity>> REMOTE_PACKAGER =
             BES.register("remote_packager", () -> BlockEntityType.Builder.of(RemotePackagerBlockEntity::new,
                     ModBlocks.REMOTE_PACKAGER.get()).build(null));

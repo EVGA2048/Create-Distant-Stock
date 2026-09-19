@@ -378,6 +378,12 @@ public final class ParcelEscrowPump {
                                          String reason, String detail) {
         try {
             quarantine.transfer(escrow, record, reason, detail, () -> quarantine.flush(server));
+            dev.distantstock.event.EventRegistry.get(server).raise(
+                    dev.distantstock.event.EventRegistry.Severity.ERROR,
+                    dev.distantstock.event.EventRegistry.Codes.PARCEL_QUARANTINED,
+                    "parcel", record.parcelId().toString(),
+                    reason + (detail == null || detail.isBlank() ? "" : " · " + detail),
+                    null, null, System.currentTimeMillis());
             LOG.error("[DistantStock/Parcel] quarantined parcel={} source=escrow reason={} detail={}",
                     record.parcelId(), reason, detail);
         } catch (IllegalStateException full) {
@@ -390,6 +396,12 @@ public final class ParcelEscrowPump {
                                          String reason, String detail) {
         try {
             quarantine.transfer(returns, record, reason, detail, () -> quarantine.flush(server));
+            dev.distantstock.event.EventRegistry.get(server).raise(
+                    dev.distantstock.event.EventRegistry.Severity.ERROR,
+                    dev.distantstock.event.EventRegistry.Codes.PARCEL_QUARANTINED,
+                    "parcel", record.parcelId().toString(),
+                    reason + (detail == null || detail.isBlank() ? "" : " · " + detail),
+                    null, null, System.currentTimeMillis());
             LOG.error("[DistantStock/Parcel] quarantined parcel={} source=return_inbox reason={} detail={}",
                     record.parcelId(), reason, detail);
         } catch (IllegalStateException full) {

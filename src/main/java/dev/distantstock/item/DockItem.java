@@ -72,8 +72,11 @@ public final class DockItem extends BlockItem {
             if (linkLevel == null) {
                 return InteractionResult.FAIL;
             }
-            RequesterData.setNetwork(stack, new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, node,
-                    WorldIdentity.get(linkLevel), link.dimension().location().toString(), behaviour.freqId));
+            RemoteNetworkId remote = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, node,
+                    WorldIdentity.get(linkLevel), link.dimension().location().toString(), behaviour.freqId);
+            java.util.UUID distantNetworkId = dev.distantstock.routing.DistantNetworkDirectory
+                    .get(serverLevel.getServer()).scopeOf(remote);
+            RequesterData.setNetwork(stack, remote, distantNetworkId);
             player.displayClientMessage(Component.translatable("gui.distantstock.dock_bound"), true);
             return InteractionResult.SUCCESS;
         }

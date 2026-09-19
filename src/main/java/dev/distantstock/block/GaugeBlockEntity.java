@@ -23,6 +23,8 @@ import dev.distantstock.routing.RemoteNetworkId;
 public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleInformation {
     private UUID freq;
     private RemoteNetworkId networkId;
+    private UUID distantNetworkId = dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
+    private boolean hasDistantNetworkId;
     private String address = "";
     private String homeAddress = "";
     /**
@@ -54,6 +56,8 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
     public void setFreq(UUID freq) {
         this.freq = freq;
         this.networkId = null;
+        this.distantNetworkId = dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
+        this.hasDistantNetworkId = false;
         sync();
     }
 
@@ -64,7 +68,27 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
     public void setNetwork(RemoteNetworkId networkId) {
         this.networkId = networkId;
         this.freq = networkId == null ? null : networkId.createFrequency();
+        this.distantNetworkId = dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
+        this.hasDistantNetworkId = false;
         sync();
+    }
+
+    public void setNetwork(RemoteNetworkId networkId, UUID distantNetworkId) {
+        this.networkId = networkId;
+        this.freq = networkId == null ? null : networkId.createFrequency();
+        this.distantNetworkId = distantNetworkId == null
+                ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID
+                : distantNetworkId;
+        this.hasDistantNetworkId = distantNetworkId != null;
+        sync();
+    }
+
+    public UUID distantNetworkId() {
+        return distantNetworkId;
+    }
+
+    public boolean hasDistantNetworkId() {
+        return hasDistantNetworkId;
     }
 
     /** The group this desk's orders are addressed to; the default group when never chosen. */
@@ -182,6 +206,9 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
         if (networkId != null) {
             tag.put("RemoteNetwork", networkId.save());
         }
+        if (hasDistantNetworkId) {
+            tag.putUUID("DistantNetwork", distantNetworkId);
+        }
         tag.putString("Address", address);
         tag.putString("HomeAddress", homeAddress);
         if (receivingGroup != null) {
@@ -201,6 +228,9 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
         freq = tag.hasUUID("Freq") ? tag.getUUID("Freq") : null;
         networkId = tag.contains("RemoteNetwork")
                 ? RemoteNetworkId.read(tag.getCompound("RemoteNetwork")).orElse(null) : null;
+        hasDistantNetworkId = tag.hasUUID("DistantNetwork");
+        distantNetworkId = hasDistantNetworkId ? tag.getUUID("DistantNetwork")
+                : dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
         address = tag.getString("Address");
         // 缺键读回空串：老存档里的请求台只有一个地址，这正是它当时的样子。
         homeAddress = tag.getString("HomeAddress");
