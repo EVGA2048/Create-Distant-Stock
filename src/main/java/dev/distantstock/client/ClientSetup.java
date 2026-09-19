@@ -93,6 +93,17 @@ public final class ClientSetup {
             SignalPanelRenderer.registerModels();
             RemoteGaugeRenderer.registerModels();
             ResonatorRenderer.registerModels();
+            // Create normally lets Flywheel's GlassPipeVisual replace the vanilla block-entity
+            // renderer entirely. In this pack that visual stops submitting fluid instances, so the
+            // pipe still transports fluid but appears empty. Disable the Flywheel visualizer only
+            // for glass fluid pipes and let Create's own TransparentStraightPipeRenderer render
+            // them instead. Keeping both active causes the two fluid surfaces to z-fight/flicker.
+            @SuppressWarnings("unchecked")
+            net.minecraft.world.level.block.entity.BlockEntityType<com.simibubi.create.content.fluids.pipes.StraightPipeBlockEntity>
+                    glassPipeType = (net.minecraft.world.level.block.entity.BlockEntityType<com.simibubi.create.content.fluids.pipes.StraightPipeBlockEntity>)
+                    (net.minecraft.world.level.block.entity.BlockEntityType<?>) net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE
+                            .get(ResourceLocation.fromNamespaceAndPath("create", "glass_fluid_pipe"));
+            dev.engine_room.flywheel.api.visualization.VisualizerRegistry.setVisualizer(glassPipeType, null);
             SimpleBlockEntityVisualizer.builder(ModBlockEntities.REMOTE_PACKAGER.get())
                     .factory((context, be, partialTick) -> new PackagerVisual<>(context, be, partialTick))
                     // The renderer still draws the packaged box outside the Flywheel check.

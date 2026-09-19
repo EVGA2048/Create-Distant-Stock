@@ -876,8 +876,13 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                 be.sync();
             }
             LinkSnapshot.View snapshot = LinkSnapshot.view();
-            be.linkUp = snapshot.linkUp() || (!snapshot.transerverAttached()
-                    && !dev.distantstock.config.StockConfig.hasPeer());
+            // A stale legacy peer.host must not make a Transerver-only standalone world look
+            // disconnected. Legacy peer settings only describe an expected remote link when the
+            // legacy transport is actually enabled; otherwise no attached Transerver means this
+            // save is simply operating as its own local node.
+            boolean waitingForLegacyPeer = dev.distantstock.config.StockConfig.useLegacy()
+                    && dev.distantstock.config.StockConfig.hasPeer();
+            be.linkUp = snapshot.linkUp() || (!snapshot.transerverAttached() && !waitingForLegacyPeer);
             be.backlogOrders = LinkSnapshot.orderDepth;
             be.inFlight = LinkSnapshot.inFlight;
             if (be.canSend()) {
