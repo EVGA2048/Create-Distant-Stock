@@ -27,6 +27,7 @@ public final class LoggerGameTests {
         UUID networkA = UUID.randomUUID();
         UUID networkB = UUID.randomUUID();
         logger.setCreateFrequency(networkA);
+        h.assertTrue(logger.installPaperRoll(), "logger test fixture could not load paper");
         EventRegistry registry = EventRegistry.get(level.getServer());
         String prefix = "logger-test-" + UUID.randomUUID();
 
@@ -70,6 +71,10 @@ public final class LoggerGameTests {
         UUID network = UUID.randomUUID();
         UUID distantNetwork = UUID.randomUUID();
         logger.setCreateFrequency(network);
+        h.assertTrue(logger.status() == LoggerBlock.Status.WARN,
+                "an empty logger still reported NORMAL instead of paper-empty warning");
+        h.assertTrue("PE".equals(logger.displayCode()),
+                "an empty logger did not show PE on the two status tubes");
         EventRegistry registry = EventRegistry.get(level.getServer());
         String prefix = "snapshot-" + UUID.randomUUID();
 
@@ -149,8 +154,8 @@ public final class LoggerGameTests {
                 "printing did not change the shared ERROR alarm from flashing to steady red");
         h.assertTrue(logger.status() == LoggerBlock.Status.ERROR_ACK,
                 "printing did not move the logger from flashing ERROR to acknowledged ERROR");
-        h.assertTrue("EA".equals(logger.displayCode()),
-                "acknowledged ERROR did not switch the two nixies to EA");
+        h.assertTrue("AC".equals(logger.displayCode()),
+                "acknowledged ERROR did not switch the two nixies to AC");
         h.assertTrue(level.getBlockState(pos).getValue(LoggerBlock.PRINTED),
                 "successful print did not show the logger receipt");
 

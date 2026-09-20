@@ -36,7 +36,7 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
     private long nextBuzzerTick;
     private int promiseBusySeconds;
     private boolean networkKnown = true;
-    private String displayCode = "OK";
+    private String displayCode = "PE";
     private int paperRemaining;
 
     public LoggerBlockEntity(BlockPos pos, BlockState state) {
@@ -68,6 +68,7 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         if (paperRemaining() > 0) return false;
         paperRemaining = PAPER_CAPACITY;
         sync();
+        updateStatus();
         return true;
     }
 
@@ -75,6 +76,7 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         if (!hasPaper()) return false;
         paperRemaining--;
         sync();
+        updateStatus();
         return true;
     }
 
@@ -167,6 +169,9 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         if (worst == EventRegistry.Severity.WARN) {
             return unacknowledged ? LoggerBlock.Status.WARN : LoggerBlock.Status.WARN_ACK;
         }
+        // Running out of paper is itself an operator-actionable warning. It must never leave the
+        // panel advertising OK while the logger is unable to print/acknowledge the next alarm.
+        if (!hasPaper()) return LoggerBlock.Status.WARN;
         return LoggerBlock.Status.NORMAL;
     }
 
@@ -225,14 +230,14 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
     }
 
     private String codeFor(LoggerBlock.Status status) {
-        if (status == LoggerBlock.Status.OFFLINE) return "OF";
+        if (status == LoggerBlock.Status.OFFLINE) return "--";
         if (status == LoggerBlock.Status.NORMAL) return "OK";
-        EventRegistry.Severity wanted = (status == LoggerBlock.Status.ERROR || status == LoggerBlock.Status.ERROR_ACK)
-                ? EventRegistry.Severity.ERROR : EventRegistry.Severity.WARN;
-        long count = scopedActive().stream().filter(row -> row.severity() == wanted).count();
-        char head = wanted == EventRegistry.Severity.ERROR ? 'E' : 'W';
-        boolean acknowledged = status == LoggerBlock.Status.ERROR_ACK || status == LoggerBlock.Status.WARN_ACK;
-        return acknowledged ? "" + head + 'A' : "" + head + Math.min(9, Math.max(1, count));
+        if (status == LoggerBlock.Status.ERROR) return "ER";
+        if (status == LoggerBlock.Status.ERROR_ACK || status == LoggerBlock.Status.WARN_ACK) return "AC";
+        // WARN with no active warning record is the local paper-empty condition.
+        boolean activeWarning = scopedActive().stream()
+                .anyMatch(row -> row.severity() == EventRegistry.Severity.WARN);
+        return activeWarning ? "AL" : "PE";
     }
 
     private void tickBuzzer() {
