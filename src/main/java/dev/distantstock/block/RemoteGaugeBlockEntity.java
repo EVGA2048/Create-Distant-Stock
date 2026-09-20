@@ -110,6 +110,14 @@ public final class RemoteGaugeBlockEntity extends FactoryPanelBlockEntity implem
         return orders.binding(slot);
     }
 
+    public java.util.UUID distantNetworkScope(FactoryPanelBlock.PanelSlot slot) {
+        return orders.scope(slot);
+    }
+
+    public void setDistantNetworkScope(FactoryPanelBlock.PanelSlot slot, java.util.UUID scope) {
+        orders.setScope(slot, scope);
+    }
+
     /** Points one panel at a warehouse, replacing whatever it was pointed at. */
     public void bind(FactoryPanelBlock.PanelSlot slot, RemoteNetworkId network, UUID receivingGroup,
                      String address) {

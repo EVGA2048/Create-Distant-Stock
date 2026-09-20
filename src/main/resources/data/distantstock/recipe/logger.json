@@ -2,14 +2,32 @@
   "type": "minecraft:crafting_shaped",
   "category": "redstone",
   "key": {
-    "A": { "item": "minecraft:andesite" },
-    "R": { "item": "minecraft:redstone" },
-    "G": { "item": "minecraft:glass_pane" }
+    "G": {
+      "item": "minecraft:glass_pane"
+    },
+    "B": {
+      "item": "create:brass_sheet"
+    },
+    "D": {
+      "item": "create:display_board"
+    },
+    "E": {
+      "item": "create:electron_tube"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "P": {
+      "item": "minecraft:paper"
+    }
   },
   "pattern": [
-    "ARA",
-    "RGR",
-    "ARA"
+    "GGG",
+    "BDB",
+    "RPE"
   ],
-  "result": { "count": 1, "id": "distantstock:logger" }
+  "result": {
+    "count": 1,
+    "id": "distantstock:logger"
+  }
 }

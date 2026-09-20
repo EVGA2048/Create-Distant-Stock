@@ -246,9 +246,9 @@ public final class AdminCommand {
                     + "」。请先退出再加入其它网络。");
         }
         String name = StringArgumentType.getString(ctx, "name");
-        UUID localNode = dev.distantstock.link.TranserverBridge.nodeId();
+        UUID localNode = dev.distantstock.link.TranserverBridge.localNodeUuid();
         if (localNode == null) {
-            return failure(ctx, "Transerver 尚未连接，无法创建可跨服加入的远仓网络。");
+            return failure(ctx, "Transerver 节点身份尚未加载，暂时不能创建远仓网络。");
         }
         try {
             var created = directory.create(name, localNode, player.getUUID(), member);
@@ -285,7 +285,7 @@ public final class AdminCommand {
         if (member == null) return 0;
         var directory = dev.distantstock.routing.DistantNetworkDirectory.get(player.getServer());
         var network = directory.networkForOwnedMember(member, player.getUUID()).orElse(null);
-        UUID localNode = dev.distantstock.link.TranserverBridge.nodeId();
+        UUID localNode = dev.distantstock.link.TranserverBridge.localNodeUuid();
         if (network == null || localNode == null) {
             return failure(ctx, "只有远仓网络的创建者能重置加入码。");
         }
@@ -332,7 +332,7 @@ public final class AdminCommand {
             return failure(ctx, "这张 Create 仓储网络当前没有加入正式远仓网络。");
         }
         if (directory.wouldOrphanAuthority(member, player.getUUID(),
-                dev.distantstock.link.TranserverBridge.nodeId())) {
+                dev.distantstock.link.TranserverBridge.localNodeUuid())) {
             return failure(ctx, "当前版本中，创建者必须在权威节点保留至少一张仓储网络。");
         }
         directory.detach(member);
@@ -363,8 +363,9 @@ public final class AdminCommand {
                 .map(dev.distantstock.stock.NetworkDirectory.Entry::networkId)
                 .filter(java.util.Objects::nonNull)
                 .findFirst().orElse(null);
-        if (local == null && stored != null
-                && stored.nodeId().toString().equals(dev.distantstock.link.TranserverBridge.localNodeId())) {
+        UUID localNode = dev.distantstock.link.TranserverBridge.localNodeUuid();
+        if (local == null && stored != null && localNode != null
+                && stored.nodeId().equals(localNode)) {
             local = stored;
         }
         if (local == null) {
@@ -992,12 +993,10 @@ public final class AdminCommand {
         if (dock == null) {
             return failure(ctx, "没有瞄到远仓港：请把准星正对一个港方块再执行这条命令");
         }
-        // TranserverBridge.nodeId() 在没挂 Transerver 时是 null，而默认目的地必须写进一个能真正落地的
-        // uuid，所以这里解析 localNodeId()：挂上了就是 Transerver 节点 id，没挂上就是本机哨兵。
-        // 没有给 setDefaultDestination 加一个收 String 的重载——记录里 destinationNode 存的本来就是
-        // nodeId().toString()，TranserverBridge.isLocal 也是拿同一串字符串去比，bool 值完全一致；加第二种
-        // 表示形式反而要额外保证两边永远同步。
-        UUID node = UUID.fromString(TranserverBridge.localNodeId());
+        UUID node = TranserverBridge.localNodeUuid();
+        if (node == null) {
+            return failure(ctx, "Transerver 节点身份尚未加载，暂时不能写入目的节点。");
+        }
         dock.setDefaultDestination(node, group.get().id());
         ctx.getSource().sendSuccess(() -> Component.literal("港 " + place(dock) + " 的默认目的地已设为 本机 "
                 + shortId(node) + " + 港组「" + group.get().name() + "」"), false);

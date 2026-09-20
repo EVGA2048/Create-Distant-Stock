@@ -323,24 +323,30 @@ public final class DockGroupGameTests {
     public static void anOrderGoesWhereItsGroupLivesAndIsRefusedWhenNobodyKnowsIt(GameTestHelper h) {
         DockGroupDirectory directory = DockGroupDirectory.get(h.getLevel().getServer());
         UUID owner = UUID.randomUUID();
+        UUID scope = UUID.randomUUID();
 
-        DockGroup mine = directory.createFor("下单组 " + UUID.randomUUID().toString().substring(0, 8), owner);
-        var here = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, mine.id());
+        DockGroup mine = directory.createForNetwork("下单组 " + UUID.randomUUID().toString().substring(0, 8),
+                owner, scope, DockGroup.Visibility.PUBLIC);
+        var here = dev.distantstock.routing.OrderDestination.resolve(
+                h.getLevel().getServer(), owner, scope, mine.id());
         h.assertTrue(here.allowed() && here.group().equals(mine.id()), "本服的组没有被认成本服的");
         h.assertTrue(here.kind() == dev.distantstock.routing.OrderDestination.Kind.HERE,
                 "本服的组被判成了别的去向");
 
         // 公开 / 私密现在只控制“能不能被发现”，不是投递白名单。只要已经知道准确地址，
         // 即使它仍带着旧版的 owner/member/lock 元数据，也应该能作为目的地。
-        DockGroup theirs = directory.createFor("别人组 " + UUID.randomUUID().toString().substring(0, 8), UUID.randomUUID());
-        var known = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, theirs.id());
+        DockGroup theirs = directory.createForNetwork("别人组 " + UUID.randomUUID().toString().substring(0, 8),
+                UUID.randomUUID(), scope, DockGroup.Visibility.PUBLIC);
+        var known = dev.distantstock.routing.OrderDestination.resolve(
+                h.getLevel().getServer(), owner, scope, theirs.id());
         h.assertTrue(known.allowed(), "知道准确接收地址后仍被旧成员权限拒绝");
         h.assertTrue(known.kind() == dev.distantstock.routing.OrderDestination.Kind.HERE,
                 "已知本地接收地址没有被判成 HERE");
 
         // 一个谁也不认识的 id：必须是 UNKNOWN，绝不能变成默认组。
         UUID ghost = UUID.randomUUID();
-        var unknown = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, ghost);
+        var unknown = dev.distantstock.routing.OrderDestination.resolve(
+                h.getLevel().getServer(), owner, scope, ghost);
         h.assertFalse(unknown.allowed(), "不存在的组被放行了（这正是货会悄悄落到别人港里的那条路）");
         h.assertTrue(unknown.kind() == dev.distantstock.routing.OrderDestination.Kind.UNKNOWN,
                 "不存在的组没有报成 UNKNOWN");
@@ -349,12 +355,13 @@ public final class DockGroupGameTests {
         //
         // 这条 2026-09-18 反过来了：以前它断言"落在本服默认组"，那是"货进虚空"那条路的入口 ——
         // 默认组等于没有收件人，发出去谁都不认。玩家拍板「必须新建或加入一个港组而不是默认的」。
-        var none = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, null);
+        var none = dev.distantstock.routing.OrderDestination.resolve(
+                h.getLevel().getServer(), owner, scope, null);
         h.assertFalse(none.allowed(), "没选组的订单被放行了（这正是货会进虚空的那条路）");
         h.assertTrue(none.kind() == dev.distantstock.routing.OrderDestination.Kind.NO_GROUP,
                 "没选组没有报成 NO_GROUP");
         var placeholder = dev.distantstock.routing.OrderDestination.resolve(
-                h.getLevel().getServer(), owner, DockGroupDirectory.DEFAULT_GROUP_ID);
+                h.getLevel().getServer(), owner, scope, DockGroupDirectory.DEFAULT_GROUP_ID);
         h.assertFalse(placeholder.allowed(), "默认组那个占位被当成目的地放行了");
         h.succeed();
     }
@@ -421,6 +428,15 @@ public final class DockGroupGameTests {
         h.assertTrue(desk != null, "the desk did not appear");
 
         Player player = h.makeMockPlayer(GameType.SURVIVAL);
+        UUID localNode = UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId());
+        var warehouse = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA, localNode,
+                dev.distantstock.routing.WorldIdentity.get(h.getLevel()),
+                h.getLevel().dimension().location().toString(), UUID.randomUUID());
+        var distant = dev.distantstock.routing.DistantNetworkDirectory.get(h.getLevel().getServer())
+                .create("desk-" + UUID.randomUUID().toString().substring(0, 8), localNode,
+                        player.getUUID(), warehouse);
+        desk.setNetwork(warehouse, distant.id());
         RequesterMenu menu = new RequesterMenu(0, player.getInventory(), pos);
         h.assertTrue(DockGroupDirectory.DEFAULT_GROUP_ID.equals(desk.receivingGroup()),
                 "a fresh desk was pointed somewhere other than the default group");
@@ -447,6 +463,7 @@ public final class DockGroupGameTests {
         BlockPos other = h.absolutePos(new BlockPos(3, 2, 1));
         h.getLevel().setBlock(other, ModBlocks.GAUGE.get().defaultBlockState(), 3);
         GaugeBlockEntity second = (GaugeBlockEntity) h.getLevel().getBlockEntity(other);
+        second.setNetwork(warehouse, distant.id());
         new RequesterMenu(1, player.getInventory(), other)
                 .writeDockGroup(player, name, SetDockGroupC2S.SELECT);
         h.assertTrue(second.receivingGroup().equals(desk.receivingGroup()),

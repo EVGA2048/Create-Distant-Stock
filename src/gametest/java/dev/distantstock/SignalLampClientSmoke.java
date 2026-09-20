@@ -237,12 +237,12 @@ public final class SignalLampClientSmoke {
                         dev.distantstock.event.EventRegistry.Severity.INFO, "TEST_CLEARED",
                         "test", "smoke", "cleared event", false, false, 1));
         var snapshot = new dev.distantstock.net.OpenLoggerS2C(source,
-                dev.distantstock.event.EventRegistry.Severity.INFO, java.util.UUID.randomUUID(), rows);
+                dev.distantstock.event.EventRegistry.Severity.INFO, java.util.UUID.randomUUID(), 16, rows);
         var page = new dev.distantstock.client.LoggerScreen(snapshot);
         page.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
         page.render(graphics, 0, 0, 0f);
         page.update(new dev.distantstock.net.OpenLoggerS2C(source,
-                dev.distantstock.event.EventRegistry.Severity.WARN, null, rows));
+                dev.distantstock.event.EventRegistry.Severity.WARN, null, 0, rows));
         page.render(graphics, 0, 0, 0f);
         LogUtils.getLogger().info("DISTANTSTOCK_LOGGER_PAGE_OK: 活动、已确认、已恢复事件均可绘制");
     }

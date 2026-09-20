@@ -110,6 +110,13 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
                 p.displayClientMessage(Component.translatable("gui.distantstock.untuned"), true);
                 return;
             }
+            UUID selectedFreq = menu.freq(p);
+            if (!dev.distantstock.stock.CreateNetworkAccess.mayInteract(
+                    menu.networkId(p), selectedFreq, p)) {
+                p.displayClientMessage(Component.translatable(
+                        "message.distantstock.network.interact_denied"), true);
+                return;
+            }
             if (msg.lines == null || msg.lines.isEmpty()) {
                 p.displayClientMessage(Component.translatable("gui.distantstock.need_item"), true);
                 return;
@@ -125,6 +132,10 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
                 return;
             }
             UUID distantNetworkId = menu.distantNetworkId(p);
+            if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(distantNetworkId)) {
+                p.displayClientMessage(Component.translatable("message.distantstock.network.required"), true);
+                return;
+            }
             Resolution resolved = resolveGroup(p, distantNetworkId, msg.receivingDockGroupId);
             UUID group = resolved.group();
             if (group == null) {
@@ -136,7 +147,7 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
                 p.displayClientMessage(Component.translatable(resolved.error()), true);
                 return;
             }
-            UUID freq = menu.freq(p);
+            UUID freq = selectedFreq;
             String address = menu.address(p);
             // 第二个地址跟着订单走：它在对面写不到包裹上，只能由下单这一侧带过去。
             String homeAddress = menu.homeAddress(p);

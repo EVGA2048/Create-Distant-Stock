@@ -2,15 +2,26 @@
   "type": "minecraft:crafting_shaped",
   "category": "redstone",
   "key": {
-    "P": { "item": "create:packager" },
-    "D": { "item": "minecraft:light_blue_dye" },
-    "A": { "item": "minecraft:amethyst_shard" },
-    "C": { "item": "minecraft:copper_ingot" }
+    "M": {
+      "item": "distantstock:ether_mechanism"
+    },
+    "P": {
+      "item": "distantstock:polished_ether_quartz"
+    },
+    "X": {
+      "item": "create:packager"
+    },
+    "B": {
+      "item": "create:brass_sheet"
+    }
   },
   "pattern": [
-    " D ",
-    "APA",
-    " C "
+    " M ",
+    "PXP",
+    " B "
   ],
-  "result": { "count": 1, "id": "distantstock:remote_packager" }
+  "result": {
+    "count": 1,
+    "id": "distantstock:remote_packager"
+  }
 }

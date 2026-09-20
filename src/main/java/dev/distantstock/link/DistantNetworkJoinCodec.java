@@ -15,7 +15,7 @@ import java.util.UUID;
 public final class DistantNetworkJoinCodec {
     private static final int MAGIC_REQUEST = 0x44534a52; // DSJR
     private static final int MAGIC_ACCEPT = 0x44534a41;  // DSJA
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
     private static final int MAX_TEXT = 256;
 
     public record Request(UUID requestId, String joinCode, RemoteNetworkId member) {
@@ -32,13 +32,14 @@ public final class DistantNetworkJoinCodec {
         out.writeInt(VERSION);
         uuid(out, request.requestId());
         string(out, DistantNetworkDirectory.normalizeCode(request.joinCode()));
-        network(out, request.member());
+        out.writeBoolean(request.member() != null);
+        if (request.member() != null) network(out, request.member());
         return bytes.toByteArray();
     }
 
     public static Request decodeRequest(byte[] payload) throws IOException {
         DataInputStream in = input(payload, MAGIC_REQUEST);
-        Request request = new Request(uuid(in), string(in), network(in));
+        Request request = new Request(uuid(in), string(in), in.readBoolean() ? network(in) : null);
         if (in.available() != 0) throw new IOException("Trailing join-request data");
         return request;
     }
@@ -52,13 +53,15 @@ public final class DistantNetworkJoinCodec {
         uuid(out, accept.networkId());
         string(out, accept.networkName());
         uuid(out, accept.ownerNode());
-        network(out, accept.member());
+        out.writeBoolean(accept.member() != null);
+        if (accept.member() != null) network(out, accept.member());
         return bytes.toByteArray();
     }
 
     public static Accept decodeAccept(byte[] payload) throws IOException {
         DataInputStream in = input(payload, MAGIC_ACCEPT);
-        Accept accept = new Accept(uuid(in), uuid(in), string(in), uuid(in), network(in));
+        Accept accept = new Accept(uuid(in), uuid(in), string(in), uuid(in),
+                in.readBoolean() ? network(in) : null);
         if (in.available() != 0) throw new IOException("Trailing join-accept data");
         return accept;
     }

@@ -283,9 +283,35 @@ public final class TowerActivationGameTests {
         BlockPos freeDock = h.absolutePos(new BlockPos(2, 2, 2));
         BlockPos paidCore = h.absolutePos(new BlockPos(5, 0, 5));
         BlockPos paidDock = h.absolutePos(new BlockPos(6, 2, 6));
+        BlockPos receiverPos = h.absolutePos(new BlockPos(8, 2, 2));
+        BlockPos secondReceiverPos = h.absolutePos(new BlockPos(8, 2, 4));
         TowerCoreBlockEntity freeTower = placeTowerAndDock(h, level, freeCore, freeDock);
         TowerCoreBlockEntity paidTower = placeTowerAndDock(h, level, paidCore, paidDock);
         DockBlockEntity dock = (DockBlockEntity) level.getBlockEntity(paidDock);
+        level.setBlock(receiverPos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        DockBlockEntity receiver = (DockBlockEntity) level.getBlockEntity(receiverPos);
+        receiver.setImport();
+        TowerActivation.pinDevice(TowerSystem.TowerId.of(level.dimension(), receiverPos), true, null);
+        level.setBlock(secondReceiverPos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        DockBlockEntity secondReceiver = (DockBlockEntity) level.getBlockEntity(secondReceiverPos);
+        secondReceiver.setImport();
+        TowerActivation.pinDevice(TowerSystem.TowerId.of(level.dimension(), secondReceiverPos), true, null);
+
+        UUID localNode = UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId());
+        var member = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA, localNode,
+                dev.distantstock.routing.WorldIdentity.get(level), level.dimension().location().toString(),
+                UUID.randomUUID());
+        var distant = dev.distantstock.routing.DistantNetworkDirectory.get(level.getServer())
+                .create("billing-" + UUID.randomUUID().toString().substring(0, 8), localNode,
+                        UUID.randomUUID(), member);
+        var receiving = DockGroupDirectory.get(level.getServer()).createForNetwork(
+                "billing-receiver-" + UUID.randomUUID().toString().substring(0, 8), null,
+                distant.id(), dev.distantstock.routing.DockGroup.Visibility.PUBLIC);
+        receiver.setGroupId(receiving.id());
+        secondReceiver.setGroupId(receiving.id());
+        ((DockBlockEntity) level.getBlockEntity(freeDock)).setDefaultDestination(localNode, receiving.id());
+        dock.setDefaultDestination(localNode, receiving.id());
 
         TowerActivation.pinDevice(TowerSystem.TowerId.of(level.dimension(), freeDock), true,
                 TowerSystem.TowerId.of(level.dimension(), freeCore));
@@ -321,6 +347,8 @@ public final class TowerActivationGameTests {
                         TowerBilling.clearOverride();
                         TowerActivation.unpinDevice(TowerSystem.TowerId.of(level.dimension(), freeDock));
                         TowerActivation.unpinDevice(TowerSystem.TowerId.of(level.dimension(), paidDock));
+                        TowerActivation.unpinDevice(TowerSystem.TowerId.of(level.dimension(), receiverPos));
+                        TowerActivation.unpinDevice(TowerSystem.TowerId.of(level.dimension(), secondReceiverPos));
                     }
                 });
             });

@@ -41,6 +41,8 @@ import java.util.Map;
 public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterBlockEntity
         implements IHaveGoggleInformation {
     private RemoteBinding binding;
+    /** Distant Stock network joined by this device; source warehouse is selected separately. */
+    private java.util.UUID distantNetworkScope;
     /** 组名的**客户端副本**。服务端从不读它，读的时候现算（见 {@link #knownGroupName()}）。 */
     private String syncedGroupName;
 
@@ -53,10 +55,32 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
         return binding;
     }
 
+    public java.util.UUID distantNetworkScope() {
+        if (distantNetworkScope != null) return distantNetworkScope;
+        return binding != null && binding.distantNetworkKnown()
+                ? binding.distantNetworkId() : null;
+    }
+
+    public void setDistantNetworkScope(java.util.UUID scope) {
+        distantNetworkScope = scope != null
+                && dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope) ? scope : null;
+        if (binding != null && distantNetworkScope != null
+                && binding.distantNetworkKnown()
+                && !distantNetworkScope.equals(binding.distantNetworkId())) {
+            binding = null;
+        }
+        setChanged();
+        sendData();
+    }
+
     /** Points this requester at a warehouse. Null unbinds it, leaving Create's own behaviour. */
     public void bind(@Nullable RemoteBinding next) {
         this.binding = next;
         if (next != null) {
+            if (next.distantNetworkKnown()
+                    && dev.distantstock.routing.DistantNetworkDirectory.isFormalId(next.distantNetworkId())) {
+                distantNetworkScope = next.distantNetworkId();
+            }
             // The far stock is only refreshed for networks something is watching, and the partial
             // check below is the only reason this machine reads it.
             StockCache.watch(next.network());
@@ -196,6 +220,12 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
         if (binding != null) {
             tag.put("RemoteBinding", binding.save());
         }
+        if (distantNetworkScope != null) {
+            tag.putUUID("DistantNetworkScope", distantNetworkScope);
+        }
+        if (distantNetworkScope != null) {
+            tag.putUUID("DistantNetworkScope", distantNetworkScope);
+        }
         if (clientPacket) {
             tag.putString("GroupName", liveGroupName());
         }
@@ -215,6 +245,11 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
     protected void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.read(tag, registries, clientPacket);
         binding = RemoteBinding.read(tag.getCompound("RemoteBinding"));
+        distantNetworkScope = tag.hasUUID("DistantNetworkScope")
+                ? tag.getUUID("DistantNetworkScope")
+                : tag.hasUUID("DistantNetwork")
+                ? tag.getUUID("DistantNetwork")
+                : binding != null && binding.distantNetworkKnown() ? binding.distantNetworkId() : null;
         if (clientPacket || level == null || level.isClientSide) {
             // 只读同步过来的那一份。组名是要在屏幕上画出来的，而客户端没有目录可查 —— 一个 uuid
             // 前八位在一行写着「接收港组」的框里等于什么都没说。

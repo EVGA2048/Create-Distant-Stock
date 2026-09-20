@@ -243,6 +243,23 @@ public final class DeployerPanels {
         return remote.orders().binding();
     }
 
+    /** Distant Stock network joined by this panel, even before a source warehouse is selected. */
+    public static java.util.UUID distantNetworkScope(
+            FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot) {
+        return board.panels.get(slot) instanceof RemoteGaugePanelBehaviour remote
+                ? remote.distantNetworkScope() : null;
+    }
+
+    /** Pair this panel to a Distant Stock network without requiring a source warehouse yet. */
+    public static boolean setDistantNetworkScope(
+            FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot, java.util.UUID scope) {
+        if (!(board.panels.get(slot) instanceof RemoteGaugePanelBehaviour remote)) {
+            return false;
+        }
+        remote.setDistantNetworkScope(scope);
+        return true;
+    }
+
     /** Unbinds the remote gauge in this slot, leaving it an ordinary factory gauge. */
     public static boolean unbind(FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot) {
         if (!(board.panels.get(slot) instanceof RemoteGaugePanelBehaviour remote)) {

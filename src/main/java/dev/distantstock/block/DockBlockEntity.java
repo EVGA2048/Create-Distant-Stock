@@ -12,6 +12,7 @@ import dev.distantstock.link.LinkSnapshot;
 import dev.distantstock.link.PackageCodec;
 import dev.distantstock.routing.RemoteRouteData;
 import dev.distantstock.link.ParcelEscrow;
+import dev.distantstock.link.ReceiverProbeService;
 import dev.distantstock.routing.DockGroupDirectory;
 import dev.distantstock.routing.TowerActivation;
 import dev.distantstock.routing.TowerBilling;
@@ -52,6 +53,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     private static final long BLOCKED_ALARM_TICKS = 120;
     /** The reason a parcel is held when its tower cannot pay for it. */
     private static final String ETHER_ERROR = "goggle.distantstock.send.no_ether";
+    private static final String NO_RECEIVER_ERROR = "goggle.distantstock.send.no_receiver";
     /**
      * How long a failed payment keeps reporting itself before the dock tries again.
      *
@@ -157,6 +159,101 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                 || status == DockStatus.INACTIVE;
     }
 
+    /**
+     * A parcel does not leave the source dock until the latest routing view says somebody can take
+     * it.  Remote capacity comes from the peer's network announcement; local capacity is read from
+     * the loaded docks directly.  This is deliberately before ether billing and escrow ownership.
+     */
+    private ReceiverProbeService.State receiverState(RemoteRoute route) {
+        if (level == null || level.getServer() == null || route == null) {
+            return ReceiverProbeService.State.UNAVAILABLE;
+        }
+        UUID scope = routeDistantNetwork(route);
+        if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope)) {
+            return ReceiverProbeService.State.UNAVAILABLE;
+        }
+        return ReceiverProbeService.state(level.getServer(), route.destinationNodeId(),
+                scope, route.receivingDockGroupId());
+    }
+
+    /** The network namespace that owns this route's receiving address, or null if it is stale. */
+    private UUID routeDistantNetwork(RemoteRoute route) {
+        if (level == null || level.getServer() == null || route == null) return null;
+        var local = DockGroupDirectory.get(level.getServer()).find(route.receivingDockGroupId()).orElse(null);
+        if (local != null && dev.distantstock.link.TranserverBridge.isLocal(
+                route.destinationNodeId().toString())) {
+            return local.distantNetworkId();
+        }
+        var remote = dev.distantstock.routing.RemoteGroups.get(level.getServer())
+                .find(route.receivingDockGroupId()).orElse(null);
+        return remote != null && remote.node().equals(route.destinationNodeId())
+                ? remote.distantNetworkId() : null;
+    }
+
+    private boolean outboundHasAvailableReceiver() {
+        if (level == null || level.getServer() == null) return false;
+        for (int slot = 0; slot < outboundInv.getSlots(); slot++) {
+            ItemStack stack = outboundInv.getStackInSlot(slot);
+            if (!PackageItem.isPackage(stack)) continue;
+            Optional<RemoteRoute> packageRoute = RemoteRouteData.read(stack);
+            Optional<RemoteRoute> orderRoute = Optional.empty();
+            if (packageRoute.isEmpty() && PackageItem.hasOrderData(stack)) {
+                orderRoute = OrderRouteDirectory.get(level.getServer()).find(PackageItem.getOrderId(stack));
+            }
+            return RouteResolution.resolve(packageRoute, orderRoute, defaultRoute())
+                    .map(route -> receiverState(route) == ReceiverProbeService.State.AVAILABLE)
+                    .orElse(false);
+        }
+        return false;
+    }
+
+    private void noteNoReceiver(RemoteRoute route) {
+        if (!NO_RECEIVER_ERROR.equals(sendError)) {
+            sendError = NO_RECEIVER_ERROR;
+            sendErrorArg = groupName(route.receivingDockGroupId());
+            raiseEvent(EventRegistry.Severity.WARN, EventRegistry.Codes.DOCK_NO_RECEIVER,
+                    "event.distantstock.dock.no_receiver");
+        }
+        sync();
+    }
+
+    private void sampleOutboundStall(Level level) {
+        // A known routing condition already has its own WARN, reason text and orange lamp.  Do not
+        // add the generic "outbound stuck" ticket on top of it five seconds later; one physical
+        // problem should print one useful receipt, not two differently-worded copies.
+        if (NO_RECEIVER_ERROR.equals(sendError)) {
+            if (outboundStallWarned || outboundStallErrored) {
+                clearEvent(EventRegistry.Codes.DOCK_OUTBOUND_STUCK);
+            }
+            outboundStrandedSince = -1;
+            outboundStallWarned = false;
+            outboundStallErrored = false;
+            return;
+        }
+        boolean stranded = outboundIsStranded();
+        if (!stranded) {
+            if (outboundStrandedSince >= 0 || outboundStallWarned || outboundStallErrored) {
+                clearEvent(EventRegistry.Codes.DOCK_OUTBOUND_STUCK);
+            }
+            outboundStrandedSince = -1;
+            outboundStallWarned = false;
+            outboundStallErrored = false;
+            return;
+        }
+        if (outboundStrandedSince < 0) outboundStrandedSince = level.getGameTime();
+        long stuckTicks = level.getGameTime() - outboundStrandedSince;
+        if (stuckTicks >= 100 && !outboundStallWarned) {
+            raiseEvent(EventRegistry.Severity.WARN, EventRegistry.Codes.DOCK_OUTBOUND_STUCK,
+                    "Outbound parcel has been blocked for " + (stuckTicks / 20) + "s; status=" + status().name());
+            outboundStallWarned = true;
+        }
+        if (stuckTicks >= 1200 && !outboundStallErrored) {
+            raiseEvent(EventRegistry.Severity.ERROR, EventRegistry.Codes.DOCK_OUTBOUND_STUCK,
+                    "Outbound parcel has been blocked for at least 60s; status=" + status().name());
+            outboundStallErrored = true;
+        }
+    }
+
     /** Takes one parcel into the bay, answering whether it fit. The bay holds exactly one. */
     public boolean acceptParcel(ItemStack stack) {
         return PackageItem.isPackage(stack)
@@ -259,10 +356,15 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     private UUID defaultReceivingGroupId = DockGroupDirectory.DEFAULT_GROUP_ID;
     private int priority;
     private String sendError = "";
+    private String sendErrorArg = "";
     private long refusedAt;
     private boolean fallbackRefused;
     private long lastAlarmAt = Long.MIN_VALUE / 2;
     private boolean pushStalled;
+    /** A parcel sitting in the outbound bay with no usable path is reported after a short grace period. */
+    private long outboundStrandedSince = -1;
+    private boolean outboundStallWarned;
+    private boolean outboundStallErrored;
     /** When the tower last failed to pay for a parcel, for the retry window. */
     private long etherRefusedAt = Long.MIN_VALUE / 2;
 
@@ -285,13 +387,17 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             return;
         }
         mode = newMode;
-        sendError = "";
+        clearSendError();
         clearFault();
         sync();
     }
 
     public UUID freq() {
         return freq;
+    }
+
+    public RemoteNetworkId networkId() {
+        return networkId;
     }
 
     public DockMode mode() {
@@ -324,7 +430,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     public void setDefaultDestination(UUID node, UUID group) {
         defaultDestinationNode = node;
         defaultReceivingGroupId = group == null ? DockGroupDirectory.DEFAULT_GROUP_ID : group;
-        sendError = "";
+        clearSendError();
         sync();
     }
 
@@ -450,7 +556,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         this.networkId = network;
         this.freq = network == null ? null : network.createFrequency();
         mode = network == null ? DockMode.RECEIVE : DockMode.SEND;
-        sendError = "";
+        clearSendError();
         sync();
     }
 
@@ -463,7 +569,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         } else if (mode == DockMode.BIDIRECTIONAL) {
             mode = DockMode.RECEIVE;
         }
-        sendError = "";
+        clearSendError();
         clearFault();
         sync();
     }
@@ -661,7 +767,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             noteReleaseRefused();
             return false;
         }
-        sendError = "";
+        clearSendError();
         noteFallback(note);
         raiseEvent(EventRegistry.Severity.WARN, eventCode, note);
         return true;
@@ -862,10 +968,14 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         if (ETHER_ERROR.equals(be.sendError)
                 && level.getGameTime() - be.etherRefusedAt >= ETHER_RETRY_TICKS) {
             // The tower was empty, not wrong: try again now that it has had time to be refilled.
-            be.sendError = "";
+            be.clearSendError();
             be.sync();
         }
         if (level.getGameTime() % 10 == 0) {
+            if (NO_RECEIVER_ERROR.equals(be.sendError) && be.outboundHasAvailableReceiver()) {
+                be.clearSendError();
+                be.sync();
+            }
             // 组名和港数每十刻对一次，变了就再同步一次。只同步一次是不够的：它们会**自己**变 ——
             // 组主改个名字、同组的另一台港被拆掉或加进来，这一台什么都不知道，而护目镜上那一行
             // 就一直写着上一次的答案。十刻和上面那一批读数同一个节拍。
@@ -889,6 +999,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                 be.pullAdjacent(level, pos);
             }
             be.drainFallback(level, pos);
+            be.sampleOutboundStall(level);
             be.updateVisual();
             be.setChanged();
         }
@@ -1063,8 +1174,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             // group to land in, which is the ordinary in-server case and always has been. The order
             // path draws the same line in TranserverOrderService.destinationNode — an order that
             // named no group wants its goods back where they came from.
-            if (!dev.distantstock.link.TranserverBridge.isLocal(route.get().destinationNodeId().toString())
-                    && DockGroupDirectory.DEFAULT_GROUP_ID.equals(route.get().receivingDockGroupId())) {
+            if (DockGroupDirectory.DEFAULT_GROUP_ID.equals(route.get().receivingDockGroupId())) {
                 if (!returnOutboundToFallback(slot, "goggle.distantstock.fallback.no_address",
                         EventRegistry.Codes.DOCK_NO_ADDRESS)) {
                     sendError = "goggle.distantstock.send.no_group";
@@ -1082,6 +1192,13 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                 if (!returnOutboundToFallback(slot, "goggle.distantstock.fallback.address_conflict",
                         EventRegistry.Codes.ADDRESS_CONFLICT)) {
                     sendError = "goggle.distantstock.send.no_route";
+                }
+                break;
+            }
+            ReceiverProbeService.State receiver = receiverState(route.get());
+            if (receiver != ReceiverProbeService.State.AVAILABLE) {
+                if (receiver == ReceiverProbeService.State.UNAVAILABLE) {
+                    noteNoReceiver(route.get());
                 }
                 break;
             }
@@ -1108,7 +1225,12 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                     noteTraffic(level);
                     // Other Create packagers/fragments of this order may still be on their way.
                     OrderRouteDirectory.get(level.getServer()).packageEscrowed(stack);
-                    sendError = "";
+                    UUID routeScope = routeDistantNetwork(route.get());
+                    if (routeScope != null) {
+                        ReceiverProbeService.consumePositive(route.get().destinationNodeId(), routeScope,
+                                route.get().receivingDockGroupId());
+                    }
+                    clearSendError();
                 } catch (IllegalArgumentException ignored) {
                     // The escrow refused the parcel, so it never left. The ether goes back with it.
                     TowerBilling.refund(level, worldPosition);
@@ -1202,7 +1324,11 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         if (!sendError.isBlank()) {
             // Gold rather than red: the dock is not broken, it is waiting for the operator to say
             // where the parcel goes, and the lamp is blinking orange for the same reason.
-            GoggleText.value(tip, sendError, ChatFormatting.GOLD);
+            if (NO_RECEIVER_ERROR.equals(sendError) && !sendErrorArg.isBlank()) {
+                GoggleText.value(tip, sendError, ChatFormatting.GOLD, sendErrorArg);
+            } else {
+                GoggleText.value(tip, sendError, ChatFormatting.GOLD);
+            }
         }
         if (fallbackSlots() > 0) {
             GoggleText.line(tip, "goggle.distantstock.fallback.slots", fallbackSlots(), SLOTS);
@@ -1320,6 +1446,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         tag.putUUID("DefaultGroup", defaultReceivingGroupId);
         tag.putInt("Priority", priority);
         tag.putString("SendError", sendError);
+        if (!sendErrorArg.isBlank()) tag.putString("SendErrorArg", sendErrorArg);
         if (clientPacket) {
             // 护目镜那两行组名和港数是**客户端**画的（Create 的护目镜在客户端收集），而客户端没有
             // server：组名查不到目录、港数走不过 deliverable 的"服务端才算"，于是一个刚加进 A服港组
@@ -1395,6 +1522,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                 ? tag.getUUID("DefaultGroup") : DockGroupDirectory.DEFAULT_GROUP_ID;
         priority = Math.max(0, Math.min(MAX_PRIORITY, tag.getInt("Priority")));
         sendError = tag.getString("SendError");
+        sendErrorArg = tag.getString("SendErrorArg");
         // 客户端只读这两个；服务端那份由上面两个方法现算，不从盘上读回来 —— 盘上那份是上一次
         // 同步过去的旧值，拿它当答案就等于把"上一次"当成"现在"。
         if (clientPacket || level == null || level.isClientSide) {
@@ -1447,8 +1575,17 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     }
 
     private void contentsChanged() {
-        sendError = "";
+        clearSendError();
         if (level == null || !level.isClientSide) sync();
+    }
+
+    private void clearSendError() {
+        boolean noReceiver = NO_RECEIVER_ERROR.equals(sendError);
+        sendError = "";
+        sendErrorArg = "";
+        if (noReceiver) {
+            clearEvent(EventRegistry.Codes.DOCK_NO_RECEIVER);
+        }
     }
 
     private boolean fallbackEmpty() {

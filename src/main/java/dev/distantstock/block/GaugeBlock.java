@@ -146,14 +146,42 @@ public final class GaugeBlock extends BaseEntityBlock implements IWrenchable {
             // an empty hand is for. A player who came to point this desk at their network would
             // otherwise get a menu and no binding, and would have to work out that the two gestures
             // are one.
-            if (!RequesterData.tuned(stack)) {
-                if (!level.isClientSide) {
-                    RequesterItem.sayUntuned(player);
-                }
-                return ItemInteractionResult.sidedSuccess(level.isClientSide);
-            }
             if (!level.isClientSide && level.getBlockEntity(pos) instanceof GaugeBlockEntity be) {
-                be.setFreq(RequesterData.freq(stack));
+                java.util.UUID scope = RequesterData.distantNetwork(stack)
+                        .filter(dev.distantstock.routing.DistantNetworkDirectory::isFormalId)
+                        .orElse(null);
+                if (scope == null) {
+                    player.displayClientMessage(Component.translatable(
+                            "message.distantstock.network.required"), true);
+                    return ItemInteractionResult.sidedSuccess(false);
+                }
+                be.setDistantNetworkContext(scope);
+                var network = RequesterData.network(stack).orElseGet(() ->
+                        dev.distantstock.stock.NetworkDirectory.findByFreq(RequesterData.freq(stack))
+                                .map(dev.distantstock.stock.NetworkDirectory.Entry::networkId)
+                                .orElse(null));
+                if (network == null) {
+                    be.clearWarehouseBinding();
+                    player.displayClientMessage(Component.translatable(
+                            "message.distantstock.requester.network_paired"), true);
+                    return ItemInteractionResult.sidedSuccess(false);
+                }
+                var live = dev.distantstock.stock.NetworkDirectory.find(network).orElse(null);
+                if (live != null && live.local()
+                        && !dev.distantstock.stock.CreateNetworkAccess.mayInteract(
+                        network, live.freq(), player)) {
+                    player.displayClientMessage(Component.translatable(
+                            "message.distantstock.network.interact_denied"), true);
+                    return ItemInteractionResult.sidedSuccess(false);
+                }
+                java.util.UUID selectedScope = RequesterData.formalDistantNetwork(stack, level.getServer())
+                        .orElse(null);
+                if (!scope.equals(selectedScope)) {
+                    player.displayClientMessage(Component.translatable(
+                            "message.distantstock.network.warehouse_other_scope"), true);
+                    return ItemInteractionResult.sidedSuccess(false);
+                }
+                be.setNetwork(network, scope);
                 if (!RequesterData.address(stack).isEmpty()) {
                     be.setAddress(RequesterData.address(stack));
                 }
@@ -178,12 +206,19 @@ public final class GaugeBlock extends BaseEntityBlock implements IWrenchable {
 
     private static void open(Level level, BlockPos pos, Player player) {
         if (!level.isClientSide && player instanceof ServerPlayer sp) {
+            GaugeBlockEntity current = level.getBlockEntity(pos) instanceof GaugeBlockEntity gauge
+                    ? gauge : null;
+            if (current != null && !dev.distantstock.stock.CreateNetworkAccess.mayInteract(
+                    current.networkId(), current.freq(), player)) {
+                player.displayClientMessage(Component.translatable(
+                        "message.distantstock.network.interact_denied"), true);
+                return;
+            }
             sp.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> new RequesterMenu(id, inv, pos),
                     Component.translatable("gui.distantstock.title")
             ), buf -> {
-                UUID freq = level.getBlockEntity(pos) instanceof GaugeBlockEntity be ? be.freq() : null;
-                MenuSync.writeGauge(buf, pos, freq);
+                MenuSync.writeGauge(buf, pos, current);
             });
         }
     }

@@ -23,6 +23,7 @@ import dev.distantstock.routing.WorldIdentity;
 import dev.distantstock.link.NetworkAnnouncementService;
 import dev.distantstock.link.TranserverStockService;
 import dev.distantstock.link.DistantNetworkJoinService;
+import dev.distantstock.link.ReceiverProbeService;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -57,6 +58,7 @@ public final class GameClock {
             NetworkAnnouncementService.register();
             TranserverStockService.register();
             DistantNetworkJoinService.register();
+            ReceiverProbeService.register();
             TranserverBridge.start(e.getServer());
             LOG.info("[DistantStock] Transerver channels registered, bridge started");
         }
@@ -72,6 +74,7 @@ public final class GameClock {
         AlarmSampler.stop();
         if (transerverActive) {
             DistantNetworkJoinService.stop();
+            ReceiverProbeService.stop();
             TranserverBridge.stop();
         }
         if (legacyActive) {
@@ -129,6 +132,7 @@ public final class GameClock {
             if (ticks % 20 == 0) {
                 NetworkAnnouncementService.publish();
                 DistantNetworkJoinService.tick(e.getServer());
+                ReceiverProbeService.tick();
             }
             if (ticks % 40 == 0) {
                 TranserverStockService.tick();
@@ -146,7 +150,8 @@ public final class GameClock {
             for (ServerPlayer player : e.getServer().getPlayerList().getPlayers()) {
                 if (player.containerMenu instanceof RequesterMenu menu) {
                     menu.refresh(player);
-                    PacketDistributor.sendToPlayer(player, StockSyncS2C.of(menu.demo, menu.stock));
+                    PacketDistributor.sendToPlayer(player, StockSyncS2C.of(
+                            menu.demo, menu.stock, menu.distantNetworkId(player)));
                 }
             }
         }

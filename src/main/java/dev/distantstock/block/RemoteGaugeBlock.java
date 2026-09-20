@@ -88,15 +88,16 @@ public final class RemoteGaugeBlock extends FactoryPanelBlock {
         if (!(level.getBlockEntity(pos) instanceof RemoteGaugeBlockEntity be)) {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);
         }
-        if (stack.getItem() instanceof RequesterItem && !RequesterData.tuned(stack)) {
-            if (!level.isClientSide) {
-                RequesterItem.sayUntuned(player);
-            }
-            return ItemInteractionResult.sidedSuccess(level.isClientSide);
-        }
-        var network = networkFromStack(stack);
-        if (network == null) {
+        if (!(stack.getItem() instanceof RequesterItem)) {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);
+        }
+        java.util.UUID distantNetworkId = RequesterData.distantNetwork(stack)
+                .filter(dev.distantstock.routing.DistantNetworkDirectory::isFormalId)
+                .orElse(null);
+        if (distantNetworkId == null) {
+            if (!level.isClientSide) player.displayClientMessage(Component.translatable(
+                    "message.distantstock.network.required"), true);
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
         PanelSlot slot = getTargetedSlot(pos, state, hit.getLocation());
         if (slot == null || !be.panels.get(slot).isActive()) {
@@ -113,16 +114,27 @@ public final class RemoteGaugeBlock extends FactoryPanelBlock {
         }
         if (player.isShiftKeyDown()) {
             be.unbind(slot);
+            be.setDistantNetworkScope(slot, null);
             player.displayClientMessage(
                     Component.translatable("gui.distantstock.remote_gauge.unbound"), true);
             return ItemInteractionResult.sidedSuccess(false);
         }
+        be.setDistantNetworkScope(slot, distantNetworkId);
+        var network = networkFromStack(stack);
+        if (network == null) {
+            player.displayClientMessage(Component.translatable(
+                    "message.distantstock.device.network_paired"), true);
+            return ItemInteractionResult.sidedSuccess(false);
+        }
+        java.util.UUID warehouseScope = RequesterData.formalDistantNetwork(stack, level.getServer())
+                .orElse(null);
+        if (!distantNetworkId.equals(warehouseScope)) {
+            player.displayClientMessage(Component.translatable(
+                    "message.distantstock.network.warehouse_other_short"), true);
+            return ItemInteractionResult.sidedSuccess(false);
+        }
         // A requester carries where its goods come from and where they come out, and both are
         // needed: a panel bound to a warehouse but to no group would order into nowhere.
-        java.util.UUID distantNetworkId = dev.distantstock.stock.NetworkDirectory.find(network)
-                .map(dev.distantstock.stock.NetworkDirectory.Entry::distantNetworkId)
-                .orElseGet(() -> RequesterData.distantNetwork(stack).orElse(
-                        dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID));
         be.bind(slot, new RemoteBinding(network, distantNetworkId,
                 RequesterData.receivingGroup(stack).orElse(null),
                 RequesterData.address(stack), RequesterData.homeAddress(stack)));

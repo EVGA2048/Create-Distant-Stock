@@ -1,0 +1,77 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:translucent",
+  "textures": {
+    "particle": "distantstock:block/logger/receipt",
+    "receipt": "distantstock:block/logger/receipt"
+  },
+  "elements": [
+    {
+      "name": "receipt_feed_fold",
+      "from": [
+        7,
+        4,
+        9
+      ],
+      "to": [
+        13,
+        4,
+        10
+      ],
+      "faces": {
+        "up": {
+          "texture": "#receipt",
+          "uv": [
+            0,
+            0,
+            6,
+            1
+          ]
+        },
+        "down": {
+          "texture": "#receipt",
+          "uv": [
+            0,
+            0,
+            6,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "name": "printed_receipt",
+      "from": [
+        7,
+        0,
+        9
+      ],
+      "to": [
+        13,
+        4,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "#receipt",
+          "uv": [
+            0,
+            0,
+            6,
+            4
+          ]
+        },
+        "south": {
+          "texture": "#receipt",
+          "uv": [
+            0,
+            0,
+            6,
+            4
+          ]
+        }
+      }
+    }
+  ],
+  "credit": "Distant Stock logger receipt overlay: V2 feed fold + V1 ticket"
+}

@@ -2,14 +2,29 @@
   "type": "minecraft:crafting_shaped",
   "category": "redstone",
   "key": {
-    "A": { "item": "minecraft:andesite" },
-    "W": { "item": "minecraft:stripped_warped_stem" },
-    "G": { "item": "minecraft:glass_pane" }
+    "G": {
+      "item": "minecraft:glass_pane"
+    },
+    "B": {
+      "item": "create:brass_sheet"
+    },
+    "D": {
+      "item": "create:display_board"
+    },
+    "E": {
+      "item": "create:electron_tube"
+    },
+    "P": {
+      "item": "distantstock:polished_ether_quartz"
+    }
   },
   "pattern": [
-    "AWA",
-    "WGW",
-    "AWA"
+    "GGG",
+    "BDB",
+    "PEP"
   ],
-  "result": { "count": 1, "id": "distantstock:monitor" }
+  "result": {
+    "count": 1,
+    "id": "distantstock:monitor"
+  }
 }

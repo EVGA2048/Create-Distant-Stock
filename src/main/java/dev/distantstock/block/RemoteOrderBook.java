@@ -31,12 +31,29 @@ final class RemoteOrderBook {
     private final FactoryPanelBlockEntity board;
     private final Map<FactoryPanelBlock.PanelSlot, RemoteOrderSlot> slots =
             new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
+    private final Map<FactoryPanelBlock.PanelSlot, UUID> scopes =
+            new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
 
     RemoteOrderBook(FactoryPanelBlockEntity board) {
         this.board = board;
         for (FactoryPanelBlock.PanelSlot slot : FactoryPanelBlock.PanelSlot.values()) {
             slots.put(slot, new RemoteOrderSlot(board, slot));
         }
+    }
+
+    UUID scope(FactoryPanelBlock.PanelSlot slot) {
+        return slot == null ? null : scopes.get(slot);
+    }
+
+    void setScope(FactoryPanelBlock.PanelSlot slot, UUID scope) {
+        if (slot == null) return;
+        if (scope == null || !dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope)) {
+            scopes.remove(slot);
+        } else {
+            scopes.put(slot, scope);
+        }
+        board.setChanged();
+        board.sendData();
     }
 
     boolean isEmpty() {
@@ -76,6 +93,10 @@ final class RemoteOrderBook {
     void bind(FactoryPanelBlock.PanelSlot slot, RemoteBinding binding) {
         if (binding == null || slot == null) {
             return;
+        }
+        if (binding.distantNetworkKnown()
+                && dev.distantstock.routing.DistantNetworkDirectory.isFormalId(binding.distantNetworkId())) {
+            scopes.put(slot, binding.distantNetworkId());
         }
         slots.get(slot).bind(binding);
     }
@@ -132,6 +153,7 @@ final class RemoteOrderBook {
     void write(CompoundTag tag) {
         CompoundTag bound = new CompoundTag();
         CompoundTag pending = new CompoundTag();
+        CompoundTag scopeTag = new CompoundTag();
         for (var entry : slots.entrySet()) {
             RemoteOrderSlot slot = entry.getValue();
             String name = entry.getKey().name();
@@ -144,14 +166,21 @@ final class RemoteOrderBook {
                 row.putLong("Since", slot.since());
                 pending.put(name, row);
             }
+            UUID scope = scopes.get(entry.getKey());
+            if (scope != null) {
+                scopeTag.putUUID(name, scope);
+            }
         }
         tag.put("RemoteBindings", bound);
         tag.put("RemoteOutstanding", pending);
+        tag.put("RemoteScopes", scopeTag);
     }
 
     void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         CompoundTag bound = tag.getCompound("RemoteBindings");
         CompoundTag pending = tag.getCompound("RemoteOutstanding");
+        CompoundTag scopeTag = tag.getCompound("RemoteScopes");
+        scopes.clear();
         for (var entry : slots.entrySet()) {
             String name = entry.getKey().name();
             CompoundTag row = new CompoundTag();
@@ -163,6 +192,17 @@ final class RemoteOrderBook {
             row.putInt("Outstanding", flight.getInt("Count"));
             row.putLong("Since", flight.getLong("Since"));
             entry.getValue().load(row, clientPacket);
+            if (scopeTag.hasUUID(name)) {
+                UUID scope = scopeTag.getUUID(name);
+                if (dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope)) {
+                    scopes.put(entry.getKey(), scope);
+                }
+            } else if (entry.getValue().binding() != null
+                    && entry.getValue().binding().distantNetworkKnown()
+                    && dev.distantstock.routing.DistantNetworkDirectory.isFormalId(
+                    entry.getValue().binding().distantNetworkId())) {
+                scopes.put(entry.getKey(), entry.getValue().binding().distantNetworkId());
+            }
         }
     }
 

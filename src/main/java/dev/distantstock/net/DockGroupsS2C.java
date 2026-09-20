@@ -164,9 +164,7 @@ public record DockGroupsS2C(List<Entry> groups, UUID carried) implements CustomP
                 // 选中它等于没选 —— 而列表里有一行、点得下去，就是在请玩家选它。
                 continue;
             }
-            if (!group.distantNetworkId().equals(distantNetworkId)
-                    && !group.distantNetworkId().equals(
-                    dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID)) {
+            if (!group.distantNetworkId().equals(distantNetworkId)) {
                 continue;
             }
             if (group.visibility() == DockGroup.Visibility.UNLISTED

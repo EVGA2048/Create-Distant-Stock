@@ -28,7 +28,8 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
      *                 cannot, rather than letting a player place an order that will never be filled.
      */
     public record NetworkLine(java.util.UUID freq, String server, int links, RemoteNetworkId networkId,
-                              boolean local, boolean packable, java.util.UUID distantNetworkId) {
+                              boolean local, boolean packable, java.util.UUID distantNetworkId,
+                              String warehouseName) {
     }
 
     public static final Type<StockSyncS2C> TYPE = new Type<>(
@@ -50,7 +51,7 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
         return TYPE;
     }
 
-    public static StockSyncS2C of(boolean demo, List<StockCache.Entry> stock) {
+    public static StockSyncS2C of(boolean demo, List<StockCache.Entry> stock, java.util.UUID scope) {
         List<Line> lines = new ArrayList<>();
         int n = Math.min(stock.size(), 512);
         for (int i = 0; i < n; i++) {
@@ -58,9 +59,13 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
             lines.add(new Line(e.itemId, e.count));
         }
         List<NetworkLine> networks = new ArrayList<>();
+        if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope)) {
+            return new StockSyncS2C(demo, lines, networks);
+        }
         for (NetworkDirectory.Entry entry : NetworkDirectory.visible(StockConfig.isHost())) {
+            if (!scope.equals(entry.distantNetworkId())) continue;
             networks.add(new NetworkLine(entry.freq(), entry.server(), entry.links(), entry.networkId(),
-                    entry.local(), entry.packable(), entry.distantNetworkId()));
+                    entry.local(), entry.packable(), entry.distantNetworkId(), entry.warehouseName()));
         }
         return new StockSyncS2C(demo, lines, networks);
     }
@@ -79,7 +84,7 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
             List<NetworkDirectory.Entry> networks = new ArrayList<>();
             for (NetworkLine line : msg.networks) {
                 networks.add(new NetworkDirectory.Entry(line.freq, line.server, line.links, line.networkId,
-                        line.local, line.packable, line.distantNetworkId));
+                        line.local, line.packable, line.distantNetworkId, line.warehouseName));
             }
             menu.networks = networks;
         });
@@ -98,6 +103,7 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
         buf.writeUUID(line.distantNetworkId() == null
                 ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID
                 : line.distantNetworkId());
+        buf.writeUtf(line.warehouseName() == null ? "" : line.warehouseName(), 64);
     }
 
     private static NetworkLine readNetwork(RegistryFriendlyByteBuf buf) {
@@ -109,6 +115,8 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
         boolean local = buf.readBoolean();
         boolean packable = buf.readBoolean();
         java.util.UUID distantNetworkId = buf.readUUID();
-        return new NetworkLine(freq, server, links, networkId, local, packable, distantNetworkId);
+        String warehouseName = buf.readUtf(64);
+        return new NetworkLine(freq, server, links, networkId, local, packable, distantNetworkId,
+                warehouseName);
     }
 }

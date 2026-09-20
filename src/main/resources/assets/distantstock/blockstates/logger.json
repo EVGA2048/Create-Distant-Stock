@@ -1,18 +1,277 @@
 {
-  "variants": {
-    "facing=north,status=normal": { "model": "distantstock:block/monitor_green_off" },
-    "facing=south,status=normal": { "model": "distantstock:block/monitor_green_off", "y": 180 },
-    "facing=west,status=normal": { "model": "distantstock:block/monitor_green_off", "y": 270 },
-    "facing=east,status=normal": { "model": "distantstock:block/monitor_green_off", "y": 90 },
-
-    "facing=north,status=warn": { "model": "distantstock:block/monitor_orange_off" },
-    "facing=south,status=warn": { "model": "distantstock:block/monitor_orange_off", "y": 180 },
-    "facing=west,status=warn": { "model": "distantstock:block/monitor_orange_off", "y": 270 },
-    "facing=east,status=warn": { "model": "distantstock:block/monitor_orange_off", "y": 90 },
-
-    "facing=north,status=error": { "model": "distantstock:block/monitor_red_fault" },
-    "facing=south,status=error": { "model": "distantstock:block/monitor_red_fault", "y": 180 },
-    "facing=west,status=error": { "model": "distantstock:block/monitor_red_fault", "y": 270 },
-    "facing=east,status=error": { "model": "distantstock:block/monitor_red_fault", "y": 90 }
-  }
+  "multipart": [
+    {
+      "when": {
+        "status": "normal",
+        "facing": "north"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_idle"
+      }
+    },
+    {
+      "when": {
+        "status": "normal",
+        "facing": "south"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_idle",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "status": "normal",
+        "facing": "west"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_idle",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "status": "normal",
+        "facing": "east"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_idle",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "status": "warn",
+        "facing": "north"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_fault"
+      }
+    },
+    {
+      "when": {
+        "status": "warn",
+        "facing": "south"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_fault",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "status": "warn",
+        "facing": "west"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_fault",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "status": "warn",
+        "facing": "east"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_fault",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "status": "warn_ack",
+        "facing": "north"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_fault_ack"
+      }
+    },
+    {
+      "when": {
+        "status": "warn_ack",
+        "facing": "south"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_fault_ack",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "status": "warn_ack",
+        "facing": "west"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_fault_ack",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "status": "warn_ack",
+        "facing": "east"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_fault_ack",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "status": "error",
+        "facing": "north"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_alarm"
+      }
+    },
+    {
+      "when": {
+        "status": "error",
+        "facing": "south"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_alarm",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "status": "error",
+        "facing": "west"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_alarm",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "status": "error",
+        "facing": "east"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_alarm",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "status": "error_ack",
+        "facing": "north"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_alarm_ack"
+      }
+    },
+    {
+      "when": {
+        "status": "error_ack",
+        "facing": "south"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_alarm_ack",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "status": "error_ack",
+        "facing": "west"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_alarm_ack",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "status": "error_ack",
+        "facing": "east"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_alarm_ack",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "status": "offline",
+        "facing": "north"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_offline"
+      }
+    },
+    {
+      "when": {
+        "status": "offline",
+        "facing": "south"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_offline",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "status": "offline",
+        "facing": "west"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_offline",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "status": "offline",
+        "facing": "east"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_offline",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "printed": "true",
+        "facing": "north"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_receipt"
+      }
+    },
+    {
+      "when": {
+        "printed": "true",
+        "facing": "south"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_receipt",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "printed": "true",
+        "facing": "west"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_receipt",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "printed": "true",
+        "facing": "east"
+      },
+      "apply": {
+        "model": "distantstock:block/logger_receipt",
+        "y": 90
+      }
+    }
+  ]
 }

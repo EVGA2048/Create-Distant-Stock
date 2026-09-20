@@ -108,9 +108,7 @@ public record RemoteGroupsS2C(List<Entry> groups) implements CustomPacketPayload
                                      java.util.UUID player, java.util.UUID distantNetworkId) {
         List<Entry> out = new ArrayList<>();
         for (RemoteGroups.Entry entry : directory.all()) {
-            if (!entry.distantNetworkId().equals(distantNetworkId)
-                    && !entry.distantNetworkId().equals(
-                    dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID)) {
+            if (!entry.distantNetworkId().equals(distantNetworkId)) {
                 continue;
             }
             if (!entry.listed() && (entry.owner() == null || !entry.owner().equals(player))) {

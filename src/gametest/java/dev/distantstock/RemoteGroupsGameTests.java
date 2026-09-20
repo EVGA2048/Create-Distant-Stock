@@ -35,10 +35,12 @@ public final class RemoteGroupsGameTests {
     private static final UUID STRANGER = UUID.fromString("00000000-0000-0000-0000-00000000ab03");
     private static final UUID NODE = UUID.fromString("00000000-0000-0000-0000-00000000ab09");
     private static final UUID OTHER_NODE = UUID.fromString("00000000-0000-0000-0000-00000000ab0a");
+    private static final UUID SCOPE = UUID.fromString("00000000-0000-0000-0000-00000000ab0b");
 
     private static RemoteGroups.Entry row(UUID group, String name, UUID owner, boolean open,
                                           Map<UUID, String> members, int docks) {
-        return new RemoteGroups.Entry(NODE, group, name, "乙服", 0L, open, owner, members, docks);
+        return new RemoteGroups.Entry(NODE, group, name, "乙服", 0L, open, owner, members, docks,
+                SCOPE, true);
     }
 
     /**
@@ -137,10 +139,10 @@ public final class RemoteGroupsGameTests {
             groups.replaceFrom(NODE, List.of(
                     row(group, "乙服仓库", OWNER, false, Map.of(MEMBER, "Iris_Aria0"), 1)), 1_000L);
 
-            var mine = OrderDestination.resolve(h.getLevel().getServer(), MEMBER, group);
+            var mine = OrderDestination.resolve(h.getLevel().getServer(), MEMBER, SCOPE, group);
             h.assertTrue(mine.kind() == OrderDestination.Kind.THERE,
                     "a listed player was not allowed to name the remote group: " + mine.kind());
-            var stranger = OrderDestination.resolve(h.getLevel().getServer(), STRANGER, group);
+            var stranger = OrderDestination.resolve(h.getLevel().getServer(), STRANGER, SCOPE, group);
             h.assertTrue(stranger.kind() == OrderDestination.Kind.THERE,
                     "knowing the exact receiving address was not enough to send: " + stranger.kind());
             h.assertTrue(stranger.allowed(), "a known receiving address reported that it was refused");
@@ -272,22 +274,25 @@ public final class RemoteGroupsGameTests {
         RemoteGroups remotes = RemoteGroups.get(server);
         UUID remoteNode = UUID.randomUUID();
         UUID remoteGroup = UUID.randomUUID();
+        UUID scope = UUID.randomUUID();
         String suffix = UUID.randomUUID().toString().substring(0, 8);
         String name = "全局地址-" + suffix;
-        DockGroup local = locals.createFor(name, OWNER);
-        DockGroup other = locals.createFor("另一个地址-" + suffix, OWNER);
+        DockGroup local = locals.createForNetwork(name, OWNER, scope, DockGroup.Visibility.PUBLIC);
+        DockGroup other = locals.createForNetwork("另一个地址-" + suffix, OWNER, scope,
+                DockGroup.Visibility.PUBLIC);
 
         try {
             remotes.replaceFrom(remoteNode, List.of(new RemoteGroups.Entry(
-                    remoteNode, remoteGroup, name, "远端", 0L, true, null, Map.of(), 1)), 1_000L);
+                    remoteNode, remoteGroup, name, "远端", 0L, true, null, Map.of(), 1,
+                    scope, true)), 1_000L);
 
-            var lookup = dev.distantstock.routing.ReceivingAddressResolver.resolve(server, name);
+            var lookup = dev.distantstock.routing.ReceivingAddressResolver.resolve(server, scope, name);
             h.assertTrue(lookup.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.CONFLICT,
                     "local+remote duplicate name did not become a conflict: " + lookup.kind());
-            h.assertTrue(OrderDestination.resolve(server, OWNER, local.id()).kind()
+            h.assertTrue(OrderDestination.resolve(server, OWNER, scope, local.id()).kind()
                             == OrderDestination.Kind.CONFLICT,
                     "the local UUID bypassed the name conflict");
-            h.assertTrue(OrderDestination.resolve(server, OWNER, remoteGroup).kind()
+            h.assertTrue(OrderDestination.resolve(server, OWNER, scope, remoteGroup).kind()
                             == OrderDestination.Kind.CONFLICT,
                     "the remote UUID bypassed the name conflict");
             h.assertFalse(dev.distantstock.routing.ReceivingAddressResolver.mayClaimLocalName(
@@ -297,8 +302,8 @@ public final class RemoteGroupsGameTests {
             // The far side changes its name: the original address immediately becomes unambiguous.
             remotes.replaceFrom(remoteNode, List.of(new RemoteGroups.Entry(
                     remoteNode, remoteGroup, "远端地址-" + suffix, "远端", 0L,
-                    true, null, Map.of(), 1)), 2_000L);
-            var cleared = dev.distantstock.routing.ReceivingAddressResolver.resolve(server, name);
+                    true, null, Map.of(), 1, scope, true)), 2_000L);
+            var cleared = dev.distantstock.routing.ReceivingAddressResolver.resolve(server, scope, name);
             h.assertTrue(cleared.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.LOCAL
                             && cleared.local().id().equals(local.id()),
                     "renaming the remote copy did not clear the conflict");

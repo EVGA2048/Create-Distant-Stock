@@ -462,6 +462,14 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
         return orders.binding(slot);
     }
 
+    public java.util.UUID distantNetworkScope(FactoryPanelBlock.PanelSlot slot) {
+        return orders.scope(slot);
+    }
+
+    public void setDistantNetworkScope(FactoryPanelBlock.PanelSlot slot, java.util.UUID scope) {
+        orders.setScope(slot, scope);
+    }
+
     public boolean bind(FactoryPanelBlock.PanelSlot slot, dev.distantstock.routing.RemoteNetworkId network,
                         java.util.UUID receivingGroup, String address) {
         orders.bind(slot, network, receivingGroup, address);

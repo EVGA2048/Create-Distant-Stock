@@ -58,10 +58,8 @@ public final class StockConfig {
         CASING_REDSTONE_RANGE = b.comment(
                         "How far a redstone signal spreads through connected distant casings, in blocks,",
                         "before the window stops opening. Bounds a search per casing, so a large build",
-                        "does not hitch when a lever is flipped.",
-                        "64 by default: a wall of casings around a real base is longer than 32 blocks,",
-                        "and having the far end of it stay opaque reads as the window being broken.")
-                .defineInRange("casing.redstoneRange", 64, 1, 192);
+                        "does not hitch when a lever is flipped. Default: 32 blocks.")
+                .defineInRange("casing.redstoneRange", 32, 1, 192);
         TOWER_CHARGE_PARCELS = b.comment(
                         "Charge the tower ether for every parcel that leaves a dock it carries.",
                         "Off by default: the tower system is still being tested, and a server that",
@@ -129,7 +127,7 @@ public final class StockConfig {
         try {
             return CASING_REDSTONE_RANGE.get();
         } catch (IllegalStateException notLoaded) {
-            return 64;
+            return 32;
         }
     }
 

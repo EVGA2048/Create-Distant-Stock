@@ -14,6 +14,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -94,20 +95,20 @@ public final class TranserverBridge {
     }
 
     /**
-     * 没有挂上 Transerver 时用的节点 id：一个存档自己就是一个节点。
+     * Stable identity of this Transerver node, independent of transport availability.
      *
-     * <p>The sentinel exists because a single-player save still ships the whole Transerver parcel
-     * pipeline: {@code TranserverBridge.attachedApi()} being null only means no Transerver server
-     * is configured, not that this save has nowhere to deliver. Sending a parcel to "this node" has
-     * to be expressible in the same UUID form a real node id uses, because that is the form
-     * {@code ParcelEscrow.Record.destinationNode()} persists and compares.
+     * <p>Transerver publishes its persisted {@code node-identity.properties} identity even when the
+     * router transport is disabled. Distant Stock deliberately has no fallback/sentinel UUID: a
+     * missing identity is a startup/configuration failure, not a different node.
      */
-    public static final String LOCAL_NODE_ID = "00000000-0000-0000-0000-000000000001";
+    public static UUID localNodeUuid() {
+        NodeIdentity identity = TranserverServices.identity().orElse(null);
+        return identity == null ? null : identity.nodeId();
+    }
 
-    /** 本机节点 id。挂上了就是 Transerver 的，没挂上就是哨兵。 */
     public static String localNodeId() {
-        UUID attached = nodeId();
-        return attached == null ? LOCAL_NODE_ID : attached.toString();
+        UUID id = localNodeUuid();
+        return id == null ? "" : id.toString();
     }
 
     /**
@@ -118,7 +119,12 @@ public final class TranserverBridge {
      * parcels finish instead of sitting in the escrow forever.
      */
     public static boolean isLocal(String destination) {
-        return destination == null || destination.isBlank() || localNodeId().equals(destination);
+        if (destination == null || destination.isBlank()) {
+            // Very old records predate node identities and can only have meant this save.
+            return true;
+        }
+        UUID local = localNodeUuid();
+        return local != null && local.toString().equals(destination);
     }
 
     public static Set<String> knownNodes() {
@@ -152,9 +158,34 @@ public final class TranserverBridge {
         for (String channel : RoutingChannels.all()) {
             available.registerHandler(channel, message -> {
                 MessageHandler handler = HANDLERS.get(message.channel());
-                return handler == null
-                        ? CompletableFuture.completedFuture(DeliveryResult.RETRY)
-                        : handler.handle(message);
+                if (handler == null) {
+                    return CompletableFuture.completedFuture(DeliveryResult.RETRY);
+                }
+                try {
+                    CompletionStage<DeliveryResult> stage = handler.handle(message);
+                    if (stage == null) {
+                        LOG.error("Distant Stock Transerver handler returned null: channel={} message={} source={}",
+                                message.channel(), message.messageId(), message.source());
+                        return CompletableFuture.completedFuture(DeliveryResult.RETRY);
+                    }
+                    return stage.handle((result, error) -> {
+                        if (error != null) {
+                            LOG.error("Distant Stock Transerver handler failed: channel={} message={} source={}",
+                                    message.channel(), message.messageId(), message.source(), error);
+                            return DeliveryResult.RETRY;
+                        }
+                        if (result == null) {
+                            LOG.error("Distant Stock Transerver handler completed with null: channel={} message={} source={}",
+                                    message.channel(), message.messageId(), message.source());
+                            return DeliveryResult.RETRY;
+                        }
+                        return result;
+                    });
+                } catch (RuntimeException error) {
+                    LOG.error("Distant Stock Transerver handler threw before returning: channel={} message={} source={}",
+                            message.channel(), message.messageId(), message.source(), error);
+                    return CompletableFuture.completedFuture(DeliveryResult.RETRY);
+                }
             });
         }
         attached = available;

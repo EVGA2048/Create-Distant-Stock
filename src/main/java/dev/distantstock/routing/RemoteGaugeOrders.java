@@ -125,6 +125,9 @@ public final class RemoteGaugeOrders {
         if (server == null || network == null || lines == null || lines.isEmpty()) {
             return false;
         }
+        if (!distantNetworkKnown || !DistantNetworkDirectory.isFormalId(distantNetworkId)) {
+            return false;
+        }
         // 没选接收港组的订单不出去：默认组等于没有收件人，货发出去谁都不认（玩家 2026-09-18 报的
         // 「发的东西都进虚空了」）。面板是自动下单的，没人看着，所以这里必须自己拦住。
         //

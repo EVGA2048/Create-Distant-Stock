@@ -28,6 +28,10 @@ public final class ModNet {
         r.playToServer(GroupMemberC2S.TYPE, GroupMemberC2S.STREAM_CODEC, GroupMemberC2S::handle);
         r.playToServer(DistantNetworkActionC2S.TYPE, DistantNetworkActionC2S.STREAM_CODEC,
                 DistantNetworkActionC2S::handle);
+        r.playToServer(DistantDeviceActionC2S.TYPE, DistantDeviceActionC2S.STREAM_CODEC,
+                DistantDeviceActionC2S::handle);
+        r.playToServer(SetCreateNetworkLockC2S.TYPE, SetCreateNetworkLockC2S.STREAM_CODEC,
+                SetCreateNetworkLockC2S::handle);
         r.playToServer(LoggerActionC2S.TYPE, LoggerActionC2S.STREAM_CODEC, LoggerActionC2S::handle);
         r.playToClient(RemoteGroupsS2C.TYPE, RemoteGroupsS2C.STREAM_CODEC, RemoteGroupsS2C::handle);
         r.playToClient(OpenMonitorS2C.TYPE, OpenMonitorS2C.STREAM_CODEC, OpenMonitorS2C::handle);
@@ -37,6 +41,10 @@ public final class ModNet {
         r.playToClient(DockGroupsS2C.TYPE, DockGroupsS2C.STREAM_CODEC, DockGroupsS2C::handle);
         r.playToClient(DistantNetworkStateS2C.TYPE, DistantNetworkStateS2C.STREAM_CODEC,
                 DistantNetworkStateS2C::handle);
+        r.playToClient(DistantDeviceStateS2C.TYPE, DistantDeviceStateS2C.STREAM_CODEC,
+                DistantDeviceStateS2C::handle);
+        r.playToClient(CreateNetworkLockS2C.TYPE, CreateNetworkLockS2C.STREAM_CODEC,
+                CreateNetworkLockS2C::handle);
         r.playToClient(OpenLoggerS2C.TYPE, OpenLoggerS2C.STREAM_CODEC, OpenLoggerS2C::handle);
     }
 

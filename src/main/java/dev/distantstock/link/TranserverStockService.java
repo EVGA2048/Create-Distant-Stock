@@ -147,7 +147,7 @@ public final class TranserverStockService {
         }
         CompletableFuture<DeliveryResult> applied = new CompletableFuture<>();
         server.execute(() -> {
-            DeliveryResult valid = validateLocal(server, TranserverBridge.nodeId(), query.networkId());
+            DeliveryResult valid = validateLocal(server, TranserverBridge.localNodeUuid(), query.networkId());
             if (valid != DeliveryResult.APPLIED) {
                 noteQuery(shortId(query.networkId()) + " " + valid);
                 applied.complete(valid);

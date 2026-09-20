@@ -92,21 +92,27 @@ public final class OrderService {
         if (server == null) {
             return Result.FAIL;
         }
+        RemoteNetworkId sourceNetwork = canonicalLocalSource(networkId);
         UUID scope = distantNetworkId != null ? distantNetworkId
-                : networkId == null ? DistantNetworkDirectory.LEGACY_NETWORK_ID
-                : NetworkDirectory.find(networkId)
+                : sourceNetwork == null ? DistantNetworkDirectory.LEGACY_NETWORK_ID
+                : NetworkDirectory.find(sourceNetwork)
                 .map(NetworkDirectory.Entry::distantNetworkId)
-                .orElseGet(() -> DistantNetworkDirectory.get(server).scopeOf(networkId));
-        if (networkId != null && distantNetworkId != null) {
-            NetworkDirectory.Entry liveSource = NetworkDirectory.find(networkId).orElse(null);
+                .orElseGet(() -> DistantNetworkDirectory.get(server).scopeOf(sourceNetwork));
+        if (!DistantNetworkDirectory.isFormalId(scope)) {
+            return Result.FAIL;
+        }
+        if (sourceNetwork != null && distantNetworkId != null) {
+            NetworkDirectory.Entry liveSource = NetworkDirectory.find(sourceNetwork).orElse(null);
             if (liveSource != null && !scope.equals(liveSource.distantNetworkId())) {
                 // The selected warehouse left this Distant Stock network. A terminal/device keeps
                 // its own network context; it must not follow the warehouse into a different one.
                 return Result.FAIL;
             }
-            UUID localNode = UUID.fromString(TranserverBridge.localNodeId());
-            if (networkId.nodeId().equals(localNode)) {
-                UUID persistedLocalScope = DistantNetworkDirectory.get(server).scopeOf(networkId);
+            UUID localNode = TranserverBridge.localNodeUuid();
+            if (localNode == null) return Result.FAIL;
+            if (sourceNetwork.nodeId().equals(localNode)) {
+                UUID persistedLocalScope = DistantNetworkDirectory.get(server)
+                        .formalNetworkOf(sourceNetwork).orElse(null);
                 if (!scope.equals(persistedLocalScope)) {
                     return Result.FAIL;
                 }
@@ -121,39 +127,55 @@ public final class OrderService {
         if (destinationNode == null) {
             return Result.FAIL;
         }
-        if (networkId == null) {
+        if (sourceNetwork == null) {
             return placeLocal(server, legacyFrequency, address, receivingDockGroupId,
                     destinationNode, homeAddress, lines);
         }
-        UUID localNode = UUID.fromString(TranserverBridge.localNodeId());
-        if (networkId.nodeId().equals(localNode)) {
-            return placeLocal(server, networkId.createFrequency(), address, receivingDockGroupId,
+        UUID localNode = TranserverBridge.localNodeUuid();
+        if (localNode == null) return Result.FAIL;
+        if (sourceNetwork.nodeId().equals(localNode)) {
+            return placeLocal(server, sourceNetwork.createFrequency(), address, receivingDockGroupId,
                     destinationNode, homeAddress, lines);
         }
         UUID correlationId = UUID.randomUUID();
         UUID childOrderId = UUID.randomUUID();
         try {
-            OrderRequestCodec.Request request = new OrderRequestCodec.Request(networkId,
+            OrderRequestCodec.Request request = new OrderRequestCodec.Request(sourceNetwork,
                     scope, receivingDockGroupId, destinationNode, correlationId, childOrderId,
                     address == null ? "" : address,
                     homeAddress == null ? "" : homeAddress, lines);
-            UUID messageId = TranserverBridge.send(networkId.nodeId().toString(), RoutingChannels.ORDER_REQUEST,
+            UUID messageId = TranserverBridge.send(sourceNetwork.nodeId().toString(), RoutingChannels.ORDER_REQUEST,
                     OrderRequestCodec.encode(request), correlationId.toString());
             if (messageId != null) {
                 LOG.info("[DistantStock/Order] queued message={} correlation={} child={} target={} network={} group={} lines={}",
-                        messageId, correlationId, childOrderId, networkId.nodeId(),
-                        networkId.createFrequency(), receivingDockGroupId, lines.size());
+                        messageId, correlationId, childOrderId, sourceNetwork.nodeId(),
+                        sourceNetwork.createFrequency(), receivingDockGroupId, lines.size());
             } else {
                 LOG.warn("[DistantStock/Order] transport unavailable correlation={} child={} target={} network={} group={}",
-                        correlationId, childOrderId, networkId.nodeId(),
-                        networkId.createFrequency(), receivingDockGroupId);
+                        correlationId, childOrderId, sourceNetwork.nodeId(),
+                        sourceNetwork.createFrequency(), receivingDockGroupId);
             }
             return messageId == null ? Result.NO_PEER : Result.QUEUED;
         } catch (IOException | RuntimeException exception) {
             LOG.warn("[DistantStock/Order] encode/send failed target={} network={} group={}",
-                    networkId.nodeId(), networkId.createFrequency(), receivingDockGroupId, exception);
+                    sourceNetwork.nodeId(), sourceNetwork.createFrequency(), receivingDockGroupId, exception);
             return Result.FAIL;
         }
+    }
+
+    /**
+     * Upgrade a stale local device binding to the live Create-network identity.
+     *
+     * <p>An exact directory hit is authoritative, including remote rows. Only an identity that is
+     * no longer known at all may fall back to a live local row with the same Create frequency.
+     */
+    private static RemoteNetworkId canonicalLocalSource(RemoteNetworkId stored) {
+        if (stored == null) return null;
+        if (NetworkDirectory.find(stored).isPresent()) return stored;
+        return NetworkDirectory.findByFreq(stored.createFrequency())
+                .filter(NetworkDirectory.Entry::local)
+                .map(NetworkDirectory.Entry::networkId)
+                .orElse(stored);
     }
 
     private static Result placeLocal(MinecraftServer server, UUID frequency, String address,
@@ -166,7 +188,8 @@ public final class OrderService {
         RemoteRoute route = new RemoteRoute(RemoteRoute.CURRENT_SCHEMA, destinationNode,
                 receivingGroup == null ? DockGroupDirectory.DEFAULT_GROUP_ID : receivingGroup,
                 UUID.randomUUID(), UUID.randomUUID());
-        UUID localNode = UUID.fromString(TranserverBridge.localNodeId());
+        UUID localNode = TranserverBridge.localNodeUuid();
+        if (localNode == null) return Result.FAIL;
         boolean crosses = !localNode.equals(destinationNode);
         boolean ok = CreateStock.request(frequency, items, address, server, route,
                 crosses ? (homeAddress == null ? "" : homeAddress) : "");
@@ -179,7 +202,7 @@ public final class OrderService {
             return null;
         }
         if (destination.kind() == OrderDestination.Kind.HERE) {
-            return UUID.fromString(TranserverBridge.localNodeId());
+            return TranserverBridge.localNodeUuid();
         }
         return RemoteGroups.get(server).find(destination.group())
                 .map(RemoteGroups.Entry::node)

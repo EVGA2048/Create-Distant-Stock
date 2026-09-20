@@ -8,6 +8,9 @@ import net.minecraft.world.item.component.CustomData;
 import java.util.UUID;
 import java.util.Optional;
 import dev.distantstock.routing.RemoteNetworkId;
+import dev.distantstock.routing.DistantNetworkDirectory;
+import dev.distantstock.stock.NetworkDirectory;
+import net.minecraft.server.MinecraftServer;
 
 public final class RequesterData {
     public static final String FREQ = "Freq";
@@ -42,8 +45,18 @@ public final class RequesterData {
     public static void setFreq(ItemStack stack, UUID freq) {
         update(stack, tag -> {
             tag.remove(NETWORK);
-            tag.remove(DISTANT_NETWORK);
             tag.putUUID(FREQ, freq);
+        });
+    }
+
+    /**
+     * Clears only the selected Create warehouse. The terminal may stay enrolled in a Distant Stock
+     * network and select another member later.
+     */
+    public static void clearWarehouseBinding(ItemStack stack) {
+        update(stack, tag -> {
+            tag.remove(FREQ);
+            tag.remove(NETWORK);
         });
     }
 
@@ -115,6 +128,59 @@ public final class RequesterData {
         CompoundTag root = tag(stack);
         return root.hasUUID(DISTANT_NETWORK)
                 ? Optional.of(root.getUUID(DISTANT_NETWORK)) : Optional.empty();
+    }
+
+    /** Stores the terminal/device's Distant Stock network independently of any selected warehouse. */
+    public static void setDistantNetwork(ItemStack stack, UUID distantNetworkId) {
+        update(stack, tag -> {
+            if (distantNetworkId == null
+                    || !DistantNetworkDirectory.isFormalId(distantNetworkId)) {
+                tag.remove(DISTANT_NETWORK);
+            } else {
+                tag.putUUID(DISTANT_NETWORK, distantNetworkId);
+            }
+        });
+    }
+
+    /**
+     * The authoritative formal Distant Stock network of the selected warehouse.
+     *
+     * <p>The UUID stored on the item is only a last-known UI/cache hint. It is deliberately never
+     * accepted here as authorization: two old terminals must not be able to claim that the same
+     * local Create network belongs to two different Distant Stock networks. Local membership comes
+     * from DistantNetworkDirectory; remote membership comes from the live peer directory.
+     */
+    public static Optional<UUID> formalDistantNetwork(ItemStack stack, MinecraftServer server) {
+        UUID carried = distantNetwork(stack)
+                .filter(DistantNetworkDirectory::isFormalId)
+                .orElse(null);
+        if (carried != null && server != null
+                && DistantNetworkDirectory.get(server).find(carried).isPresent()) {
+            return Optional.of(carried);
+        }
+        RemoteNetworkId network = network(stack).orElse(null);
+        if (network == null) return Optional.empty();
+        if (server == null) return Optional.empty();
+        NetworkDirectory.Entry exact = NetworkDirectory.find(network).orElse(null);
+        if (exact != null) {
+            if (exact.local()) {
+                return DistantNetworkDirectory.get(server).formalNetworkOf(exact.networkId());
+            }
+            return Optional.ofNullable(exact.distantNetworkId())
+                    .filter(DistantNetworkDirectory::isFormalId);
+        }
+
+        // Device bindings survive upgrades. If the exact RemoteNetworkId is no longer known but
+        // this Create frequency is currently a live local warehouse, the live local identity is
+        // authoritative and replaces the stale node/world fields stored on the item.
+        RemoteNetworkId canonicalLocal = NetworkDirectory.findByFreq(network.createFrequency())
+                .filter(NetworkDirectory.Entry::local)
+                .map(NetworkDirectory.Entry::networkId)
+                .orElse(null);
+        if (canonicalLocal != null) {
+            return DistantNetworkDirectory.get(server).formalNetworkOf(canonicalLocal);
+        }
+        return Optional.empty();
     }
 
     public static Optional<UUID> receivingGroup(ItemStack stack) {

@@ -140,8 +140,19 @@ public final class DockInteractionEvents {
             player.displayClientMessage(
                     Component.translatable("gui.distantstock.remote_gauge.unbound"), true);
         } else {
-            dev.distantstock.panel.DeployerPanels.bind(board, slot, network,
-                    RequesterData.receivingGroup(stack).orElse(null), RequesterData.address(stack));
+            java.util.UUID distantNetworkId = RequesterData.formalDistantNetwork(
+                    stack, level.getServer()).orElse(null);
+            if (distantNetworkId == null) {
+                player.displayClientMessage(Component.translatable(
+                        "message.distantstock.network.required"), true);
+                event.setCancellationResult(ItemInteractionResult.sidedSuccess(false).result());
+                event.setCanceled(true);
+                return;
+            }
+            dev.distantstock.panel.DeployerPanels.bind(board, slot,
+                    new dev.distantstock.block.RemoteBinding(network, distantNetworkId,
+                            RequesterData.receivingGroup(stack).orElse(null),
+                            RequesterData.address(stack), RequesterData.homeAddress(stack)));
             player.displayClientMessage(Component.translatable("gui.distantstock.remote_gauge.bound",
                     network.shortLabel()), true);
         }

@@ -47,15 +47,6 @@ public final class ReceivingAddressResolver {
         List<DockGroup> directlyLocal = locals.named(scope, input);
         List<RemoteGroups.Entry> directlyRemote = remotes.matchingInput(scope, input);
         UUID effectiveScope = scope;
-        // Old saves had no Distant Stock network on receiving addresses. Once a Create warehouse
-        // joins a real network, those already-configured routes must not instantly break. A scoped
-        // address always wins; Legacy is consulted only when the new network has no such name.
-        if (directlyLocal.isEmpty() && directlyRemote.isEmpty()
-                && !scope.equals(DistantNetworkDirectory.LEGACY_NETWORK_ID)) {
-            effectiveScope = DistantNetworkDirectory.LEGACY_NETWORK_ID;
-            directlyLocal = locals.named(effectiveScope, input);
-            directlyRemote = remotes.matchingInput(effectiveScope, input);
-        }
 
         Set<String> canonicalNames = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         directlyLocal.forEach(group -> canonicalNames.add(group.name()));

@@ -60,8 +60,7 @@ public final class StackLightBlockEntity extends BlockEntity {
             return;
         }
         if (now < be.nextBuzzerTick) return;
-        level.playSound(null, pos, ModSounds.STACK_LIGHT_BUZZER.get(), SoundSource.BLOCKS, 0.72f, 1.0f);
-        be.nextBuzzerTick = now + 22; // 1.1 s cadence for the metro-door warning pulse.
+        be.playBuzzerPulse(level);
     }
 
     public boolean bindIfFree(ResourceLocation dimension, BlockPos source) {
@@ -77,10 +76,25 @@ public final class StackLightBlockEntity extends BlockEntity {
     public boolean applyFrom(ResourceLocation dimension, BlockPos source,
                              boolean red, boolean yellow, boolean green, boolean buzzer) {
         if (!accepts(dimension, source) || level == null || level.isClientSide) return false;
+        BlockState previous = getBlockState();
+        boolean yellowRising = !previous.getValue(StackLightBlock.YELLOW) && yellow;
+        boolean greenRising = !previous.getValue(StackLightBlock.GREEN) && green;
         buzzerEnabled = buzzer;
         StackLightBlock.apply(level, worldPosition, red, yellow, green);
+        if (buzzer && (yellowRising || greenRising)) {
+            // One acknowledgement chirp for a newly asserted non-fault condition. If red is also
+            // active, this pulse becomes the current alarm beat so the periodic fault buzzer does
+            // not fire again on the same tick and produce a doubled sound.
+            playBuzzerPulse(level);
+        }
         sync();
         return true;
+    }
+
+    private void playBuzzerPulse(Level level) {
+        level.playSound(null, worldPosition, ModSounds.STACK_LIGHT_BUZZER.get(),
+                SoundSource.BLOCKS, 0.72f, 1.0f);
+        nextBuzzerTick = level.getGameTime() + 22; // 1.1 s cadence for the metro-door warning pulse.
     }
 
     public void unbindIf(ResourceLocation dimension, BlockPos source) {

@@ -67,6 +67,9 @@ public final class OrderDestination {
         if (server == null) {
             return new Answer(Kind.UNKNOWN, null);
         }
+        if (!DistantNetworkDirectory.isFormalId(distantNetworkId)) {
+            return new Answer(Kind.UNKNOWN, null);
+        }
         if (asked == null || asked.equals(DockGroupDirectory.DEFAULT_GROUP_ID)) {
             // 没选组不放行 —— 见 {@link Kind#NO_GROUP}。这是"货进虚空"那条路的入口。
             return new Answer(Kind.NO_GROUP, null);
@@ -82,16 +85,14 @@ public final class OrderDestination {
             if (remote == null) {
                 return new Answer(Kind.UNKNOWN, null);
             }
-            if (!remote.distantNetworkId().equals(distantNetworkId)
-                    && !remote.distantNetworkId().equals(DistantNetworkDirectory.LEGACY_NETWORK_ID)) {
+            if (!remote.distantNetworkId().equals(distantNetworkId)) {
                 return new Answer(Kind.UNKNOWN, null);
             }
             // PUBLIC / UNLISTED controls discovery, not delivery permission. Once a player knows
             // the exact receiving address (or already carries its UUID), the address may be used.
             return new Answer(Kind.THERE, asked);
         }
-        if (!group.distantNetworkId().equals(distantNetworkId)
-                && !group.distantNetworkId().equals(DistantNetworkDirectory.LEGACY_NETWORK_ID)) {
+        if (!group.distantNetworkId().equals(distantNetworkId)) {
             return new Answer(Kind.UNKNOWN, null);
         }
         return new Answer(Kind.HERE, group.id());

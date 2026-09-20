@@ -28,6 +28,14 @@ public final class RequesterMenu extends AbstractContainerMenu {
     public List<NetworkDirectory.Entry> networks = new ArrayList<>();
     public UUID selectedFreq;
     public boolean demo;
+    /** Server-authored configuration snapshot carried by the menu-opening payload. Client only. */
+    boolean hasOpenedState;
+    RemoteNetworkId openedNetworkId;
+    UUID openedDistantNetworkId;
+    String openedAddress = "";
+    String openedHomeAddress = "";
+    UUID openedReceivingGroup;
+    String openedReceivingGroupName = "";
 
     public RequesterMenu(int id, Inventory inv, InteractionHand hand) {
         super(ModMenus.REQUESTER.get(), id);
@@ -38,6 +46,43 @@ public final class RequesterMenu extends AbstractContainerMenu {
             // The screen cannot draw a list it has never been given, and the field it replaces used
             // to be free text precisely because there was nothing to list.
             sendGroupList(inv.player, device(inv.player));
+        }
+    }
+
+    /** Persist only the terminal's Distant Stock network context; no Create warehouse is implied. */
+    public void persistDistantNetworkContext(Player player, UUID scope) {
+        if (player == null || isGauge()) return;
+        ItemStack stack = device(player);
+        if (stack.isEmpty()) return;
+        RequesterData.setDistantNetwork(stack, scope);
+        player.getInventory().setChanged();
+    }
+
+    public void clearDistantNetworkContext(Player player) {
+        if (player == null || isGauge()) return;
+        ItemStack stack = device(player);
+        if (stack.isEmpty()) return;
+        RequesterData.setDistantNetwork(stack, null);
+        RequesterData.clearWarehouseBinding(stack);
+        RequesterData.setReceivingGroup(stack, null, null);
+        selectedFreq = null;
+        player.getInventory().setChanged();
+    }
+
+    /** Replace an obsolete local RemoteNetworkId stored on the device with the live directory id. */
+    public void persistLocalNetworkIdentity(Player player, RemoteNetworkId member, UUID scope) {
+        if (player == null || member == null) return;
+        UUID stored = scope == null
+                ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID : scope;
+        GaugeBlockEntity gauge = gauge(player);
+        if (gauge != null) {
+            gauge.setNetwork(member, stored);
+            return;
+        }
+        ItemStack stack = device(player);
+        if (!stack.isEmpty()) {
+            RequesterData.setNetwork(stack, member, stored);
+            player.getInventory().setChanged();
         }
     }
 
@@ -62,6 +107,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
         if (!stack.isEmpty()) {
             if (!RequesterData.distantNetwork(stack).filter(stored::equals).isPresent()) {
                 RequesterData.setNetwork(stack, member, stored);
+                player.getInventory().setChanged();
             }
         }
     }
@@ -86,6 +132,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
             menu.selectedFreq = buf.readUUID();
         }
         MenuSync.readCatalog(menu, buf);
+        MenuSync.readState(menu, buf);
         return menu;
     }
 
@@ -112,6 +159,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
     }
 
     public String address(Player player) {
+        if (hasOpenedState && player != null && player.level().isClientSide) {
+            return openedAddress;
+        }
         GaugeBlockEntity be = gauge(player);
         if (be != null) {
             return be.address();
@@ -127,6 +177,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
      * happen to call the door the same thing.
      */
     public String homeAddress(Player player) {
+        if (hasOpenedState && player != null && player.level().isClientSide) {
+            return openedHomeAddress;
+        }
         GaugeBlockEntity be = gauge(player);
         if (be != null) {
             return be.homeAddress();
@@ -143,10 +196,14 @@ public final class RequesterMenu extends AbstractContainerMenu {
         ItemStack stack = device(player);
         if (!stack.isEmpty()) {
             RequesterData.setHomeAddress(stack, homeAddress);
+            player.getInventory().setChanged();
         }
     }
 
     public RemoteNetworkId networkId(Player player) {
+        if (hasOpenedState && player != null && player.level().isClientSide) {
+            return openedNetworkId;
+        }
         GaugeBlockEntity be = gauge(player);
         if (be != null) {
             return be.networkId();
@@ -156,72 +213,58 @@ public final class RequesterMenu extends AbstractContainerMenu {
 
     /** The Distant Stock network that contains the selected Create logistics network. */
     public UUID distantNetworkId(Player player) {
-        RemoteNetworkId resolved = MenuSync.resolve(networkId(player), freq(player));
-        UUID storedScope = null;
-        boolean storedKnown = false;
-        GaugeBlockEntity gauge = gauge(player);
-        if (gauge != null && resolved != null && resolved.equals(gauge.networkId())
-                && gauge.hasDistantNetworkId()) {
-            storedScope = gauge.distantNetworkId();
-            storedKnown = true;
-        } else {
-            ItemStack stack = device(player);
-            if (!stack.isEmpty()) {
-                RemoteNetworkId savedNetwork = RequesterData.network(stack).orElse(null);
-                if (savedNetwork != null && savedNetwork.equals(resolved)) {
-                    storedScope = RequesterData.distantNetwork(stack).orElse(null);
-                    storedKnown = storedScope != null;
+        if (hasOpenedState && player != null && player.level().isClientSide) {
+            if (selectedFreq != null) {
+                for (NetworkDirectory.Entry entry : networks) {
+                    if (selectedFreq.equals(entry.freq())) {
+                        return entry.distantNetworkId() == null
+                                ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID
+                                : entry.distantNetworkId();
+                    }
                 }
             }
+            return openedDistantNetworkId == null
+                    ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID
+                    : openedDistantNetworkId;
+        }
+        GaugeBlockEntity gauge = gauge(player);
+        if (gauge != null && gauge.hasDistantNetworkId()
+                && dev.distantstock.routing.DistantNetworkDirectory.isFormalId(gauge.distantNetworkId())) {
+            return gauge.distantNetworkId();
+        }
+        if (!isGauge()) {
+            UUID carriedScope = RequesterData.distantNetwork(device(player))
+                    .filter(dev.distantstock.routing.DistantNetworkDirectory::isFormalId)
+                    .orElse(null);
+            if (carriedScope != null) {
+                return carriedScope;
+            }
+        }
+        RemoteNetworkId resolved = MenuSync.resolve(networkId(player), freq(player));
+        if (resolved == null || player == null || player.level().getServer() == null) {
+            return dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
         }
 
-        // A local Create network is authoritative for its own membership: if it joined/left through
-        // another terminal, every terminal tuned to that local warehouse should learn the change.
-        // A remote warehouse is different: the terminal keeps the Distant-network context it was
-        // operating in. If that warehouse later moves elsewhere, it becomes an invalid source; it
-        // must not drag this terminal into the other network without a join code.
-        for (NetworkDirectory.Entry entry : networks) {
-            if (resolved != null && resolved.equals(entry.networkId())
-                    || resolved == null && freq(player) != null && freq(player).equals(entry.freq())) {
-                UUID liveScope = entry.distantNetworkId() == null
-                        ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID
-                        : entry.distantNetworkId();
-                if (entry.local() || !storedKnown) {
-                    if (player != null && player.level().getServer() != null && resolved != null) {
-                        persistDistantNetworkScope(player, resolved, liveScope);
-                    }
-                    return liveScope;
-                }
-                if (storedKnown) {
-                    return storedScope;
-                }
-                if (player != null && player.level().getServer() != null && resolved != null) {
-                    persistDistantNetworkScope(player, resolved, liveScope);
-                }
-                return liveScope;
-            }
-        }
-        if (storedKnown) {
-            return storedScope;
-        }
-        if (player == null || player.level().getServer() == null) {
-            return dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
-        }
-        if (resolved == null) {
-            return dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
+        UUID localNode = dev.distantstock.link.TranserverBridge.localNodeUuid();
+        if (localNode != null && localNode.equals(resolved.nodeId())) {
+            // Local SavedData is the only authority for membership. A device's stored scope is
+            // merely a cache and must never let two old terminals disagree about one warehouse.
+            // Canonicalise by frequency when a live local row exists, but do not require the
+            // background scanner to have run yet.
+            RemoteNetworkId canonical = NetworkDirectory.findByFreq(resolved.createFrequency())
+                    .filter(NetworkDirectory.Entry::local)
+                    .map(NetworkDirectory.Entry::networkId)
+                    .orElse(resolved);
+            return dev.distantstock.routing.DistantNetworkDirectory.get(player.level().getServer())
+                    .formalNetworkOf(canonical)
+                    .orElse(dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID);
         }
         NetworkDirectory.Entry live = NetworkDirectory.find(resolved).orElse(null);
-        if (live != null) {
-            UUID liveScope = live.distantNetworkId() == null
-                    ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID
-                    : live.distantNetworkId();
-            if (live.local()) {
-                persistDistantNetworkScope(player, resolved, liveScope);
-            }
-            return liveScope;
+        if (live != null && dev.distantstock.routing.DistantNetworkDirectory
+                .isFormalId(live.distantNetworkId())) {
+            return live.distantNetworkId();
         }
-        return dev.distantstock.routing.DistantNetworkDirectory
-                .get(player.level().getServer()).scopeOf(resolved);
+        return dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
     }
 
     public void writeAddress(Player player, String address) {
@@ -233,6 +276,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
         ItemStack stack = device(player);
         if (!stack.isEmpty()) {
             RequesterData.setAddress(stack, address);
+            player.getInventory().setChanged();
         }
     }
 
@@ -313,6 +357,12 @@ public final class RequesterMenu extends AbstractContainerMenu {
         }
         java.util.UUID who = player == null ? null : player.getUUID();
         UUID addressScope = distantNetworkId(player);
+        if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(addressScope)) {
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "message.distantstock.network.required"), true);
+            sendGroupList(player, stack);
+            return;
+        }
         if (action == dev.distantstock.net.SetDockGroupC2S.TOGGLE_OPEN) {
             // Legacy management flag. It no longer controls delivery, but old saves/screens may
             // still use it for collaborator membership until that UI is fully retired.
@@ -401,6 +451,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
      * under cannot disagree about where the goods come out.
      */
     public java.util.Optional<UUID> carriedGroup(Player player) {
+        if (hasOpenedState && player != null && player.level().isClientSide) {
+            return java.util.Optional.ofNullable(openedReceivingGroup);
+        }
         GaugeBlockEntity be = gauge(player);
         if (be != null) {
             return java.util.Optional.of(be.receivingGroup());
@@ -429,6 +482,40 @@ public final class RequesterMenu extends AbstractContainerMenu {
             return;
         }
         RequesterData.setReceivingGroup(stack, id, name);
+        if (player != null) {
+            player.getInventory().setChanged();
+        }
+    }
+
+    /** Name included in the server-authored open snapshot, before the async group list arrives. */
+    public String openedReceivingGroupName() {
+        return hasOpenedState ? openedReceivingGroupName : "";
+    }
+
+    public boolean hasOpenedState() {
+        return hasOpenedState;
+    }
+
+    public java.util.Optional<UUID> openedReceivingGroup() {
+        return hasOpenedState ? java.util.Optional.ofNullable(openedReceivingGroup)
+                : java.util.Optional.empty();
+    }
+
+    public String openedAddress() {
+        return hasOpenedState ? openedAddress : "";
+    }
+
+    public String openedHomeAddress() {
+        return hasOpenedState ? openedHomeAddress : "";
+    }
+
+    public RemoteNetworkId openedNetworkId() {
+        return hasOpenedState ? openedNetworkId : null;
+    }
+
+    public java.util.Optional<UUID> openedDistantNetworkId() {
+        return hasOpenedState ? java.util.Optional.ofNullable(openedDistantNetworkId)
+                : java.util.Optional.empty();
     }
 
     /** Pushes the current list to whoever has this screen open. */
@@ -464,6 +551,12 @@ public final class RequesterMenu extends AbstractContainerMenu {
     private static UUID scopeOf(Player player, ItemStack stack) {
         if (player == null || player.level().getServer() == null || stack == null || stack.isEmpty()) {
             return dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
+        }
+        UUID terminalScope = RequesterData.distantNetwork(stack)
+                .filter(dev.distantstock.routing.DistantNetworkDirectory::isFormalId)
+                .orElse(null);
+        if (terminalScope != null) {
+            return terminalScope;
         }
         RemoteNetworkId network = RequesterData.network(stack).orElse(null);
         if (network == null) {

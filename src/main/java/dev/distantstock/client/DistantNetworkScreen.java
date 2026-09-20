@@ -9,7 +9,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/** Small Create-style management page for the Distant Stock network of the selected warehouse. */
+/** Small Create-style management page for the Distant Stock network carried by this terminal. */
 public final class DistantNetworkScreen extends Screen {
     private static final int W = 220;
     private static final int H = 142;
@@ -26,11 +26,17 @@ public final class DistantNetworkScreen extends Screen {
 
     private EditBox nameInput;
     private EditBox codeInput;
+    private EditBox warehouseNameInput;
     private Button createButton;
     private Button joinButton;
+    private Button renameWarehouseButton;
     private Button resetButton;
     private Button leaveButton;
     private Button copyButton;
+    /** Drafts survive init()/resize/state refreshes; widgets are only views of these values. */
+    private String nameDraft = "";
+    private String codeDraft = "";
+    private String warehouseNameDraft = "";
 
     public DistantNetworkScreen(RequesterScreen parent) {
         this(parent, true);
@@ -45,6 +51,13 @@ public final class DistantNetworkScreen extends Screen {
 
     public void apply(DistantNetworkStateS2C next) {
         state = next == null ? new DistantNetworkStateS2C(false, null, "", false, "") : next;
+        if (warehouseNameInput != null && !warehouseNameInput.isFocused()) {
+            String current = selectedLocalWarehouseName();
+            if (!current.isBlank()) {
+                warehouseNameDraft = current;
+                warehouseNameInput.setValue(current);
+            }
+        }
         updateWidgets();
     }
 
@@ -66,6 +79,11 @@ public final class DistantNetworkScreen extends Screen {
         nameInput.setMaxLength(dev.distantstock.routing.DistantNetworkDirectory.MAX_NAME_LENGTH);
         nameInput.setBordered(false);
         nameInput.setTextColor(INK);
+        nameInput.setValue(nameDraft);
+        nameInput.setResponder(value -> {
+            nameDraft = value == null ? "" : value;
+            updateWidgets();
+        });
         addRenderableWidget(nameInput);
 
         codeInput = new EditBox(font, x + 10, y + 97, 104, 12,
@@ -73,16 +91,45 @@ public final class DistantNetworkScreen extends Screen {
         codeInput.setMaxLength(9);
         codeInput.setBordered(false);
         codeInput.setTextColor(INK);
+        codeInput.setValue(codeDraft);
+        codeInput.setResponder(value -> {
+            codeDraft = value == null ? "" : value;
+            updateWidgets();
+        });
         addRenderableWidget(codeInput);
+
+        String currentWarehouseName = selectedLocalWarehouseName();
+        if (warehouseNameDraft.isBlank() && !currentWarehouseName.isBlank()) {
+            warehouseNameDraft = currentWarehouseName;
+        }
+        warehouseNameInput = new EditBox(font, x + 10, y + 72, 128, 12,
+                Component.translatable("gui.distantstock.distant_network.warehouse_name"));
+        warehouseNameInput.setMaxLength(dev.distantstock.routing.DistantNetworkDirectory.MAX_NAME_LENGTH);
+        warehouseNameInput.setBordered(false);
+        warehouseNameInput.setTextColor(INK);
+        warehouseNameInput.setValue(warehouseNameDraft);
+        warehouseNameInput.setResponder(value -> {
+            warehouseNameDraft = value == null ? "" : value;
+            updateWidgets();
+        });
+        addRenderableWidget(warehouseNameInput);
 
         createButton = addRenderableWidget(Button.builder(
                         Component.translatable("gui.distantstock.distant_network.create"),
-                        b -> send(DistantNetworkActionC2S.CREATE, nameInput.getValue().trim()))
+                        b -> send(DistantNetworkActionC2S.CREATE, nameDraft.trim()))
                 .bounds(x + 145, y + 66, 62, 18).build());
         joinButton = addRenderableWidget(Button.builder(
                         Component.translatable("gui.distantstock.distant_network.join"),
-                        b -> send(DistantNetworkActionC2S.JOIN, codeInput.getValue().trim()))
+                        b -> {
+                            String normalized = normalizedCodeDraft();
+                            if (normalized != null) send(DistantNetworkActionC2S.JOIN, normalized);
+                        })
                 .bounds(x + 121, y + 93, 86, 18).build());
+        renameWarehouseButton = addRenderableWidget(Button.builder(
+                        Component.translatable("gui.distantstock.distant_network.rename_warehouse"),
+                        b -> send(DistantNetworkActionC2S.RENAME_WAREHOUSE,
+                                warehouseNameDraft.trim()))
+                .bounds(x + 145, y + 68, 62, 18).build());
         copyButton = addRenderableWidget(Button.builder(
                 Component.translatable("gui.distantstock.distant_network.copy_code"), b -> {
                     if (minecraft != null && !state.joinCode().isBlank()) {
@@ -108,17 +155,41 @@ public final class DistantNetworkScreen extends Screen {
         }
     }
 
+    private dev.distantstock.stock.NetworkDirectory.Entry selectedLocalWarehouse() {
+        if (parent == null || minecraft == null || minecraft.player == null || !state.joined()) {
+            return null;
+        }
+        java.util.UUID freq = parent.getMenu().freq(minecraft.player);
+        if (freq == null) return null;
+        return parent.getMenu().networks.stream()
+                .filter(entry -> entry.local() && freq.equals(entry.freq()))
+                .filter(entry -> state.networkId().equals(entry.distantNetworkId()))
+                .findFirst().orElse(null);
+    }
+
+    private String selectedLocalWarehouseName() {
+        var entry = selectedLocalWarehouse();
+        return entry == null ? "" : entry.warehouseName();
+    }
+
     private void updateWidgets() {
         if (nameInput == null) return;
         boolean joined = state.joined();
-        boolean canJoinHere = state.localWarehouse() && !joined;
+        boolean portable = parent == null || !parent.getMenu().isGauge();
+        boolean canJoinHere = portable && !joined;
+        boolean canRenameWarehouse = joined && selectedLocalWarehouse() != null;
         nameInput.visible = canJoinHere;
         codeInput.visible = canJoinHere;
+        warehouseNameInput.visible = canRenameWarehouse;
         createButton.visible = canJoinHere;
         joinButton.visible = canJoinHere;
+        renameWarehouseButton.visible = canRenameWarehouse;
+        createButton.active = canJoinHere && !nameDraft.trim().isEmpty();
+        joinButton.active = canJoinHere && normalizedCodeDraft() != null;
+        renameWarehouseButton.active = canRenameWarehouse && !warehouseNameDraft.trim().isEmpty();
         copyButton.visible = joined && state.owner() && !state.joinCode().isBlank();
-        resetButton.visible = joined && state.owner() && state.localWarehouse();
-        leaveButton.visible = joined && state.localWarehouse();
+        resetButton.visible = joined && state.owner();
+        leaveButton.visible = joined && portable;
     }
 
     @Override
@@ -145,12 +216,11 @@ public final class DistantNetworkScreen extends Screen {
                                 "gui.distantstock.distant_network.code_owner_only"),
                         x + 10, y + 59, HINT, false);
             }
-            if (!state.localWarehouse()) {
-                g.drawString(font, Component.translatable(
-                                "gui.distantstock.distant_network.remote_readonly"),
-                        x + 10, y + 78, HINT, false);
+            if (selectedLocalWarehouse() != null) {
+                field(g, warehouseNameInput, Component.translatable(
+                        "gui.distantstock.distant_network.warehouse_name_hint").getString(), mouseX, mouseY);
             }
-        } else if (state.localWarehouse()) {
+        } else if (parent == null || !parent.getMenu().isGauge()) {
             g.drawString(font, Component.translatable(
                             "gui.distantstock.distant_network.unjoined"),
                     x + 10, y + 31, HINT, false);
@@ -162,11 +232,8 @@ public final class DistantNetworkScreen extends Screen {
             field(g, codeInput, "1F2A-5B7G", mouseX, mouseY);
         } else {
             g.drawString(font, Component.translatable(
-                            "gui.distantstock.distant_network.no_local"),
+                            "message.distantstock.network.portable_required"),
                     x + 10, y + 31, HINT, false);
-            g.drawString(font, Component.translatable(
-                            "gui.distantstock.distant_network.no_local_help"),
-                    x + 10, y + 45, HINT, false);
         }
     }
 
@@ -184,10 +251,20 @@ public final class DistantNetworkScreen extends Screen {
         PacketDistributor.sendToServer(new DistantNetworkActionC2S(action, value == null ? "" : value));
     }
 
+    private String normalizedCodeDraft() {
+        try {
+            return dev.distantstock.routing.DistantNetworkDirectory.normalizeCode(codeDraft);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
     @Override
     public void onClose() {
-        if (minecraft != null) {
+        if (minecraft != null && parent != null) {
             minecraft.setScreen(parent);
+        } else {
+            super.onClose();
         }
     }
 }

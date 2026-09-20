@@ -31,6 +31,8 @@ import net.minecraft.world.level.Level;
  */
 public class RemoteGaugePanelBehaviour extends AbstractPanelBehaviour {
     private final RemoteOrderSlot orders;
+    /** Distant Stock network joined by this panel, independent of its selected source warehouse. */
+    private java.util.UUID distantNetworkScope;
 
     public RemoteGaugePanelBehaviour(PanelType<?> type, FactoryPanelBlockEntity board,
                                      FactoryPanelBlock.PanelSlot slot) {
@@ -41,6 +43,26 @@ public class RemoteGaugePanelBehaviour extends AbstractPanelBehaviour {
     /** Where this panel orders from. Never null; a panel with no binding simply does not order. */
     public RemoteOrderSlot orders() {
         return orders;
+    }
+
+    public java.util.UUID distantNetworkScope() {
+        if (distantNetworkScope != null) return distantNetworkScope;
+        var binding = orders.binding();
+        return binding != null && binding.distantNetworkKnown()
+                ? binding.distantNetworkId() : null;
+    }
+
+    public void setDistantNetworkScope(java.util.UUID scope) {
+        distantNetworkScope = scope != null
+                && dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope) ? scope : null;
+        var binding = orders.binding();
+        if (binding != null && distantNetworkScope != null
+                && binding.distantNetworkKnown()
+                && !distantNetworkScope.equals(binding.distantNetworkId())) {
+            orders.unbind();
+        }
+        blockEntity.setChanged();
+        blockEntity.sendData();
     }
 
     /**
@@ -123,6 +145,9 @@ public class RemoteGaugePanelBehaviour extends AbstractPanelBehaviour {
         super.easyWrite(tag, registries, clientPacket);
         CompoundTag ours = new CompoundTag();
         orders.save(ours);
+        if (distantNetworkScope != null) {
+            ours.putUUID("DistantNetworkScope", distantNetworkScope);
+        }
         tag.put("DistantStock", ours);
     }
 
@@ -130,7 +155,12 @@ public class RemoteGaugePanelBehaviour extends AbstractPanelBehaviour {
     public void easyRead(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.easyRead(tag, registries, clientPacket);
         if (tag.contains("DistantStock")) {
-            orders.load(tag.getCompound("DistantStock"), clientPacket);
+            CompoundTag ours = tag.getCompound("DistantStock");
+            orders.load(ours, clientPacket);
+            distantNetworkScope = ours.hasUUID("DistantNetworkScope")
+                    ? ours.getUUID("DistantNetworkScope")
+                    : orders.binding() != null && orders.binding().distantNetworkKnown()
+                    ? orders.binding().distantNetworkId() : null;
         }
     }
 }

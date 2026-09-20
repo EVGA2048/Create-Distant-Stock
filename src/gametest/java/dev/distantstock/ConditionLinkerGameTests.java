@@ -51,7 +51,7 @@ public final class ConditionLinkerGameTests {
         linker.sampleAndSend();
         assertLamp(h, lightPos, false, false, true);
 
-        // West / plain side only enables the buzzer; with no red lamp it must remain silent.
+        // West / plain side enables the buzzer. Merely enabling it, with no lamp edge, stays idle.
         level.setBlock(linkerPos.south(), Blocks.AIR.defaultBlockState(), 3);
         level.setBlock(linkerPos.west(), Blocks.REDSTONE_BLOCK.defaultBlockState(), 3);
         linker.sampleAndSend();
@@ -59,7 +59,8 @@ public final class ConditionLinkerGameTests {
         h.assertTrue(light.buzzerEnabled(), "plain side did not enable buzzer");
         h.assertFalse(light.buzzerActive(), "buzzer became active without red fault lamp");
 
-        // Fault + buzzer enable is the only audible combination.
+        // Red + buzzer enable arms the repeating fault alarm. Yellow/green are one-shot edge chirps
+        // instead, so they deliberately do not make buzzerActive() true while held.
         level.setBlock(redInput, Blocks.REDSTONE_BLOCK.defaultBlockState(), 3);
         linker.sampleAndSend();
         assertLamp(h, lightPos, true, false, false);

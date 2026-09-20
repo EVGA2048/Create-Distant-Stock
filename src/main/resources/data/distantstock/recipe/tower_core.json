@@ -2,14 +2,26 @@
   "type": "minecraft:crafting_shaped",
   "category": "redstone",
   "key": {
-    "P": { "item": "distantstock:polished_ether_quartz" },
-    "B": { "item": "create:brass_sheet" },
-    "G": { "item": "create:gearbox" }
+    "P": {
+      "item": "distantstock:polished_ether_quartz"
+    },
+    "B": {
+      "item": "create:brass_sheet"
+    },
+    "G": {
+      "item": "create:gearbox"
+    },
+    "M": {
+      "item": "distantstock:ether_mechanism"
+    }
   },
   "pattern": [
     "PBP",
-    "BGB",
-    "PBP"
+    "BMB",
+    "PGP"
   ],
-  "result": { "count": 1, "id": "distantstock:tower_core" }
+  "result": {
+    "count": 1,
+    "id": "distantstock:tower_core"
+  }
 }

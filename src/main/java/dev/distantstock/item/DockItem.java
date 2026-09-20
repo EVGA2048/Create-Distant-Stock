@@ -51,11 +51,10 @@ public final class DockItem extends BlockItem {
             return InteractionResult.FAIL;
         }
         if (behaviour != null && LogisticallyLinkedBehaviour.isValidLink(behaviour)) {
-            UUID node = TranserverBridge.nodeId();
+            UUID node = TranserverBridge.localNodeUuid();
             if (node == null) {
-                // A distant binding records which server the network lives on, and that identity is
-                // the Transerver node id. With no node configured there is nothing to write into the
-                // item, so say that instead of blaming the stock link.
+                // Binding stores the stable node identity, not the current transport session.
+                // Transport may be offline while this server still has a perfectly valid identity.
                 player.displayClientMessage(
                         Component.translatable("gui.distantstock.dock_bind_no_node"), true);
                 return InteractionResult.FAIL;
@@ -74,6 +73,11 @@ public final class DockItem extends BlockItem {
             }
             RemoteNetworkId remote = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, node,
                     WorldIdentity.get(linkLevel), link.dimension().location().toString(), behaviour.freqId);
+            if (!dev.distantstock.stock.CreateNetworkAccess.mayInteract(remote, behaviour.freqId, player)) {
+                player.displayClientMessage(Component.translatable(
+                        "message.distantstock.network.interact_denied"), true);
+                return InteractionResult.FAIL;
+            }
             java.util.UUID distantNetworkId = dev.distantstock.routing.DistantNetworkDirectory
                     .get(serverLevel.getServer()).scopeOf(remote);
             RequesterData.setNetwork(stack, remote, distantNetworkId);

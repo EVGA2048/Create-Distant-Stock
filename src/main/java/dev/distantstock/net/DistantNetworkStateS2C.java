@@ -58,10 +58,35 @@ public record DistantNetworkStateS2C(boolean localWarehouse, UUID networkId, Str
                     new DistantNetworkStateS2C(local, null, "", false, ""));
             return;
         }
-        boolean owner = network.ownedBy(player.getUUID())
-                && network.authoritativeOn(dev.distantstock.link.TranserverBridge.nodeId());
+        java.util.UUID localNode = dev.distantstock.link.TranserverBridge.localNodeUuid();
+        boolean owner = localNode != null && network.ownedBy(player.getUUID())
+                && network.authoritativeOn(localNode);
         PacketDistributor.sendToPlayer(player, new DistantNetworkStateS2C(
                 local, network.id(), network.name(), owner, owner ? network.joinCode() : ""));
+    }
+
+    /** State of the terminal's Distant Stock network itself, independent of any selected warehouse. */
+    public static void sendScope(ServerPlayer player, UUID scope) {
+        if (player == null || player.getServer() == null
+                || !DistantNetworkDirectory.isFormalId(scope)) {
+            if (player != null) {
+                PacketDistributor.sendToPlayer(player,
+                        new DistantNetworkStateS2C(false, null, "", false, ""));
+            }
+            return;
+        }
+        DistantNetworkDirectory directory = DistantNetworkDirectory.get(player.getServer());
+        var network = directory.find(scope).orElse(null);
+        if (network == null || network.legacy()) {
+            PacketDistributor.sendToPlayer(player,
+                    new DistantNetworkStateS2C(false, null, "", false, ""));
+            return;
+        }
+        UUID localNode = dev.distantstock.link.TranserverBridge.localNodeUuid();
+        boolean owner = localNode != null && network.ownedBy(player.getUUID())
+                && network.authoritativeOn(localNode);
+        PacketDistributor.sendToPlayer(player, new DistantNetworkStateS2C(
+                false, network.id(), network.name(), owner, owner ? network.joinCode() : ""));
     }
 
     public static void handle(DistantNetworkStateS2C msg, IPayloadContext ctx) {

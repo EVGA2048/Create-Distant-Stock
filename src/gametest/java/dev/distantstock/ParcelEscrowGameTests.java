@@ -376,27 +376,19 @@ public final class ParcelEscrowGameTests {
         });
     }
 
-    /**
-     * isLocal 的边界。空白目的地是「比节点 id 更早的记录」，只能由本机认领；哨兵必须是一个
-     * uuid 的规范写法，否则写进记录再读出来就匹配不上；别人的节点 id 不能被当成本机，那会把
-     * 包裹投进错误的存档。
-     */
+    /** isLocal 的边界：旧空白记录属于本机，正式节点 UUID 属于本机，别人的 UUID 绝不能属于本机。 */
     @GameTest(template = "empty", timeoutTicks = 40)
     public static void isLocalAcceptsBlanksAndTheLocalNode(GameTestHelper h) {
         h.assertTrue(TranserverBridge.isLocal(null), "null 目的地必须算本机");
         h.assertTrue(TranserverBridge.isLocal(""), "空目的地必须算本机");
         h.assertTrue(TranserverBridge.isLocal("   "), "纯空白目的地必须算本机");
-        h.assertTrue(TranserverBridge.isLocal(TranserverBridge.localNodeId()), "本机节点 id 必须算本机");
-        try {
-            UUID sentinel = UUID.fromString(TranserverBridge.LOCAL_NODE_ID);
-            h.assertTrue(TranserverBridge.LOCAL_NODE_ID.equals(sentinel.toString()),
-                    "哨兵的字符串形式和 UUID.toString() 不一致，落盘的记录将永远匹配不上本机");
-        } catch (IllegalArgumentException invalid) {
-            h.fail("本机哨兵不是合法 uuid：" + invalid.getMessage());
-        }
-        // 挂上 Transerver 时 localNodeId() 是真实节点，没挂上时是哨兵；两种情况都要有一个「别人」。
-        String foreign = TranserverBridge.LOCAL_NODE_ID.equals(TranserverBridge.localNodeId())
-                ? UUID.randomUUID().toString() : TranserverBridge.LOCAL_NODE_ID;
+        UUID local = TranserverBridge.localNodeUuid();
+        h.assertTrue(local != null, "Transerver 的持久节点身份没有在服务器启动时暴露");
+        h.assertTrue(TranserverBridge.isLocal(local.toString()), "本机节点 id 必须算本机");
+        String foreign;
+        do {
+            foreign = UUID.randomUUID().toString();
+        } while (foreign.equals(local.toString()));
         h.assertFalse(TranserverBridge.isLocal(foreign), "别的节点被当成了本机：" + foreign);
         h.succeed();
     }

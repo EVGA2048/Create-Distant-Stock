@@ -10,12 +10,16 @@ import dev.distantstock.menu.RemoteRedstoneRequesterMenu;
 import dev.distantstock.net.SetRequesterTargetC2S;
 import net.createmod.catnip.gui.element.GuiGameElement;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
+
+import java.util.List;
 
 /**
  * 远仓红石请求器的界面：Create 那个窗口**加长一段**，里面放我们那两行。
@@ -68,12 +72,53 @@ public final class RemoteRedstoneRequesterScreen extends RedstoneRequesterScreen
 
     private AddressEditBox group;
     private AddressEditBox homeAddress;
+    private EditBox networkCode;
+    private Button joinNetworkButton;
+    private Button sourceButton;
+    private dev.distantstock.net.DistantDeviceStateS2C networkState =
+            new dev.distantstock.net.DistantDeviceStateS2C(
+                    net.minecraft.core.BlockPos.ZERO, -1, null, "", null, List.of());
+    private boolean sourcePickerOpen;
     /** 接收港组的清单：点一行就把名字填进框里，和终端那个下拉是同一份数据。 */
     private final GroupPicker picker = new GroupPicker();
 
     public RemoteRedstoneRequesterScreen(RedstoneRequesterMenu menu, Inventory inventory,
                                          Component title) {
         super(menu, inventory, title);
+    }
+
+    private int sourcePickerRows() {
+        return networkState == null ? 0 : Math.min(6, networkState.members().size());
+    }
+
+    private int sourcePickerX() { return leftPos + WINDOW_X + HINT_X; }
+    private int sourcePickerW() { return HINT_ROOM; }
+    private int sourcePickerY() { return topPos + HINT_Y - 4 - sourcePickerRows() * 12; }
+
+    private boolean insideSourcePicker(double x, double y) {
+        return sourcePickerOpen && x >= sourcePickerX() && x < sourcePickerX() + sourcePickerW()
+                && y >= sourcePickerY() && y < sourcePickerY() + sourcePickerRows() * 12;
+    }
+
+    private int sourcePickerIndex(double x, double y) {
+        if (!insideSourcePicker(x, y)) return -1;
+        int index = (int) ((y - sourcePickerY()) / 12);
+        return index >= 0 && networkState != null && index < networkState.members().size() ? index : -1;
+    }
+
+    private void renderSourcePicker(GuiGraphics graphics, int mouseX, int mouseY) {
+        if (!sourcePickerOpen || networkState == null || networkState.members().isEmpty()) return;
+        int x = sourcePickerX(), y = sourcePickerY(), w = sourcePickerW(), rows = sourcePickerRows();
+        graphics.fill(x - 2, y - 2, x + w + 2, y + rows * 12 + 2, 0xEE20282B);
+        for (int i = 0; i < rows; i++) {
+            var member = networkState.members().get(i);
+            int ry = y + i * 12;
+            boolean hover = mouseX >= x && mouseX < x + w && mouseY >= ry && mouseY < ry + 12;
+            if (hover) graphics.fill(x, ry, x + w, ry + 12, 0x665A7A82);
+            String text = memberLabel(member) + (member.packable() ? "" : " · !");
+            graphics.drawString(font, font.plainSubstrByWidth(text, w - 6), x + 3, ry + 2,
+                    member.packable() ? 0x3D3D3D : 0x9A4A38, false);
+        }
     }
 
     @Override
@@ -102,11 +147,105 @@ public final class RemoteRedstoneRequesterScreen extends RedstoneRequesterScreen
         homeAddress.setHint(Component.translatable("gui.distantstock.route.home.hint"));
         addRenderableWidget(homeAddress);
 
+        int networkX = leftPos + WINDOW_X + HINT_X;
+        int networkY = topPos + HINT_Y - 2;
+        networkCode = new EditBox(font, networkX, networkY, 82, 12,
+                Component.translatable("gui.distantstock.device.join_code"));
+        networkCode.setBordered(false);
+        networkCode.setMaxLength(9);
+        networkCode.setTextColor(0x3D3D3D);
+        networkCode.setHint(Component.literal("1F2A-5B7G"));
+        networkCode.setResponder(ignore -> updateNetworkWidgets());
+        addRenderableWidget(networkCode);
+        joinNetworkButton = addRenderableWidget(Button.builder(
+                        Component.translatable("gui.distantstock.distant_network.join"), b -> joinNetwork())
+                .bounds(networkX + 87, networkY - 2, 42, 14).build());
+        sourceButton = addRenderableWidget(Button.builder(Component.empty(), b -> {
+                    sourcePickerOpen = !sourcePickerOpen;
+                })
+                .bounds(networkX, networkY - 2, HINT_ROOM, 14).build());
+        updateNetworkWidgets();
+
         moveBottomBar();
         // 清单是服务器推的，而推的那一次可以和界面创建抢跑 —— 抢输了这份就永远缺着，表现是
         // "点开是空的"。要一次比赌它送到便宜（终端那条注释里写的就是这个教训）。
         PacketDistributor.sendToServer(new dev.distantstock.net.SetDockGroupC2S(
                 "", dev.distantstock.net.SetDockGroupC2S.REFRESH));
+        requestNetworkState();
+    }
+
+    public void applyDistantNetworkState(dev.distantstock.net.DistantDeviceStateS2C state) {
+        RemoteRedstoneRequesterBlockEntity requester = requester();
+        if (state == null || requester == null || !state.pos().equals(requester.getBlockPos())
+                || state.slot() >= 0) return;
+        networkState = state;
+        sourcePickerOpen = false;
+        updateNetworkWidgets();
+    }
+
+    private void requestNetworkState() {
+        RemoteRedstoneRequesterBlockEntity requester = requester();
+        if (requester == null) return;
+        PacketDistributor.sendToServer(new dev.distantstock.net.DistantDeviceActionC2S(
+                requester.getBlockPos(), -1, dev.distantstock.net.DistantDeviceActionC2S.REFRESH,
+                "", null));
+    }
+
+    private void joinNetwork() {
+        RemoteRedstoneRequesterBlockEntity requester = requester();
+        if (requester == null || networkCode == null) return;
+        String code = networkCode.getValue().trim();
+        try {
+            code = dev.distantstock.routing.DistantNetworkDirectory.normalizeCode(code);
+        } catch (IllegalArgumentException ignored) {
+            return;
+        }
+        PacketDistributor.sendToServer(new dev.distantstock.net.DistantDeviceActionC2S(
+                requester.getBlockPos(), -1, dev.distantstock.net.DistantDeviceActionC2S.JOIN,
+                code, null));
+    }
+
+    private void updateNetworkWidgets() {
+        if (networkCode == null || joinNetworkButton == null || sourceButton == null) return;
+        boolean joined = networkState != null && networkState.joined();
+        networkCode.visible = !joined;
+        joinNetworkButton.visible = !joined;
+        if (!joined) {
+            try {
+                dev.distantstock.routing.DistantNetworkDirectory.normalizeCode(networkCode.getValue());
+                joinNetworkButton.active = true;
+            } catch (IllegalArgumentException ignored) {
+                joinNetworkButton.active = false;
+            }
+        }
+        sourceButton.visible = joined;
+        if (joined) {
+            String source = selectedSourceLabel();
+            String label = networkState.networkName().isBlank()
+                    ? Component.translatable("gui.distantstock.device.select_source").getString()
+                    : networkState.networkName() + " · " + (source.isBlank()
+                    ? Component.translatable("gui.distantstock.device.select_source").getString() : source);
+            sourceButton.setMessage(Component.literal(font.plainSubstrByWidth(label, sourceButton.getWidth() - 10)));
+            sourceButton.active = !networkState.members().isEmpty();
+        }
+    }
+
+    private String selectedSourceLabel() {
+        if (networkState == null || networkState.selected() == null) return "";
+        return networkState.members().stream()
+                .filter(member -> networkState.selected().equals(member.network()))
+                .map(this::memberLabel)
+                .findFirst().orElse(networkState.selected().shortLabel());
+    }
+
+    private String memberLabel(dev.distantstock.net.DistantDeviceStateS2C.Member member) {
+        String warehouse = member.warehouseName() == null || member.warehouseName().isBlank()
+                ? Component.translatable("gui.distantstock.warehouse.unnamed").getString()
+                : member.warehouseName();
+        String where = member.local()
+                ? Component.translatable("gui.distantstock.local").getString()
+                : member.server();
+        return where == null || where.isBlank() ? warehouse : warehouse + " · " + where;
     }
 
     /** 本服的清单到了。 */
@@ -231,20 +370,7 @@ public final class RemoteRedstoneRequesterScreen extends RedstoneRequesterScreen
         if (homeAddress != null) {
             AddressStrip.renderUnder(graphics, homeAddress);
         }
-        // 一行只读的绑定说明，画在灰按钮条中间那一块空处：这一条只能在别处改（拿调谐过的终端右键它），
-        // 不写出来玩家会以为屏幕上少了一个框。**画在背景这一层**：再晚一步就会被物品提示盖住。
-        RemoteRedstoneRequesterBlockEntity requester = requester();
-        boolean unbound = requester == null || requester.binding() == null;
-        // 没绑定的时候说**该做的那一步**（去终端里调谐再右键它），而不是"这台是普通请求器"：
-        // 没绑定时这两行根本存不下来（绑定本身就是存它们的地方），玩家 2026-09-18 报的"填了没用"
-        // 就是这个。灰条里地方窄，长了会被截断，但"还没绑定 + 终端"这几个字一定在前半句里。
-        Component line = unbound
-                ? Component.translatable("gui.distantstock.remote_requester.binding")
-                : Component.translatable("gui.distantstock.remote_requester.source",
-                        requester.binding().network().shortLabel());
-        // 灰条里这一块地方宽度有限 —— 长了就截断，宁可少几个字也不要压到隔壁的图标上。
-        graphics.drawString(font, font.plainSubstrByWidth(line.getString(), HINT_ROOM),
-                leftPos + WINDOW_X + HINT_X, topPos + HINT_Y, unbound ? 0x9A4A38 : 0x3D3D3D, false);
+        // 灰条第一行现在是真正的网络/来源控件，不再画“拿终端绑定”的旧提示。
         // 没有「确认」按钮了，所以得说出来：这两行是关掉界面时才送出去的。
         Component note = Component.translatable("gui.distantstock.save_on_close");
         graphics.drawString(font, note, leftPos + WINDOW_X + HINT_X, topPos + NOTE_Y,
@@ -264,6 +390,7 @@ public final class RemoteRedstoneRequesterScreen extends RedstoneRequesterScreen
             picker.render(graphics, font, pickerX(), pickerY(), pickerW(), mouseX, mouseY,
                     group == null ? "" : group.getValue());
         }
+        renderSourcePicker(graphics, mouseX, mouseY);
     }
 
     /** 地址补全跟着框一起活；父类只照顾它自己那个框。 */
@@ -290,6 +417,22 @@ public final class RemoteRedstoneRequesterScreen extends RedstoneRequesterScreen
      */
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (sourcePickerOpen && networkState != null) {
+            int hit = sourcePickerIndex(mouseX, mouseY);
+            if (hit >= 0) {
+                RemoteRedstoneRequesterBlockEntity requester = requester();
+                if (requester != null) {
+                    var member = networkState.members().get(hit);
+                    PacketDistributor.sendToServer(new dev.distantstock.net.DistantDeviceActionC2S(
+                            requester.getBlockPos(), -1,
+                            dev.distantstock.net.DistantDeviceActionC2S.SELECT, "", member.network()));
+                }
+                sourcePickerOpen = false;
+                return true;
+            }
+            if (insideSourcePicker(mouseX, mouseY)) return true;
+            sourcePickerOpen = false;
+        }
         // 清单先来：它画在框上面，点它的时候该落到行里，而不是落到底下那个输入框上。
         if (picker.isOpen()) {
             String picked = picker.hit(mouseX, mouseY, pickerX(), pickerY(), pickerW());
@@ -340,6 +483,10 @@ public final class RemoteRedstoneRequesterScreen extends RedstoneRequesterScreen
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (networkCode != null && networkCode.isFocused()
+                && networkCode.keyPressed(keyCode, scanCode, modifiers)) {
+            return true;
+        }
         if (getFocused() instanceof AddressEditBox box
                 && box.keyPressed(keyCode, scanCode, modifiers)) {
             return true;
@@ -349,6 +496,10 @@ public final class RemoteRedstoneRequesterScreen extends RedstoneRequesterScreen
 
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
+        if (networkCode != null && networkCode.isFocused()
+                && networkCode.charTyped(codePoint, modifiers)) {
+            return true;
+        }
         if (getFocused() instanceof AddressEditBox box && box.charTyped(codePoint, modifiers)) {
             return true;
         }

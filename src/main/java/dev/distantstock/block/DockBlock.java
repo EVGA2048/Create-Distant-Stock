@@ -7,6 +7,7 @@ import dev.distantstock.routing.DockGroupDirectory;
 import dev.distantstock.routing.DockMode;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.item.RequesterItem;
+import dev.distantstock.routing.RemoteNetworkId;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.core.BlockPos;
@@ -133,6 +134,68 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
         }
         if (stack.getItem() instanceof RequesterItem) {
             if (!level.isClientSide) {
+                java.util.UUID scope = RequesterData.distantNetwork(stack)
+                        .filter(dev.distantstock.routing.DistantNetworkDirectory::isFormalId)
+                        .orElse(null);
+                if (scope == null) {
+                    player.displayClientMessage(Component.translatable(
+                            "message.distantstock.network.required"), true);
+                    return ItemInteractionResult.sidedSuccess(false);
+                }
+                RemoteNetworkId dockNetwork = be.networkId();
+                if (dockNetwork == null && be.freq() != null) {
+                    dockNetwork = dev.distantstock.stock.NetworkDirectory.findByFreq(be.freq())
+                            .filter(dev.distantstock.stock.NetworkDirectory.Entry::local)
+                            .map(dev.distantstock.stock.NetworkDirectory.Entry::networkId)
+                            .orElse(null);
+                }
+                if (dockNetwork == null) {
+                    player.displayClientMessage(Component.translatable(
+                            "message.distantstock.dock.bind_create_first"), true);
+                    return ItemInteractionResult.sidedSuccess(false);
+                }
+                var directory = dev.distantstock.routing.DistantNetworkDirectory.get(level.getServer());
+                java.util.UUID currentScope = directory.formalNetworkOf(dockNetwork).orElse(null);
+                if (currentScope == null) {
+                    if (!dev.distantstock.stock.CreateNetworkAccess.mayAdministrate(
+                            dockNetwork, dockNetwork.createFrequency(), player)) {
+                        player.displayClientMessage(Component.translatable(
+                                "message.distantstock.network.create_admin_required"), true);
+                        return ItemInteractionResult.sidedSuccess(false);
+                    }
+                    if (!directory.attach(dockNetwork, scope)) {
+                        player.displayClientMessage(Component.translatable(
+                                "message.distantstock.network.warehouse_join_failed"), true);
+                        return ItemInteractionResult.sidedSuccess(false);
+                    }
+                    directory.assignDefaultMemberName(dockNetwork, scope, player.getName().getString());
+                    be.setNetwork(dockNetwork);
+                    RequesterData.setNetwork(stack, dockNetwork, scope);
+                    player.getInventory().setChanged();
+                    dev.distantstock.stock.StockScanner.scan(level.getServer());
+                    String name = directory.find(scope).map(dev.distantstock.routing.DistantNetworkDirectory.Network::name)
+                            .orElse(scope.toString().substring(0, 8));
+                    player.displayClientMessage(Component.translatable(
+                            "message.distantstock.network.warehouse_joined", name), true);
+                    return ItemInteractionResult.sidedSuccess(false);
+                }
+                if (!scope.equals(currentScope)) {
+                    String name = directory.find(currentScope)
+                            .map(dev.distantstock.routing.DistantNetworkDirectory.Network::name)
+                            .orElse(currentScope.toString().substring(0, 8));
+                    player.displayClientMessage(Component.translatable(
+                            "message.distantstock.network.warehouse_other", name), true);
+                    return ItemInteractionResult.sidedSuccess(false);
+                }
+                RemoteNetworkId selected = RequesterData.network(stack).orElse(null);
+                if (!dockNetwork.equals(selected)) {
+                    RequesterData.setNetwork(stack, dockNetwork, scope);
+                    player.getInventory().setChanged();
+                    player.displayClientMessage(Component.translatable(
+                            "message.distantstock.network.warehouse_selected",
+                            dockNetwork.shortLabel()), true);
+                    return ItemInteractionResult.sidedSuccess(false);
+                }
                 if (player.isShiftKeyDown()) {
                     // 潜行右键：把这个港挂到终端携带的那个接收港组上，并切成收货。
                     //
@@ -148,7 +211,7 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                     // Joining someone else's group means their parcels come out of this dock. A
                     // closed group refuses, and says so out loud: a click that is silently ignored
                     // reads as a broken item, not as a locked door.
-                    if (admits(level, group, player)) {
+                    if (admits(level, group, scope, player)) {
                         be.setImport();
                         be.setGroupId(group);
                         // 整个手势的全部效果就是方块上的一行字，不说出来玩家不知道写进去没有。
@@ -161,11 +224,6 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                         player.displayClientMessage(
                                 Component.translatable("gui.distantstock.group.closed"), true);
                     }
-                } else if (!RequesterData.tuned(stack)) {
-                    // Untuned terminal, plain click: say so rather than doing nothing. Sneak-click
-                    // still works — writing an address and joining a group need no network, and a
-                    // terminal is the only thing that can do either.
-                    RequesterItem.sayUntuned(player);
                 } else {
                     be.setMode(DockMode.SEND);
                     // What the requester carries is the destination. Sneak-click is what sets a
@@ -191,20 +249,12 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                     // player who picked a system and then bound a network got the system silently
                     // replaced, which is the sort of thing that reads as "groups do not work".
                     //
-                    // 旧写法还有一处更早的错：.filter(network -> !network.nodeId().equals(nodeId()))
-                    // 想「不要把包裹发给本机」。TranserverBridge.nodeId() 在装了 Transerver 却没接上
-                    // API 时返回 null（单机存档就是这种情况），而 equals(null) 恒为 false，过滤器等于
-                    // 失效；而且就算它返回真实节点 id，「发到本机」本身也不非法——同一个存档里的两个
-                    // 港组就是两套系统，服内互传靠的就是它。
-                    java.util.UUID node = RequesterData.network(stack)
-                            .map(dev.distantstock.routing.RemoteNetworkId::nodeId)
-                            .orElseGet(() -> java.util.UUID.fromString(TranserverBridge.localNodeId()));
-                    if (!admits(level, carried, player)) {
-                        // The same refusal for the sending side. Pointing a dock at a group fills
-                        // that group's docks with parcels, which is no more a stranger's business
-                        // than adding a dock to it.
+                    // 「发到本机」本身并不非法：同一个存档里的两个接收地址就是两套系统，服内互传
+                    // 靠的正是本机节点身份。节点身份与 Transerver transport 是否在线是两回事。
+                    java.util.UUID node = destinationNode(level, scope, carried);
+                    if (node == null) {
                         player.displayClientMessage(
-                                Component.translatable("gui.distantstock.group.closed"), true);
+                                Component.translatable("gui.distantstock.group.unknown"), true);
                         return ItemInteractionResult.sidedSuccess(level.isClientSide);
                     }
                     be.setDefaultDestination(node, carried);
@@ -325,7 +375,7 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                 .orElse(node.toString().substring(0, 8));
     }
 
-    private static boolean admits(Level level, java.util.UUID group, Player player) {
+    private static boolean admits(Level level, java.util.UUID group, java.util.UUID scope, Player player) {
         if (level.getServer() == null) {
             return false;
         }
@@ -335,6 +385,21 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
         dev.distantstock.routing.DockGroup found = DockGroupDirectory.get(level.getServer()).find(group).orElse(null);
         // A group that is gone cannot be joined, and saying yes would leave a dock pointed at
         // nothing while reporting success.
-        return found != null && found.admits(player.getUUID());
+        return found != null && found.distantNetworkId().equals(scope) && found.admits(player.getUUID());
+    }
+
+    /** The node that actually owns this receiving address, inside the selected Distant network. */
+    private static java.util.UUID destinationNode(Level level, java.util.UUID scope, java.util.UUID group) {
+        if (level.getServer() == null || !dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope)
+                || group == null || group.equals(DockGroupDirectory.DEFAULT_GROUP_ID)) {
+            return null;
+        }
+        var local = DockGroupDirectory.get(level.getServer()).find(group).orElse(null);
+        if (local != null) {
+            return local.distantNetworkId().equals(scope)
+                    ? TranserverBridge.localNodeUuid() : null;
+        }
+        var remote = dev.distantstock.routing.RemoteGroups.get(level.getServer()).find(group).orElse(null);
+        return remote != null && remote.distantNetworkId().equals(scope) ? remote.node() : null;
     }
 }

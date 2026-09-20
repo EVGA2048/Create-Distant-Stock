@@ -44,6 +44,123 @@ public final class DistantNetworkGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 20)
+    public static void localIdentityUpgradeMigratesMembershipAndAuthority(GameTestHelper h) {
+        var directory = new DistantNetworkDirectory();
+        UUID freq = UUID.randomUUID();
+        UUID oldNode = UUID.randomUUID();
+        UUID currentNode = UUID.randomUUID();
+        UUID owner = UUID.randomUUID();
+        UUID world = UUID.randomUUID();
+        String dimension = "minecraft:overworld";
+        var oldMember = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, oldNode,
+                world, dimension, freq);
+        var currentMember = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, currentNode,
+                world, dimension, freq);
+        var network = directory.create("identity-upgrade-" + freq.toString().substring(0, 8),
+                oldNode, owner, oldMember);
+
+        h.assertTrue(directory.canonicalizeLocalMember(currentMember),
+                "local identity upgrade did not migrate the stale membership");
+        h.assertTrue(directory.formalNetworkOf(currentMember).filter(network.id()::equals).isPresent(),
+                "current local identity did not inherit the existing Distant Stock membership");
+        h.assertTrue(directory.networkOf(oldMember).isEmpty(),
+                "stale local RemoteNetworkId remained in membership after canonicalisation");
+        var migrated = directory.find(network.id()).orElseThrow();
+        h.assertTrue(currentNode.equals(migrated.ownerNode()),
+                "network authority still points at the obsolete local node identity");
+        h.assertTrue(migrated.ownedBy(owner) && !migrated.joinCode().isBlank(),
+                "identity migration damaged owner or join-code metadata");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void localJoinCodeAcceptsExplicitLegacyMembership(GameTestHelper h) {
+        var server = h.getLevel().getServer();
+        var directory = DistantNetworkDirectory.get(server);
+        UUID node = UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId());
+        UUID playerId = UUID.randomUUID();
+        var authorityMember = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, node,
+                dev.distantstock.routing.WorldIdentity.get(h.getLevel()),
+                h.getLevel().dimension().location().toString(), UUID.randomUUID());
+        var network = directory.create("local-code-" + UUID.randomUUID().toString().substring(0, 8),
+                node, playerId, authorityMember);
+
+        var joiningMember = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, node,
+                dev.distantstock.routing.WorldIdentity.get(h.getLevel()),
+                h.getLevel().dimension().location().toString(), UUID.randomUUID());
+        h.assertTrue(directory.attach(joiningMember, DistantNetworkDirectory.LEGACY_NETWORK_ID),
+                "fixture could not put joining member in Legacy");
+        h.assertTrue(dev.distantstock.link.DistantNetworkJoinService.request(
+                        server, playerId, joiningMember, network.joinCode()),
+                "local join code was rejected before Legacy -> formal migration");
+        h.assertTrue(directory.formalNetworkOf(joiningMember).filter(network.id()::equals).isPresent(),
+                "local join code did not migrate Legacy membership into the formal network");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void explicitLegacyMembershipCanMigrateIntoAFormalNetwork(GameTestHelper h) {
+        var directory = DistantNetworkDirectory.get(h.getLevel().getServer());
+        UUID node = UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId());
+        var member = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, node,
+                dev.distantstock.routing.WorldIdentity.get(h.getLevel()),
+                h.getLevel().dimension().location().toString(), UUID.randomUUID());
+
+        // Simulate a save written by an older build that explicitly persisted the hidden Legacy
+        // scope instead of merely falling back to it.
+        h.assertTrue(directory.attach(member, DistantNetworkDirectory.LEGACY_NETWORK_ID),
+                "fixture could not attach the member to Legacy");
+        var created = directory.create("legacy-upgrade-" + UUID.randomUUID().toString().substring(0, 8),
+                node, OWNER_PLAYER, member);
+        h.assertTrue(directory.formalNetworkOf(member).filter(created.id()::equals).isPresent(),
+                "creating a formal network did not replace explicit Legacy membership");
+
+        var second = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, node,
+                dev.distantstock.routing.WorldIdentity.get(h.getLevel()),
+                h.getLevel().dimension().location().toString(), UUID.randomUUID());
+        h.assertTrue(directory.attach(second, DistantNetworkDirectory.LEGACY_NETWORK_ID),
+                "second fixture could not attach to Legacy");
+        h.assertTrue(directory.attach(second, created.id()),
+                "joining a formal network was blocked by explicit Legacy membership");
+        h.assertTrue(directory.formalNetworkOf(second).filter(created.id()::equals).isPresent(),
+                "Legacy -> formal attach did not persist");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void sameReceivingAddressNameIsIsolatedByDistantNetwork(GameTestHelper h) {
+        var server = h.getLevel().getServer();
+        DockGroupDirectory addresses = DockGroupDirectory.get(server);
+        UUID firstScope = UUID.randomUUID();
+        UUID secondScope = UUID.randomUUID();
+        String name = "333-" + UUID.randomUUID().toString().substring(0, 6);
+        DockGroup first = addresses.createForNetwork(name, OWNER_PLAYER, firstScope,
+                DockGroup.Visibility.PUBLIC);
+        DockGroup second = addresses.createForNetwork(name, OWNER_PLAYER, secondScope,
+                DockGroup.Visibility.PUBLIC);
+        try {
+            var firstMatch = dev.distantstock.routing.ReceivingAddressResolver.resolve(
+                    server, firstScope, name);
+            var secondMatch = dev.distantstock.routing.ReceivingAddressResolver.resolve(
+                    server, secondScope, name);
+            h.assertTrue(firstMatch.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.LOCAL
+                            && first.id().equals(firstMatch.groupId()),
+                    "network A did not resolve its own same-named address");
+            h.assertTrue(secondMatch.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.LOCAL
+                            && second.id().equals(secondMatch.groupId()),
+                    "network B did not resolve its own same-named address");
+            h.assertFalse(dev.distantstock.routing.ReceivingAddressResolver.conflicted(server, first.id()),
+                    "same name in another Distant Stock network falsely conflicted with network A");
+            h.assertFalse(dev.distantstock.routing.ReceivingAddressResolver.conflicted(server, second.id()),
+                    "same name in another Distant Stock network falsely conflicted with network B");
+        } finally {
+            addresses.delete(first.id());
+            addresses.delete(second.id());
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
     public static void remoteBindingKeepsDistantNetworkScopeAcrossSave(GameTestHelper h) {
         RemoteNetworkId warehouse = member();
         UUID scope = UUID.randomUUID();
@@ -178,7 +295,7 @@ public final class DistantNetworkGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 20)
-    public static void legacyReceivingAddressesRemainUsableAfterWarehouseMigration(GameTestHelper h) {
+    public static void legacyReceivingAddressesDoNotLeakIntoFormalNetworks(GameTestHelper h) {
         var server = h.getLevel().getServer();
         DockGroupDirectory addresses = DockGroupDirectory.get(server);
         String name = "旧地址-" + UUID.randomUUID().toString().substring(0, 6);
@@ -186,13 +303,15 @@ public final class DistantNetworkGameTests {
         UUID nexus = UUID.randomUUID();
         try {
             var resolved = dev.distantstock.routing.ReceivingAddressResolver.resolve(server, nexus, name);
-            h.assertTrue(resolved.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.LOCAL
-                            && resolved.local().id().equals(legacy.id()),
-                    "a migrated warehouse could no longer resolve its old receiving address");
+            h.assertTrue(resolved.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.UNKNOWN,
+                    "a formal Distant Stock network fell back to a Legacy receiving address");
             var order = dev.distantstock.routing.OrderDestination.resolve(
                     server, OWNER_PLAYER, nexus, legacy.id());
-            h.assertTrue(order.allowed() && order.kind() == dev.distantstock.routing.OrderDestination.Kind.HERE,
-                    "a saved legacy receiving-address UUID stopped working after warehouse migration");
+            h.assertFalse(order.allowed(),
+                    "a Legacy receiving-address UUID remained routable inside a formal network");
+            h.assertFalse(dev.distantstock.routing.OrderDestination.resolve(
+                            server, OWNER_PLAYER, DistantNetworkDirectory.LEGACY_NETWORK_ID, legacy.id()).allowed(),
+                    "an unjoined warehouse could still place a Distant Stock order through Legacy");
         } finally {
             addresses.delete(legacy.id());
         }
@@ -246,6 +365,55 @@ public final class DistantNetworkGameTests {
                                 && group.visibility() == DockGroup.Visibility.UNLISTED)
                         .orElse(false),
                 "the SNC unlisted address did not survive its scope/visibility");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void warehouseDisplayNamePersistsAndFollowsCanonicalIdentity(GameTestHelper h) {
+        DistantNetworkDirectory directory = new DistantNetworkDirectory();
+        UUID freq = UUID.randomUUID();
+        UUID world = UUID.randomUUID();
+        RemoteNetworkId oldMember = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA,
+                UUID.randomUUID(), world, "minecraft:overworld", freq);
+        var network = directory.create("Named Warehouses", oldMember.nodeId(), OWNER_PLAYER, oldMember);
+        directory.assignDefaultMemberName(oldMember, network.id(), "Tomori");
+        h.assertTrue(directory.renameMember(oldMember, "中央仓库"),
+                "a formal member warehouse could not be renamed");
+
+        CompoundTag saved = directory.save(new CompoundTag(), h.getLevel().registryAccess());
+        DistantNetworkDirectory loaded = DistantNetworkDirectory.load(saved, h.getLevel().registryAccess());
+        h.assertTrue(loaded.memberName(oldMember).filter("中央仓库"::equals).isPresent(),
+                "warehouse display name vanished during save/load");
+
+        RemoteNetworkId currentMember = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA,
+                UUID.randomUUID(), world, "minecraft:overworld", freq);
+        h.assertTrue(loaded.canonicalizeLocalMember(currentMember),
+                "fixture did not canonicalize the stale local member identity");
+        h.assertTrue(loaded.memberName(currentMember).filter("中央仓库"::equals).isPresent(),
+                "warehouse display name did not follow the canonical local identity");
+        h.assertTrue(loaded.memberName(oldMember).isEmpty(),
+                "stale member identity kept a duplicate warehouse display name");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void networkAnnouncementCarriesWarehouseDisplayName(GameTestHelper h) {
+        RemoteNetworkId member = member();
+        UUID scope = UUID.randomUUID();
+        var entry = new dev.distantstock.stock.NetworkDirectory.Entry(
+                member.createFrequency(), "Parallel", 3, member, true, true, scope, "中央仓库");
+        try {
+            byte[] encoded = dev.distantstock.link.NetworkAnnouncementCodec.encode(
+                    java.util.List.of(entry), 20.0, 12.5, java.util.List.of());
+            var decoded = dev.distantstock.link.NetworkAnnouncementCodec.decode(encoded);
+            h.assertTrue(decoded.size() == 1, "announcement lost the warehouse row");
+            h.assertTrue("中央仓库".equals(decoded.getFirst().warehouseName()),
+                    "announcement v5 lost the warehouse display name");
+            h.assertTrue(scope.equals(decoded.getFirst().distantNetworkId()),
+                    "announcement v5 damaged the Distant Stock scope while adding the name");
+        } catch (java.io.IOException exception) {
+            h.fail("warehouse-name announcement codec failed: " + exception.getMessage());
+        }
         h.succeed();
     }
 

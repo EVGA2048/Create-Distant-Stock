@@ -21,21 +21,29 @@ public final class NetworkDirectory {
      *                 and a warning that appears where nothing is wrong is worse than a missing one.
      */
     public record Entry(UUID freq, String server, int links, RemoteNetworkId networkId,
-                        boolean local, boolean packable, UUID distantNetworkId) {
+                        boolean local, boolean packable, UUID distantNetworkId, String warehouseName) {
+        public Entry {
+            warehouseName = warehouseName == null ? "" : warehouseName.trim();
+        }
+
+        public Entry(UUID freq, String server, int links, RemoteNetworkId networkId,
+                     boolean local, boolean packable, UUID distantNetworkId) {
+            this(freq, server, links, networkId, local, packable, distantNetworkId, "");
+        }
         public Entry(UUID freq, String server, int links) {
             this(freq, server, links, null, true, true,
-                    dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID);
+                    dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID, "");
         }
 
         public Entry(UUID freq, String server, int links, RemoteNetworkId networkId, boolean local) {
             this(freq, server, links, networkId, local, true,
-                    dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID);
+                    dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID, "");
         }
 
         public Entry(UUID freq, String server, int links, RemoteNetworkId networkId,
                      boolean local, boolean packable) {
             this(freq, server, links, networkId, local, packable,
-                    dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID);
+                    dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID, "");
         }
 
         /**

@@ -1,0 +1,105 @@
+{
+  "type": "create:sequenced_assembly",
+  "ingredient": {
+    "item": "create:precision_mechanism"
+  },
+  "loops": 1,
+  "results": [
+    {
+      "chance": 120.0,
+      "id": "distantstock:ether_mechanism"
+    },
+    {
+      "chance": 8.0,
+      "id": "create:precision_mechanism"
+    },
+    {
+      "chance": 4.0,
+      "id": "distantstock:polished_ether_quartz"
+    }
+  ],
+  "sequence": [
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "distantstock:incomplete_ether_mechanism"
+        },
+        {
+          "item": "distantstock:polished_ether_quartz"
+        }
+      ],
+      "results": [
+        {
+          "id": "distantstock:incomplete_ether_mechanism"
+        }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "distantstock:incomplete_ether_mechanism"
+        },
+        {
+          "item": "create:electron_tube"
+        }
+      ],
+      "results": [
+        {
+          "id": "distantstock:incomplete_ether_mechanism"
+        }
+      ]
+    },
+    {
+      "type": "create:filling",
+      "ingredients": [
+        {
+          "item": "distantstock:incomplete_ether_mechanism"
+        },
+        {
+          "type": "neoforge:single",
+          "amount": 250,
+          "fluid": "distantstock:molten_amethyst"
+        }
+      ],
+      "results": [
+        {
+          "id": "distantstock:incomplete_ether_mechanism"
+        }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "distantstock:incomplete_ether_mechanism"
+        },
+        {
+          "item": "create:copper_sheet"
+        }
+      ],
+      "results": [
+        {
+          "id": "distantstock:incomplete_ether_mechanism"
+        }
+      ]
+    },
+    {
+      "type": "create:pressing",
+      "ingredients": [
+        {
+          "item": "distantstock:incomplete_ether_mechanism"
+        }
+      ],
+      "results": [
+        {
+          "id": "distantstock:incomplete_ether_mechanism"
+        }
+      ]
+    }
+  ],
+  "transitional_item": {
+    "id": "distantstock:incomplete_ether_mechanism"
+  }
+}

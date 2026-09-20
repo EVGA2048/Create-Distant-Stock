@@ -41,6 +41,8 @@ public final class EventReceiptItem extends Item {
         data.putString("SourceId", event.sourceId());
         data.putString("Detail", event.detail());
         data.putInt("Count", event.count());
+        if (event.createFrequency() != null) data.putUUID("CreateFrequency", event.createFrequency());
+        if (event.distantNetworkId() != null) data.putUUID("DistantNetwork", event.distantNetworkId());
         CompoundTag root = new CompoundTag();
         root.put(ROOT, data);
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(root));
@@ -62,6 +64,8 @@ public final class EventReceiptItem extends Item {
         return Optional.of(new Receipt(data.getUUID("EventId"), data.getLong("OccurredAt"),
                 data.getLong("PrintedAt"), severity, data.getString("Code"),
                 data.getString("SourceType"), data.getString("SourceId"), data.getString("Detail"),
+                data.hasUUID("CreateFrequency") ? data.getUUID("CreateFrequency") : null,
+                data.hasUUID("DistantNetwork") ? data.getUUID("DistantNetwork") : null,
                 Math.max(1, data.getInt("Count"))));
     }
 
@@ -78,6 +82,8 @@ public final class EventReceiptItem extends Item {
         List<Component> lines = new ArrayList<>();
         lines.add(Component.literal(TIME.format(Instant.ofEpochMilli(receipt.occurredAt())))
                 .withStyle(ChatFormatting.GRAY));
+        lines.add(Component.translatable("item.distantstock.event_receipt.printed_at",
+                TIME.format(Instant.ofEpochMilli(receipt.printedAt()))).withStyle(ChatFormatting.DARK_GRAY));
         ChatFormatting severityColor = switch (receipt.severity()) {
             case INFO -> ChatFormatting.AQUA;
             case WARN -> ChatFormatting.GOLD;
@@ -85,10 +91,20 @@ public final class EventReceiptItem extends Item {
         };
         lines.add(Component.literal(receipt.severity().name() + " / " + receipt.code())
                 .withStyle(severityColor));
-        lines.add(Component.translatable("item.distantstock.event_receipt.source", receipt.sourceId())
+        lines.add(Component.translatable("item.distantstock.event_receipt.source",
+                        receipt.sourceType() + " / " + receipt.sourceId())
                 .withStyle(ChatFormatting.DARK_GRAY));
+        if (receipt.createFrequency() != null) {
+            lines.add(Component.translatable("item.distantstock.event_receipt.create_network",
+                    receipt.createFrequency().toString()).withStyle(ChatFormatting.DARK_AQUA));
+        }
+        if (receipt.distantNetworkId() != null) {
+            lines.add(Component.translatable("item.distantstock.event_receipt.distant_network",
+                    receipt.distantNetworkId().toString()).withStyle(ChatFormatting.BLUE));
+        }
         if (!receipt.detail().isBlank()) {
-            lines.add(Component.translatable("item.distantstock.event_receipt.detail", receipt.detail())
+            lines.add(Component.translatable("item.distantstock.event_receipt.detail",
+                            Component.translatable(receipt.detail()))
                     .withStyle(ChatFormatting.GRAY));
         }
         if (receipt.count() > 1) {
@@ -113,6 +129,7 @@ public final class EventReceiptItem extends Item {
 
     public record Receipt(UUID eventId, long occurredAt, long printedAt,
                           EventRegistry.Severity severity, String code,
-                          String sourceType, String sourceId, String detail, int count) {
+                          String sourceType, String sourceId, String detail,
+                          UUID createFrequency, UUID distantNetworkId, int count) {
     }
 }

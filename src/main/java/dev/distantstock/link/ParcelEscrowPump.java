@@ -156,8 +156,12 @@ public final class ParcelEscrowPump {
                     // the record silently stays HELD forever: the parcel has left the dock, the goggles
                     // count it as in flight, and it never arrives. Running the receiver's own apply() here
                     // is what makes "send to my other dock group" work on a save with no Transerver at all.
+                    UUID localNode = TranserverBridge.localNodeUuid();
+                    if (localNode == null) {
+                        continue;
+                    }
                     DeliveryResult result = TranserverPackageService.apply(server, dispatch,
-                            TranserverBridge.localNodeId());
+                            localNode.toString());
                     if (result == DeliveryResult.APPLIED) {
                         // The parcel is in the target dock now. Remove the escrow record first and flush,
                         // because a crash between the two leaves a record the ledger will recognise as a

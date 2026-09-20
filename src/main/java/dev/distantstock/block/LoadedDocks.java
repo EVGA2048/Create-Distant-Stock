@@ -24,6 +24,24 @@ public final class LoadedDocks {
         ALL.add(be);
     }
 
+    /**
+     * Docks that can accept a parcel right now, not merely blocks carrying this group id.
+     * This is the number peers advertise as destination capacity: a RECEIVE dock outside a running
+     * tower, a SEND-only dock, or a full dock is not somebody the sender can safely hand a parcel to.
+     */
+    public static int availableReceiversInGroup(UUID groupId) {
+        int count = 0;
+        for (DockBlockEntity be : ALL) {
+            if (!deliverable(be) || !be.groupId().equals(groupId)) {
+                continue;
+            }
+            if (be.canReceive() && !be.isFull()) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public static void remove(DockBlockEntity be) {
         ALL.remove(be);
     }

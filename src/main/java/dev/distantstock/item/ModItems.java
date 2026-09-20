@@ -31,8 +31,8 @@ public final class ModItems {
                             ModBlocks.REMOTE_REDSTONE_REQUESTER.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> MONITOR = ITEMS.register("monitor",
             () -> new BlockItem(ModBlocks.MONITOR.get(), new Item.Properties()));
-    public static final DeferredHolder<Item, BlockItem> LOGGER = ITEMS.register("logger",
-            () -> new BlockItem(ModBlocks.LOGGER.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, LoggerItem> LOGGER = ITEMS.register("logger",
+            () -> new LoggerItem(ModBlocks.LOGGER.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> STACK_LIGHT = ITEMS.register("stack_light",
             () -> new BlockItem(ModBlocks.STACK_LIGHT.get(), new Item.Properties()));
     public static final DeferredHolder<Item, ConditionLinkerItem> CONDITION_LINKER = ITEMS.register("condition_linker",
@@ -56,6 +56,8 @@ public final class ModItems {
             () -> new RemotePackageItem(new Item.Properties()));
     public static final DeferredHolder<Item, EventReceiptItem> EVENT_RECEIPT = ITEMS.register("event_receipt",
             () -> new EventReceiptItem(new Item.Properties().stacksTo(16)));
+    public static final DeferredHolder<Item, Item> LOGGER_PAPER_ROLL = ITEMS.register("logger_paper_roll",
+            () -> new Item(new Item.Properties().stacksTo(16)));
     public static final DeferredHolder<Item, Item> MANUAL = ITEMS.register("manual",
             () -> new ManualItem(new Item.Properties().stacksTo(1)));
 
@@ -66,6 +68,10 @@ public final class ModItems {
     public static final DeferredHolder<Item, Item> ETHER_QUARTZ = ITEMS.register("ether_quartz",
             () -> new Item(new Item.Properties()));
     public static final DeferredHolder<Item, Item> POLISHED_ETHER_QUARTZ = ITEMS.register("polished_ether_quartz",
+            () -> new Item(new Item.Properties()));
+    public static final DeferredHolder<Item, Item> INCOMPLETE_ETHER_MECHANISM = ITEMS.register("incomplete_ether_mechanism",
+            () -> new Item(new Item.Properties()));
+    public static final DeferredHolder<Item, Item> ETHER_MECHANISM = ITEMS.register("ether_mechanism",
             () -> new Item(new Item.Properties()));
     public static final DeferredHolder<Item, BucketItem> ETHER_BUCKET = ITEMS.register("ether_bucket",
             () -> new BucketItem(dev.distantstock.fluid.ModFluids.ETHER.get(),
@@ -110,9 +116,13 @@ public final class ModItems {
                 out.accept(TOWER_COUPLER.get());
                 out.accept(ETHER_RESONATOR.get());
                 out.accept(REMOTE_PACKAGE.get());
+                out.accept(EVENT_RECEIPT.get());
+                out.accept(LOGGER_PAPER_ROLL.get());
                 out.accept(ENDER_DUST.get());
                 out.accept(ETHER_QUARTZ.get());
                 out.accept(POLISHED_ETHER_QUARTZ.get());
+                out.accept(INCOMPLETE_ETHER_MECHANISM.get());
+                out.accept(ETHER_MECHANISM.get());
                 out.accept(ETHER_BUCKET.get());
                 out.accept(MOLTEN_AMETHYST_BUCKET.get());
                 out.accept(ETHER_BOTTLE.get());

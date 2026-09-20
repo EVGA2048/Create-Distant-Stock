@@ -1,5 +1,7 @@
 package dev.distantstock.client;
 
+import dev.distantstock.block.LoggerBlockEntity;
+
 import dev.distantstock.event.EventRegistry;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.net.LoggerActionC2S;
@@ -109,6 +111,10 @@ public final class LoggerScreen extends Screen {
                 : Component.translatable("gui.distantstock.logger.scope.network",
                 RequesterData.shortFreq(snapshot.createFrequency())).getString();
         g.drawString(font, fit(scope, W - 28), x + 14, y + 34, MUTED, false);
+        Component paper = Component.translatable("gui.distantstock.logger.paper",
+                snapshot.paperRemaining(), LoggerBlockEntity.PAPER_CAPACITY);
+        g.drawString(font, paper, x + W - 14 - font.width(paper), y + 34,
+                snapshot.paperRemaining() > 0 ? GOOD : ERROR, false);
     }
 
     private void drawFilters(GuiGraphics g, int x, int y, int mouseX, int mouseY) {
@@ -188,12 +194,17 @@ public final class LoggerScreen extends Screen {
             g.drawString(font, Component.translatable("gui.distantstock.logger.acknowledged"),
                     ax, y + 3, MUTED, false);
         } else if (row.severity() != EventRegistry.Severity.INFO) {
+            boolean paperAvailable = snapshot.paperRemaining() > 0;
             boolean over = inside(mouseX, mouseY, ax - 3, y + 1, 42, 14);
-            g.fill(ax - 3, y + 1, ax + 39, y + 15, over ? 0xFF5A4B36 : 0xFF463A2E);
+            g.fill(ax - 3, y + 1, ax + 39, y + 15,
+                    !paperAvailable ? 0xFF2E3436 : over ? 0xFF5A4B36 : 0xFF463A2E);
             Component print = Component.translatable("gui.distantstock.logger.print");
-            g.drawString(font, print, ax + 18 - font.width(print) / 2, y + 4, WARN, false);
-            hits.add(new Hit(ax - 3, y + 1, 42, 14,
-                    () -> PacketDistributor.sendToServer(LoggerActionC2S.print(source(), row.id()))));
+            g.drawString(font, print, ax + 18 - font.width(print) / 2, y + 4,
+                    paperAvailable ? WARN : MUTED, false);
+            if (paperAvailable) {
+                hits.add(new Hit(ax - 3, y + 1, 42, 14,
+                        () -> PacketDistributor.sendToServer(LoggerActionC2S.print(source(), row.id()))));
+            }
         }
     }
 

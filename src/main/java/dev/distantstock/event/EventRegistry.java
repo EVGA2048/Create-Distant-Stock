@@ -38,12 +38,18 @@ public final class EventRegistry extends SavedData {
         public static final String DOCK_NO_ADDRESS = "DOCK_NO_ADDRESS";
         public static final String DOCK_NO_ROUTE = "DOCK_NO_ROUTE";
         public static final String DOCK_RETURN_BLOCKED = "DOCK_RETURN_BLOCKED";
+        public static final String DOCK_OUTBOUND_STUCK = "DOCK_OUTBOUND_STUCK";
+        public static final String DOCK_NO_RECEIVER = "DOCK_NO_RECEIVER";
         public static final String ADDRESS_CONFLICT = "ADDRESS_CONFLICT";
         public static final String LINK_OFFLINE = "LINK_OFFLINE";
         public static final String TOWER_STOPPED = "TOWER_STOPPED";
         public static final String TOWER_OVERSTRESSED = "TOWER_OVERSTRESSED";
         public static final String TOWER_NO_ETHER = "TOWER_NO_ETHER";
         public static final String PARCEL_QUARANTINED = "PARCEL_QUARANTINED";
+        public static final String NETWORK_OFFLINE = "NETWORK_OFFLINE";
+        public static final String NETWORK_LINKS_OFFLINE = "NETWORK_LINKS_OFFLINE";
+        public static final String NETWORK_LOCKED = "NETWORK_LOCKED";
+        public static final String AUTOMATION_STALLED = "AUTOMATION_STALLED";
 
         private Codes() {
         }

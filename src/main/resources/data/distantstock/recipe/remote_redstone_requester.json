@@ -2,20 +2,23 @@
   "type": "minecraft:crafting_shaped",
   "category": "redstone",
   "key": {
-    "B": {
-      "item": "create:brass_sheet"
+    "M": {
+      "item": "distantstock:ether_mechanism"
     },
     "P": {
       "item": "distantstock:polished_ether_quartz"
     },
     "R": {
       "item": "create:redstone_requester"
+    },
+    "B": {
+      "item": "create:brass_sheet"
     }
   },
   "pattern": [
-    "BPB",
+    " M ",
     "PRP",
-    "BPB"
+    " B "
   ],
   "result": {
     "count": 1,

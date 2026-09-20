@@ -24,6 +24,53 @@ import java.util.UUID;
 @PrefixGameTestTemplate(false)
 public final class DockGameTests {
 
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void receiverProbeRequiresSameNetworkAndLiveReceivingDock(GameTestHelper h) {
+        var level = h.getLevel();
+        UUID localNode = UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId());
+        var member = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA, localNode,
+                dev.distantstock.routing.WorldIdentity.get(level), level.dimension().location().toString(),
+                UUID.randomUUID());
+        var distant = dev.distantstock.routing.DistantNetworkDirectory.get(level.getServer())
+                .create("probe-" + UUID.randomUUID().toString().substring(0, 8), localNode,
+                        UUID.randomUUID(), member);
+        var groups = dev.distantstock.routing.DockGroupDirectory.get(level.getServer());
+        var live = groups.createForNetwork("333-" + UUID.randomUUID().toString().substring(0, 6),
+                null, distant.id(), dev.distantstock.routing.DockGroup.Visibility.PUBLIC);
+        var empty = groups.createForNetwork("empty-" + UUID.randomUUID().toString().substring(0, 6),
+                null, distant.id(), dev.distantstock.routing.DockGroup.Visibility.PUBLIC);
+
+        BlockPos receiverPos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(receiverPos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        DockBlockEntity receiver = (DockBlockEntity) level.getBlockEntity(receiverPos);
+        receiver.setImport();
+        receiver.setGroupId(live.id());
+        // setBlock has not necessarily run the BE's onLoad hook before this same test tick; make
+        // the live-dock registry explicit because that registry is exactly what the probe reads.
+        dev.distantstock.block.LoadedDocks.add(receiver);
+        TowerActivation.pinDevice(dev.distantstock.routing.TowerSystem.TowerId.of(
+                level.dimension(), receiverPos), true, null);
+        try {
+            h.assertTrue(dev.distantstock.link.ReceiverProbeService.state(level.getServer(), localNode,
+                            distant.id(), live.id()) == dev.distantstock.link.ReceiverProbeService.State.AVAILABLE,
+                    "live receiver in the same Distant Stock network was not available");
+            h.assertTrue(dev.distantstock.link.ReceiverProbeService.state(level.getServer(), localNode,
+                            distant.id(), empty.id()) == dev.distantstock.link.ReceiverProbeService.State.UNAVAILABLE,
+                    "an address with no receiving dock was reported available");
+            h.assertTrue(dev.distantstock.link.ReceiverProbeService.state(level.getServer(), localNode,
+                            UUID.randomUUID(), live.id()) == dev.distantstock.link.ReceiverProbeService.State.UNAVAILABLE,
+                    "a live dock leaked across Distant Stock network scope");
+            h.succeed();
+        } finally {
+            TowerActivation.unpinDevice(dev.distantstock.routing.TowerSystem.TowerId.of(
+                    level.dimension(), receiverPos));
+            dev.distantstock.block.LoadedDocks.remove(receiver);
+            groups.delete(live.id());
+            groups.delete(empty.id());
+        }
+    }
+
     /** Handing a parcel to the dock by hand has to use the same slot a hopper fills. */
     @GameTest(template = "empty", timeoutTicks = 40)
     public static void packageRightClickEntersDock(GameTestHelper h) {
@@ -43,6 +90,54 @@ public final class DockGameTests {
                 "parcel did not enter the dock");
         h.assertTrue(parcel.isEmpty(), "survival right click did not consume the parcel");
         h.succeed();
+    }
+
+    /**
+     * A named receiving address is not enough by itself: the latest peer announcement must say
+     * that at least one dock behind that address can actually receive.  Otherwise the source keeps
+     * custody, flashes orange and raises one WARN for the logger instead of handing the parcel to
+     * escrow and discovering the missing receiver on the far side.
+     */
+    @GameTest(template = "empty", timeoutTicks = 180)
+    public static void remoteAddressWithNoReceiverStaysAtTheSendingDock(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        DockBlockEntity dock = (DockBlockEntity) level.getBlockEntity(pos);
+        TestTowers.carried(h, pos);
+
+        UUID remoteNode = UUID.randomUUID();
+        UUID group = UUID.randomUUID();
+        dev.distantstock.routing.RemoteGroups.get(level.getServer()).add(
+                new dev.distantstock.routing.RemoteGroups.Entry(remoteNode, group, "333", "peer",
+                        0, true, null, java.util.Map.of(), 0), System.currentTimeMillis());
+
+        dock.setExport(UUID.randomUUID());
+        dock.setDefaultDestination(remoteNode, group);
+        int escrowBefore = dev.distantstock.link.ParcelEscrow.get(level.getServer()).size();
+
+        ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        com.simibubi.create.content.logistics.box.PackageItem.addAddress(parcel, "Line-333");
+        var handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, Direction.UP);
+        h.assertTrue(handler != null && handler.insertItem(0, parcel, false).isEmpty(),
+                "parcel did not enter the outgoing bay");
+
+        h.runAfterDelay(100, () -> {
+            h.assertTrue(!dock.displayedStack().isEmpty(),
+                    "parcel left even though address 333 advertised zero receiving docks");
+            h.assertTrue(dock.fallbackSlots() == 0,
+                    "no-receiver parcel was returned instead of being held for automatic recovery");
+            h.assertTrue(dock.status() == DockStatus.BLOCKED,
+                    "no receiver did not switch the dock to the orange blocked lamp");
+            h.assertTrue(dev.distantstock.link.ParcelEscrow.get(level.getServer()).size() == escrowBefore,
+                    "no-receiver parcel entered escrow before a destination could accept it");
+            String source = dev.distantstock.event.EventRegistry.blockSource(level, pos);
+            var event = dev.distantstock.event.EventRegistry.get(level.getServer())
+                    .active(dev.distantstock.event.EventRegistry.Codes.DOCK_NO_RECEIVER, "dock", source);
+            h.assertTrue(event.isPresent() && event.get().severity() == dev.distantstock.event.EventRegistry.Severity.WARN,
+                    "no receiver did not raise the logger WARN event");
+            h.succeed();
+        });
     }
 
     /**
@@ -266,8 +361,16 @@ public final class DockGameTests {
         // Two systems with two names, so neither dock can be receiving by accident.
         var directory = dev.distantstock.routing.DockGroupDirectory.get(level.getServer());
         String stamp = java.util.UUID.randomUUID().toString().substring(0, 8);
-        dev.distantstock.routing.DockGroup from = directory.createFor("tower-a-" + stamp, null);
-        dev.distantstock.routing.DockGroup to = directory.createFor("tower-b-" + stamp, null);
+        var member = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA, node,
+                dev.distantstock.routing.WorldIdentity.get(level), level.dimension().location().toString(),
+                java.util.UUID.randomUUID());
+        var distant = dev.distantstock.routing.DistantNetworkDirectory.get(level.getServer())
+                .create("tower-hop-" + stamp, node, java.util.UUID.randomUUID(), member);
+        dev.distantstock.routing.DockGroup from = directory.createForNetwork("tower-a-" + stamp, null,
+                distant.id(), dev.distantstock.routing.DockGroup.Visibility.PUBLIC);
+        dev.distantstock.routing.DockGroup to = directory.createForNetwork("tower-b-" + stamp, null,
+                distant.id(), dev.distantstock.routing.DockGroup.Visibility.PUBLIC);
         sender.setGroupId(from.id());
         receiver.setGroupId(to.id());
 

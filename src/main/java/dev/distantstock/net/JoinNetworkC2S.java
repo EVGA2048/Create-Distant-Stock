@@ -5,6 +5,7 @@ import dev.distantstock.config.StockConfig;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.menu.RequesterMenu;
 import dev.distantstock.stock.NetworkDirectory;
+import dev.distantstock.stock.CreateNetworkAccess;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -59,32 +60,34 @@ public record JoinNetworkC2S(UUID freq, RemoteNetworkId networkId) implements Cu
             if (entry == null) {
                 return;
             }
-            /*
-             * First tune: a terminal has no Distant Stock network context yet, so it may only be
-             * pointed at a Create network that physically lives on this server. Cross-server
-             * warehouses become selectable only after the local warehouse has joined a Distant
-             * Stock network.
-             *
-             * Retune: stay inside the current Distant Stock network. This is a server-side gate,
-             * not just a filtered list on the screen — a crafted packet must not hop between two
-             * unrelated logistics domains.
-             */
-            RemoteNetworkId current = menu.networkId(player);
-            if (current == null) {
-                if (!entry.local()) {
-                    return;
-                }
+            java.util.UUID targetScope;
+            if (entry.local() && entry.networkId() != null) {
+                targetScope = dev.distantstock.routing.DistantNetworkDirectory.get(player.getServer())
+                        .formalNetworkOf(entry.networkId())
+                        .orElse(dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID);
             } else {
-                java.util.UUID currentScope = menu.distantNetworkId(player);
-                if (!currentScope.equals(entry.distantNetworkId())) {
-                    return;
-                }
+                targetScope = entry.distantNetworkId() == null
+                        ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID
+                        : entry.distantNetworkId();
+            }
+            // A warehouse may only be selected after this terminal/request desk already has a
+            // formal Distant Stock network context, and only from that network's member set. The
+            // server enforces this even if a crafted client sends an arbitrary Create frequency.
+            java.util.UUID currentScope = menu.distantNetworkId(player);
+            if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(currentScope)
+                    || !currentScope.equals(targetScope)) {
+                return;
+            }
+            if (entry.local() && !CreateNetworkAccess.mayInteract(entry.networkId(), entry.freq(), player)) {
+                player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                        "message.distantstock.network.interact_denied"), true);
+                return;
             }
             if (menu.gauge(player) != null) {
                 if (entry.networkId() == null) {
                     menu.gauge(player).setFreq(msg.freq);
                 } else {
-                    menu.gauge(player).setNetwork(entry.networkId(), entry.distantNetworkId());
+                    menu.gauge(player).setNetwork(entry.networkId(), targetScope);
                 }
             } else {
                 ItemStack device = menu.device(player);
@@ -92,7 +95,7 @@ public record JoinNetworkC2S(UUID freq, RemoteNetworkId networkId) implements Cu
                     if (entry.networkId() == null) {
                         RequesterData.setFreq(device, msg.freq);
                     } else {
-                        RequesterData.setNetwork(device, entry.networkId(), entry.distantNetworkId());
+                        RequesterData.setNetwork(device, entry.networkId(), targetScope);
                     }
                 }
             }
@@ -102,7 +105,9 @@ public record JoinNetworkC2S(UUID freq, RemoteNetworkId networkId) implements Cu
                 dev.distantstock.stock.StockCache.clearRefusal(entry.networkId());
             }
             menu.refresh(player);
-            PacketDistributor.sendToPlayer(player, StockSyncS2C.of(menu.demo, menu.stock));
+            PacketDistributor.sendToPlayer(player, StockSyncS2C.of(
+                    menu.demo, menu.stock, menu.distantNetworkId(player)));
+            CreateNetworkLockS2C.send(player, menu);
         });
     }
 }

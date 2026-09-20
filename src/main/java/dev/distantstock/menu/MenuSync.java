@@ -5,9 +5,12 @@ import dev.distantstock.link.LinkClient;
 import dev.distantstock.stock.CreateStock;
 import dev.distantstock.stock.NetworkDirectory;
 import dev.distantstock.stock.StockCache;
+import dev.distantstock.block.GaugeBlockEntity;
+import dev.distantstock.item.RequesterData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,21 +18,85 @@ import java.util.UUID;
 import dev.distantstock.routing.RemoteNetworkId;
 
 public final class MenuSync {
-    public static void writeItem(FriendlyByteBuf buf, InteractionHand hand, UUID freq) {
+    public static void writeItem(FriendlyByteBuf buf, InteractionHand hand, ItemStack stack) {
         buf.writeBoolean(false);
         buf.writeEnum(hand);
+        UUID freq = RequesterData.freq(stack);
         writeFreq(buf, freq);
-        writeCatalog(buf, freq);
+        UUID scope = RequesterData.distantNetwork(stack)
+                .filter(dev.distantstock.routing.DistantNetworkDirectory::isFormalId)
+                .orElse(null);
+        writeCatalog(buf, freq, scope);
+        writeState(buf,
+                RequesterData.network(stack).orElse(null),
+                scope,
+                RequesterData.address(stack), RequesterData.homeAddress(stack),
+                RequesterData.receivingGroup(stack).orElse(null),
+                RequesterData.receivingGroupName(stack).orElse(""));
     }
 
-    public static void writeGauge(FriendlyByteBuf buf, BlockPos pos, UUID freq) {
+    public static void writeGauge(FriendlyByteBuf buf, BlockPos pos, GaugeBlockEntity gauge) {
         buf.writeBoolean(true);
         buf.writeBlockPos(pos);
+        UUID freq = gauge == null ? null : gauge.freq();
         writeFreq(buf, freq);
-        writeCatalog(buf, freq);
+        UUID scope = gauge != null && gauge.hasDistantNetworkId()
+                && dev.distantstock.routing.DistantNetworkDirectory.isFormalId(gauge.distantNetworkId())
+                ? gauge.distantNetworkId() : null;
+        writeCatalog(buf, freq, scope);
+        if (gauge == null) {
+            writeState(buf, null, null, "", "", null, "");
+            return;
+        }
+        UUID group = gauge.receivingGroup();
+        writeState(buf, gauge.networkId(), gauge.hasDistantNetworkId() ? gauge.distantNetworkId() : null,
+                gauge.address(), gauge.homeAddress(), group, groupName(gauge, group));
     }
 
-    public static void writeCatalog(FriendlyByteBuf buf, UUID freq) {
+    /**
+     * The requester's durable configuration travels in the menu-opening payload itself.
+     *
+     * <p>Do not make the client reconstruct this from its ItemStack / block-entity mirror. The held
+     * requester is edited while a menu with no inventory slots is open, so its client copy may be
+     * stale; a block entity update can likewise arrive after the screen has already initialised.
+     * Opening the screen is the one moment the server can hand over one coherent truth.
+     */
+    private static void writeState(FriendlyByteBuf buf, RemoteNetworkId network, UUID distantNetwork,
+                                   String address, String homeAddress, UUID group, String groupName) {
+        buf.writeBoolean(network != null);
+        if (network != null) buf.writeNbt(network.save());
+        buf.writeBoolean(distantNetwork != null);
+        if (distantNetwork != null) buf.writeUUID(distantNetwork);
+        buf.writeUtf(address == null ? "" : address, 40);
+        buf.writeUtf(homeAddress == null ? "" : homeAddress, 40);
+        buf.writeBoolean(group != null);
+        if (group != null) buf.writeUUID(group);
+        buf.writeUtf(groupName == null ? "" : groupName, dev.distantstock.routing.DockGroup.MAX_NAME_LENGTH);
+    }
+
+    public static void readState(RequesterMenu menu, FriendlyByteBuf buf) {
+        menu.openedNetworkId = buf.readBoolean()
+                ? RemoteNetworkId.read(buf.readNbt()).orElse(null) : null;
+        menu.openedDistantNetworkId = buf.readBoolean() ? buf.readUUID() : null;
+        menu.openedAddress = buf.readUtf(40);
+        menu.openedHomeAddress = buf.readUtf(40);
+        menu.openedReceivingGroup = buf.readBoolean() ? buf.readUUID() : null;
+        menu.openedReceivingGroupName = buf.readUtf(dev.distantstock.routing.DockGroup.MAX_NAME_LENGTH);
+        menu.hasOpenedState = true;
+    }
+
+    private static String groupName(GaugeBlockEntity gauge, UUID group) {
+        if (gauge == null || group == null || gauge.getLevel() == null || gauge.getLevel().getServer() == null) {
+            return "";
+        }
+        var server = gauge.getLevel().getServer();
+        var local = dev.distantstock.routing.DockGroupDirectory.get(server).find(group).orElse(null);
+        if (local != null) return local.name();
+        var remote = dev.distantstock.routing.RemoteGroups.get(server).find(group).orElse(null);
+        return remote == null ? "" : remote.name();
+    }
+
+    public static void writeCatalog(FriendlyByteBuf buf, UUID freq, UUID scope) {
         warm(freq);
         List<StockCache.Entry> list = StockCache.get(freq);
         buf.writeBoolean(StockConfig.DEMO_STOCK.get());
@@ -40,7 +107,11 @@ public final class MenuSync {
             buf.writeUtf(e.itemId);
             buf.writeVarInt(e.count);
         }
-        List<NetworkDirectory.Entry> networks = NetworkDirectory.visible(StockConfig.isHost());
+        List<NetworkDirectory.Entry> networks = !dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope)
+                ? List.of()
+                : NetworkDirectory.visible(StockConfig.isHost()).stream()
+                .filter(entry -> scope.equals(entry.distantNetworkId()))
+                .toList();
         buf.writeVarInt(Math.min(networks.size(), 128));
         for (int i = 0; i < networks.size() && i < 128; i++) {
             NetworkDirectory.Entry entry = networks.get(i);
@@ -61,6 +132,7 @@ public final class MenuSync {
             buf.writeUUID(entry.distantNetworkId() == null
                     ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID
                     : entry.distantNetworkId());
+            buf.writeUtf(entry.warehouseName(), 64);
         }
     }
 
@@ -83,8 +155,9 @@ public final class MenuSync {
             boolean local = buf.readBoolean();
             boolean packable = buf.readBoolean();
             UUID distantNetworkId = buf.readUUID();
+            String warehouseName = buf.readUtf(64);
             directory.add(new NetworkDirectory.Entry(freq, server, links, networkId, local, packable,
-                    distantNetworkId));
+                    distantNetworkId, warehouseName));
         }
         menu.networks = directory;
     }
@@ -105,10 +178,18 @@ public final class MenuSync {
         if (freq == null) {
             return networkId;
         }
-        RemoteNetworkId known = NetworkDirectory.findByFreq(freq)
-                .map(NetworkDirectory.Entry::networkId)
-                .orElse(null);
+        NetworkDirectory.Entry knownEntry = NetworkDirectory.findByFreq(freq).orElse(null);
+        RemoteNetworkId known = knownEntry == null ? null : knownEntry.networkId();
         if (networkId == null) {
+            return known;
+        }
+        // The live local directory is authoritative for a local Create warehouse.  A portable
+        // requester may have been tuned by an older Distant Stock version when singleplayer used a
+        // different/null node id.  Requiring the node id to match here traps that item forever on
+        // the stale identity: the network page shows the warehouse from the live directory, while
+        // CREATE/JOIN looks up the old identity and concludes it is not local.  Frequency is unique
+        // inside this local Create runtime, so a local row safely replaces the stale item copy.
+        if (knownEntry != null && knownEntry.local() && known != null) {
             return known;
         }
         // 设备身上那一份可能比目录旧：它记着的是**上一次开机**的世界 id（那次身份没落盘，见

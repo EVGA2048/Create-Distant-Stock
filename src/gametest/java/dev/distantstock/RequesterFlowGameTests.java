@@ -13,24 +13,74 @@ import dev.distantstock.routing.TowerActivation;
 import dev.distantstock.routing.TowerSystem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BarrelBlockEntity;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.AttachFace;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import java.util.List;
 import java.util.UUID;
+import io.netty.buffer.Unpooled;
 
 /** Exercises the requester service with real Create packaging; only the conveyor handoff is simulated. */
 @GameTestHolder("distantstock")
 @PrefixGameTestTemplate(false)
 public final class RequesterFlowGameTests {
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void freshDockItemBindsToCreateNetworkUsingStableNodeIdentity(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        UUID localNode = dev.distantstock.link.TranserverBridge.localNodeUuid();
+        h.assertTrue(localNode != null, "stable Transerver node identity is unavailable");
+
+        UUID freq = UUID.randomUUID();
+        BlockPos linkPos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(linkPos, net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                .get(ResourceLocation.parse("create:stock_link")).defaultBlockState()
+                .setValue(BlockStateProperties.ATTACH_FACE, AttachFace.FLOOR), 3);
+        var link = (PackagerLinkBlockEntity) level.getBlockEntity(linkPos);
+        h.assertTrue(link != null, "Create stock link did not create its block entity");
+
+        var logistics = new com.simibubi.create.content.logistics.packagerLink.LogisticsNetwork(freq);
+        com.simibubi.create.Create.LOGISTICS.logisticsNetworks.put(freq, logistics);
+        try {
+            LogisticallyLinkedBehaviour.remove(link.behaviour);
+            link.behaviour.freqId = freq;
+            logistics.loadedLinks.add(GlobalPos.of(level.dimension(), linkPos));
+            LogisticallyLinkedBehaviour.keepAlive(link.behaviour);
+
+            ItemStack dock = new ItemStack(dev.distantstock.item.ModItems.DOCK.get());
+            player.setItemInHand(InteractionHand.MAIN_HAND, dock);
+            BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(linkPos), Direction.UP, linkPos, false);
+            var result = dock.getItem().useOn(new UseOnContext(player, InteractionHand.MAIN_HAND, hit));
+            h.assertTrue(result.consumesAction(), "a fresh Distant Stock dock could not copy a valid Create network");
+
+            var bound = dev.distantstock.item.RequesterData.network(dock).orElse(null);
+            h.assertTrue(bound != null, "dock binding reported success without storing a RemoteNetworkId");
+            h.assertTrue(localNode.equals(bound.nodeId()),
+                    "dock stored transport-session identity instead of the stable local node identity");
+            h.assertTrue(freq.equals(bound.createFrequency()), "dock stored the wrong Create logistics frequency");
+        } finally {
+            com.simibubi.create.Create.LOGISTICS.logisticsNetworks.remove(freq);
+        }
+        h.succeed();
+    }
+
     /**
      * 请求台重启之后还记得自己调在哪张网络上。
      *
@@ -74,6 +124,151 @@ public final class RequesterFlowGameTests {
         h.succeed();
     }
 
+    @GameTest(template = "empty", timeoutTicks = 30)
+    public static void deviceCachedScopeCannotOverrideLiveCreateMembership(GameTestHelper h) {
+        var level = h.getLevel();
+        UUID freq = UUID.randomUUID();
+        UUID localNode = UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId());
+        var network = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA, localNode,
+                dev.distantstock.routing.WorldIdentity.get(level), level.dimension().location().toString(), freq);
+        var directory = dev.distantstock.routing.DistantNetworkDirectory.get(level.getServer());
+        var formal = directory.create("scope-source-" + freq.toString().substring(0, 8),
+                localNode, UUID.randomUUID(), network);
+
+        var oldRows = dev.distantstock.stock.NetworkDirectory.local();
+        try {
+            dev.distantstock.stock.NetworkDirectory.replaceLocal(java.util.List.of(
+                    new dev.distantstock.stock.NetworkDirectory.Entry(freq, "唯一真值仓库", 1,
+                            network, true, true, formal.id())));
+
+            ItemStack first = new ItemStack(dev.distantstock.item.ModItems.REQUESTER.get());
+            ItemStack second = new ItemStack(dev.distantstock.item.ModItems.REQUESTER.get());
+            UUID staleA = UUID.randomUUID();
+            UUID staleB = UUID.randomUUID();
+            dev.distantstock.item.RequesterData.setNetwork(first, network, staleA);
+            dev.distantstock.item.RequesterData.setNetwork(second, network, staleB);
+
+            h.assertTrue(dev.distantstock.item.RequesterData.formalDistantNetwork(first, level.getServer())
+                            .filter(formal.id()::equals).isPresent(),
+                    "terminal A's cached Distant network overrode the live Create membership");
+            h.assertTrue(dev.distantstock.item.RequesterData.formalDistantNetwork(second, level.getServer())
+                            .filter(formal.id()::equals).isPresent(),
+                    "terminal B's different cached Distant network overrode the same live membership");
+        } finally {
+            dev.distantstock.stock.NetworkDirectory.replaceLocal(oldRows);
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void freshRequestDeskHasNoCreateOrDistantNetworkContext(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.GAUGE.get().defaultBlockState(), 3);
+        var desk = (dev.distantstock.block.GaugeBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(desk != null && desk.freq() == null && desk.networkId() == null
+                        && !desk.hasDistantNetworkId(),
+                "a freshly placed request desk already carried a Create/Distant network binding");
+
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        FriendlyByteBuf wire = new FriendlyByteBuf(Unpooled.buffer());
+        dev.distantstock.menu.MenuSync.writeGauge(wire, pos, desk);
+        var opened = dev.distantstock.menu.RequesterMenu.fromNetwork(34, player.getInventory(), wire);
+        h.assertTrue(opened.openedNetworkId() == null && opened.openedDistantNetworkId().isEmpty(),
+                "a fresh request desk's open payload invented a Distant network context");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void stalePortableLocalNodeIdResolvesToLiveSingleplayerWarehouse(GameTestHelper h) {
+        var level = h.getLevel();
+        UUID freq = UUID.randomUUID();
+        UUID liveNode = UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId());
+        var live = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA, liveNode,
+                dev.distantstock.routing.WorldIdentity.get(level), level.dimension().location().toString(), freq);
+        var stale = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA, UUID.randomUUID(),
+                UUID.randomUUID(), level.dimension().location().toString(), freq);
+
+        var oldRows = dev.distantstock.stock.NetworkDirectory.local();
+        try {
+            dev.distantstock.stock.NetworkDirectory.replaceLocal(java.util.List.of(
+                    new dev.distantstock.stock.NetworkDirectory.Entry(freq, "本地测试仓库", 1,
+                            live, true, true,
+                            dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID)));
+            h.assertTrue(live.equals(dev.distantstock.menu.MenuSync.resolve(stale, freq)),
+                    "a stale portable local node id overruled the live singleplayer warehouse identity");
+
+            var directory = dev.distantstock.routing.DistantNetworkDirectory.get(level.getServer());
+            var formal = directory.create("identity-migration-" + freq.toString().substring(0, 8),
+                    stale.nodeId(), UUID.randomUUID(), stale);
+            h.assertTrue(directory.migrateMemberIdentity(stale, live),
+                    "formal membership could not migrate from the old local id to the live id");
+            h.assertTrue(directory.formalNetworkOf(live).filter(formal.id()::equals).isPresent(),
+                    "migrated live local identity lost its Distant Stock network membership");
+            h.assertTrue(directory.networkOf(stale).isEmpty(),
+                    "obsolete local member identity remained attached after migration");
+        } finally {
+            dev.distantstock.stock.NetworkDirectory.replaceLocal(oldRows);
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void requesterOpenPayloadCarriesServerSettingsAndClearedPortableGroup(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.GAUGE.get().defaultBlockState(), 3);
+        var desk = (dev.distantstock.block.GaugeBlockEntity) level.getBlockEntity(pos);
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        UUID localNode = UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId());
+        UUID scope = UUID.randomUUID();
+        UUID groupId = UUID.randomUUID();
+        var network = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA, localNode,
+                dev.distantstock.routing.WorldIdentity.get(level), level.dimension().location().toString(),
+                UUID.randomUUID());
+        desk.setNetwork(network, scope);
+        desk.setAddress("对面-111");
+        desk.setHomeAddress("本端-222");
+        desk.setReceivingGroup(groupId);
+
+        FriendlyByteBuf gaugeWire = new FriendlyByteBuf(Unpooled.buffer());
+        dev.distantstock.menu.MenuSync.writeGauge(gaugeWire, pos, desk);
+        var openedDesk = dev.distantstock.menu.RequesterMenu.fromNetwork(31, player.getInventory(), gaugeWire);
+        h.assertTrue(network.equals(openedDesk.openedNetworkId()),
+                "request desk open payload lost its RemoteNetworkId");
+        h.assertTrue(openedDesk.openedDistantNetworkId().filter(scope::equals).isPresent(),
+                "request desk open payload lost its Distant Stock network");
+        h.assertTrue("对面-111".equals(openedDesk.openedAddress())
+                        && "本端-222".equals(openedDesk.openedHomeAddress()),
+                "request desk open payload did not carry its saved addresses");
+        h.assertTrue(openedDesk.openedReceivingGroup().filter(groupId::equals).isPresent(),
+                "request desk open payload lost its receiving address id");
+
+        ItemStack portable = new ItemStack(dev.distantstock.item.ModItems.REQUESTER.get());
+        dev.distantstock.item.RequesterData.setNetwork(portable, network, scope);
+        dev.distantstock.item.RequesterData.setAddress(portable, "远端");
+        dev.distantstock.item.RequesterData.setHomeAddress(portable, "本地");
+        dev.distantstock.item.RequesterData.setReceivingGroup(portable, UUID.randomUUID(), "333");
+        player.setItemInHand(InteractionHand.MAIN_HAND, portable);
+        var serverMenu = new dev.distantstock.menu.RequesterMenu(32, player.getInventory(), InteractionHand.MAIN_HAND);
+        serverMenu.writeDockGroup(player, "", dev.distantstock.net.SetDockGroupC2S.SELECT);
+        h.assertTrue(dev.distantstock.item.RequesterData.receivingGroup(portable).isEmpty()
+                        && dev.distantstock.item.RequesterData.receivingGroupName(portable).isEmpty(),
+                "clearing 333 from a portable requester did not clear the server ItemStack");
+
+        FriendlyByteBuf itemWire = new FriendlyByteBuf(Unpooled.buffer());
+        dev.distantstock.menu.MenuSync.writeItem(itemWire, InteractionHand.MAIN_HAND, portable);
+        var openedPortable = dev.distantstock.menu.RequesterMenu.fromNetwork(33, player.getInventory(), itemWire);
+        h.assertTrue(openedPortable.openedReceivingGroup().isEmpty()
+                        && openedPortable.openedReceivingGroupName().isEmpty(),
+                "a cleared portable requester resurrected the old 333 in its next open payload");
+        h.succeed();
+    }
+
     @GameTest(template = "empty", timeoutTicks = 450)
     public static void localRequestRoutesEveryVanillaPackageToSelectedGroup(GameTestHelper h) {
         runRequest(h, false);
@@ -87,9 +282,19 @@ public final class RequesterFlowGameTests {
     private static void runRequest(GameTestHelper h, boolean stableId) {
         var level = h.getLevel();
         UUID frequency = UUID.randomUUID();
+        UUID localNode = UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId());
+        var network = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA, localNode,
+                stableId ? dev.distantstock.routing.WorldIdentity.get(level) : UUID.randomUUID(),
+                level.dimension().location().toString(), frequency);
+        UUID owner = UUID.randomUUID();
+        var distant = dev.distantstock.routing.DistantNetworkDirectory.get(level.getServer())
+                .create("request-flow-" + frequency.toString().substring(0, 8), localNode, owner, network);
         var groups = DockGroupDirectory.get(level.getServer());
-        UUID from = groups.create("from-" + frequency).id();
-        UUID to = groups.create("to-" + frequency).id();
+        UUID from = groups.createForNetwork("from-" + frequency, owner, distant.id(),
+                dev.distantstock.routing.DockGroup.Visibility.PUBLIC).id();
+        UUID to = groups.createForNetwork("to-" + frequency, owner, distant.id(),
+                dev.distantstock.routing.DockGroup.Visibility.PUBLIC).id();
         BlockPos packPos = h.absolutePos(new BlockPos(2, 2, 2));
         level.setBlock(packPos.south(), Blocks.BARREL.defaultBlockState(), 3);
         var barrel = (BarrelBlockEntity) level.getBlockEntity(packPos.south());
@@ -117,15 +322,23 @@ public final class RequesterFlowGameTests {
             com.simibubi.create.Create.LOGISTICS.logisticsNetworks.put(frequency,
                     new com.simibubi.create.content.logistics.packagerLink.LogisticsNetwork(frequency));
             LogisticallyLinkedBehaviour.keepAlive(link.behaviour);
+            // openNetworks() deliberately ignores a Create network until at least one stock link is
+            // loaded. The keepAlive bookkeeping settles on Create's tick; make the visibility fact
+            // explicit here because this assertion is about Distant Stock's singleplayer node id,
+            // not Create's delayed registration timing.
+            com.simibubi.create.Create.LOGISTICS.logisticsNetworks.get(frequency).loadedLinks.add(
+                    net.minecraft.core.GlobalPos.of(level.dimension(), packPos.above()));
             packager.recheckIfLinksPresent();
             h.assertTrue(packager.getAvailableItems().getCountOf(new ItemStack(Items.IRON_INGOT)) == 640,
                     "fixture packager cannot see its inventory");
-            var network = stableId ? new dev.distantstock.routing.RemoteNetworkId(
-                    dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA,
-                    UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId()),
-                    dev.distantstock.routing.WorldIdentity.get(level), level.dimension().location().toString(), frequency) : null;
-            h.assertTrue(OrderService.place(level.getServer(), network, frequency, "factory", to,
-                    List.of(new LinkQueues.Line("minecraft:iron_ingot", 640))) == OrderService.Result.QUEUED,
+            dev.distantstock.stock.StockScanner.scan(level.getServer());
+            var scanned = dev.distantstock.stock.NetworkDirectory.findByFreq(frequency).orElse(null);
+            h.assertTrue(scanned != null && scanned.local() && scanned.networkId() != null
+                            && localNode.equals(scanned.networkId().nodeId()),
+                    "singleplayer StockScanner published the local Create network without a stable RemoteNetworkId");
+            h.assertTrue(OrderService.place(level.getServer(), network, frequency, distant.id(),
+                    "factory", to, List.of(new LinkQueues.Line("minecraft:iron_ingot", 640)), "")
+                    == OrderService.Result.QUEUED,
                     "request was not queued");
         });
         h.succeedWhen(() -> {

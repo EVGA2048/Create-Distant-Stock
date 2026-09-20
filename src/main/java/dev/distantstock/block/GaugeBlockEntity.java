@@ -91,6 +91,22 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
         return hasDistantNetworkId;
     }
 
+    /** Pair the desk with a Distant Stock network without selecting a warehouse yet. */
+    public void setDistantNetworkContext(UUID scope) {
+        distantNetworkId = scope == null
+                ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID : scope;
+        hasDistantNetworkId = scope != null
+                && dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope);
+        sync();
+    }
+
+    /** Keep the Distant Stock context but forget which member warehouse this desk reads/orders. */
+    public void clearWarehouseBinding() {
+        freq = null;
+        networkId = null;
+        sync();
+    }
+
     /** The group this desk's orders are addressed to; the default group when never chosen. */
     public UUID receivingGroup() {
         return receivingGroup == null

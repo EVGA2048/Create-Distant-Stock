@@ -79,14 +79,15 @@ public record LoggerActionC2S(BlockPos source, int action, UUID eventId, int val
             if (message.action() == SET_LEVEL) {
                 int index = Math.clamp(message.value(), 0, EventRegistry.Severity.values().length - 1);
                 logger.setMinimumSeverity(EventRegistry.Severity.values()[index]);
-            } else if (message.action() == ACKNOWLEDGE && message.eventId() != null) {
-                EventRegistry events = EventRegistry.get(player.getServer());
-                EventRegistry.Record record = events.find(message.eventId()).orElse(null);
-                if (record != null && record.active() && logger.visible(record)) {
-                    events.acknowledge(message.eventId(), System.currentTimeMillis());
-                }
-            } else if (message.action() == PRINT && message.eventId() != null) {
-                printAndAcknowledge(logger, EventRegistry.get(player.getServer()), message.eventId(),
+            } else if ((message.action() == ACKNOWLEDGE || message.action() == PRINT)
+                    && message.eventId() != null) {
+                // Printing is the acknowledgement operation. Keep the legacy ACK action id for
+                // wire compatibility, but never permit a silent acknowledgement that would mute
+                // the physical logger without producing its incident slip.
+                if (!logger.hasPaper()) {
+                    player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                            "message.distantstock.logger.no_paper"), true);
+                } else printAndAcknowledge(logger, EventRegistry.get(player.getServer()), message.eventId(),
                         stack -> {
                             if (!player.addItem(stack)) {
                                 player.drop(stack, false);
@@ -114,7 +115,11 @@ public record LoggerActionC2S(BlockPos source, int action, UUID eventId, int val
         if (record == null || !record.active() || record.acknowledged() || !logger.visible(record)) {
             return false;
         }
+        if (!logger.hasPaper()) return false;
         output.accept(EventReceiptItem.create(record, now));
-        return events.acknowledge(eventId, now);
+        if (!logger.consumePaper()) return false;
+        boolean acknowledged = events.acknowledge(eventId, now);
+        if (acknowledged) logger.showPrintedReceipt();
+        return acknowledged;
     }
 }

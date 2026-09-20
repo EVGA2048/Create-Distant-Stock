@@ -52,6 +52,17 @@ public record BindPanelFromTerminalC2S(BlockPos pos, int slot, boolean unbind, i
         return TYPE;
     }
 
+    private static void setScope(FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot,
+                                 java.util.UUID scope) {
+        if (board instanceof RemoteGaugeBlockEntity gauge) {
+            gauge.setDistantNetworkScope(slot, scope);
+        } else if (board instanceof SignalPanelBlockEntity signal) {
+            signal.setDistantNetworkScope(slot, scope);
+        } else if (net.neoforged.fml.ModList.get().isLoaded("deployer")) {
+            dev.distantstock.panel.DeployerPanels.setDistantNetworkScope(board, slot, scope);
+        }
+    }
+
     public static void handle(BindPanelFromTerminalC2S msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             Player player = ctx.player();
@@ -66,26 +77,39 @@ public record BindPanelFromTerminalC2S(BlockPos pos, int slot, boolean unbind, i
                 return;
             }
             ItemStack held = player.getItemInHand(handOf(msg.hand));
-            if (!(held.getItem() instanceof RequesterItem) || !RequesterData.tuned(held)) {
-                // 手上一把没调谐的终端：说清楚，别装作绑好了。
-                RequesterItem.sayUntuned(player);
+            if (!(held.getItem() instanceof RequesterItem)) {
+                return;
+            }
+            java.util.UUID distantNetworkId = RequesterData.distantNetwork(held)
+                    .filter(dev.distantstock.routing.DistantNetworkDirectory::isFormalId)
+                    .orElse(null);
+            if (distantNetworkId == null) {
+                player.displayClientMessage(Component.translatable(
+                        "message.distantstock.network.required"), true);
                 return;
             }
             if (msg.unbind) {
                 if (unbind(board, slot)) {
+                    setScope(board, slot, null);
                     player.displayClientMessage(
                             Component.translatable("gui.distantstock.remote_gauge.unbound"), true);
                 }
                 return;
             }
+            setScope(board, slot, distantNetworkId);
             RemoteNetworkId network = RequesterData.network(held).orElse(null);
             if (network == null) {
+                player.displayClientMessage(Component.translatable(
+                        "message.distantstock.device.network_paired"), true);
                 return;
             }
-            java.util.UUID distantNetworkId = dev.distantstock.stock.NetworkDirectory.find(network)
-                    .map(dev.distantstock.stock.NetworkDirectory.Entry::distantNetworkId)
-                    .orElseGet(() -> RequesterData.distantNetwork(held).orElse(
-                            dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID));
+            java.util.UUID warehouseScope = RequesterData.formalDistantNetwork(
+                    held, player.level().getServer()).orElse(null);
+            if (!distantNetworkId.equals(warehouseScope)) {
+                player.displayClientMessage(Component.translatable(
+                        "message.distantstock.network.warehouse_other_short"), true);
+                return;
+            }
             // 终端身上带的不止网络：货从哪个港出来、包裹写什么门牌，都在这儿。缺了港组的面板会往
             // 没人接的地方下单，所以这四个一起写。
             RemoteBinding binding = new RemoteBinding(network, distantNetworkId,

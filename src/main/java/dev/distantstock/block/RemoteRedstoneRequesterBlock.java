@@ -46,12 +46,6 @@ public final class RemoteRedstoneRequesterBlock extends RedstoneRequesterBlock {
         if (!(stack.getItem() instanceof RequesterItem)) {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);
         }
-        if (!RequesterData.tuned(stack)) {
-            if (!level.isClientSide) {
-                RequesterItem.sayUntuned(player);
-            }
-            return ItemInteractionResult.sidedSuccess(level.isClientSide);
-        }
         if (!(level.getBlockEntity(pos) instanceof RemoteRedstoneRequesterBlockEntity be)) {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);
         }
@@ -60,18 +54,33 @@ public final class RemoteRedstoneRequesterBlock extends RedstoneRequesterBlock {
         }
         if (player.isShiftKeyDown()) {
             be.bind(null);
+            be.setDistantNetworkScope(null);
             player.displayClientMessage(
                     Component.translatable("gui.distantstock.remote_gauge.unbound"), true);
             return ItemInteractionResult.sidedSuccess(false);
         }
-        var network = RequesterData.network(stack).orElse(null);
-        if (network == null) {
+        java.util.UUID distantNetworkId = RequesterData.distantNetwork(stack)
+                .filter(dev.distantstock.routing.DistantNetworkDirectory::isFormalId)
+                .orElse(null);
+        if (distantNetworkId == null) {
+            player.displayClientMessage(Component.translatable(
+                    "message.distantstock.network.required"), true);
             return ItemInteractionResult.sidedSuccess(false);
         }
-        java.util.UUID distantNetworkId = dev.distantstock.stock.NetworkDirectory.find(network)
-                .map(dev.distantstock.stock.NetworkDirectory.Entry::distantNetworkId)
-                .orElseGet(() -> RequesterData.distantNetwork(stack).orElse(
-                        dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID));
+        be.setDistantNetworkScope(distantNetworkId);
+        var network = RequesterData.network(stack).orElse(null);
+        if (network == null) {
+            player.displayClientMessage(Component.translatable(
+                    "message.distantstock.device.network_paired"), true);
+            return ItemInteractionResult.sidedSuccess(false);
+        }
+        java.util.UUID warehouseScope = RequesterData.formalDistantNetwork(
+                stack, level.getServer()).orElse(null);
+        if (!distantNetworkId.equals(warehouseScope)) {
+            player.displayClientMessage(Component.translatable(
+                    "message.distantstock.network.warehouse_other_short"), true);
+            return ItemInteractionResult.sidedSuccess(false);
+        }
         be.bind(new RemoteBinding(network, distantNetworkId,
                 RequesterData.receivingGroup(stack).orElse(null),
                 RequesterData.address(stack), RequesterData.homeAddress(stack)));

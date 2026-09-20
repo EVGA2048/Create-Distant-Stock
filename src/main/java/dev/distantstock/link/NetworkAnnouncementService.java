@@ -13,8 +13,11 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.Set;
 import dev.transerver.api.TranserverApi;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public final class NetworkAnnouncementService {
+    private static final Logger LOG = LogManager.getLogger();
     /**
      * How often the announcement is repeated even when nothing about it changed.
      *
@@ -53,7 +56,12 @@ public final class NetworkAnnouncementService {
             return;
         }
         List<NetworkDirectory.Entry> local = NetworkDirectory.local().stream()
-                .filter(entry -> entry.networkId() != null).toList();
+                .filter(entry -> entry.networkId() != null)
+                // An unjoined Create warehouse is local setup data, not a peer-visible remote
+                // warehouse. Legacy is a migration bucket, never a routing network.
+                .filter(entry -> dev.distantstock.routing.DistantNetworkDirectory
+                        .isFormalId(entry.distantNetworkId()))
+                .toList();
         Set<String> recipients = TranserverBridge.knownNodes();
         if (recipients.isEmpty()) {
             return;
@@ -107,13 +115,16 @@ public final class NetworkAnnouncementService {
                 // 没选（货发出去没有收件人）。对面看到它只会多一行点不得的名字。
                 continue;
             }
+            if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(group.distantNetworkId())) {
+                continue;
+            }
             List<NetworkAnnouncementCodec.Group.Member> members = new java.util.ArrayList<>();
             group.members().forEach((id, name) -> members.add(
                     new NetworkAnnouncementCodec.Group.Member(id, name)));
             out.add(new NetworkAnnouncementCodec.Group(group.id(), group.distantNetworkId(),
                     group.name(), group.visibility() == dev.distantstock.routing.DockGroup.Visibility.PUBLIC,
                     group.owner(), group.open(),
-                    dev.distantstock.block.LoadedDocks.allInGroup(group.id()).size(),
+                    dev.distantstock.block.LoadedDocks.availableReceiversInGroup(group.id()),
                     List.copyOf(members)));
             if (out.size() >= 64) {
                 break;
@@ -140,7 +151,14 @@ public final class NetworkAnnouncementService {
             NetworkAnnouncementCodec.Announcement announcement =
                     NetworkAnnouncementCodec.decodeAnnouncement(message.payload());
             List<NetworkDirectory.Entry> entries = announcement.entries();
-            if (entries.stream().anyMatch(entry -> !entry.networkId().nodeId().equals(source))) {
+            NetworkDirectory.Entry wrongSource = entries.stream()
+                    .filter(entry -> entry.networkId() == null
+                            || !entry.networkId().nodeId().equals(source))
+                    .findFirst().orElse(null);
+            if (wrongSource != null) {
+                LOG.warn("Rejected network announcement {} from {}: advertised network belongs to {}",
+                        message.messageId(), message.source(), wrongSource.networkId() == null
+                                ? "<missing>" : wrongSource.networkId().nodeId());
                 return CompletableFuture.completedFuture(DeliveryResult.REJECTED);
             }
             MinecraftServer server = TranserverBridge.server();
@@ -149,29 +167,41 @@ public final class NetworkAnnouncementService {
             }
             NetworkAnnouncementCodec.Metrics metrics = announcement.metrics();
             List<NetworkAnnouncementCodec.Group> groups = announcement.groups();
-            CompletableFuture<DeliveryResult> result = new CompletableFuture<>();
-            server.execute(() -> {
-                NetworkDirectory.replacePeer(message.source(), entries);
-                // The announcer names itself on every entry it sends. Written down here so the
-                // readouts that mention another node — a remote dock group, the second line on a
-                // crossing parcel — can say "远仓B" instead of a uuid prefix.
-                String alias = entries.stream().map(NetworkDirectory.Entry::server)
-                        .filter(name -> name != null && !name.isBlank())
-                        .findFirst().orElse("");
-                if (!alias.isBlank()) {
-                    dev.distantstock.routing.PeerNames.get(server).remember(source, alias);
-                }
-                rememberGroups(server, source, alias, groups);
-
-                if (metrics.known()) {
-                    // This is where a peer's TPS comes from in Transerver mode: nothing else crosses
-                    // on a regular beat, and the monitor shows the number.
-                    LinkSnapshot.peerMetrics(message.source(), metrics.tps(), metrics.mspt());
-                }
-                result.complete(DeliveryResult.APPLIED);
-            });
-            return result;
-        } catch (IOException | IllegalArgumentException exception) {
+            NetworkDirectory.replacePeer(message.source(), entries);
+            if (metrics.known()) {
+                LinkSnapshot.peerMetrics(message.source(), metrics.tps(), metrics.mspt());
+            }
+            String alias = entries.stream().map(NetworkDirectory.Entry::server)
+                    .filter(name -> name != null && !name.isBlank())
+                    .findFirst().orElse("");
+            try {
+                server.execute(() -> {
+                    try {
+                        if (!alias.isBlank()) {
+                            dev.distantstock.routing.PeerNames.get(server).remember(source, alias);
+                        }
+                        rememberGroups(server, source, alias, groups);
+                    } catch (RuntimeException error) {
+                        LOG.error("Failed to apply network announcement {} from {} on the server thread",
+                                message.messageId(), message.source(), error);
+                    }
+                });
+            } catch (RuntimeException error) {
+                LOG.error("Could not schedule network announcement {} from {} on the server thread",
+                        message.messageId(), message.source(), error);
+                return CompletableFuture.completedFuture(DeliveryResult.RETRY);
+            }
+            // The volatile/ConcurrentHashMap snapshot is already applied. SavedData work is queued
+            // on Minecraft's thread and this heartbeat repeats, so do not keep Transerver's durable
+            // handler completion coupled to Arclight/NeoForge executor semantics.
+            return CompletableFuture.completedFuture(DeliveryResult.APPLIED);
+        } catch (IOException exception) {
+            LOG.warn("Rejected network announcement {} from {}: {}",
+                    message.messageId(), message.source(), exception.getMessage());
+            return CompletableFuture.completedFuture(DeliveryResult.REJECTED);
+        } catch (IllegalArgumentException exception) {
+            LOG.warn("Rejected network announcement {} from {}: {}",
+                    message.messageId(), message.source(), exception.getMessage());
             return CompletableFuture.completedFuture(DeliveryResult.REJECTED);
         }
     }

@@ -42,8 +42,7 @@ public final class TranserverOrderService {
 
     private static UUID knownDestinationNode(MinecraftServer server, UUID group) {
         if (DockGroupDirectory.get(server).find(group).isPresent()) {
-            UUID local = TranserverBridge.nodeId();
-            return local == null ? UUID.fromString(TranserverBridge.localNodeId()) : local;
+            return TranserverBridge.localNodeUuid();
         }
         return RemoteGroups.get(server).find(group).map(RemoteGroups.Entry::node).orElse(null);
     }
@@ -78,12 +77,16 @@ public final class TranserverOrderService {
                 // The second address is for a parcel that crosses, and only for one. An order the
                 // packing server keeps — the group it names is one of its own — is packed, sorted and
                 // delivered on one machine, and writing a home address onto it would put a note on a
-                // parcel about a journey it is not taking. Compare against this node: the sentinel is
-                // what "here" means on a save with no Transerver attached.
-                UUID here = TranserverBridge.nodeId();
-                boolean crosses = here == null
-                        ? !destination.toString().equals(TranserverBridge.localNodeId())
-                        : !here.equals(destination);
+                // parcel about a journey it is not taking. Compare against this node's stable
+                // identity, which exists independently of transport availability.
+                UUID here = TranserverBridge.localNodeUuid();
+                if (here == null) {
+                    inbox.state(record.childOrderId(), InboundOrderInbox.State.RECEIVED,
+                            "local node identity is not available yet");
+                    inbox.flush(server);
+                    continue;
+                }
+                boolean crosses = !here.equals(destination);
                 boolean applied = CreateStock.request(record.request().networkId().createFrequency(), items,
                         record.request().address(), server, route,
                         crosses ? record.request().homeAddress() : "");
@@ -116,8 +119,7 @@ public final class TranserverOrderService {
             return null;
         }
         if (DockGroupDirectory.get(server).find(group).isPresent()) {
-            UUID local = TranserverBridge.nodeId();
-            return local == null ? UUID.fromString(TranserverBridge.localNodeId()) : local;
+            return TranserverBridge.localNodeUuid();
         }
         return RemoteGroups.get(server).find(group).map(RemoteGroups.Entry::node).orElse(null);
     }
@@ -141,12 +143,16 @@ public final class TranserverOrderService {
     }
 
     private static DeliveryResult accept(MinecraftServer server, UUID sourceNode, OrderRequestCodec.Request request) {
-        UUID localNode = TranserverBridge.nodeId();
+        UUID localNode = TranserverBridge.localNodeUuid();
         if (localNode == null || !localNode.equals(request.networkId().nodeId())) {
             return DeliveryResult.REJECTED;
         }
+        if (!DistantNetworkDirectory.isFormalId(request.distantNetworkId())) {
+            return DeliveryResult.REJECTED;
+        }
         if (request.distantNetworkId() != null) {
-            UUID localScope = DistantNetworkDirectory.get(server).scopeOf(request.networkId());
+            UUID localScope = DistantNetworkDirectory.get(server)
+                    .formalNetworkOf(request.networkId()).orElse(null);
             if (!request.distantNetworkId().equals(localScope)) {
                 // This Create warehouse is not a member of the Distant Stock network named by the
                 // request. Never let the ordering node move a warehouse across network boundaries.
@@ -167,9 +173,7 @@ public final class TranserverOrderService {
         }
         if (request.distantNetworkId() != null) {
             UUID knownScope = knownDestinationScope(server, request.receivingDockGroupId());
-            if (knownScope != null
-                    && !knownScope.equals(request.distantNetworkId())
-                    && !knownScope.equals(DistantNetworkDirectory.LEGACY_NETWORK_ID)) {
+            if (knownScope != null && !knownScope.equals(request.distantNetworkId())) {
                 return DeliveryResult.REJECTED;
             }
         }

@@ -26,7 +26,8 @@ public final class NetworkAnnouncementCodec {
      * defaults are the permissive ones — "can pack" and "no opinion about who may use this group" —
      * so a mixed pair of versions loses a warning, never an order.
      */
-    private static final int VERSION = 4;
+    private static final int VERSION = 5;
+    private static final int VERSION_WITH_WAREHOUSE_NAME = 5;
     private static final int VERSION_WITH_DISTANT_NETWORK = 4;
     private static final int VERSION_WITH_GROUPS = 3;
     private static final int VERSION_WITH_METRICS = 2;
@@ -76,6 +77,7 @@ public final class NetworkAnnouncementCodec {
             if (entry.distantNetworkId() != null) {
                 uuid(out, entry.distantNetworkId());
             }
+            string(out, entry.warehouseName());
         }
         out.writeDouble(tps);
         out.writeDouble(mspt);
@@ -194,10 +196,11 @@ public final class NetworkAnnouncementCodec {
             boolean packable = version < 3 || in.readBoolean();
             UUID distantNetworkId = version >= VERSION_WITH_DISTANT_NETWORK && in.readBoolean()
                     ? uuid(in) : dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
+            String warehouseName = version >= VERSION_WITH_WAREHOUSE_NAME ? string(in) : "";
             RemoteNetworkId id = new RemoteNetworkId(1, node, world, dimension, frequency);
             // False by definition: this is a list that arrived from another node.
             entries.add(new NetworkDirectory.Entry(frequency, alias, links, id, false, packable,
-                    distantNetworkId));
+                    distantNetworkId, warehouseName));
         }
         Metrics metrics = Metrics.UNKNOWN;
         if (version >= VERSION_WITH_METRICS && in.available() >= 16) {
