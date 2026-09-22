@@ -160,6 +160,18 @@ public final class RemoteGaugeBlockEntity extends FactoryPanelBlockEntity implem
         orders.unbind(slot);
     }
 
+    @Override
+    public boolean removePanel(FactoryPanelBlock.PanelSlot slot) {
+        boolean removed = super.removePanel(slot);
+        if (removed) {
+            // A physically removed panel is a new device if this slot is filled again. Keeping the
+            // old warehouse/scope here makes the replacement silently inherit somebody else's
+            // configuration.
+            orders.forget(slot);
+        }
+        return removed;
+    }
+
     /** How much this panel has asked for and not yet seen arrive. */
     public int outstanding(FactoryPanelBlock.PanelSlot slot) {
         return orders.outstanding(slot);

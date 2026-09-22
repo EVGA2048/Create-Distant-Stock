@@ -17,6 +17,7 @@ import net.minecraft.core.GlobalPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
@@ -41,6 +42,37 @@ import io.netty.buffer.Unpooled;
 @GameTestHolder("distantstock")
 @PrefixGameTestTemplate(false)
 public final class RequesterFlowGameTests {
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void remoteRedstoneRequesterDropKeepsDistantScopeWithoutWarehouseBinding(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.REMOTE_REDSTONE_REQUESTER.get().defaultBlockState(), 3);
+        var requester = (dev.distantstock.block.RemoteRedstoneRequesterBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(requester != null, "远仓红石请求器没有方块实体");
+
+        UUID scope = UUID.randomUUID();
+        requester.setDistantNetworkScope(scope);
+        h.assertTrue(requester.binding() == null,
+                "测试夹具意外给只有远仓 scope 的请求器创建了仓库 binding");
+
+        CompoundTag safe = new CompoundTag();
+        requester.writeSafe(safe, level.registryAccess());
+        h.assertTrue(safe.hasUUID("DistantNetworkScope") && scope.equals(safe.getUUID("DistantNetworkScope")),
+                "请求器掉落数据没有保存独立的 Distant Stock network scope");
+
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(pos, ModBlocks.REMOTE_REDSTONE_REQUESTER.get().defaultBlockState(), 3);
+        var reloaded = (dev.distantstock.block.RemoteRedstoneRequesterBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(reloaded != null && reloaded != requester, "重新放置后请求器没有重建");
+        reloaded.loadWithComponents(safe, level.registryAccess());
+
+        h.assertTrue(scope.equals(reloaded.distantNetworkScope()),
+                "只有 scope、尚未绑定来源仓库的请求器在搬动后退回了 Legacy/未加入状态");
+        h.assertTrue(reloaded.binding() == null,
+                "搬动一个尚未选择来源仓库的请求器凭空生成了 binding");
+        h.succeed();
+    }
     @GameTest(template = "empty", timeoutTicks = 40)
     public static void freshDockItemBindsToCreateNetworkUsingStableNodeIdentity(GameTestHelper h) {
         var level = h.getLevel();

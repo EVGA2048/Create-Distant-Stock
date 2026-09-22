@@ -3,6 +3,7 @@ package dev.distantstock.client;
 import dev.distantstock.block.LoggerBlockEntity;
 
 import dev.distantstock.event.EventRegistry;
+import dev.distantstock.event.EventText;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.net.LoggerActionC2S;
 import dev.distantstock.net.OpenLoggerS2C;
@@ -192,7 +193,7 @@ public final class LoggerScreen extends Screen {
 
         String time = TIME.format(Instant.ofEpochMilli(row.updatedAt()));
         g.drawString(font, time, x + 7, y + 3, MUTED, false);
-        String code = fit(row.code(), 98);
+        String code = fit(EventText.title(row.code()).getString(), 98);
         g.drawString(font, code, x + 54, y + 3, row.active() ? INK : MUTED, false);
         String source = fit(row.sourceId(), 78);
         g.drawString(font, source, x + 154, y + 3, MUTED, false);

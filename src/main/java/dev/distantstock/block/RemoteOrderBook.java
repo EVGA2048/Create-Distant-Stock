@@ -111,6 +111,9 @@ final class RemoteOrderBook {
     void forget(FactoryPanelBlock.PanelSlot slot) {
         if (slot != null) {
             slots.get(slot).forget();
+            scopes.remove(slot);
+            board.setChanged();
+            board.sendData();
         }
     }
 

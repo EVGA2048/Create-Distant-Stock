@@ -188,83 +188,132 @@ public final class ChainDiagnostics {
         for (DiagnosticFrogportBlockEntity controller : controllers) {
             if (!(controller.getLevel() instanceof ServerLevel level)) continue;
             Graph graph = graph(controller);
-            if (graph.conveyors().isEmpty()) continue;
-            if (!isLeader(controller, graph)) continue;
+            if (graph.conveyors().isEmpty()) {
+                controller.setDiagnosticPlan("disconnected", "", 0, 0, 0, 0, 0, 0);
+                controller.setDiagnosticHealth(0, false);
+                continue;
+            }
+            if (!isLeader(controller, graph)) {
+                controller.setDiagnosticPlan("standby", "", 0, 0, 0, 0, 0, 0);
+                controller.setDiagnosticHealth(0, false);
+                continue;
+            }
 
             ControllerKey key = new ControllerKey(level.dimension(), controller.getBlockPos());
             RuntimeState runtime = RUNTIME.computeIfAbsent(key, ignored -> new RuntimeState());
 
             maintainFaults(controller, graph, key, level.getGameTime());
 
-            if (level.getGameTime() < runtime.nextScanTick || hasNormalProbe(key)) continue;
+            int liveFaults = (int) FAULTS.keySet().stream()
+                    .filter(fault -> fault.controller().equals(key)).count();
+            liveFaults += (int) BAD_ADDRESSES.values().stream()
+                    .filter(owners -> owners.contains(key)).count();
+            boolean cacheMitigating = FAULTS.values().stream()
+                    .anyMatch(fault -> fault.key.controller().equals(key)
+                            && fault.mitigated && fault.cachePos != null);
+            controller.setDiagnosticHealth(liveFaults, cacheMitigating);
+
+            // One diagnostic Frogport runs one probe at a time. This makes the cycle deterministic
+            // and prevents a recovery probe and a normal health probe from competing for its mouth.
+            Probe active = activeProbe(key);
+            if (active != null) {
+                Fault fault = FAULTS.get(new FaultKey(key, active.address()));
+                int targets = active.recovery() && fault != null
+                        ? Math.max(1, fault.targets.size())
+                        : receiverAddresses(graph).getOrDefault(active.address(), List.of()).size();
+                controller.setDiagnosticPlan(active.recovery() ? "recovery" : "waiting",
+                        active.address(), active.planIndex(), active.planTotal(), targets,
+                        0, active.sentTick(), active.deadlineTick());
+                continue;
+            }
+
             Map<String, List<FrogportBlockEntity>> addresses = receiverAddresses(graph);
             List<String> candidates = addresses.keySet().stream()
                     .filter(address -> !FAULTS.containsKey(new FaultKey(key, address)))
                     .sorted()
                     .toList();
+
             if (candidates.isEmpty()) {
                 runtime.nextScanTick = level.getGameTime() + SCAN_INTERVAL;
+                controller.setDiagnosticPlan("idle", "", 0, 0, 0,
+                        runtime.nextScanTick, 0, 0);
                 continue;
             }
+
             runtime.cursor = Math.floorMod(runtime.cursor, candidates.size());
-            String address = candidates.get(runtime.cursor++);
-            FrogportBlockEntity target = addresses.get(address).get(0);
+            int planIndex = runtime.cursor + 1;
+            String address = candidates.get(runtime.cursor);
+            List<FrogportBlockEntity> addressTargets = addresses.get(address);
+
+            if (level.getGameTime() < runtime.nextScanTick) {
+                controller.setDiagnosticPlan("scheduled", address, planIndex, candidates.size(),
+                        addressTargets.size(), runtime.nextScanTick, 0, 0);
+                continue;
+            }
+
+            runtime.cursor++;
+            FrogportBlockEntity target = addressTargets.get(0);
             if (sendProbe(controller, key, address, target.getBlockPos(), address,
-                    false, level.getGameTime())) {
+                    false, level.getGameTime(), planIndex, candidates.size(), addressTargets.size())) {
                 runtime.nextScanTick = level.getGameTime() + SCAN_INTERVAL;
             } else {
                 runtime.nextScanTick = level.getGameTime() + 10;
+                controller.setDiagnosticPlan("busy", address, planIndex, candidates.size(),
+                        addressTargets.size(), runtime.nextScanTick, 0, 0);
             }
         }
 
         clearOrphanedPersistentChainFaults(server);
     }
 
-    /** Rebuild address-error runtime state from the durable 18-slot diagnostic quarantine. */
+    /**
+     * Rebuild no-route runtime state from each diagnostic Frogport's durable unresolved-address set.
+     *
+     * <p>The 18-slot quarantine is only a transport buffer. A package leaving that inventory for a
+     * Packager below means "handled", not "fault repaired", so inventory presence must never decide
+     * whether CHAIN_NO_ROUTE remains active.</p>
+     */
     private static void refreshQuarantineFaults(MinecraftServer server) {
-        Map<AddressKey, Set<ControllerKey>> observed = new HashMap<>();
         for (DiagnosticFrogportBlockEntity diagnostic : DIAGNOSTICS) {
             if (!(diagnostic.getLevel() instanceof ServerLevel level)) continue;
             ControllerKey controller = new ControllerKey(level.dimension(), diagnostic.getBlockPos());
+
+            // Migration/safety net: old worlds may contain quarantined packages from before the
+            // durable unresolved-address set existed. Seeing one still creates the durable fault.
             for (int slot = 0; slot < diagnostic.inventory.getSlots(); slot++) {
                 ItemStack stack = diagnostic.inventory.getStackInSlot(slot);
                 if (stack.isEmpty() || !PackageItem.isPackage(stack) || PingPackageData.isPing(stack)) continue;
                 String address = PackageItem.getAddress(stack);
                 if (address == null || address.isBlank()) address = "<blank>";
                 AddressKey key = new AddressKey(level.dimension(), address);
-                observed.computeIfAbsent(key, ignored -> new LinkedHashSet<>()).add(controller);
+                diagnostic.rememberBadAddress(address, ADDRESS_NETWORKS.containsKey(key));
+            }
+
+            for (String address : new ArrayList<>(diagnostic.unresolvedBadAddresses())) {
+                AddressKey key = new AddressKey(level.dimension(), address);
+                boolean stillConfigured = ADDRESS_NETWORKS.containsKey(key);
+                if (stillConfigured) diagnostic.noteBadAddressGaugeBacked(address);
+
                 BAD_ADDRESSES.computeIfAbsent(key, ignored -> new LinkedHashSet<>()).add(controller);
                 String source = sourceId(level, diagnostic.getBlockPos(), address);
                 EventRegistry registry = EventRegistry.get(server);
                 if (registry.active(EventRegistry.Codes.CHAIN_NO_ROUTE, "chain", source).isEmpty()) {
                     registry.raise(EventRegistry.Severity.ERROR, EventRegistry.Codes.CHAIN_NO_ROUTE,
-                            "chain", source, address, level.getGameTime());
+                            "chain", source, address, diagnostic.createFrequency(), null,
+                            level.getGameTime());
+                }
+
+                // If this bad address came from a Factory Gauge, seeing the Gauge stop advertising
+                // it for >60 ticks is positive evidence that the operator corrected/reconfigured it.
+                // Non-gauge bad addresses stay faulted until a real receiver appears and a healthy
+                // Ping clears them through clearBadAddress().
+                if (diagnostic.badAddressWasGaugeBacked(address) && !stillConfigured) {
+                    long lastSeen = diagnostic.badAddressGaugeLastSeen(address);
+                    if (lastSeen != Long.MIN_VALUE && level.getGameTime() - lastSeen > 60) {
+                        clearBadAddress(level, controller, address, level.getGameTime());
+                    }
                 }
             }
-        }
-
-        // Once the quarantined parcel has been removed, retain the fault only while a live Factory
-        // Gauge still advertises that bad address. After the gauge is corrected (60-tick association
-        // expiry), clear the alarm and Andon state automatically.
-        Iterator<Map.Entry<AddressKey, Set<ControllerKey>>> it = BAD_ADDRESSES.entrySet().iterator();
-        while (it.hasNext()) {
-            var entry = it.next();
-            AddressKey addressKey = entry.getKey();
-            ServerLevel level = server.getLevel(addressKey.dimension());
-            if (level == null) continue;
-            boolean stillConfigured = ADDRESS_NETWORKS.containsKey(addressKey);
-            Set<ControllerKey> observedOwners = observed.getOrDefault(addressKey, Set.of());
-            Iterator<ControllerKey> owners = entry.getValue().iterator();
-            while (owners.hasNext()) {
-                ControllerKey owner = owners.next();
-                DiagnosticFrogportBlockEntity loaded = controller(owner);
-                if (loaded == null) continue; // unloaded chunk: state is unknown, never clear speculatively
-                if (observedOwners.contains(owner) || stillConfigured) continue;
-                owners.remove();
-                EventRegistry.get(server).clear(EventRegistry.Codes.CHAIN_NO_ROUTE, "chain",
-                        sourceId(level, owner.pos(), addressKey.address()), level.getGameTime());
-            }
-            if (entry.getValue().isEmpty()) it.remove();
         }
     }
 
@@ -317,8 +366,11 @@ public final class ChainDiagnostics {
         if (probe.recovery()) {
             Fault fault = FAULTS.get(new FaultKey(probe.controller(), probe.address()));
             if (fault != null) fault.nextRetryTick = now + RETRY_INTERVAL;
+            controller.recordDiagnosticResult("recovery_timeout", probe.address());
             return;
         }
+
+        controller.recordDiagnosticResult("timeout", probe.address());
 
         Graph graph = graph(controller);
         List<FrogportBlockEntity> targets = receiverAddresses(graph).getOrDefault(probe.address(), List.of());
@@ -355,7 +407,7 @@ public final class ChainDiagnostics {
 
         EventRegistry.get(server).raise(EventRegistry.Severity.ERROR,
                 EventRegistry.Codes.CHAIN_PING_TIMEOUT, "chain", sourceId(level, probe.controller().pos(), probe.address()),
-                probe.address(), now);
+                probe.address(), controller.createFrequency(), null, now);
     }
 
     private static void maintainFaults(DiagnosticFrogportBlockEntity controller, Graph graph,
@@ -373,7 +425,7 @@ public final class ChainDiagnostics {
                         EventRegistry.get(level.getServer()).raise(EventRegistry.Severity.ERROR,
                                 EventRegistry.Codes.CHAIN_CACHE_FULL, "chain",
                                 sourceId(level, controller.getBlockPos(), fault.key.address()) + "/cache",
-                                fault.key.address(), now);
+                                fault.key.address(), controller.createFrequency(), null, now);
                     }
                 } else if (FULL_CACHES.remove(fault.key)) {
                     EventRegistry.get(level.getServer()).clear(EventRegistry.Codes.CHAIN_CACHE_FULL, "chain",
@@ -407,8 +459,10 @@ public final class ChainDiagnostics {
                     restore(controller, fault, now);
                     continue;
                 }
+                int recoveryIndex = fault.passed.size() + 1;
                 if (!sendProbe(controller, controllerKey, fault.key.address(), target,
-                        recoveryAddress(target), true, now)) {
+                        recoveryAddress(target), true, now,
+                        recoveryIndex, Math.max(1, fault.targets.size()), Math.max(1, fault.targets.size()))) {
                     fault.nextRetryTick = now + 10;
                 }
             } else {
@@ -420,7 +474,8 @@ public final class ChainDiagnostics {
                 }
                 BlockPos target = targets.get(0).getBlockPos();
                 if (!sendProbe(controller, controllerKey, fault.key.address(), target,
-                        fault.key.address(), true, now)) {
+                        fault.key.address(), true, now,
+                        1, Math.max(1, targets.size()), targets.size())) {
                     fault.nextRetryTick = now + 10;
                 }
             }
@@ -429,13 +484,17 @@ public final class ChainDiagnostics {
 
     private static boolean sendProbe(DiagnosticFrogportBlockEntity controller, ControllerKey key,
                                      String originalAddress, BlockPos targetPos, String routingAddress,
-                                     boolean recovery, long now) {
+                                     boolean recovery, long now,
+                                     int planIndex, int planTotal, int targetCount) {
         UUID id = UUID.randomUUID();
         long timeout = estimatedProbeTimeoutTicks(controller, targetPos);
         ItemStack ping = PingPackageData.create(id, key.dimension().location().toString(), key.pos(),
                 targetPos, originalAddress, routingAddress, now, now + timeout);
         if (!controller.sendProbe(ping)) return false;
-        PROBES.put(id, new Probe(id, key, originalAddress, targetPos, now + timeout, recovery));
+        PROBES.put(id, new Probe(id, key, originalAddress, targetPos, now, now + timeout,
+                recovery, planIndex, planTotal));
+        controller.setDiagnosticPlan(recovery ? "recovery" : "waiting", originalAddress,
+                planIndex, planTotal, targetCount, 0, now, now + timeout);
         return true;
     }
 
@@ -550,12 +609,14 @@ public final class ChainDiagnostics {
             if (fault.mitigated) {
                 fault.passed.add(probe.targetPos());
                 fault.nextRetryTick = now + 10;
+                DiagnosticFrogportBlockEntity controller = controller(probe.controller());
+                if (controller != null) controller.recordDiagnosticResult("recovery_ok", probe.address());
                 if (fault.passed.containsAll(fault.targets)) {
-                    DiagnosticFrogportBlockEntity controller = controller(probe.controller());
                     if (controller != null) restore(controller, fault, now);
                 }
             } else {
                 DiagnosticFrogportBlockEntity controller = controller(probe.controller());
+                if (controller != null) controller.recordDiagnosticResult("recovery_ok", probe.address());
                 if (controller != null) restore(controller, fault, now);
             }
             return;
@@ -563,6 +624,8 @@ public final class ChainDiagnostics {
 
         // A healthy, on-time normal probe also proves an address that previously did not exist now
         // has a receiver again.
+        DiagnosticFrogportBlockEntity controller = controller(probe.controller());
+        if (controller != null) controller.recordDiagnosticResult("ok", probe.address());
         clearBadAddress(level, probe.controller(), probe.address(), now);
     }
 
@@ -579,6 +642,8 @@ public final class ChainDiagnostics {
             runtime.nextScanTick = player.level().getGameTime() + 20;
             Fault fault = FAULTS.get(new FaultKey(probe.controller(), probe.address()));
             if (fault != null) fault.nextRetryTick = player.level().getGameTime() + RETRY_INTERVAL;
+            DiagnosticFrogportBlockEntity controller = controller(probe.controller());
+            if (controller != null) controller.recordDiagnosticResult("skipped", probe.address());
         }
         PingPackageData.invalidateForPlayer(stack);
     }
@@ -590,11 +655,14 @@ public final class ChainDiagnostics {
         String address = PackageItem.getAddress(stack);
         if (address == null || address.isBlank()) address = "<blank>";
         ControllerKey key = new ControllerKey(level.dimension(), controller.getBlockPos());
-        BAD_ADDRESSES.computeIfAbsent(new AddressKey(level.dimension(), address), ignored -> new LinkedHashSet<>())
+        AddressKey addressKey = new AddressKey(level.dimension(), address);
+        BAD_ADDRESSES.computeIfAbsent(addressKey, ignored -> new LinkedHashSet<>())
                 .add(key);
+        controller.rememberBadAddress(address, ADDRESS_NETWORKS.containsKey(addressKey));
+        controller.recordDiagnosticResult("no_route", address);
         EventRegistry.get(level.getServer()).raise(EventRegistry.Severity.ERROR,
                 EventRegistry.Codes.CHAIN_NO_ROUTE, "chain", sourceId(level, controller.getBlockPos(), address),
-                address, level.getGameTime());
+                address, controller.createFrequency(), null, level.getGameTime());
     }
 
     private static void clearBadAddress(ServerLevel level, ControllerKey controller, String address, long now) {
@@ -604,6 +672,8 @@ public final class ChainDiagnostics {
             owners.remove(controller);
             if (owners.isEmpty()) BAD_ADDRESSES.remove(key);
         }
+        DiagnosticFrogportBlockEntity loaded = controller(controller);
+        if (loaded != null) loaded.clearBadAddress(address);
         EventRegistry.get(level.getServer()).clear(EventRegistry.Codes.CHAIN_NO_ROUTE, "chain",
                 sourceId(level, controller.pos(), address), now);
     }
@@ -630,6 +700,7 @@ public final class ChainDiagnostics {
         }
         EventRegistry.get(level.getServer()).clear(EventRegistry.Codes.CHAIN_PING_TIMEOUT, "chain",
                 sourceId(level, controller.getBlockPos(), fault.key.address()), now);
+        controller.recordDiagnosticResult("recovered", fault.key.address());
     }
 
     /** Used by brass signal lamps wired to Factory Gauges. */
@@ -690,6 +761,13 @@ public final class ChainDiagnostics {
 
     private static boolean hasNormalProbe(ControllerKey key) {
         return PROBES.values().stream().anyMatch(p -> p.controller().equals(key) && !p.recovery());
+    }
+
+    private static Probe activeProbe(ControllerKey key) {
+        return PROBES.values().stream()
+                .filter(p -> p.controller().equals(key))
+                .min(Comparator.comparingLong(Probe::sentTick))
+                .orElse(null);
     }
 
     private static boolean hasRecoveryProbe(ControllerKey key, String address) {
@@ -789,7 +867,8 @@ public final class ChainDiagnostics {
     }
 
     private record Probe(UUID id, ControllerKey controller, String address, BlockPos targetPos,
-                         long deadlineTick, boolean recovery) {
+                         long sentTick, long deadlineTick, boolean recovery,
+                         int planIndex, int planTotal) {
     }
 
     private static final class RuntimeState {

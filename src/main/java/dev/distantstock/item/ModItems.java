@@ -21,10 +21,12 @@ public final class ModItems {
             () -> new RequesterItem(new Item.Properties().stacksTo(1)));
     public static final DeferredHolder<Item, DockItem> DOCK = ITEMS.register("dock",
             () -> new DockItem(ModBlocks.DOCK.get(), new Item.Properties()));
-    public static final DeferredHolder<Item, BlockItem> DIAGNOSTIC_FROGPORT = block("diagnostic_frogport",
-            ModBlocks.DIAGNOSTIC_FROGPORT);
-    public static final DeferredHolder<Item, BlockItem> CACHE_FROGPORT = block("cache_frogport",
-            ModBlocks.CACHE_FROGPORT);
+    public static final DeferredHolder<Item, DiagnosticFrogportItem> DIAGNOSTIC_FROGPORT =
+            ITEMS.register("diagnostic_frogport", () -> new DiagnosticFrogportItem(
+                    ModBlocks.DIAGNOSTIC_FROGPORT.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, com.simibubi.create.content.logistics.packagePort.PackagePortItem> CACHE_FROGPORT =
+            ITEMS.register("cache_frogport", () -> new com.simibubi.create.content.logistics.packagePort.PackagePortItem(
+                    ModBlocks.CACHE_FROGPORT.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> GAUGE = ITEMS.register("gauge",
             () -> new BlockItem(ModBlocks.GAUGE.get(), new Item.Properties()));
     public static final DeferredHolder<Item, RemoteGaugeItem> REMOTE_GAUGE = ITEMS.register("remote_gauge",
@@ -62,7 +64,7 @@ public final class ModItems {
     public static final DeferredHolder<Item, BlockItem> ETHER_RESONATOR = block("ether_resonator", ModBlocks.ETHER_RESONATOR);
     public static final DeferredHolder<Item, RemotePackageItem> REMOTE_PACKAGE = ITEMS.register("remote_package",
             () -> new RemotePackageItem(new Item.Properties()));
-    /** System-generated diagnostic parcel. Deliberately omitted from the creative tab. */
+    /** System-generated diagnostic parcel; also exposed in creative for route diagnostics/testing. */
     public static final DeferredHolder<Item, PingPackageItem> PING_PACKAGE = ITEMS.register("ping_package",
             () -> new PingPackageItem(new Item.Properties()));
     public static final DeferredHolder<Item, EventReceiptItem> EVENT_RECEIPT = ITEMS.register("event_receipt",
@@ -104,7 +106,7 @@ public final class ModItems {
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB = TABS.register("main", () -> CreativeModeTab.builder()
             .title(Component.translatable("itemGroup.distantstock"))
-            .icon(() -> new ItemStack(REQUESTER.get()))
+            .icon(() -> new ItemStack(DOCK.get()))
             .displayItems((params, out) -> {
                 out.accept(REQUESTER.get());
                 out.accept(DOCK.get());
@@ -131,6 +133,7 @@ public final class ModItems {
                 out.accept(TOWER_COUPLER.get());
                 out.accept(ETHER_RESONATOR.get());
                 out.accept(REMOTE_PACKAGE.get());
+                out.accept(PING_PACKAGE.get());
                 if (net.neoforged.fml.ModList.get().isLoaded("fluidlogistics")) {
                     out.accept(dev.distantstock.compat.fluidlogistics.FluidLogisticsCompat.remoteFluidPackage());
                 }

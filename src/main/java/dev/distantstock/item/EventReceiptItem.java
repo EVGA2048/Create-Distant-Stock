@@ -1,6 +1,7 @@
 package dev.distantstock.item;
 
 import dev.distantstock.event.EventRegistry;
+import dev.distantstock.event.EventText;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -89,7 +90,8 @@ public final class EventReceiptItem extends Item {
             case WARN -> ChatFormatting.GOLD;
             case ERROR -> ChatFormatting.RED;
         };
-        lines.add(Component.literal(receipt.severity().name() + " / " + receipt.code())
+        lines.add(Component.literal(receipt.severity().name() + " / ")
+                .append(EventText.title(receipt.code()))
                 .withStyle(severityColor));
         lines.add(Component.translatable("item.distantstock.event_receipt.source",
                         receipt.sourceType() + " / " + receipt.sourceId())
@@ -104,7 +106,7 @@ public final class EventReceiptItem extends Item {
         }
         if (!receipt.detail().isBlank()) {
             lines.add(Component.translatable("item.distantstock.event_receipt.detail",
-                            Component.translatable(receipt.detail()))
+                            EventText.detail(receipt.code(), receipt.detail()))
                     .withStyle(ChatFormatting.GRAY));
         }
         if (receipt.count() > 1) {

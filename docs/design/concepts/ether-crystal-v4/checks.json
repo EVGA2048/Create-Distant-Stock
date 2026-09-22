@@ -1,0 +1,25 @@
+{
+  "size": [
+    16,
+    16
+  ],
+  "alpha_values": [
+    0,
+    84,
+    94,
+    112,
+    133,
+    157,
+    170,
+    178,
+    207,
+    213,
+    220,
+    228,
+    238,
+    246,
+    250
+  ],
+  "opaque_background": false,
+  "game_integration": false
+}

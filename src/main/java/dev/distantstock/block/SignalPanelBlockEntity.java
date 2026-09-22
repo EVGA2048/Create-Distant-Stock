@@ -507,7 +507,10 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
     @Override
     public boolean removePanel(FactoryPanelBlock.PanelSlot slot) {
         boolean removed = super.removePanel(slot);
-        if (removed) remoteGauges.remove(slot);
+        if (removed) {
+            remoteGauges.remove(slot);
+            orders.forget(slot);
+        }
         return removed;
     }
 

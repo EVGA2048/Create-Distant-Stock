@@ -38,6 +38,125 @@ import java.util.UUID;
 @GameTestHolder("distantstock")
 @PrefixGameTestTemplate(false)
 public final class SignalLampGameTests {
+
+
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void remoteGaugeBindingSurvivesReloadAndLocalRetune(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.REMOTE_GAUGE.get().defaultBlockState(), 3);
+        var gauge = (RemoteGaugeBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(gauge != null, "远仓仪表没有方块实体");
+
+        FactoryPanelBlock.PanelSlot slot = FactoryPanelBlock.PanelSlot.TOP_LEFT;
+        UUID localA = UUID.randomUUID();
+        UUID localB = UUID.randomUUID();
+        h.assertTrue(gauge.addPanel(slot, localA), "测试夹具无法创建远仓仪表面板");
+
+        UUID scope = UUID.randomUUID();
+        UUID group = UUID.randomUUID();
+        var source = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA,
+                UUID.randomUUID(), UUID.randomUUID(),
+                level.dimension().location().toString(), UUID.randomUUID());
+        gauge.bind(slot, new RemoteBinding(source, scope, group, "远端收货口", "本端回流口"));
+        gauge.setDistantNetworkScope(slot, scope);
+
+        CompoundTag saved = gauge.saveWithoutMetadata(level.registryAccess());
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(pos, ModBlocks.REMOTE_GAUGE.get().defaultBlockState(), 3);
+        var reloaded = (RemoteGaugeBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(reloaded != null && reloaded != gauge, "重载后远仓仪表没有重建");
+        reloaded.loadWithComponents(saved, level.registryAccess());
+
+        RemoteBinding beforeRetune = reloaded.binding(slot);
+        h.assertTrue(beforeRetune != null, "远仓仪表重载后丢了远端 binding");
+        h.assertTrue(source.equals(beforeRetune.network())
+                        && scope.equals(beforeRetune.distantNetworkId())
+                        && group.equals(beforeRetune.receivingGroup())
+                        && "远端收货口".equals(beforeRetune.address())
+                        && "本端回流口".equals(beforeRetune.homeAddress()),
+                "远仓仪表重载后 binding 内容发生变化：" + beforeRetune);
+        h.assertTrue(scope.equals(reloaded.distantNetworkScope(slot)),
+                "远仓仪表重载后丢了独立 Distant Stock scope");
+
+        reloaded.panels.get(slot).setNetwork(localB);
+        RemoteBinding afterRetune = reloaded.binding(slot);
+        h.assertTrue(localB.equals(reloaded.panels.get(slot).network),
+                "重新调谐没有更新远仓仪表的本地 Create 网络");
+        h.assertTrue(beforeRetune.equals(afterRetune),
+                "重新调谐本地 Create 网络时误删/改写了远端仓库 binding");
+        h.assertTrue(scope.equals(reloaded.distantNetworkScope(slot)),
+                "重新调谐本地 Create 网络时误删了 Distant Stock scope");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void removedRemoteGaugeSlotDoesNotLeakBindingIntoReplacement(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.REMOTE_GAUGE.get().defaultBlockState(), 3);
+        var gauge = (RemoteGaugeBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(gauge != null, "远仓仪表没有方块实体");
+
+        FactoryPanelBlock.PanelSlot slot = FactoryPanelBlock.PanelSlot.TOP_LEFT;
+        FactoryPanelBlock.PanelSlot keep = FactoryPanelBlock.PanelSlot.TOP_RIGHT;
+        h.assertTrue(gauge.addPanel(slot, UUID.randomUUID()), "无法创建待移除远仓仪表面板");
+        h.assertTrue(gauge.addPanel(keep, UUID.randomUUID()), "无法创建保留面板");
+
+        UUID scope = UUID.randomUUID();
+        UUID group = UUID.randomUUID();
+        var source = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA,
+                UUID.randomUUID(), UUID.randomUUID(),
+                level.dimension().location().toString(), UUID.randomUUID());
+        gauge.bind(slot, new RemoteBinding(source, scope, group, "旧远端地址", "旧本端地址"));
+        gauge.setDistantNetworkScope(slot, scope);
+
+        h.assertTrue(gauge.removePanel(slot), "移除远仓仪表面板失败");
+        h.assertTrue(gauge.binding(slot) == null && gauge.distantNetworkScope(slot) == null,
+                "被拆掉的远仓仪表面板留下了 binding/scope");
+
+        h.assertTrue(gauge.addPanel(slot, UUID.randomUUID()), "无法在原槽位安装新面板");
+        h.assertTrue(gauge.binding(slot) == null && gauge.distantNetworkScope(slot) == null,
+                "新装到原槽位的远仓仪表继承了上一块面板的幽灵配置");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void removedRemoteGaugeFromSignalPanelDoesNotLeakBinding(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.SIGNAL_PANEL.get().defaultBlockState(), 3);
+        var panel = (SignalPanelBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(panel != null, "信号面板没有方块实体");
+
+        FactoryPanelBlock.PanelSlot slot = FactoryPanelBlock.PanelSlot.BOTTOM_LEFT;
+        FactoryPanelBlock.PanelSlot keep = FactoryPanelBlock.PanelSlot.BOTTOM_RIGHT;
+        h.assertTrue(panel.addPanel(slot, UUID.randomUUID()), "无法创建混合板远仓仪表槽");
+        h.assertTrue(panel.addPanel(keep, UUID.randomUUID()), "无法创建混合板保留槽");
+        panel.setRemoteGauge(slot, true);
+
+        UUID scope = UUID.randomUUID();
+        UUID group = UUID.randomUUID();
+        var source = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA,
+                UUID.randomUUID(), UUID.randomUUID(),
+                level.dimension().location().toString(), UUID.randomUUID());
+        panel.bind(slot, new RemoteBinding(source, scope, group, "旧远端地址", "旧本端地址"));
+        panel.setDistantNetworkScope(slot, scope);
+
+        h.assertTrue(panel.removePanel(slot), "移除混合板远仓仪表失败");
+        h.assertTrue(!panel.isRemoteGauge(slot) && panel.binding(slot) == null
+                        && panel.distantNetworkScope(slot) == null,
+                "混合板移除远仓仪表后留下了类型/binding/scope");
+
+        h.assertTrue(panel.addPanel(slot, UUID.randomUUID()), "无法在混合板原槽位安装新面板");
+        panel.setRemoteGauge(slot, true);
+        h.assertTrue(panel.binding(slot) == null && panel.distantNetworkScope(slot) == null,
+                "混合板新装远仓仪表继承了上一块面板的幽灵配置");
+        h.succeed();
+    }
     @GameTest(template = "empty", timeoutTicks = 40)
     public static void remoteGaugeMayBePlacedBeforeLocalCreateTuning(GameTestHelper h) {
         var level = h.getLevel();

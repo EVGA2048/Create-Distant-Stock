@@ -21,7 +21,9 @@
     "client.LampConnectionHandlerMixin",
     "client.RemoteFluidPackageRendererMixin",
     "client.FrogportVisualTintMixin",
-    "client.PackagePortScreenMixin"
+    "client.PackagePortScreenMixin",
+    "client.ChainConveyorFrogportSelectionMixin",
+    "client.PackagePortTargetSelectionMixin"
   ],
   "injectors": {
     "defaultRequire": 1

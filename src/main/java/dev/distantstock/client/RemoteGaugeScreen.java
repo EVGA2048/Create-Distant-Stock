@@ -490,9 +490,8 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen implements Group
     /**
      * 这块仪表指着哪台仓库，或者一句"它没有指着谁"；**读不出来的时候返回 null，什么都不画**。
      *
-     * <p>"读不出来"是 Deployer 那条路：别的模组的板子上那格仪表我们只能拿到它的地址
-     * （{@code DeployerPanels.addressOf}），拿不到它绑的网络。这时候沉默比编一句话强 —— 说"未绑定"
-     * 会让一台绑好的仪表看起来是坏的。
+     * <p>Deployer 板上的远仓仪表也使用同一份 {@code RemoteBinding}，所以这里必须把它读出来；
+     * 否则设备实际绑定正常，重开界面却会像没配置过一样。
      */
     private static Component sourceLine(FactoryPanelBehaviour behaviour) {
         RemoteBinding binding = knownBinding(behaviour);
@@ -517,6 +516,10 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen implements Group
         }
         if (behaviour.blockEntity instanceof dev.distantstock.block.SignalPanelBlockEntity signal) {
             return signal.binding(behaviour.slot);
+        }
+        if (behaviour.blockEntity instanceof FactoryPanelBlockEntity board
+                && net.neoforged.fml.ModList.get().isLoaded("deployer")) {
+            return dev.distantstock.panel.DeployerPanels.bindingOf(board, behaviour.slot);
         }
         return null;
     }

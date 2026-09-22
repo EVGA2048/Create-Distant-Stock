@@ -114,8 +114,6 @@ public final class DockGameTests {
 
         dock.setExport(UUID.randomUUID());
         dock.setDefaultDestination(remoteNode, group);
-        int escrowBefore = dev.distantstock.link.ParcelEscrow.get(level.getServer()).size();
-
         ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
         com.simibubi.create.content.logistics.box.PackageItem.addAddress(parcel, "Line-333");
         var handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, Direction.UP);
@@ -129,8 +127,10 @@ public final class DockGameTests {
                     "no-receiver parcel was returned instead of being held for automatic recovery");
             h.assertTrue(dock.status() == DockStatus.BLOCKED,
                     "no receiver did not switch the dock to the orange blocked lamp");
-            h.assertTrue(dev.distantstock.link.ParcelEscrow.get(level.getServer()).size() == escrowBefore,
-                    "no-receiver parcel entered escrow before a destination could accept it");
+            // Do not compare the server-global escrow size here: GameTests run in parallel and
+            // unrelated parcel tests legitimately enqueue/dequeue their own escrow entries during
+            // this 100-tick window. The stronger parcel-local assertion above proves this dock kept
+            // custody of the exact outgoing stack instead of handing it to transport.
             String source = dev.distantstock.event.EventRegistry.blockSource(level, pos);
             var event = dev.distantstock.event.EventRegistry.get(level.getServer())
                     .active(dev.distantstock.event.EventRegistry.Codes.DOCK_NO_RECEIVER, "dock", source);

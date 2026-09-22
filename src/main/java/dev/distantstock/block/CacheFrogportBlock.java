@@ -10,6 +10,21 @@ public final class CacheFrogportBlock extends FrogportBlock {
         super(properties);
     }
 
+
+    @Override
+    protected net.minecraft.world.InteractionResult useWithoutItem(
+            net.minecraft.world.level.block.state.BlockState state,
+            net.minecraft.world.level.Level level,
+            net.minecraft.core.BlockPos pos,
+            net.minecraft.world.entity.player.Player player,
+            net.minecraft.world.phys.BlockHitResult hit) {
+        if (level.getBlockEntity(pos) instanceof FrogportBlockEntity frog) {
+            frog.use(player);
+            return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide);
+        }
+        return net.minecraft.world.InteractionResult.PASS;
+    }
+
     @Override
     public Class<FrogportBlockEntity> getBlockEntityClass() {
         return FrogportBlockEntity.class;

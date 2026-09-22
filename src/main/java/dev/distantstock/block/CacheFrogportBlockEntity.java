@@ -1,18 +1,22 @@
 package dev.distantstock.block;
 
+import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
 import com.simibubi.create.content.logistics.packagePort.frogport.FrogportBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import dev.distantstock.diagnostics.ChainDiagnostics;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.items.IItemHandler;
 
 import java.util.List;
+import java.util.Locale;
 
-public final class CacheFrogportBlockEntity extends FrogportBlockEntity {
+public final class CacheFrogportBlockEntity extends FrogportBlockEntity implements IHaveGoggleInformation {
     private String takeoverAddress = "";
     private long nextReleaseTick;
     private int releaseDelaySeconds = 5;
@@ -51,7 +55,7 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity {
     }
 
     public void setReleaseDelaySeconds(int seconds) {
-        releaseDelaySeconds = Math.max(0, Math.min(100, seconds));
+        releaseDelaySeconds = normalizeReleaseDelaySeconds(seconds);
         pendingRedstoneReleases = 0;
         if (level != null) {
             nextReleaseTick = level.getGameTime();
@@ -141,7 +145,7 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity {
         super.lazyTick();
         if (level == null || level.isClientSide || !takeoverAddress.isBlank() || cachedCount() == 0
                 || target == null || isAnimationInProgress()) return;
-        if (releaseDelaySeconds == 0) return; // redstone-controlled mode; trigger semantics are wired separately
+        if (releaseDelaySeconds == 0) return; // redstone mode is handled by rising-edge logic in tick()
         long now = level.getGameTime();
         if (now < nextReleaseTick) return;
         if (!releaseOne(now)) return;
@@ -173,6 +177,52 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity {
     }
 
     @Override
+    public boolean addToGoggleTooltip(List<Component> tooltip, boolean isPlayerSneaking) {
+        GoggleText.title(tooltip, "block.distantstock.cache_frogport");
+
+        String phase;
+        ChatFormatting phaseColor;
+        if (!takeoverAddress.isBlank()) {
+            phase = "takeover";
+            phaseColor = ChatFormatting.YELLOW;
+        } else if (cachedCount() > 0) {
+            phase = "replay";
+            phaseColor = ChatFormatting.AQUA;
+        } else {
+            phase = "idle";
+            phaseColor = ChatFormatting.DARK_GREEN;
+        }
+        GoggleText.value(tooltip, "goggle.distantstock.cache.state", phaseColor,
+                Component.translatable("goggle.distantstock.cache.phase." + phase));
+
+        if (!takeoverAddress.isBlank()) {
+            GoggleText.line(tooltip, "goggle.distantstock.cache.address", takeoverAddress);
+        }
+        GoggleText.value(tooltip, "goggle.distantstock.cache.inventory",
+                cachedCount() >= inventory.getSlots() ? ChatFormatting.RED : ChatFormatting.GRAY,
+                cachedCount(), inventory.getSlots());
+
+        if (releaseDelaySeconds == 0) {
+            GoggleText.line(tooltip, "goggle.distantstock.cache.release_redstone");
+            if (pendingRedstoneReleases > 0) {
+                GoggleText.line(tooltip, "goggle.distantstock.cache.pending_redstone",
+                        pendingRedstoneReleases);
+            }
+        } else {
+            GoggleText.line(tooltip, "goggle.distantstock.cache.release_interval", releaseDelaySeconds);
+            if (level != null && takeoverAddress.isBlank() && cachedCount() > 0) {
+                long remaining = Math.max(0, nextReleaseTick - level.getGameTime());
+                GoggleText.line(tooltip, "goggle.distantstock.cache.next_release", seconds(remaining));
+            }
+        }
+        return true;
+    }
+
+    private static String seconds(long ticks) {
+        return String.format(Locale.ROOT, "%.1f s", Math.max(0, ticks) / 20.0);
+    }
+
+    @Override
     protected void write(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.write(tag, registries, clientPacket);
         tag.putString("TakeoverAddress", takeoverAddress);
@@ -188,9 +238,23 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity {
         takeoverAddress = tag.getString("TakeoverAddress");
         nextReleaseTick = tag.getLong("NextRelease");
         releaseDelaySeconds = tag.contains("ReleaseDelaySeconds")
-                ? Math.max(0, Math.min(100, tag.getInt("ReleaseDelaySeconds")))
+                ? normalizeReleaseDelaySeconds(tag.getInt("ReleaseDelaySeconds"))
                 : 5;
         lastRedstonePowered = tag.getBoolean("LastRedstonePowered");
         pendingRedstoneReleases = Math.max(0, Math.min(18, tag.getInt("PendingRedstoneReleases")));
+    }
+
+    private static int normalizeReleaseDelaySeconds(int seconds) {
+        int[] allowed = {0, 5, 10, 15, 30};
+        int best = allowed[0];
+        int bestDistance = Math.abs(seconds - best);
+        for (int candidate : allowed) {
+            int distance = Math.abs(seconds - candidate);
+            if (distance < bestDistance) {
+                best = candidate;
+                bestDistance = distance;
+            }
+        }
+        return best;
     }
 }

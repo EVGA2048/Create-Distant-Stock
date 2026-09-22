@@ -254,6 +254,13 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
         if (binding != null) {
             tag.put("RemoteBinding", binding.save());
         }
+        // Distant-network membership is independent from the selected source warehouse. A player
+        // may join the machine to a formal Distant Stock network first and choose/bind a warehouse
+        // later; in that perfectly valid state binding == null. Persist the scope explicitly so
+        // breaking and replacing the requester does not silently throw it back to Legacy scope.
+        if (distantNetworkScope != null) {
+            tag.putUUID("DistantNetworkScope", distantNetworkScope);
+        }
     }
 
     @Override

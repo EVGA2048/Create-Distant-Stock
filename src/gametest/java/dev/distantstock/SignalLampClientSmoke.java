@@ -3,6 +3,7 @@ package dev.distantstock;
 import com.mojang.logging.LogUtils;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelConnectionHandler;
 import dev.distantstock.block.ModBlocks;
+import dev.distantstock.item.ModItems;
 import dev.distantstock.client.RemoteGaugeRenderer;
 import dev.distantstock.client.ResonatorRenderer;
 import dev.distantstock.client.SignalPanelRenderer;
@@ -36,6 +37,45 @@ public final class SignalLampClientSmoke {
                     .noneMatch(m -> m.getName().contains("distantstock$lampOutput"))) {
                 throw new AssertionError("Client lamp connection mixin was not applied");
             }
+            if (Arrays.stream(com.simibubi.create.content.logistics.packagePort.frogport.FrogportRenderer.class.getDeclaredMethods())
+                    .noneMatch(m -> m.getName().contains("distantstock$replacePart"))) {
+                throw new AssertionError("Special Frogport authored-model renderer mixin was not applied");
+            }
+            LogUtils.getLogger().info(
+                    "DISTANTSTOCK_SPECIAL_FROGPORT_RENDERER_OK: authored partial-model swap applied");
+
+            var chainMethods = Arrays.stream(
+                    com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorInteractionHandler.class
+                            .getDeclaredMethods()).map(java.lang.reflect.Method::getName).toList();
+            if (chainMethods.stream().noneMatch(n -> n.contains("distantstock$specialFrogportActivatesChainSelection"))
+                    || chainMethods.stream().noneMatch(n -> n.contains("distantstock$specialFrogportCreatesTarget"))) {
+                throw new AssertionError("Special Frogport chain-selection mixin was not applied");
+            }
+            if (Arrays.stream(com.simibubi.create.content.logistics.packagePort.PackagePortTargetSelectionHandler.class
+                            .getDeclaredMethods())
+                    .noneMatch(m -> m.getName().contains("distantstock$keepSpecialFrogportTargeting"))) {
+                throw new AssertionError("Special Frogport target-preview mixin was not applied");
+            }
+            var untunedDiagnostic = new net.minecraft.world.item.ItemStack(ModItems.DIAGNOSTIC_FROGPORT.get());
+            var untunedId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(
+                    dev.distantstock.client.SpecialFrogportSelection.normalizeForCreateCheck(untunedDiagnostic).getItem());
+            if (!ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "diagnostic_frogport").equals(untunedId)) {
+                throw new AssertionError("Untuned diagnostic Frogport incorrectly entered chain targeting: " + untunedId);
+            }
+
+            dev.distantstock.item.RequesterData.setFreq(untunedDiagnostic, java.util.UUID.randomUUID());
+            for (var stack : java.util.List.of(
+                    untunedDiagnostic,
+                    new net.minecraft.world.item.ItemStack(ModItems.CACHE_FROGPORT.get()))) {
+                var normalized = dev.distantstock.client.SpecialFrogportSelection.normalizeForCreateCheck(stack);
+                var id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(normalized.getItem());
+                if (!ResourceLocation.fromNamespaceAndPath("create", "package_frogport").equals(id)) {
+                    throw new AssertionError("Configured special Frogport did not normalize for Create chain selection: " + id);
+                }
+            }
+            LogUtils.getLogger().info(
+                    "DISTANTSTOCK_SPECIAL_FROGPORT_SELECTION_OK: tuned diagnostic/cache Frogports participate in Create chain targeting");
+
             if (net.neoforged.fml.ModList.get().isLoaded("fluidlogistics")) {
                 if (Arrays.stream(com.simibubi.create.content.logistics.box.PackageRenderer.class.getDeclaredMethods())
                         .noneMatch(m -> m.getName().contains("distantstock$renderRemoteFluidPackage"))) {

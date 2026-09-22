@@ -12,7 +12,6 @@ import com.simibubi.create.AllPartialModels;
 import com.simibubi.create.content.logistics.packager.PackagerRenderer;
 import com.simibubi.create.content.logistics.packager.PackagerVisual;
 import com.simibubi.create.content.logistics.packagePort.frogport.FrogportRenderer;
-import com.simibubi.create.content.logistics.packagePort.frogport.FrogportVisual;
 import dev.engine_room.flywheel.lib.visualization.SimpleBlockEntityVisualizer;
 import dev.engine_room.flywheel.lib.model.baked.PartialModel;
 import net.minecraft.client.Minecraft;
@@ -96,6 +95,7 @@ public final class ClientSetup {
             RemoteGaugeRenderer.registerModels();
             ResonatorRenderer.registerModels();
             WallSounderRenderer.registerModels();
+            SpecialFrogportModels.init();
             // Create normally lets Flywheel's GlassPipeVisual replace the vanilla block-entity
             // renderer entirely. In this pack that visual stops submitting fluid instances, so the
             // pipe still transports fluid but appears empty. Disable the Flywheel visualizer only
@@ -112,12 +112,9 @@ public final class ClientSetup {
                     // The renderer still draws the packaged box outside the Flywheel check.
                     .neverSkipVanillaRender()
                     .apply();
-            SimpleBlockEntityVisualizer.builder(ModBlockEntities.DIAGNOSTIC_FROGPORT.get())
-                    .factory((context, be, partialTick) -> new FrogportVisual(context, be, partialTick))
-                    .apply();
-            SimpleBlockEntityVisualizer.builder(ModBlockEntities.CACHE_FROGPORT.get())
-                    .factory((context, be, partialTick) -> new FrogportVisual(context, be, partialTick))
-                    .apply();
+            // Diagnostic/cache Frogports intentionally use Create's vanilla FrogportRenderer
+            // rather than FrogportVisual. Their authored orange/green partial models are selected
+            // by FrogportVisualTintMixin without multiplying colours over the cyan source texture.
         }
 
 
