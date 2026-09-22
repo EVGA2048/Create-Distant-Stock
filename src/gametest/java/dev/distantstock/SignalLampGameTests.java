@@ -39,6 +39,97 @@ import java.util.UUID;
 @PrefixGameTestTemplate(false)
 public final class SignalLampGameTests {
     @GameTest(template = "empty", timeoutTicks = 40)
+    public static void remoteGaugeMayBePlacedBeforeLocalCreateTuning(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos wall = h.absolutePos(new BlockPos(2, 2, 3));
+        level.setBlock(wall, Blocks.STONE.defaultBlockState(), 3);
+        Vec3 hit = Vec3.atLowerCornerOf(wall).add(.5, .5, 0);
+        player.setPos(hit.x, hit.y - player.getEyeHeight(), hit.z - 2);
+
+        ItemStack gauge = new ItemStack(ModItems.REMOTE_GAUGE.get(), 2);
+        h.assertFalse(LogisticallyLinkedBlockItem.isTuned(gauge),
+                "fresh remote gauge unexpectedly starts Create-tuned");
+        player.setItemInHand(InteractionHand.MAIN_HAND, gauge);
+        var result = gauge.getItem().useOn(new UseOnContext(player, InteractionHand.MAIN_HAND,
+                new BlockHitResult(hit, Direction.NORTH, wall, false)));
+        h.assertTrue(result.consumesAction(), "untuned remote gauge refused placement");
+
+        BlockPos placed = wall.north();
+        h.assertTrue(level.getBlockEntity(placed) instanceof RemoteGaugeBlockEntity,
+                "untuned remote gauge placed the wrong block entity");
+        var board = (RemoteGaugeBlockEntity) level.getBlockEntity(placed);
+        h.assertTrue(board.activePanels() == 1, "fresh remote gauge did not create exactly one panel");
+        var active = board.panels.values().stream().filter(FactoryPanelBehaviour::isActive).findFirst().orElse(null);
+        h.assertTrue(active != null, "placed remote gauge has no active panel");
+        h.assertTrue(RemoteGaugeBlockEntity.UNCONFIGURED_LOCAL_NETWORK.equals(active.network),
+                "untuned remote gauge did not keep the explicit unconfigured-local-network state");
+        h.assertTrue(gauge.getCount() == 1, "untuned remote gauge placement consumed the wrong amount");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void tunedRemoteGaugeKeepsItsLocalCreateNetworkOnPlacement(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos wall = h.absolutePos(new BlockPos(2, 2, 3));
+        level.setBlock(wall, Blocks.STONE.defaultBlockState(), 3);
+        Vec3 hit = Vec3.atLowerCornerOf(wall).add(.5, .5, 0);
+        player.setPos(hit.x, hit.y - player.getEyeHeight(), hit.z - 2);
+
+        UUID freq = UUID.randomUUID();
+        ItemStack gauge = new ItemStack(ModItems.REMOTE_GAUGE.get(), 2);
+        CompoundTag data = new CompoundTag();
+        data.putUUID("Freq", freq);
+        gauge.set(DataComponents.BLOCK_ENTITY_DATA, CustomData.of(data));
+        h.assertTrue(LogisticallyLinkedBlockItem.isTuned(gauge), "test remote gauge was not Create-tuned");
+        player.setItemInHand(InteractionHand.MAIN_HAND, gauge);
+        var result = gauge.getItem().useOn(new UseOnContext(player, InteractionHand.MAIN_HAND,
+                new BlockHitResult(hit, Direction.NORTH, wall, false)));
+        h.assertTrue(result.consumesAction(), "tuned remote gauge refused placement");
+
+        var board = (RemoteGaugeBlockEntity) level.getBlockEntity(wall.north());
+        h.assertTrue(board != null, "tuned remote gauge did not place");
+        var active = board.panels.values().stream().filter(FactoryPanelBehaviour::isActive).findFirst().orElse(null);
+        h.assertTrue(active != null, "tuned remote gauge has no active panel");
+        h.assertTrue(freq.equals(active.network), "tuned remote gauge lost its local Create network");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void placedRemoteGaugeCanBeCreateTunedAfterwards(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos.south(), Blocks.STONE.defaultBlockState(), 3);
+        BlockState state = ModBlocks.REMOTE_GAUGE.get().defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH);
+        level.setBlock(pos, state, 3);
+        var board = (RemoteGaugeBlockEntity) level.getBlockEntity(pos);
+        var slot = FactoryPanelBlock.PanelSlot.BOTTOM_LEFT;
+        board.addPanel(slot, RemoteGaugeBlockEntity.UNCONFIGURED_LOCAL_NETWORK);
+        board.panels.get(slot).setNetwork(RemoteGaugeBlockEntity.UNCONFIGURED_LOCAL_NETWORK);
+
+        UUID freq = UUID.randomUUID();
+        ItemStack tuned = new ItemStack(ModItems.REMOTE_GAUGE.get(), 2);
+        CompoundTag data = new CompoundTag();
+        data.putUUID("Freq", freq);
+        tuned.set(DataComponents.BLOCK_ENTITY_DATA, CustomData.of(data));
+        player.setItemInHand(InteractionHand.MAIN_HAND, tuned);
+        Vec3 hit = hitForSlot(pos, state, slot);
+        h.assertTrue(hit != null, "no hit position maps to the remote gauge slot");
+        GaugePlacementEvents.install(new PlayerInteractEvent.RightClickBlock(player,
+                InteractionHand.MAIN_HAND, pos,
+                new BlockHitResult(hit, Direction.NORTH, pos, false)));
+
+        h.assertTrue(freq.equals(board.panels.get(slot).network),
+                "post-placement tuning never reached the occupied remote gauge slot");
+        h.assertTrue(tuned.getCount() == 2, "retuning an existing remote gauge consumed an item");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
     public static void placementAndUnbind(GameTestHelper h) {
         var player = h.makeMockPlayer(GameType.SURVIVAL);
         var level = h.getLevel();

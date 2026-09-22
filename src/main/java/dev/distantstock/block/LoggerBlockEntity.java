@@ -32,6 +32,11 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
     private RemoteNetworkId networkId;
     private UUID distantNetworkId;
     private EventRegistry.Severity minimumSeverity = EventRegistry.Severity.INFO;
+    private AlarmSoundMode alarmSoundMode = AlarmSoundMode.DING_DONG;
+    /** When an unacknowledged alarm first began feeding a visible half-ticket. */
+    private long alarmReceiptStartedTick = Long.MIN_VALUE;
+    /** Start/end of the short full-ticket motion after the operator prints/acknowledges an alarm. */
+    private long printedStartedTick = Long.MIN_VALUE;
     private long printedUntilTick;
     private long nextBuzzerTick;
     private int promiseBusySeconds;
@@ -49,6 +54,16 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
 
     public UUID distantNetworkId() {
         return distantNetworkId;
+    }
+
+    public AlarmSoundMode alarmSoundMode() {
+        return alarmSoundMode;
+    }
+
+    public void setAlarmSoundMode(AlarmSoundMode mode) {
+        alarmSoundMode = mode == null ? AlarmSoundMode.DING_DONG : mode;
+        nextBuzzerTick = level == null ? 0 : level.getGameTime();
+        sync();
     }
 
     public String displayCode() {
@@ -84,6 +99,8 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         this.networkId = network;
         this.createFrequency = network == null ? null : network.createFrequency();
         this.distantNetworkId = distantNetworkId;
+        this.networkKnown = true;
+        this.promiseBusySeconds = 0;
         sync();
         updateStatus();
     }
@@ -92,6 +109,19 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         this.createFrequency = createFrequency;
         this.networkId = null;
         this.distantNetworkId = null;
+        this.networkKnown = true;
+        this.promiseBusySeconds = 0;
+        sync();
+        updateStatus();
+    }
+
+    /** Removes the scope entirely: this logger becomes an all-events console. */
+    public void clearBinding() {
+        createFrequency = null;
+        networkId = null;
+        distantNetworkId = null;
+        networkKnown = true;
+        promiseBusySeconds = 0;
         sync();
         updateStatus();
     }
@@ -140,9 +170,75 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         if (createFrequency == null) return true;
         if (createFrequency.equals(record.createFrequency())) return true;
         if (distantNetworkId != null && distantNetworkId.equals(record.distantNetworkId())) return true;
-        // The transport itself is shared infrastructure: if it is down, every bound logger should
-        // say so even though the link event has no one Create frequency to attach to.
-        return record.createFrequency() == null && "link".equals(record.sourceType());
+        // The transport is genuinely global. Towers are different: one tower can carry several
+        // warehouses, so its event has no honest single frequency. A bound logger only accepts a
+        // tower alarm when that tower's geometric reach contains at least one loaded device from
+        // this Create network. Device bindings survive the tower stopping, so this remains true at
+        // the exact moment its activation snapshot goes dark.
+        if (record.createFrequency() == null && "link".equals(record.sourceType())) return true;
+        if (record.createFrequency() == null && "chain".equals(record.sourceType()) && level != null) {
+            return dev.distantstock.diagnostics.ChainDiagnostics.addressUsedByNetwork(
+                    level, record.detail(), createFrequency);
+        }
+        return record.createFrequency() == null && "tower".equals(record.sourceType())
+                && towerAffectsBoundNetwork(record.sourceId());
+    }
+
+    private boolean towerAffectsBoundNetwork(String sourceId) {
+        if (level == null || level.isClientSide || sourceId == null || createFrequency == null) return false;
+        TowerCoreBlockEntity target = null;
+        for (TowerCoreBlockEntity tower : LoadedTowers.all()) {
+            if (tower.getLevel() != level || tower.tier() == null) continue;
+            if (EventRegistry.blockSource(level, tower.getBlockPos()).equals(sourceId)) {
+                target = tower;
+                break;
+            }
+        }
+        if (target == null) return false;
+
+        BlockPos base = target.getBlockPos();
+        long radius = target.tier().radius();
+        long radiusSq = radius * radius;
+
+        for (DockBlockEntity dock : LoadedDocks.allDocks()) {
+            if (createFrequency.equals(dock.freq()) && underTower(dock.getLevel(), dock.getBlockPos(), base, radiusSq)) {
+                return true;
+            }
+        }
+        for (GaugeBlockEntity gauge : LoadedDocks.allGauges()) {
+            if (createFrequency.equals(gauge.freq()) && underTower(gauge.getLevel(), gauge.getBlockPos(), base, radiusSq)) {
+                return true;
+            }
+        }
+        for (MonitorBlockEntity monitor : LoadedDevices.monitors()) {
+            if (createFrequency.equals(monitor.frequency())
+                    && underTower(monitor.getLevel(), monitor.getBlockPos(), base, radiusSq)) {
+                return true;
+            }
+        }
+
+        // Packagers do not store the logistics frequency themselves; Create stores it on their
+        // stock links. Ask Create's own frequency index and follow each matching link to its packager.
+        for (com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour linked
+                : com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour
+                .getAllPresent(createFrequency, false)) {
+            if (!(linked.blockEntity instanceof com.simibubi.create.content.logistics.packagerLink.PackagerLinkBlockEntity link)) {
+                continue;
+            }
+            if (link.getPackager() instanceof RemotePackagerBlockEntity packager
+                    && underTower(packager.getLevel(), packager.getBlockPos(), base, radiusSq)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean underTower(Level deviceLevel, BlockPos device, BlockPos base, long radiusSq) {
+        if (deviceLevel != level) return false;
+        long dx = (long) base.getX() - device.getX();
+        long dy = (long) base.getY() - device.getY();
+        long dz = (long) base.getZ() - device.getZ();
+        return dx * dx + dy * dy + dz * dz <= radiusSq;
     }
 
     public boolean visible(EventRegistry.Record record) {
@@ -204,9 +300,44 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
     /** Shows the physical paper output briefly after a successful print/ack operation. */
     public void showPrintedReceipt() {
         if (level == null || level.isClientSide) return;
-        printedUntilTick = level.getGameTime() + 60;
+        printedStartedTick = level.getGameTime();
+        printedUntilTick = printedStartedTick + 60;
         setPrinted(true);
+        sync();
         updateStatus();
+    }
+
+    /**
+     * Visual paper travel for the client renderer, 0 = hidden, .5 = alarm waiting, 1 = fully printed.
+     * The paper is purely visual until the operator confirms a print; the half-ticket never consumes
+     * the roll or creates an item by itself.
+     */
+    public float receiptExtension(float partialTick) {
+        if (level == null) return 0f;
+        double now = level.getGameTime() + partialTick;
+        BlockState state = getBlockState();
+
+        if (state.hasProperty(LoggerBlock.PRINTED) && state.getValue(LoggerBlock.PRINTED)
+                && printedStartedTick != Long.MIN_VALUE) {
+            double feed = Math.clamp((now - printedStartedTick) / 6.0, 0.0, 1.0);
+            double extension = .5 + .5 * smooth(feed);
+            double remaining = printedUntilTick - now;
+            if (remaining < 8.0) {
+                extension *= Math.clamp(remaining / 8.0, 0.0, 1.0);
+            }
+            return (float) extension;
+        }
+
+        LoggerBlock.Status status = state.hasProperty(LoggerBlock.STATUS)
+                ? state.getValue(LoggerBlock.STATUS) : LoggerBlock.Status.NORMAL;
+        boolean unacknowledgedAlarm = status == LoggerBlock.Status.WARN || status == LoggerBlock.Status.ERROR;
+        if (!unacknowledgedAlarm || !hasPaper() || alarmReceiptStartedTick == Long.MIN_VALUE) return 0f;
+        double feed = Math.clamp((now - alarmReceiptStartedTick) / 10.0, 0.0, 1.0);
+        return (float) (.5 * smooth(feed));
+    }
+
+    private static double smooth(double value) {
+        return value * value * (3.0 - 2.0 * value);
     }
 
     private void setPrinted(boolean printed) {
@@ -244,15 +375,40 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         if (level == null || level.isClientSide) return;
         EventRegistry.Record alarm = nextPrintableAlarm();
         if (alarm == null) {
+            if (alarmReceiptStartedTick != Long.MIN_VALUE) {
+                alarmReceiptStartedTick = Long.MIN_VALUE;
+                sync();
+            }
             nextBuzzerTick = level.getGameTime();
             return;
         }
+        if (hasPaper() && alarmReceiptStartedTick == Long.MIN_VALUE) {
+            alarmReceiptStartedTick = level.getGameTime();
+            sync();
+        }
         long now = level.getGameTime();
         if (now < nextBuzzerTick) return;
-        level.playSound(null, worldPosition, ModSounds.STACK_LIGHT_BUZZER.get(),
-                SoundSource.BLOCKS, alarm.severity() == EventRegistry.Severity.ERROR ? 0.78f : 0.58f,
-                alarm.severity() == EventRegistry.Severity.ERROR ? 1.0f : 1.08f);
-        nextBuzzerTick = now + (alarm.severity() == EventRegistry.Severity.ERROR ? 22 : 60);
+        switch (alarmSoundMode) {
+            case DING_DONG -> {
+                level.playSound(null, worldPosition, ModSounds.WALL_SOUNDER_B2.get(),
+                        SoundSource.BLOCKS,
+                        alarm.severity() == EventRegistry.Severity.ERROR ? 0.82f : 0.68f, 1.0f);
+                nextBuzzerTick = now + 30;
+            }
+            case SWEEP -> {
+                level.playSound(null, worldPosition, ModSounds.WALL_SOUNDER_F1.get(),
+                        SoundSource.BLOCKS,
+                        alarm.severity() == EventRegistry.Severity.ERROR ? 0.82f : 0.68f, 1.0f);
+                nextBuzzerTick = now + 90;
+            }
+            case BUZZER -> {
+                level.playSound(null, worldPosition, ModSounds.STACK_LIGHT_BUZZER.get(),
+                        SoundSource.BLOCKS,
+                        alarm.severity() == EventRegistry.Severity.ERROR ? 0.78f : 0.58f,
+                        alarm.severity() == EventRegistry.Severity.ERROR ? 1.0f : 1.08f);
+                nextBuzzerTick = now + (alarm.severity() == EventRegistry.Severity.ERROR ? 22 : 60);
+            }
+        }
     }
 
     private void sampleNetworkHealth() {
@@ -306,6 +462,9 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         if (networkId != null) tag.put("RemoteNetwork", networkId.save());
         if (distantNetworkId != null) tag.putUUID("DistantNetwork", distantNetworkId);
         tag.putString("MinimumSeverity", minimumSeverity.name());
+        tag.putString("AlarmSoundMode", alarmSoundMode.name());
+        if (alarmReceiptStartedTick != Long.MIN_VALUE) tag.putLong("AlarmReceiptStartedTick", alarmReceiptStartedTick);
+        if (printedStartedTick != Long.MIN_VALUE) tag.putLong("PrintedStartedTick", printedStartedTick);
         if (printedUntilTick > 0) tag.putLong("PrintedUntilTick", printedUntilTick);
         tag.putInt("PromiseBusySeconds", promiseBusySeconds);
         tag.putBoolean("NetworkKnown", networkKnown);
@@ -326,6 +485,17 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         } catch (IllegalArgumentException ignored) {
             minimumSeverity = EventRegistry.Severity.INFO;
         }
+        try {
+            alarmSoundMode = tag.contains("AlarmSoundMode")
+                    ? AlarmSoundMode.valueOf(tag.getString("AlarmSoundMode"))
+                    : AlarmSoundMode.DING_DONG;
+        } catch (IllegalArgumentException ignored) {
+            alarmSoundMode = AlarmSoundMode.DING_DONG;
+        }
+        alarmReceiptStartedTick = tag.contains("AlarmReceiptStartedTick")
+                ? tag.getLong("AlarmReceiptStartedTick") : Long.MIN_VALUE;
+        printedStartedTick = tag.contains("PrintedStartedTick")
+                ? tag.getLong("PrintedStartedTick") : Long.MIN_VALUE;
         printedUntilTick = tag.getLong("PrintedUntilTick");
         promiseBusySeconds = tag.getInt("PromiseBusySeconds");
         networkKnown = !tag.contains("NetworkKnown") || tag.getBoolean("NetworkKnown");
@@ -360,5 +530,12 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         if (level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
         }
+    }
+
+    /** Three operator-selectable alarm sounds. There is deliberately no silent mode. */
+    public enum AlarmSoundMode {
+        DING_DONG,
+        SWEEP,
+        BUZZER
     }
 }

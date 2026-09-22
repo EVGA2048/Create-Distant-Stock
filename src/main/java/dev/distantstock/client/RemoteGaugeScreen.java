@@ -145,10 +145,8 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen implements Group
                 .bounds(left, networkY - 2, wide, 14).build());
         updateNetworkWidgets();
 
-        // 清单是服务器推的，推的那一次可以和界面创建抢跑 —— 要一次比赌它送到便宜。
-        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-                new dev.distantstock.net.SetDockGroupC2S("",
-                        dev.distantstock.net.SetDockGroupC2S.REFRESH));
+        // 组清单跟设备状态一起按**设备自己的正式远仓 scope**发送。
+        // 不能拿一个空终端去 REFRESH：空终端会被解释成 Legacy scope，把正式网络的组全过滤掉。
         requestNetworkState();
     }
 

@@ -3,6 +3,7 @@ package dev.distantstock.block;
 import com.mojang.serialization.MapCodec;
 import com.simibubi.create.content.equipment.wrench.IWrenchable;
 import dev.distantstock.item.RequesterData;
+import dev.distantstock.item.RequesterItem;
 import dev.distantstock.item.EventReceiptItem;
 import dev.distantstock.item.ModItems;
 import dev.distantstock.event.EventRegistry;
@@ -88,6 +89,32 @@ public final class LoggerBlock extends WallPanelBlock implements IWrenchable {
     @Override
     protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
                                                Player player, InteractionHand hand, BlockHitResult hit) {
+        if (stack.getItem() instanceof RequesterItem
+                && level.getBlockEntity(pos) instanceof LoggerBlockEntity logger) {
+            if (!level.isClientSide) {
+                if (player.isShiftKeyDown()) {
+                    logger.clearBinding();
+                    player.displayClientMessage(Component.translatable(
+                            "gui.distantstock.logger.scope_all"), true);
+                } else if (!RequesterData.tuned(stack)) {
+                    player.displayClientMessage(Component.translatable(
+                            "message.distantstock.logger.terminal_unbound"), true);
+                } else {
+                    var network = RequesterData.network(stack).orElse(null);
+                    if (network != null) {
+                        java.util.UUID distant = RequesterData.formalDistantNetwork(stack, level.getServer())
+                                .orElseGet(() -> RequesterData.distantNetwork(stack).orElse(null));
+                        logger.setBinding(network, distant);
+                    } else {
+                        logger.setCreateFrequency(RequesterData.freq(stack));
+                    }
+                    player.displayClientMessage(Component.translatable(
+                            "gui.distantstock.logger.scope_bound",
+                            RequesterData.shortFreq(RequesterData.freq(stack))), true);
+                }
+            }
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        }
         if (stack.is(ModItems.LOGGER_PAPER_ROLL.get())
                 && level.getBlockEntity(pos) instanceof LoggerBlockEntity logger) {
             if (!level.isClientSide) {

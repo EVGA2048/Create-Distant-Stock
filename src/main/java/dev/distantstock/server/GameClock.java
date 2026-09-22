@@ -72,6 +72,7 @@ public final class GameClock {
     @SubscribeEvent
     public static void stopping(ServerStoppingEvent e) {
         AlarmSampler.stop();
+        dev.distantstock.diagnostics.ChainDiagnostics.stop();
         if (transerverActive) {
             DistantNetworkJoinService.stop();
             ReceiverProbeService.stop();
@@ -110,6 +111,7 @@ public final class GameClock {
             dev.distantstock.block.LoadedDocks.forget(level);
             dev.distantstock.block.LoadedTowers.forget(level);
             dev.distantstock.block.LoadedDevices.forget(level);
+            dev.distantstock.diagnostics.ChainDiagnostics.forget(level);
         }
     }
 
@@ -122,6 +124,7 @@ public final class GameClock {
         // every tick so a broken tower releases its chunks promptly rather than at the next beat.
         TowerActivation.tick(e.getServer());
         TowerChunkLoader.tick(e.getServer());
+        dev.distantstock.diagnostics.ChainDiagnostics.tick(e.getServer());
 
         if (transerverActive) {
             TranserverBridge.tick();

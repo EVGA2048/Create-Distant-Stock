@@ -51,9 +51,11 @@ public record DistantDeviceStateS2C(BlockPos pos, int slot, UUID scope, String n
         var blockEntity = level.getBlockEntity(target.pos());
         UUID scope = null;
         RemoteNetworkId selected = null;
+        UUID receivingGroup = null;
         if (blockEntity instanceof RemoteRedstoneRequesterBlockEntity requester && target.slot() < 0) {
             scope = requester.distantNetworkScope();
             selected = requester.binding() == null ? null : requester.binding().network();
+            receivingGroup = requester.binding() == null ? null : requester.binding().receivingGroup();
         } else {
             FactoryPanelBlock.PanelSlot[] slots = FactoryPanelBlock.PanelSlot.values();
             if (target.slot() < 0 || target.slot() >= slots.length) return;
@@ -61,15 +63,18 @@ public record DistantDeviceStateS2C(BlockPos pos, int slot, UUID scope, String n
             if (blockEntity instanceof RemoteGaugeBlockEntity gauge) {
                 scope = gauge.distantNetworkScope(panel);
                 selected = gauge.binding(panel) == null ? null : gauge.binding(panel).network();
+                receivingGroup = gauge.binding(panel) == null ? null : gauge.binding(panel).receivingGroup();
             } else if (blockEntity instanceof SignalPanelBlockEntity signal && signal.isRemoteGauge(panel)) {
                 scope = signal.distantNetworkScope(panel);
                 selected = signal.binding(panel) == null ? null : signal.binding(panel).network();
+                receivingGroup = signal.binding(panel) == null ? null : signal.binding(panel).receivingGroup();
             } else if (blockEntity instanceof com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockEntity board
                     && net.neoforged.fml.ModList.get().isLoaded("deployer")
                     && dev.distantstock.panel.DeployerPanels.holdsRemoteGauge(board, panel)) {
                 scope = dev.distantstock.panel.DeployerPanels.distantNetworkScope(board, panel);
                 var binding = dev.distantstock.panel.DeployerPanels.bindingOf(board, panel);
                 selected = binding == null ? null : binding.network();
+                receivingGroup = binding == null ? null : binding.receivingGroup();
             } else {
                 return;
             }
@@ -90,6 +95,9 @@ public record DistantDeviceStateS2C(BlockPos pos, int slot, UUID scope, String n
         PacketDistributor.sendToPlayer(player,
                 new DistantDeviceStateS2C(target.pos(), target.slot(), scope, name,
                         selected, List.copyOf(members)));
+        if (DistantNetworkDirectory.isFormalId(scope)) {
+            dev.distantstock.menu.RequesterMenu.sendGroupList(player, scope, receivingGroup);
+        }
     }
 
     public static void handle(DistantDeviceStateS2C msg, IPayloadContext ctx) {

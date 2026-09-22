@@ -167,10 +167,8 @@ public final class RemoteRedstoneRequesterScreen extends RedstoneRequesterScreen
         updateNetworkWidgets();
 
         moveBottomBar();
-        // 清单是服务器推的，而推的那一次可以和界面创建抢跑 —— 抢输了这份就永远缺着，表现是
-        // "点开是空的"。要一次比赌它送到便宜（终端那条注释里写的就是这个教训）。
-        PacketDistributor.sendToServer(new dev.distantstock.net.SetDockGroupC2S(
-                "", dev.distantstock.net.SetDockGroupC2S.REFRESH));
+        // 组清单由 DistantDeviceStateS2C 使用这台设备自己的正式远仓 scope 一起发送。
+        // 旧的空 ItemStack REFRESH 会落到 Legacy scope，恰好把真正想看的组全部过滤掉。
         requestNetworkState();
     }
 

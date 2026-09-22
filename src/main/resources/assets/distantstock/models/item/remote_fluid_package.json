@@ -1,0 +1,192 @@
+{
+  "format_version": "1.21.6",
+  "credit": "FluidLogistics package geometry compatibility; Distant Stock pale-blue skin",
+  "parent": "create:item/package_transforms",
+  "render_type": "minecraft:cutout",
+  "textures": {
+    "0": "distantstock:item/remote_fluid_package",
+    "particle": "distantstock:item/remote_fluid_package"
+  },
+  "elements": [
+    {
+      "name": "box",
+      "from": [
+        1,
+        0,
+        2
+      ],
+      "to": [
+        15,
+        10,
+        14
+      ],
+      "rotation": {
+        "angle": 0,
+        "axis": "y",
+        "origin": [
+          8,
+          5,
+          8
+        ]
+      },
+      "faces": {
+        "north": {
+          "uv": [
+            1,
+            5.5,
+            7,
+            10.5
+          ],
+          "texture": "#0"
+        },
+        "east": {
+          "uv": [
+            1,
+            0.5,
+            7,
+            5.5
+          ],
+          "texture": "#0"
+        },
+        "south": {
+          "uv": [
+            7,
+            5.5,
+            1,
+            10.5
+          ],
+          "texture": "#0"
+        },
+        "west": {
+          "uv": [
+            1,
+            10.5,
+            7,
+            15.5
+          ],
+          "texture": "#0"
+        },
+        "up": {
+          "uv": [
+            9,
+            2,
+            15,
+            8
+          ],
+          "rotation": 180,
+          "texture": "#0"
+        },
+        "down": {
+          "uv": [
+            9,
+            8,
+            15,
+            14
+          ],
+          "rotation": 270,
+          "texture": "#0"
+        }
+      }
+    },
+    {
+      "name": "box_outline",
+      "from": [
+        15,
+        10,
+        14
+      ],
+      "to": [
+        1,
+        0,
+        2
+      ],
+      "rotation": {
+        "angle": 0,
+        "axis": "y",
+        "origin": [
+          8,
+          5,
+          8
+        ]
+      },
+      "faces": {
+        "north": {
+          "uv": [
+            7,
+            5.5,
+            1,
+            10.5
+          ],
+          "rotation": 180,
+          "texture": "#0"
+        },
+        "east": {
+          "uv": [
+            1,
+            10.5,
+            7,
+            15.5
+          ],
+          "rotation": 180,
+          "texture": "#0"
+        },
+        "south": {
+          "uv": [
+            1,
+            5.5,
+            7,
+            10.5
+          ],
+          "rotation": 180,
+          "texture": "#0"
+        },
+        "west": {
+          "uv": [
+            1,
+            0.5,
+            7,
+            5.5
+          ],
+          "rotation": 180,
+          "texture": "#0"
+        },
+        "up": {
+          "uv": [
+            9,
+            8,
+            15,
+            14
+          ],
+          "rotation": 180,
+          "texture": "#0"
+        },
+        "down": {
+          "uv": [
+            9,
+            2,
+            15,
+            8
+          ],
+          "rotation": 180,
+          "texture": "#0"
+        }
+      }
+    }
+  ],
+  "display": {},
+  "groups": [
+    {
+      "name": "fluid_package",
+      "origin": [
+        8,
+        8,
+        8
+      ],
+      "color": 0,
+      "children": [
+        0,
+        1
+      ]
+    }
+  ]
+}

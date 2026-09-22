@@ -126,6 +126,9 @@ public class RemoteGaugePanelBehaviour extends AbstractPanelBehaviour {
 
     @Override
     public void tick() {
+        if (!dev.distantstock.block.RemoteGaugeBlockEntity.localNetworkConfigured(network)) {
+            return;
+        }
         super.tick();
         Level level = blockEntity.getLevel();
         if (level == null || level.isClientSide || !isActive()) {
@@ -138,6 +141,14 @@ public class RemoteGaugePanelBehaviour extends AbstractPanelBehaviour {
             return;
         }
         orders.tick();
+    }
+
+    @Override
+    public void lazyTick() {
+        if (!dev.distantstock.block.RemoteGaugeBlockEntity.localNetworkConfigured(network)) {
+            return;
+        }
+        super.lazyTick();
     }
 
     @Override

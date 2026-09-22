@@ -157,6 +157,7 @@ def extraGaugesJar = new File(modpackMods, 'extra_gauges-2.1.2.jar')
  * our panels are registered into their registries, and this one is a reference, not a dependency.
  */
 def mobilePackagesJar = new File(modpackMods, 'create_mobile_packages-1.21.1-0.7.4.jar')
+def fluidLogisticsJar = new File(modpackMods, 'fluidlogistics-1.0.1.jar')
 
 tasks.register('extractPonder') {
     onlyIf { !ponderJar.exists() }
@@ -205,6 +206,14 @@ dependencies {
     }
     if (mobilePackagesJar.exists()) {
         runtimeOnly files(mobilePackagesJar)
+    }
+    // Optional compile surface only. The runtime dependency is intentionally absent so normal
+    // dev/test runs prove Distant Stock still starts without FluidLogistics installed.
+    if (fluidLogisticsJar.exists()) {
+        compileOnly files(fluidLogisticsJar)
+        if (providers.gradleProperty('withFluidLogistics').isPresent()) {
+            runtimeOnly files(fluidLogisticsJar)
+        }
     }
 }
 

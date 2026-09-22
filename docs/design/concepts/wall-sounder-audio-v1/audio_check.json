@@ -1,0 +1,62 @@
+{
+  "sample_rate": 48000,
+  "channels": 1,
+  "target_peak_dbfs": -20,
+  "preview_leading_silence_s": 2.0,
+  "pulse_period_s": 1.5,
+  "preview_repeats": 4,
+  "playback_performed": false,
+  "candidates": {
+    "a_soft_chime": {
+      "label": "柔和短铃",
+      "wav": {
+        "duration_s": 0.34,
+        "peak_dbfs": -20.0,
+        "rms_dbfs": -30.32,
+        "max_sample_step": 0.0115478
+      },
+      "ogg_decoded": {
+        "duration_s": 0.3373,
+        "peak_dbfs": -19.91,
+        "rms_dbfs": -30.22,
+        "max_sample_step": 0.0116608
+      },
+      "preview_duration_s": 7.84,
+      "ogg_sha256": "113340c69a9ce695b43cdd5d759e261a61a965c1f40d25b6bb26a7b89421fb31"
+    },
+    "b_descending_pair": {
+      "label": "圆润双音",
+      "wav": {
+        "duration_s": 0.46,
+        "peak_dbfs": -20.0,
+        "rms_dbfs": -29.23,
+        "max_sample_step": 0.012407
+      },
+      "ogg_decoded": {
+        "duration_s": 0.4573,
+        "peak_dbfs": -19.87,
+        "rms_dbfs": -29.12,
+        "max_sample_step": 0.012582
+      },
+      "preview_duration_s": 7.96,
+      "ogg_sha256": "4095b1fd95c899ad2629bd81e4ff734bac4086bce3a41dea66853d3581c0f4d3"
+    },
+    "c_low_signal": {
+      "label": "低音机械提示",
+      "wav": {
+        "duration_s": 0.32,
+        "peak_dbfs": -20.0,
+        "rms_dbfs": -29.97,
+        "max_sample_step": 0.0084924
+      },
+      "ogg_decoded": {
+        "duration_s": 0.3173,
+        "peak_dbfs": -19.98,
+        "rms_dbfs": -29.86,
+        "max_sample_step": 0.0085363
+      },
+      "preview_duration_s": 7.82,
+      "ogg_sha256": "fac2638e7c14d9d1a00477b95458ae49705472473cd3151445fad6b85413e6b8"
+    }
+  }
+}

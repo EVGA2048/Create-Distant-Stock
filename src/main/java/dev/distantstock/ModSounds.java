@@ -15,6 +15,14 @@ public final class ModSounds {
             SOUNDS.register("stack_light_buzzer", () ->
                     SoundEvent.createVariableRangeEvent(
                             ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "stack_light_buzzer")));
+    public static final DeferredHolder<SoundEvent, SoundEvent> WALL_SOUNDER_B2 =
+            SOUNDS.register("wall_sounder_b2", () ->
+                    SoundEvent.createVariableRangeEvent(
+                            ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "wall_sounder_b2")));
+    public static final DeferredHolder<SoundEvent, SoundEvent> WALL_SOUNDER_F1 =
+            SOUNDS.register("wall_sounder_f1", () ->
+                    SoundEvent.createVariableRangeEvent(
+                            ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "wall_sounder_f1")));
 
     private ModSounds() {
     }

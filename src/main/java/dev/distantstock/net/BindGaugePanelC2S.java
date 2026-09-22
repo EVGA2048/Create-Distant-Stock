@@ -95,6 +95,18 @@ public record BindGaugePanelC2S(BlockPos pos, int slot, String destination, Stri
                 ? dev.distantstock.panel.DeployerPanels.bindingOf(board, slot) : null;
     }
 
+    private static java.util.UUID distantNetworkScope(
+            FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot) {
+        if (board instanceof dev.distantstock.block.RemoteGaugeBlockEntity gauge) {
+            return gauge.distantNetworkScope(slot);
+        }
+        if (board instanceof dev.distantstock.block.SignalPanelBlockEntity signal) {
+            return signal.distantNetworkScope(slot);
+        }
+        return net.neoforged.fml.ModList.get().isLoaded("deployer")
+                ? dev.distantstock.panel.DeployerPanels.distantNetworkScope(board, slot) : null;
+    }
+
     public static void handle(BindGaugePanelC2S msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             Player player = ctx.player();
@@ -118,12 +130,19 @@ public record BindGaugePanelC2S(BlockPos pos, int slot, String destination, Stri
             // 还没到，RemoteGroups 里还没有那一行。
             java.util.UUID group = null;
             dev.distantstock.block.RemoteBinding current = currentBinding(board, slot);
-            java.util.UUID distantNetworkId = current == null
-                    ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID
-                    : dev.distantstock.stock.NetworkDirectory.find(current.network())
-                    .map(dev.distantstock.stock.NetworkDirectory.Entry::distantNetworkId)
-                    .orElse(current.distantNetworkId());
+            java.util.UUID distantNetworkId = distantNetworkScope(board, slot);
+            if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(distantNetworkId)
+                    && current != null && current.distantNetworkKnown()) {
+                // Migration compatibility only: old saved bindings predate the explicit per-device
+                // scope field. Once the device has a formal scope, that field is authoritative.
+                distantNetworkId = current.distantNetworkId();
+            }
             if (!wanted.isEmpty()) {
+                if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(distantNetworkId)) {
+                    player.displayClientMessage(Component.translatable(
+                            "message.distantstock.network.required"), true);
+                    return;
+                }
                 var match = dev.distantstock.routing.ReceivingAddressResolver.resolve(
                         player.level().getServer(), distantNetworkId, wanted);
                 DockGroup existing = match.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.LOCAL

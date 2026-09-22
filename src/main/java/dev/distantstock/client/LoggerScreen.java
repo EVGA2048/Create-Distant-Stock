@@ -134,6 +134,20 @@ public final class LoggerScreen extends Screen {
                     () -> PacketDistributor.sendToServer(LoggerActionC2S.level(source, choice))));
             bx += w + 5;
         }
+
+        int soundX = bx + 2;
+        int soundW = x + W - 14 - soundX;
+        LoggerBlockEntity.AlarmSoundMode current = snapshot.alarmSoundMode();
+        Component sound = Component.translatable("gui.distantstock.logger.sound",
+                Component.translatable("gui.distantstock.logger.sound."
+                        + current.name().toLowerCase(java.util.Locale.ROOT)));
+        boolean over = inside(mouseX, mouseY, soundX, by, soundW, 15);
+        g.fill(soundX, by, soundX + soundW, by + 15, over ? 0xFF405158 : 0xFF324147);
+        g.drawString(font, fit(sound.getString(), soundW - 8), soundX + 4, by + 4, INK, false);
+        LoggerBlockEntity.AlarmSoundMode[] modes = LoggerBlockEntity.AlarmSoundMode.values();
+        LoggerBlockEntity.AlarmSoundMode next = modes[(current.ordinal() + 1) % modes.length];
+        hits.add(new Hit(soundX, by, soundW, 15,
+                () -> PacketDistributor.sendToServer(LoggerActionC2S.sound(source, next))));
     }
 
     private void drawRows(GuiGraphics g, int x, int y, int mouseX, int mouseY) {

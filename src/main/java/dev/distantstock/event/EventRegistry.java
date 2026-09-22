@@ -50,6 +50,9 @@ public final class EventRegistry extends SavedData {
         public static final String NETWORK_LINKS_OFFLINE = "NETWORK_LINKS_OFFLINE";
         public static final String NETWORK_LOCKED = "NETWORK_LOCKED";
         public static final String AUTOMATION_STALLED = "AUTOMATION_STALLED";
+        public static final String CHAIN_NO_ROUTE = "CHAIN_NO_ROUTE";
+        public static final String CHAIN_PING_TIMEOUT = "CHAIN_PING_TIMEOUT";
+        public static final String CHAIN_CACHE_FULL = "CHAIN_CACHE_FULL";
 
         private Codes() {
         }

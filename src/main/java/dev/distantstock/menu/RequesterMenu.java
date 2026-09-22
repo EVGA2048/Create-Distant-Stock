@@ -520,20 +520,36 @@ public final class RequesterMenu extends AbstractContainerMenu {
 
     /** Pushes the current list to whoever has this screen open. */
     public static void sendGroupList(Player player, ItemStack stack) {
-        if (!(player instanceof net.minecraft.server.level.ServerPlayer serverPlayer)
+        if (!(player instanceof net.minecraft.server.level.ServerPlayer)
                 || player.level().getServer() == null) {
             // There is nothing to push to a player who is not on a server — a game test's mock
             // player is the case that matters, and the write it is testing happens either way.
             return;
         }
-        dev.distantstock.routing.DockGroupDirectory directory =
-                dev.distantstock.routing.DockGroupDirectory.get(player.level().getServer());
         java.util.UUID carried = player.containerMenu instanceof RequesterMenu menu
                 ? menu.carriedGroup(player).orElse(null)
                 : dev.distantstock.item.RequesterData.receivingGroup(stack).orElse(null);
         java.util.UUID scope = player.containerMenu instanceof RequesterMenu menu
                 ? menu.distantNetworkId(player)
                 : scopeOf(player, stack);
+        sendGroupList(player, scope, carried);
+    }
+
+    /**
+     * Pushes receiving addresses for an already-known Distant Stock scope.
+     *
+     * <p>Placed devices do not carry a requester ItemStack. Passing {@code ItemStack.EMPTY} through
+     * the terminal helper used to silently turn their request into Legacy scope, so every formal
+     * receiving address was filtered out and the picker opened empty. A device already stores the
+     * authoritative scope; use it directly instead of inventing a terminal to ask through.
+     */
+    public static void sendGroupList(Player player, java.util.UUID scope, java.util.UUID carried) {
+        if (!(player instanceof net.minecraft.server.level.ServerPlayer serverPlayer)
+                || player.level().getServer() == null) {
+            return;
+        }
+        dev.distantstock.routing.DockGroupDirectory directory =
+                dev.distantstock.routing.DockGroupDirectory.get(player.level().getServer());
         net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(serverPlayer,
                 dev.distantstock.net.DockGroupsS2C.of(directory, player.getUUID(), carried, scope,
                         group -> dev.distantstock.block.LoadedDocks.allInGroup(group).size(),

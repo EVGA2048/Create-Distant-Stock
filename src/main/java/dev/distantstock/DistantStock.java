@@ -34,5 +34,10 @@ public final class DistantStock {
         if (net.neoforged.fml.ModList.get().isLoaded("deployer")) {
             dev.distantstock.panel.DeployerPanels.register(bus);
         }
+        // FluidLogistics is a true optional compat surface. This class references its API and is
+        // therefore never resolved on packs that do not have the mod installed.
+        if (net.neoforged.fml.ModList.get().isLoaded("fluidlogistics")) {
+            dev.distantstock.compat.fluidlogistics.FluidLogisticsCompat.register(bus);
+        }
     }
 }

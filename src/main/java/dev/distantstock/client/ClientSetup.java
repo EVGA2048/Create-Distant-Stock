@@ -11,6 +11,8 @@ import dev.distantstock.menu.ModMenus;
 import com.simibubi.create.AllPartialModels;
 import com.simibubi.create.content.logistics.packager.PackagerRenderer;
 import com.simibubi.create.content.logistics.packager.PackagerVisual;
+import com.simibubi.create.content.logistics.packagePort.frogport.FrogportRenderer;
+import com.simibubi.create.content.logistics.packagePort.frogport.FrogportVisual;
 import dev.engine_room.flywheel.lib.visualization.SimpleBlockEntityVisualizer;
 import dev.engine_room.flywheel.lib.model.baked.PartialModel;
 import net.minecraft.client.Minecraft;
@@ -93,6 +95,7 @@ public final class ClientSetup {
             SignalPanelRenderer.registerModels();
             RemoteGaugeRenderer.registerModels();
             ResonatorRenderer.registerModels();
+            WallSounderRenderer.registerModels();
             // Create normally lets Flywheel's GlassPipeVisual replace the vanilla block-entity
             // renderer entirely. In this pack that visual stops submitting fluid instances, so the
             // pipe still transports fluid but appears empty. Disable the Flywheel visualizer only
@@ -108,6 +111,12 @@ public final class ClientSetup {
                     .factory((context, be, partialTick) -> new PackagerVisual<>(context, be, partialTick))
                     // The renderer still draws the packaged box outside the Flywheel check.
                     .neverSkipVanillaRender()
+                    .apply();
+            SimpleBlockEntityVisualizer.builder(ModBlockEntities.DIAGNOSTIC_FROGPORT.get())
+                    .factory((context, be, partialTick) -> new FrogportVisual(context, be, partialTick))
+                    .apply();
+            SimpleBlockEntityVisualizer.builder(ModBlockEntities.CACHE_FROGPORT.get())
+                    .factory((context, be, partialTick) -> new FrogportVisual(context, be, partialTick))
                     .apply();
         }
 
@@ -136,8 +145,11 @@ public final class ClientSetup {
                     RemoteGaugeRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.REMOTE_PACKAGER.get(), PackagerRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.DOCK.get(), DockParcelRenderer::new);
+            e.registerBlockEntityRenderer(ModBlockEntities.DIAGNOSTIC_FROGPORT.get(), FrogportRenderer::new);
+            e.registerBlockEntityRenderer(ModBlockEntities.CACHE_FROGPORT.get(), FrogportRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.SIGNAL_PANEL.get(), SignalPanelRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.ETHER_RESONATOR.get(), ResonatorRenderer::new);
+            e.registerBlockEntityRenderer(ModBlockEntities.WALL_SOUNDER.get(), WallSounderRenderer::new);
             // The monitor's face is a flap display, and this is Create's renderer for one: the
             // glyphs, the flip animation and the light they are drawn in all come from it. Nothing
             // of ours is involved, which is the point — a board that looks like a display board
@@ -162,6 +174,16 @@ public final class ClientSetup {
             AllPartialModels.PACKAGE_RIGGING.put(remoteId,
                     PartialModel.of(ResourceLocation.fromNamespaceAndPath(DistantStock.MODID,
                             "item/remote_package_rigging_12x12")));
+            ResourceLocation pingId = BuiltInRegistries.ITEM.getKey(ModItems.PING_PACKAGE.get());
+            AllPartialModels.PACKAGES.put(pingId,
+                    PartialModel.of(ResourceLocation.fromNamespaceAndPath(DistantStock.MODID,
+                            "item/ping_package_12x12")));
+            AllPartialModels.PACKAGE_RIGGING.put(pingId,
+                    PartialModel.of(ResourceLocation.fromNamespaceAndPath(DistantStock.MODID,
+                            "item/ping_package_rigging_12x12")));
+            if (net.neoforged.fml.ModList.get().isLoaded("fluidlogistics")) {
+                dev.distantstock.compat.fluidlogistics.FluidLogisticsClientCompat.registerModels();
+            }
         }
     }
 

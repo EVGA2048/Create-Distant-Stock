@@ -22,6 +22,7 @@ public record LoggerActionC2S(BlockPos source, int action, UUID eventId, int val
     public static final int ACKNOWLEDGE = 1;
     public static final int SET_LEVEL = 2;
     public static final int PRINT = 3;
+    public static final int SET_SOUND = 4;
 
     public static final Type<LoggerActionC2S> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "logger_action"));
@@ -42,6 +43,10 @@ public record LoggerActionC2S(BlockPos source, int action, UUID eventId, int val
 
     public static LoggerActionC2S print(BlockPos pos, UUID eventId) {
         return new LoggerActionC2S(pos, PRINT, eventId, 0);
+    }
+
+    public static LoggerActionC2S sound(BlockPos pos, LoggerBlockEntity.AlarmSoundMode mode) {
+        return new LoggerActionC2S(pos, SET_SOUND, null, mode.ordinal());
     }
 
     private static void write(RegistryFriendlyByteBuf buf, LoggerActionC2S message) {
@@ -79,6 +84,10 @@ public record LoggerActionC2S(BlockPos source, int action, UUID eventId, int val
             if (message.action() == SET_LEVEL) {
                 int index = Math.clamp(message.value(), 0, EventRegistry.Severity.values().length - 1);
                 logger.setMinimumSeverity(EventRegistry.Severity.values()[index]);
+            } else if (message.action() == SET_SOUND) {
+                int index = Math.clamp(message.value(), 0,
+                        LoggerBlockEntity.AlarmSoundMode.values().length - 1);
+                logger.setAlarmSoundMode(LoggerBlockEntity.AlarmSoundMode.values()[index]);
             } else if ((message.action() == ACKNOWLEDGE || message.action() == PRINT)
                     && message.eventId() != null) {
                 // Printing is the acknowledgement operation. Keep the legacy ACK action id for

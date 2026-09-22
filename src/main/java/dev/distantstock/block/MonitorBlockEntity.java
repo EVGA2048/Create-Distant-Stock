@@ -162,6 +162,11 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
         return networkId;
     }
 
+    /** Create logistics network displayed by this monitor, used by tower-alarm scoping. */
+    public java.util.UUID frequency() {
+        return freq;
+    }
+
     public void setNetwork(RemoteNetworkId networkId) {
         this.networkId = networkId;
         this.freq = networkId == null ? null : networkId.createFrequency();

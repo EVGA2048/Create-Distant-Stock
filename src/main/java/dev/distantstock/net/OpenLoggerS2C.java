@@ -16,6 +16,7 @@ import java.util.UUID;
 
 /** Snapshot used both to open and refresh one logger screen. */
 public record OpenLoggerS2C(BlockPos source, EventRegistry.Severity minimumSeverity,
+                            LoggerBlockEntity.AlarmSoundMode alarmSoundMode,
                             UUID createFrequency, int paperRemaining, List<Row> rows) implements CustomPacketPayload {
     public static final Type<OpenLoggerS2C> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "open_logger"));
@@ -24,12 +25,13 @@ public record OpenLoggerS2C(BlockPos source, EventRegistry.Severity minimumSever
 
     public OpenLoggerS2C {
         minimumSeverity = minimumSeverity == null ? EventRegistry.Severity.INFO : minimumSeverity;
+        alarmSoundMode = alarmSoundMode == null ? LoggerBlockEntity.AlarmSoundMode.DING_DONG : alarmSoundMode;
         paperRemaining = Math.clamp(paperRemaining, 0, LoggerBlockEntity.PAPER_CAPACITY);
         rows = rows == null ? List.of() : List.copyOf(rows);
     }
 
     public static OpenLoggerS2C from(LoggerBlockEntity logger) {
-        return new OpenLoggerS2C(logger.getBlockPos(), logger.minimumSeverity(), logger.createFrequency(),
+        return new OpenLoggerS2C(logger.getBlockPos(), logger.minimumSeverity(), logger.alarmSoundMode(), logger.createFrequency(),
                 logger.paperRemaining(),
                 logger.rows().stream().map(Row::from).toList());
     }
@@ -37,6 +39,7 @@ public record OpenLoggerS2C(BlockPos source, EventRegistry.Severity minimumSever
     private static void write(RegistryFriendlyByteBuf buf, OpenLoggerS2C message) {
         buf.writeBlockPos(message.source());
         buf.writeVarInt(message.minimumSeverity().ordinal());
+        buf.writeVarInt(message.alarmSoundMode().ordinal());
         buf.writeBoolean(message.createFrequency() != null);
         if (message.createFrequency() != null) buf.writeUUID(message.createFrequency());
         buf.writeVarInt(message.paperRemaining());
@@ -49,12 +52,14 @@ public record OpenLoggerS2C(BlockPos source, EventRegistry.Severity minimumSever
     private static OpenLoggerS2C read(RegistryFriendlyByteBuf buf) {
         BlockPos source = buf.readBlockPos();
         int severity = Math.clamp(buf.readVarInt(), 0, EventRegistry.Severity.values().length - 1);
+        int sound = Math.clamp(buf.readVarInt(), 0, LoggerBlockEntity.AlarmSoundMode.values().length - 1);
         UUID frequency = buf.readBoolean() ? buf.readUUID() : null;
         int paper = Math.clamp(buf.readVarInt(), 0, LoggerBlockEntity.PAPER_CAPACITY);
         int count = Math.clamp(buf.readVarInt(), 0, LoggerBlockEntity.SNAPSHOT_LIMIT);
         java.util.ArrayList<Row> rows = new java.util.ArrayList<>(count);
         for (int i = 0; i < count; i++) rows.add(Row.read(buf));
-        return new OpenLoggerS2C(source, EventRegistry.Severity.values()[severity], frequency, paper, rows);
+        return new OpenLoggerS2C(source, EventRegistry.Severity.values()[severity],
+                LoggerBlockEntity.AlarmSoundMode.values()[sound], frequency, paper, rows);
     }
 
     @Override

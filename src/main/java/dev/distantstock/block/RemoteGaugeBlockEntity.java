@@ -24,6 +24,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 
 /**
  * A factory gauge board whose panels can order from another server.
@@ -43,6 +44,14 @@ import java.util.UUID;
  * off as lost.
  */
 public final class RemoteGaugeBlockEntity extends FactoryPanelBlockEntity implements IHaveGoggleInformation {
+    /** Create requires every panel network field to be a serializable UUID, even before setup. */
+    public static final UUID UNCONFIGURED_LOCAL_NETWORK = UUID.nameUUIDFromBytes(
+            "distantstock:unconfigured_local_inventory".getBytes(StandardCharsets.UTF_8));
+
+    public static boolean localNetworkConfigured(UUID network) {
+        return network != null && !UNCONFIGURED_LOCAL_NETWORK.equals(network);
+    }
+
     private final RemoteOrderBook orders = new RemoteOrderBook(this);
 
     public RemoteGaugeBlockEntity(BlockPos pos, BlockState state) {
@@ -86,6 +95,21 @@ public final class RemoteGaugeBlockEntity extends FactoryPanelBlockEntity implem
     private static final class RemotePanelBehaviour extends FactoryPanelBehaviour {
         private RemotePanelBehaviour(FactoryPanelBlockEntity be, FactoryPanelBlock.PanelSlot slot) {
             super(be, slot);
+        }
+
+        @Override
+        public void tick() {
+            // An untuned remote gauge is a valid placed/configurable device, but not yet a valid
+            // local stock monitor. Keep Create's network field serializable, but never query the
+            // internal unconfigured marker as if it were a real logistics network.
+            if (!localNetworkConfigured(network)) return;
+            super.tick();
+        }
+
+        @Override
+        public void lazyTick() {
+            if (!localNetworkConfigured(network)) return;
+            super.lazyTick();
         }
 
         /**

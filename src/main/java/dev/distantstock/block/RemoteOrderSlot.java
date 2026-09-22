@@ -103,6 +103,11 @@ public final class RemoteOrderSlot {
         if (behaviour == null || !behaviour.isActive()) {
             return;
         }
+        if (!RemoteGaugeBlockEntity.localNetworkConfigured(behaviour.network)) {
+            // The item is deliberately placeable before local Create tuning. Never interpret an
+            // unconfigured local monitor as "stock = 0" and start ordering forever.
+            return;
+        }
         ItemStack filter = behaviour.getFilter();
         if (filter.isEmpty()) {
             return;

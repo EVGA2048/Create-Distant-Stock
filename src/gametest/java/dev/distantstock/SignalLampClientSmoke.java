@@ -36,6 +36,20 @@ public final class SignalLampClientSmoke {
                     .noneMatch(m -> m.getName().contains("distantstock$lampOutput"))) {
                 throw new AssertionError("Client lamp connection mixin was not applied");
             }
+            if (net.neoforged.fml.ModList.get().isLoaded("fluidlogistics")) {
+                if (Arrays.stream(com.simibubi.create.content.logistics.box.PackageRenderer.class.getDeclaredMethods())
+                        .noneMatch(m -> m.getName().contains("distantstock$renderRemoteFluidPackage"))) {
+                    throw new AssertionError("Remote fluid package entity renderer mixin was not applied");
+                }
+                var remoteFluidId = ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "remote_fluid_package");
+                var remoteFluidModel = com.simibubi.create.AllPartialModels.PACKAGES.get(remoteFluidId);
+                if (remoteFluidModel == null) {
+                    throw new AssertionError("Remote fluid package has no Create package partial model");
+                }
+                verify(remoteFluidModel.get(), mc);
+                LogUtils.getLogger().info(
+                        "DISTANTSTOCK_REMOTE_FLUID_ENTITY_RENDERER_OK: mixin applied and blue shell partial baked");
+            }
             // The casing's connected texture attaches by swapping its baked model, and a swap that
             // silently did not happen leaves a perfectly ordinary-looking block with no connection
             // logic at all. Nothing else in the game reports that, so it is asserted here.
@@ -237,12 +251,16 @@ public final class SignalLampClientSmoke {
                         dev.distantstock.event.EventRegistry.Severity.INFO, "TEST_CLEARED",
                         "test", "smoke", "cleared event", false, false, 1));
         var snapshot = new dev.distantstock.net.OpenLoggerS2C(source,
-                dev.distantstock.event.EventRegistry.Severity.INFO, java.util.UUID.randomUUID(), 16, rows);
+                dev.distantstock.event.EventRegistry.Severity.INFO,
+                dev.distantstock.block.LoggerBlockEntity.AlarmSoundMode.DING_DONG,
+                java.util.UUID.randomUUID(), 16, rows);
         var page = new dev.distantstock.client.LoggerScreen(snapshot);
         page.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
         page.render(graphics, 0, 0, 0f);
         page.update(new dev.distantstock.net.OpenLoggerS2C(source,
-                dev.distantstock.event.EventRegistry.Severity.WARN, null, 0, rows));
+                dev.distantstock.event.EventRegistry.Severity.WARN,
+                dev.distantstock.block.LoggerBlockEntity.AlarmSoundMode.BUZZER,
+                null, 0, rows));
         page.render(graphics, 0, 0, 0f);
         LogUtils.getLogger().info("DISTANTSTOCK_LOGGER_PAGE_OK: 活动、已确认、已恢复事件均可绘制");
     }

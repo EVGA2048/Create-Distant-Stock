@@ -103,8 +103,16 @@ public final class DockParcelRenderer implements BlockEntityRenderer<DockBlockEn
         pose.translate(.5, frame.baseY(), .5);
         pose.mulPose(Axis.YP.rotationDegrees(180 - facingYRot));
         pose.scale(frame.scale(), frame.scale(), frame.scale());
+        pose.pushPose();
         pose.translate(-.5, 0, -.5);
         drawModel(model, frame.clipY(), pose, out, innerLight);
+        pose.popPose();
+        if (net.neoforged.fml.ModList.get().isLoaded("fluidlogistics")
+                && ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "remote_fluid_package")
+                .equals(BuiltInRegistries.ITEM.getKey(parcel.getItem()))) {
+            dev.distantstock.compat.fluidlogistics.FluidLogisticsClientCompat
+                    .renderContentsForEntity(parcel, pose, buffers, innerLight);
+        }
         pose.popPose();
     }
 

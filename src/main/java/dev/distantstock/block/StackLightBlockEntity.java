@@ -31,8 +31,7 @@ public final class StackLightBlockEntity extends BlockEntity {
     }
 
     public boolean buzzerActive() {
-        BlockState state = getBlockState();
-        return buzzerEnabled && state.hasProperty(StackLightBlock.RED) && state.getValue(StackLightBlock.RED);
+        return buzzerEnabled;
     }
 
     public BlockPos sourcePos() {
@@ -76,17 +75,8 @@ public final class StackLightBlockEntity extends BlockEntity {
     public boolean applyFrom(ResourceLocation dimension, BlockPos source,
                              boolean red, boolean yellow, boolean green, boolean buzzer) {
         if (!accepts(dimension, source) || level == null || level.isClientSide) return false;
-        BlockState previous = getBlockState();
-        boolean yellowRising = !previous.getValue(StackLightBlock.YELLOW) && yellow;
-        boolean greenRising = !previous.getValue(StackLightBlock.GREEN) && green;
         buzzerEnabled = buzzer;
         StackLightBlock.apply(level, worldPosition, red, yellow, green);
-        if (buzzer && (yellowRising || greenRising)) {
-            // One acknowledgement chirp for a newly asserted non-fault condition. If red is also
-            // active, this pulse becomes the current alarm beat so the periodic fault buzzer does
-            // not fire again on the same tick and produce a doubled sound.
-            playBuzzerPulse(level);
-        }
         sync();
         return true;
     }

@@ -233,45 +233,6 @@
         "model": "distantstock:block/logger_offline",
         "y": 90
       }
-    },
-    {
-      "when": {
-        "printed": "true",
-        "facing": "north"
-      },
-      "apply": {
-        "model": "distantstock:block/logger_receipt"
-      }
-    },
-    {
-      "when": {
-        "printed": "true",
-        "facing": "south"
-      },
-      "apply": {
-        "model": "distantstock:block/logger_receipt",
-        "y": 180
-      }
-    },
-    {
-      "when": {
-        "printed": "true",
-        "facing": "west"
-      },
-      "apply": {
-        "model": "distantstock:block/logger_receipt",
-        "y": 270
-      }
-    },
-    {
-      "when": {
-        "printed": "true",
-        "facing": "east"
-      },
-      "apply": {
-        "model": "distantstock:block/logger_receipt",
-        "y": 90
-      }
     }
   ]
 }

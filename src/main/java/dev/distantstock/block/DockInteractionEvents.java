@@ -219,7 +219,8 @@ public final class DockInteractionEvents {
                 || state.getBlock() instanceof GaugeBlock
                 || state.getBlock() instanceof RemoteGaugeBlock
                 || state.getBlock() instanceof RemoteRedstoneRequesterBlock
-                || state.getBlock() instanceof MonitorBlock;
+                || state.getBlock() instanceof MonitorBlock
+                || state.getBlock() instanceof LoggerBlock;
     }
 
     private DockInteractionEvents() {

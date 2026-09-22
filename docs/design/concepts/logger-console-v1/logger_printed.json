@@ -1,0 +1,1111 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:cutout",
+  "credit": "Distant Stock / logger console V1 / art study; custom native-density miniature tubes",
+  "textures": {
+    "particle": "logger_study:back"
+  },
+  "elements": [
+    {
+      "name": "wall_panel",
+      "from": [
+        0,
+        0,
+        13
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:face",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "south": {
+          "texture": "logger_study:back",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "west": {
+          "texture": "logger_study:side",
+          "uv": [
+            0,
+            0,
+            3,
+            16
+          ]
+        },
+        "east": {
+          "texture": "logger_study:side",
+          "uv": [
+            0,
+            0,
+            3,
+            16
+          ]
+        },
+        "up": {
+          "texture": "logger_study:side",
+          "uv": [
+            0,
+            0,
+            16,
+            3
+          ]
+        },
+        "down": {
+          "texture": "logger_study:side",
+          "uv": [
+            0,
+            0,
+            16,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "name": "tube_0_socket",
+      "from": [
+        10,
+        7,
+        10
+      ],
+      "to": [
+        15,
+        8,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            5,
+            1
+          ]
+        },
+        "south": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            5,
+            1
+          ]
+        },
+        "west": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "east": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "up": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            5,
+            3
+          ]
+        },
+        "down": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            5,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "name": "tube_0_glass",
+      "from": [
+        10,
+        8,
+        10
+      ],
+      "to": [
+        15,
+        15,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:digit_0_lit",
+          "uv": [
+            0,
+            0,
+            5,
+            7
+          ]
+        },
+        "south": {
+          "texture": "logger_study:tube_side",
+          "uv": [
+            0,
+            0,
+            5,
+            7
+          ]
+        },
+        "west": {
+          "texture": "logger_study:tube_side",
+          "uv": [
+            0,
+            0,
+            3,
+            7
+          ]
+        },
+        "east": {
+          "texture": "logger_study:tube_side",
+          "uv": [
+            0,
+            0,
+            3,
+            7
+          ]
+        },
+        "up": {
+          "texture": "logger_study:tube_side",
+          "uv": [
+            0,
+            0,
+            5,
+            3
+          ]
+        },
+        "down": {
+          "texture": "logger_study:tube_side",
+          "uv": [
+            0,
+            0,
+            5,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "name": "tube_0_cap",
+      "from": [
+        11,
+        15,
+        11
+      ],
+      "to": [
+        14,
+        16,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "south": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "west": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "east": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "up": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            3,
+            2
+          ]
+        },
+        "down": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            3,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "tube_1_socket",
+      "from": [
+        4,
+        7,
+        10
+      ],
+      "to": [
+        9,
+        8,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            5,
+            1
+          ]
+        },
+        "south": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            5,
+            1
+          ]
+        },
+        "west": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "east": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "up": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            5,
+            3
+          ]
+        },
+        "down": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            5,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "name": "tube_1_glass",
+      "from": [
+        4,
+        8,
+        10
+      ],
+      "to": [
+        9,
+        15,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:digit_0_lit",
+          "uv": [
+            0,
+            0,
+            5,
+            7
+          ]
+        },
+        "south": {
+          "texture": "logger_study:tube_side",
+          "uv": [
+            0,
+            0,
+            5,
+            7
+          ]
+        },
+        "west": {
+          "texture": "logger_study:tube_side",
+          "uv": [
+            0,
+            0,
+            3,
+            7
+          ]
+        },
+        "east": {
+          "texture": "logger_study:tube_side",
+          "uv": [
+            0,
+            0,
+            3,
+            7
+          ]
+        },
+        "up": {
+          "texture": "logger_study:tube_side",
+          "uv": [
+            0,
+            0,
+            5,
+            3
+          ]
+        },
+        "down": {
+          "texture": "logger_study:tube_side",
+          "uv": [
+            0,
+            0,
+            5,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "name": "tube_1_cap",
+      "from": [
+        5,
+        15,
+        11
+      ],
+      "to": [
+        8,
+        16,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "south": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "west": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "east": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "up": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            3,
+            2
+          ]
+        },
+        "down": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            3,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "red_socket",
+      "from": [
+        1,
+        12,
+        11
+      ],
+      "to": [
+        3,
+        13,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "south": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "west": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "east": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "up": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "down": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "red_bulb",
+      "from": [
+        1,
+        13,
+        10
+      ],
+      "to": [
+        3,
+        15,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:red_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "south": {
+          "texture": "logger_study:red_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "west": {
+          "texture": "logger_study:red_off",
+          "uv": [
+            0,
+            0,
+            3,
+            2
+          ]
+        },
+        "east": {
+          "texture": "logger_study:red_off",
+          "uv": [
+            0,
+            0,
+            3,
+            2
+          ]
+        },
+        "up": {
+          "texture": "logger_study:red_off",
+          "uv": [
+            0,
+            0,
+            2,
+            3
+          ]
+        },
+        "down": {
+          "texture": "logger_study:red_off",
+          "uv": [
+            0,
+            0,
+            2,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "name": "amber_socket",
+      "from": [
+        1,
+        8,
+        11
+      ],
+      "to": [
+        3,
+        9,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "south": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "west": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "east": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "up": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "down": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "amber_bulb",
+      "from": [
+        1,
+        9,
+        10
+      ],
+      "to": [
+        3,
+        11,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:amber_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "south": {
+          "texture": "logger_study:amber_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "west": {
+          "texture": "logger_study:amber_off",
+          "uv": [
+            0,
+            0,
+            3,
+            2
+          ]
+        },
+        "east": {
+          "texture": "logger_study:amber_off",
+          "uv": [
+            0,
+            0,
+            3,
+            2
+          ]
+        },
+        "up": {
+          "texture": "logger_study:amber_off",
+          "uv": [
+            0,
+            0,
+            2,
+            3
+          ]
+        },
+        "down": {
+          "texture": "logger_study:amber_off",
+          "uv": [
+            0,
+            0,
+            2,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "name": "green_socket",
+      "from": [
+        1,
+        4,
+        11
+      ],
+      "to": [
+        3,
+        5,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "south": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "west": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "east": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "up": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "down": {
+          "texture": "logger_study:brass",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "green_bulb",
+      "from": [
+        1,
+        5,
+        10
+      ],
+      "to": [
+        3,
+        7,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:green_on",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "south": {
+          "texture": "logger_study:green_on",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "west": {
+          "texture": "logger_study:green_on",
+          "uv": [
+            0,
+            0,
+            3,
+            2
+          ]
+        },
+        "east": {
+          "texture": "logger_study:green_on",
+          "uv": [
+            0,
+            0,
+            3,
+            2
+          ]
+        },
+        "up": {
+          "texture": "logger_study:green_on",
+          "uv": [
+            0,
+            0,
+            2,
+            3
+          ]
+        },
+        "down": {
+          "texture": "logger_study:green_on",
+          "uv": [
+            0,
+            0,
+            2,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "name": "printer_housing",
+      "from": [
+        5,
+        3,
+        10
+      ],
+      "to": [
+        15,
+        6,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:printer",
+          "uv": [
+            0,
+            0,
+            10,
+            3
+          ]
+        },
+        "south": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            10,
+            3
+          ]
+        },
+        "west": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            3,
+            3
+          ]
+        },
+        "east": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            3,
+            3
+          ]
+        },
+        "up": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            10,
+            3
+          ]
+        },
+        "down": {
+          "texture": "logger_study:iron",
+          "uv": [
+            0,
+            0,
+            10,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "name": "receipt_feed_fold",
+      "from": [
+        7,
+        4,
+        9
+      ],
+      "to": [
+        13,
+        4,
+        10
+      ],
+      "faces": {
+        "up": {
+          "texture": "logger_study:receipt",
+          "uv": [
+            0,
+            0,
+            6,
+            1
+          ]
+        },
+        "down": {
+          "texture": "logger_study:receipt",
+          "uv": [
+            0,
+            0,
+            6,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "name": "printed_receipt",
+      "from": [
+        7,
+        0,
+        9
+      ],
+      "to": [
+        13,
+        4,
+        9
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:receipt",
+          "uv": [
+            0,
+            0,
+            6,
+            4
+          ]
+        },
+        "south": {
+          "texture": "logger_study:receipt",
+          "uv": [
+            0,
+            0,
+            6,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "name": "buzzer_grille",
+      "from": [
+        1,
+        0,
+        12
+      ],
+      "to": [
+        4,
+        4,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "logger_study:buzzer",
+          "uv": [
+            0,
+            0,
+            3,
+            4
+          ]
+        },
+        "south": {
+          "texture": "logger_study:dark",
+          "uv": [
+            0,
+            0,
+            3,
+            4
+          ]
+        },
+        "west": {
+          "texture": "logger_study:dark",
+          "uv": [
+            0,
+            0,
+            1,
+            4
+          ]
+        },
+        "east": {
+          "texture": "logger_study:dark",
+          "uv": [
+            0,
+            0,
+            1,
+            4
+          ]
+        },
+        "up": {
+          "texture": "logger_study:dark",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "down": {
+          "texture": "logger_study:dark",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        }
+      }
+    }
+  ]
+}

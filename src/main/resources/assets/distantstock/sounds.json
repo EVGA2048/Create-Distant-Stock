@@ -2,7 +2,28 @@
   "stack_light_buzzer": {
     "subtitle": "subtitle.distantstock.stack_light_buzzer",
     "sounds": [
-      { "name": "distantstock:stack_light_buzzer_v8", "stream": false }
+      {
+        "name": "distantstock:stack_light_buzzer_v8",
+        "stream": false
+      }
+    ]
+  },
+  "wall_sounder_b2": {
+    "subtitle": "subtitle.distantstock.wall_sounder",
+    "sounds": [
+      {
+        "name": "distantstock:wall_sounder_b2",
+        "stream": false
+      }
+    ]
+  },
+  "wall_sounder_f1": {
+    "subtitle": "subtitle.distantstock.wall_sounder",
+    "sounds": [
+      {
+        "name": "distantstock:wall_sounder_f1",
+        "stream": false
+      }
     ]
   }
 }

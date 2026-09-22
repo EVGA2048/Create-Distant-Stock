@@ -1,0 +1,30 @@
+{
+  "diagnostic_port.png": {
+    "size": [
+      32,
+      32
+    ],
+    "sha256": "9d3e905a6f55d99407fdf3d39aef11cb651a8764aaab7b1dd6beadbac0cd26d6"
+  },
+  "diagnostic_port2.png": {
+    "size": [
+      32,
+      32
+    ],
+    "sha256": "bc377be1ef67c1af5ae8cc220a4656df077a765a272c72de483d465036598049"
+  },
+  "cache_port.png": {
+    "size": [
+      32,
+      32
+    ],
+    "sha256": "65ab1fdd693ad92ae308d640b701c13bca74467fd9cbea38e621142ff8b415bb"
+  },
+  "cache_port2.png": {
+    "size": [
+      32,
+      32
+    ],
+    "sha256": "36513d3d97a28ae577d18940e6593876df7b824993dceafb52b8c07685c8d1af"
+  }
+}

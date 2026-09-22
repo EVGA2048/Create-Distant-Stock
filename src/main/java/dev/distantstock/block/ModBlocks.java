@@ -14,6 +14,16 @@ public final class ModBlocks {
 
     public static final DeferredHolder<net.minecraft.world.level.block.Block, DockBlock> DOCK =
             BLOCKS.register("dock", () -> new DockBlock(machine()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, DiagnosticFrogportBlock> DIAGNOSTIC_FROGPORT =
+            BLOCKS.register("diagnostic_frogport", () -> new DiagnosticFrogportBlock(
+                    BlockBehaviour.Properties.ofFullCopy(net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
+                            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", "package_frogport")))
+                            .noOcclusion()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, CacheFrogportBlock> CACHE_FROGPORT =
+            BLOCKS.register("cache_frogport", () -> new CacheFrogportBlock(
+                    BlockBehaviour.Properties.ofFullCopy(net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
+                            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", "package_frogport")))
+                            .noOcclusion()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, GaugeBlock> GAUGE =
             BLOCKS.register("gauge", () -> new GaugeBlock(machine().noOcclusion()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, RemoteGaugeBlock> REMOTE_GAUGE =
@@ -25,6 +35,12 @@ public final class ModBlocks {
     public static final DeferredHolder<net.minecraft.world.level.block.Block, StackLightBlock> STACK_LIGHT =
             BLOCKS.register("stack_light", () -> new StackLightBlock(panel()
                     .lightLevel(state -> StackLightBlock.anyLit(state) ? 12 : 0)));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, WallSounderBlock> RED_WALL_SOUNDER =
+            BLOCKS.register("red_wall_sounder", () -> new WallSounderBlock(panel()
+                    .lightLevel(state -> state.getValue(WallSounderBlock.LIT) ? 15 : 0)));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, WallSounderBlock> ORANGE_WALL_SOUNDER =
+            BLOCKS.register("orange_wall_sounder", () -> new WallSounderBlock(panel()
+                    .lightLevel(state -> state.getValue(WallSounderBlock.LIT) ? 15 : 0)));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, ConditionLinkerBlock> CONDITION_LINKER =
             BLOCKS.register("condition_linker", () -> new ConditionLinkerBlock(panel()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, RemotePackagerBlock> REMOTE_PACKAGER =

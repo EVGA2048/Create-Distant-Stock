@@ -3,15 +3,18 @@ package dev.distantstock.block;
 import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
 import com.simibubi.create.content.logistics.BigItemStack;
 import com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlockEntity;
+import com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterEffectPacket;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.link.LinkQueues;
 import dev.distantstock.routing.RemoteGaugeOrders;
 import dev.distantstock.stock.StockCache;
 import dev.distantstock.routing.TowerActivation;
+import net.createmod.catnip.platform.CatnipServices;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
@@ -116,13 +119,13 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
             // Carried by a tower or it does not send. The unbound path above is Create's own machine
             // and is left alone; this one spends a warehouse's stock across a server boundary, and
             // that is the tower's to carry.
-            playEffect(false);
+            sendEffect(false);
             lastRequestSucceeded = false;
             return;
         }
         List<LinkQueues.Line> lines = linesFor(bound);
         if (lines.isEmpty()) {
-            playEffect(false);
+            sendEffect(false);
             lastRequestSucceeded = false;
             return;
         }
@@ -136,7 +139,22 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
                 bound.network(), bound.distantNetworkId(), bound.distantNetworkKnown(), encodedTargetAdress,
                 bound.receivingGroup(), bound.homeAddress(), lines);
         lastRequestSucceeded = ok;
-        playEffect(ok);
+        sendEffect(ok);
+    }
+
+    /**
+     * Uses Create's own effect packet path.
+     *
+     * <p>{@link #playEffect(boolean)} is a client-side renderer/sound method. Calling it on the
+     * dedicated server, as the old remote branch did, never told nearby clients anything — hence a
+     * perfectly real redstone edge with no requester animation. The vanilla requester sends this
+     * packet after every attempt; keep the exact same contract here.
+     */
+    private void sendEffect(boolean success) {
+        if (level instanceof ServerLevel serverLevel) {
+            CatnipServices.NETWORK.sendToClientsAround(serverLevel, worldPosition, 32,
+                    new RedstoneRequesterEffectPacket(worldPosition, success));
+        }
     }
 
     /** The configured items as order lines, cut down to what the warehouse is known to hold. */
@@ -223,9 +241,6 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
         if (distantNetworkScope != null) {
             tag.putUUID("DistantNetworkScope", distantNetworkScope);
         }
-        if (distantNetworkScope != null) {
-            tag.putUUID("DistantNetworkScope", distantNetworkScope);
-        }
         if (clientPacket) {
             tag.putString("GroupName", liveGroupName());
         }
@@ -277,10 +292,22 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
                 || level == null || level.getServer() == null) {
             return "";
         }
-        return dev.distantstock.routing.DockGroupDirectory.get(level.getServer())
+        var server = level.getServer();
+        String local = dev.distantstock.routing.DockGroupDirectory.get(server)
                 .find(binding.receivingGroup())
                 .map(dev.distantstock.routing.DockGroup::name)
-                .orElseGet(() -> RequesterData.shortFreq(binding.receivingGroup()));
+                .orElse(null);
+        if (local != null && !local.isBlank()) {
+            return local;
+        }
+        String remote = dev.distantstock.routing.RemoteGroups.get(server)
+                .find(binding.receivingGroup())
+                .filter(entry -> !binding.distantNetworkKnown()
+                        || entry.distantNetworkId().equals(binding.distantNetworkId()))
+                .map(dev.distantstock.routing.RemoteGroups.Entry::name)
+                .orElse(null);
+        return remote == null || remote.isBlank()
+                ? RequesterData.shortFreq(binding.receivingGroup()) : remote;
     }
 
     /** 屏幕改完目标以后写回来：网络和送货地址不动，只换接收港组和本端地址。 */

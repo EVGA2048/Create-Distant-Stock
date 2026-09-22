@@ -3,7 +3,28 @@
   "minVersion": "0.8",
   "package": "dev.distantstock.mixin",
   "compatibilityLevel": "JAVA_21",
-  "mixins": ["LampConnectionMixin"],
-  "client": ["client.PackagerRendererMixin", "client.LampConnectionHandlerMixin"],
-  "injectors": { "defaultRequire": 1 }
+  "mixins": [
+    "LampConnectionMixin",
+    "compat.FluidPackagerBlockEntityMixin",
+    "ChainConveyorAccessor",
+    "ChainConveyorBlockEntityMixin",
+    "ChainConveyorRoutingTableMixin",
+    "PackagePortBlockEntityMixin",
+    "FrogportBlockEntityMixin",
+    "ChainPackageInteractionPacketMixin",
+    "FactoryPanelDiagnosticsMixin",
+    "ChainConveyorFrogportTargetMixin",
+    "PackagePortConfigurationPacketMixin"
+  ],
+  "client": [
+    "client.PackagerRendererMixin",
+    "client.LampConnectionHandlerMixin",
+    "client.RemoteFluidPackageRendererMixin",
+    "client.FrogportVisualTintMixin",
+    "client.PackagePortScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "plugin": "dev.distantstock.mixin.DistantStockMixinPlugin"
 }

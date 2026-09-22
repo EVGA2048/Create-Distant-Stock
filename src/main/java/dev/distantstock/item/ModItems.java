@@ -21,10 +21,14 @@ public final class ModItems {
             () -> new RequesterItem(new Item.Properties().stacksTo(1)));
     public static final DeferredHolder<Item, DockItem> DOCK = ITEMS.register("dock",
             () -> new DockItem(ModBlocks.DOCK.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, BlockItem> DIAGNOSTIC_FROGPORT = block("diagnostic_frogport",
+            ModBlocks.DIAGNOSTIC_FROGPORT);
+    public static final DeferredHolder<Item, BlockItem> CACHE_FROGPORT = block("cache_frogport",
+            ModBlocks.CACHE_FROGPORT);
     public static final DeferredHolder<Item, BlockItem> GAUGE = ITEMS.register("gauge",
             () -> new BlockItem(ModBlocks.GAUGE.get(), new Item.Properties()));
-    public static final DeferredHolder<Item, com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockItem> REMOTE_GAUGE = ITEMS.register("remote_gauge",
-            () -> new com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockItem(ModBlocks.REMOTE_GAUGE.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, RemoteGaugeItem> REMOTE_GAUGE = ITEMS.register("remote_gauge",
+            () -> new RemoteGaugeItem(ModBlocks.REMOTE_GAUGE.get(), new Item.Properties()));
     public static final DeferredHolder<Item, com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlockItem> REMOTE_REDSTONE_REQUESTER =
             ITEMS.register("remote_redstone_requester",
                     () -> new com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlockItem(
@@ -35,6 +39,10 @@ public final class ModItems {
             () -> new LoggerItem(ModBlocks.LOGGER.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> STACK_LIGHT = ITEMS.register("stack_light",
             () -> new BlockItem(ModBlocks.STACK_LIGHT.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, BlockItem> RED_WALL_SOUNDER = block("red_wall_sounder",
+            ModBlocks.RED_WALL_SOUNDER);
+    public static final DeferredHolder<Item, BlockItem> ORANGE_WALL_SOUNDER = block("orange_wall_sounder",
+            ModBlocks.ORANGE_WALL_SOUNDER);
     public static final DeferredHolder<Item, ConditionLinkerItem> CONDITION_LINKER = ITEMS.register("condition_linker",
             () -> new ConditionLinkerItem(ModBlocks.CONDITION_LINKER.get(), new Item.Properties().stacksTo(1)));
     public static final DeferredHolder<Item, BlockItem> REMOTE_PACKAGER = ITEMS.register("remote_packager",
@@ -54,6 +62,9 @@ public final class ModItems {
     public static final DeferredHolder<Item, BlockItem> ETHER_RESONATOR = block("ether_resonator", ModBlocks.ETHER_RESONATOR);
     public static final DeferredHolder<Item, RemotePackageItem> REMOTE_PACKAGE = ITEMS.register("remote_package",
             () -> new RemotePackageItem(new Item.Properties()));
+    /** System-generated diagnostic parcel. Deliberately omitted from the creative tab. */
+    public static final DeferredHolder<Item, PingPackageItem> PING_PACKAGE = ITEMS.register("ping_package",
+            () -> new PingPackageItem(new Item.Properties()));
     public static final DeferredHolder<Item, EventReceiptItem> EVENT_RECEIPT = ITEMS.register("event_receipt",
             () -> new EventReceiptItem(new Item.Properties().stacksTo(16)));
     public static final DeferredHolder<Item, Item> LOGGER_PAPER_ROLL = ITEMS.register("logger_paper_roll",
@@ -97,12 +108,16 @@ public final class ModItems {
             .displayItems((params, out) -> {
                 out.accept(REQUESTER.get());
                 out.accept(DOCK.get());
+                out.accept(DIAGNOSTIC_FROGPORT.get());
+                out.accept(CACHE_FROGPORT.get());
                 out.accept(GAUGE.get());
                 out.accept(REMOTE_GAUGE.get());
                 out.accept(REMOTE_REDSTONE_REQUESTER.get());
                 out.accept(MONITOR.get());
                 out.accept(LOGGER.get());
                 out.accept(STACK_LIGHT.get());
+                out.accept(RED_WALL_SOUNDER.get());
+                out.accept(ORANGE_WALL_SOUNDER.get());
                 out.accept(CONDITION_LINKER.get());
                 out.accept(REMOTE_PACKAGER.get());
                 out.accept(CYAN_INDICATOR_LAMP.get());
@@ -116,6 +131,9 @@ public final class ModItems {
                 out.accept(TOWER_COUPLER.get());
                 out.accept(ETHER_RESONATOR.get());
                 out.accept(REMOTE_PACKAGE.get());
+                if (net.neoforged.fml.ModList.get().isLoaded("fluidlogistics")) {
+                    out.accept(dev.distantstock.compat.fluidlogistics.FluidLogisticsCompat.remoteFluidPackage());
+                }
                 out.accept(EVENT_RECEIPT.get());
                 out.accept(LOGGER_PAPER_ROLL.get());
                 out.accept(ENDER_DUST.get());

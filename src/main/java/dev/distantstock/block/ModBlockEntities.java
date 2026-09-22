@@ -13,6 +13,12 @@ public final class ModBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DockBlockEntity>> DOCK =
             BES.register("dock", () -> BlockEntityType.Builder.of(ModBlockEntities::dockEntity,
                     ModBlocks.DOCK.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DiagnosticFrogportBlockEntity>> DIAGNOSTIC_FROGPORT =
+            BES.register("diagnostic_frogport", () -> BlockEntityType.Builder.of(
+                    DiagnosticFrogportBlockEntity::new, ModBlocks.DIAGNOSTIC_FROGPORT.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CacheFrogportBlockEntity>> CACHE_FROGPORT =
+            BES.register("cache_frogport", () -> BlockEntityType.Builder.of(
+                    CacheFrogportBlockEntity::new, ModBlocks.CACHE_FROGPORT.get()).build(null));
 
     private static DockBlockEntity dockEntity(net.minecraft.core.BlockPos pos,
                                               net.minecraft.world.level.block.state.BlockState state) {
@@ -41,6 +47,9 @@ public final class ModBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<StackLightBlockEntity>> STACK_LIGHT =
             BES.register("stack_light", () -> BlockEntityType.Builder.of(StackLightBlockEntity::new,
                     ModBlocks.STACK_LIGHT.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<WallSounderBlockEntity>> WALL_SOUNDER =
+            BES.register("wall_sounder", () -> BlockEntityType.Builder.of(WallSounderBlockEntity::new,
+                    ModBlocks.RED_WALL_SOUNDER.get(), ModBlocks.ORANGE_WALL_SOUNDER.get()).build(null));
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ConditionLinkerBlockEntity>> CONDITION_LINKER =
             BES.register("condition_linker", () -> BlockEntityType.Builder.of(ConditionLinkerBlockEntity::new,
                     ModBlocks.CONDITION_LINKER.get()).build(null));

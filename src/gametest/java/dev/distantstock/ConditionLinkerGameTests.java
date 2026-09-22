@@ -51,20 +51,25 @@ public final class ConditionLinkerGameTests {
         linker.sampleAndSend();
         assertLamp(h, lightPos, false, false, true);
 
-        // West / plain side enables the buzzer. Merely enabling it, with no lamp edge, stays idle.
+        // West / plain side is the buzzer channel. It is intentionally independent of all lamps.
         level.setBlock(linkerPos.south(), Blocks.AIR.defaultBlockState(), 3);
         level.setBlock(linkerPos.west(), Blocks.REDSTONE_BLOCK.defaultBlockState(), 3);
         linker.sampleAndSend();
         assertLamp(h, lightPos, false, false, false);
         h.assertTrue(light.buzzerEnabled(), "plain side did not enable buzzer");
-        h.assertFalse(light.buzzerActive(), "buzzer became active without red fault lamp");
+        h.assertTrue(light.buzzerActive(), "buzzer enable did not make the buzzer active by itself");
 
-        // Red + buzzer enable arms the repeating fault alarm. Yellow/green are one-shot edge chirps
-        // instead, so they deliberately do not make buzzerActive() true while held.
+        // Lamps may change while the buzzer is enabled, but they do not own or gate the sound.
         level.setBlock(redInput, Blocks.REDSTONE_BLOCK.defaultBlockState(), 3);
         linker.sampleAndSend();
         assertLamp(h, lightPos, true, false, false);
-        h.assertTrue(light.buzzerActive(), "red + buzzer-enable did not arm audible alarm");
+        h.assertTrue(light.buzzerActive(), "red lamp change disabled the independent buzzer");
+
+        // Turning the buzzer input off silences it even while red remains lit.
+        level.setBlock(linkerPos.west(), Blocks.AIR.defaultBlockState(), 3);
+        linker.sampleAndSend();
+        assertLamp(h, lightPos, true, false, false);
+        h.assertFalse(light.buzzerActive(), "buzzer stayed active after its own input went low");
         h.succeed();
     }
 

@@ -46,3 +46,10 @@ type="optional"
 versionRange="[9.0,)"
 ordering="NONE"
 side="BOTH"
+
+[[dependencies.${mod_id}]]
+modId="fluidlogistics"
+type="optional"
+versionRange="[1.0.1,)"
+ordering="AFTER"
+side="BOTH"

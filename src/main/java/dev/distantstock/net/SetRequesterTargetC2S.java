@@ -56,12 +56,11 @@ public record SetRequesterTargetC2S(BlockPos pos, String group, String homeAddre
      */
     private static Resolution resolve(net.minecraft.world.entity.player.Player player,
                                       net.minecraft.server.MinecraftServer server,
-                                      dev.distantstock.routing.RemoteNetworkId sourceNetwork,
+                                      java.util.UUID distantNetworkId,
                                       String typed) {
-        java.util.UUID distantNetworkId = dev.distantstock.stock.NetworkDirectory.find(sourceNetwork)
-                .map(dev.distantstock.stock.NetworkDirectory.Entry::distantNetworkId)
-                .orElseGet(() -> dev.distantstock.routing.DistantNetworkDirectory.get(server)
-                        .scopeOf(sourceNetwork));
+        if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(distantNetworkId)) {
+            return new Resolution(null);
+        }
         var match = dev.distantstock.routing.ReceivingAddressResolver.resolve(
                 server, distantNetworkId, typed);
         if (match.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.CONFLICT) {
@@ -118,7 +117,10 @@ public record SetRequesterTargetC2S(BlockPos pos, String group, String homeAddre
                 // 清空这一格 = 不指定组（这样发不出去，见 OrderDestination）。
                 group = null;
             } else {
-                Resolution resolution = resolve(player, server, requester.binding().network(), typed);
+                // 设备自己加入的正式远仓网络才是目的地址的作用域。
+                // 来源仓库只是“从哪拿货”，不能反过来决定这台机器属于哪个远仓网络；远端仓库公告
+                // 暂时不在目录里时，从来源反推会错误退回 Legacy，正是实机上列表/保存一起坏掉的根因。
+                Resolution resolution = resolve(player, server, requester.distantNetworkScope(), typed);
                 if (resolution.group() != null) {
                     group = resolution.group();
                 } else {

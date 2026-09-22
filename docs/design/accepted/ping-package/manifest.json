@@ -1,0 +1,11 @@
+{
+  "source": "docs/design/concepts/lemon-ping-package-cable-blue",
+  "user_confirmation": "就这样",
+  "sha256": {
+    "README.md": "b91ef379409f561e818d88730efae115d88c58bc05f1f6230b9efd2e1bb18dab",
+    "preview.png": "e19323b666ce24d4b5cf4f53feb0b392a1f8a8fbda88f7a7df04a8387a8e45c8",
+    "remote_package_particle.png": "9d45d08b7bda3b7ca257a3b17fc484f8946f12e36c8904de48d128a617e10f16",
+    "remote_package_ping.png": "05faf9e1d5c7d65b5c4755ed57900e1ff456d061974af0f6f1f272535e9b34a1",
+    "side_pixels.png": "8f813360f6e76d8a54685cb2bb36f1bcd8fc8abaf0a809445906d0106db63261"
+  }
+}

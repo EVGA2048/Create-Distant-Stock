@@ -27,6 +27,11 @@ public final class LampReadings {
         if (gauge.isMissingAddress() || gauge.redstonePowered) {
             return LampState.FATAL;
         }
+        LampState diagnosed = dev.distantstock.diagnostics.ChainDiagnostics.lampState(
+                gauge.panelBE().getLevel(), gauge.getFrogAddress());
+        if (diagnosed != null) {
+            return diagnosed;
+        }
         if (gauge.satisfied) {
             // Nothing on order means the line is ready but idle, not busy.
             return gauge.getPromised() > 0 ? LampState.ALL_GOOD : LampState.IDLE;

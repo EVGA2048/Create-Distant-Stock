@@ -1,0 +1,124 @@
+{
+  "revision": 2,
+  "base_model": "../models/model-off.json",
+  "pivot": [
+    8,
+    8,
+    8
+  ],
+  "units_per_block": 16,
+  "color_order_world_top_to_bottom": [
+    "red",
+    "yellow",
+    "green"
+  ],
+  "convention": "Python right-handed coordinates, not Minecraft blockstate rotation values.",
+  "ceiling": "Swap red/green logical bulb identities before X=180 rotation; powered textures follow logical color.",
+  "wall_north_parts": {
+    "foot_and_horizontal_stem": "Original elements 0,1 rotated X=-90 about [8,8,8]",
+    "vertical_stem": "Copy original element 1, translate [0,5,2]",
+    "upright_lamp_stack": "Original elements 2..8, translate [0,5,2], no rotation"
+  },
+  "orientations": {
+    "floor": {
+      "construction": "original V2",
+      "bounds": [
+        [
+          4,
+          0,
+          4
+        ],
+        [
+          12,
+          24,
+          12
+        ]
+      ],
+      "mount_plane": "y=0"
+    },
+    "ceiling": {
+      "construction": "swap red/green bulb identities, then rotate X=180",
+      "bounds": [
+        [
+          4,
+          -8,
+          4
+        ],
+        [
+          12,
+          16,
+          12
+        ]
+      ],
+      "mount_plane": "y=16"
+    },
+    "wall_north": {
+      "construction": "upright north-wall model",
+      "yaw": 0,
+      "bounds": [
+        [
+          4,
+          4,
+          7
+        ],
+        [
+          12,
+          29,
+          16
+        ]
+      ],
+      "mount_plane": "z=16"
+    },
+    "wall_south": {
+      "construction": "upright north-wall model",
+      "yaw": 180,
+      "bounds": [
+        [
+          4,
+          4,
+          0
+        ],
+        [
+          12,
+          29,
+          9
+        ]
+      ],
+      "mount_plane": "z=0"
+    },
+    "wall_west": {
+      "construction": "upright north-wall model",
+      "yaw": 90,
+      "bounds": [
+        [
+          7,
+          4,
+          4
+        ],
+        [
+          16,
+          29,
+          12
+        ]
+      ],
+      "mount_plane": "x=16"
+    },
+    "wall_east": {
+      "construction": "upright north-wall model",
+      "yaw": -90,
+      "bounds": [
+        [
+          0,
+          4,
+          4
+        ],
+        [
+          9,
+          29,
+          12
+        ]
+      ],
+      "mount_plane": "x=0"
+    }
+  }
+}
