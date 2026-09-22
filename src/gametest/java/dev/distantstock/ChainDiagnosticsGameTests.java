@@ -171,6 +171,7 @@ public final class ChainDiagnosticsGameTests {
         UUID frequency = UUID.randomUUID();
         diagnostic.setCreateFrequency(frequency);
         logger.setCreateFrequency(frequency);
+        h.assertTrue(logger.installPaperRoll(), "could not install Logger paper roll for recovery-state test");
         String address = "BAD-" + UUID.randomUUID();
         ItemStack bad = new ItemStack(ModItems.REMOTE_PACKAGE.get());
         PackageItem.addAddress(bad, address);
@@ -194,9 +195,22 @@ public final class ChainDiagnosticsGameTests {
         h.assertTrue(ChainDiagnostics.lampState(level, address) == LampState.FATAL,
                 "Andon/lamp state cleared while the no-route fault was still unresolved");
 
-        EventRegistry.get(level.getServer()).clear(alarm.code(), alarm.sourceType(), alarm.sourceId(),
-                level.getGameTime());
-        diagnostic.clearBadAddress(address);
+        h.assertTrue(EventRegistry.get(level.getServer()).acknowledge(alarm.id(), level.getGameTime()),
+                "could not acknowledge the one-off no-route alarm");
+        h.assertTrue(logger.status() == dev.distantstock.block.LoggerBlock.Status.ERROR_ACK,
+                "Logger did not enter AC immediately after acknowledgement: " + logger.status());
+        h.assertTrue(ChainDiagnostics.lampState(level, address) == LampState.FATAL_ACK,
+                "Andon/lamp did not enter acknowledged-fault state");
+
+        ChainDiagnostics.tick(level.getServer());
+        h.assertTrue(EventRegistry.get(level.getServer())
+                        .active(EventRegistry.Codes.CHAIN_NO_ROUTE, "chain", alarm.sourceId()).isEmpty(),
+                "acknowledged one-off no-route fault did not clear after the parcel was handled");
+        h.assertTrue(logger.status() == dev.distantstock.block.LoggerBlock.Status.NORMAL,
+                "Logger stayed AC after the handled one-off fault was resolved: " + logger.status());
+        h.assertTrue(ChainDiagnostics.lampState(level, address) == null,
+                "Andon/lamp stayed faulted after the handled one-off fault was resolved");
+
         h.succeed();
     }
 

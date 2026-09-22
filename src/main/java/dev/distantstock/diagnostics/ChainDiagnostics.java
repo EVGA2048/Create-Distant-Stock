@@ -8,6 +8,7 @@ import com.simibubi.create.content.logistics.packagePort.frogport.FrogportBlockE
 import dev.distantstock.block.CacheFrogportBlockEntity;
 import dev.distantstock.block.DiagnosticFrogportBlockEntity;
 import dev.distantstock.block.LampState;
+import dev.distantstock.block.SignalPanelBlockEntity;
 import dev.distantstock.event.EventRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -277,6 +278,7 @@ public final class ChainDiagnostics {
         for (DiagnosticFrogportBlockEntity diagnostic : DIAGNOSTICS) {
             if (!(diagnostic.getLevel() instanceof ServerLevel level)) continue;
             ControllerKey controller = new ControllerKey(level.dimension(), diagnostic.getBlockPos());
+            Set<String> quarantinedNow = new LinkedHashSet<>();
 
             // Migration/safety net: old worlds may contain quarantined packages from before the
             // durable unresolved-address set existed. Seeing one still creates the durable fault.
@@ -286,6 +288,7 @@ public final class ChainDiagnostics {
                 String address = PackageItem.getAddress(stack);
                 if (address == null || address.isBlank()) address = "<blank>";
                 AddressKey key = new AddressKey(level.dimension(), address);
+                quarantinedNow.add(address);
                 diagnostic.rememberBadAddress(address, ADDRESS_NETWORKS.containsKey(key));
             }
 
@@ -297,10 +300,24 @@ public final class ChainDiagnostics {
                 BAD_ADDRESSES.computeIfAbsent(key, ignored -> new LinkedHashSet<>()).add(controller);
                 String source = sourceId(level, diagnostic.getBlockPos(), address);
                 EventRegistry registry = EventRegistry.get(server);
-                if (registry.active(EventRegistry.Codes.CHAIN_NO_ROUTE, "chain", source).isEmpty()) {
+                EventRegistry.Record active = registry.active(
+                        EventRegistry.Codes.CHAIN_NO_ROUTE, "chain", source).orElse(null);
+                if (active == null) {
                     registry.raise(EventRegistry.Severity.ERROR, EventRegistry.Codes.CHAIN_NO_ROUTE,
                             "chain", source, address, diagnostic.createFrequency(), null,
                             level.getGameTime());
+                    active = registry.active(EventRegistry.Codes.CHAIN_NO_ROUTE, "chain", source).orElse(null);
+                }
+
+                // A one-off malformed parcel has no persistent configuration source to repair.
+                // Once it has physically left the quarantine (normally into the Packager below)
+                // and the operator has acknowledged the alarm, the incident is considered handled.
+                // A future parcel with the same bad address will raise a fresh alarm.
+                if (!diagnostic.badAddressWasGaugeBacked(address)
+                        && !quarantinedNow.contains(address)
+                        && active != null && active.acknowledged()) {
+                    clearBadAddress(level, controller, address, level.getGameTime());
+                    continue;
                 }
 
                 // If this bad address came from a Factory Gauge, seeing the Gauge stop advertising
@@ -652,6 +669,7 @@ public final class ChainDiagnostics {
     public static void unroutableCaptured(DiagnosticFrogportBlockEntity controller, ItemStack stack) {
         if (controller == null || !(controller.getLevel() instanceof ServerLevel level)
                 || stack == null || stack.isEmpty() || !PackageItem.isPackage(stack)) return;
+        register(controller);
         String address = PackageItem.getAddress(stack);
         if (address == null || address.isBlank()) address = "<blank>";
         ControllerKey key = new ControllerKey(level.dimension(), controller.getBlockPos());
@@ -707,7 +725,21 @@ public final class ChainDiagnostics {
     public static LampState lampState(Level level, String address) {
         if (level == null || address == null || address.isBlank()) return null;
         AddressKey key = new AddressKey(level.dimension(), address);
-        if (BAD_ADDRESSES.containsKey(key)) return LampState.FATAL;
+        Set<ControllerKey> badOwners = BAD_ADDRESSES.get(key);
+        if (badOwners != null && !badOwners.isEmpty()) {
+            if (level instanceof ServerLevel serverLevel && level.getServer() != null) {
+                EventRegistry registry = EventRegistry.get(level.getServer());
+                List<EventRegistry.Record> active = new ArrayList<>();
+                for (ControllerKey owner : badOwners) {
+                    registry.active(EventRegistry.Codes.CHAIN_NO_ROUTE, "chain",
+                                    sourceId(serverLevel, owner.pos(), address))
+                            .ifPresent(active::add);
+                }
+                LampState alarmState = SignalPanelBlockEntity.eventLevel(active);
+                if (alarmState != null) return alarmState;
+            }
+            return LampState.FATAL;
+        }
         boolean cacheFull = FULL_CACHES.stream().anyMatch(f ->
                 f.controller().dimension().equals(level.dimension()) && f.address().equals(address));
         if (cacheFull) return LampState.FATAL;
