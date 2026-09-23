@@ -546,6 +546,61 @@ public final class SignalLampGameTests {
         var be = (FactoryPanelBlockEntity) level.getBlockEntity(pos);
         h.assertTrue(placed == 4, "only " + placed + " of 4 remote gauges were accepted");
         h.assertTrue(be.activePanels() == 4, "expected 4 panels, got " + be.activePanels());
+        h.assertTrue(be instanceof SignalPanelBlockEntity,
+                "multi-gauge board did not become the mixed-panel host");
+        var mixed = (SignalPanelBlockEntity) be;
+        for (var slot : FactoryPanelBlock.PanelSlot.values()) {
+            h.assertTrue(mixed.isRemoteGauge(slot),
+                    "remote gauge slot silently downgraded to a factory gauge: " + slot);
+        }
+        h.succeed();
+    }
+
+    /** Converting a dedicated remote-gauge board must carry its warehouse binding with it. */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void secondRemoteGaugePreservesExistingRemoteBinding(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos.south(), Blocks.STONE.defaultBlockState(), 3);
+        var state = ModBlocks.REMOTE_GAUGE.get().defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH);
+        level.setBlock(pos, state, 3);
+
+        var first = FactoryPanelBlock.PanelSlot.BOTTOM_LEFT;
+        var original = (dev.distantstock.block.RemoteGaugeBlockEntity) level.getBlockEntity(pos);
+        UUID localFreq = UUID.randomUUID();
+        original.addPanel(first, localFreq);
+        UUID distantScope = UUID.randomUUID();
+        var remote = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA,
+                UUID.randomUUID(), UUID.randomUUID(), "minecraft:overworld", UUID.randomUUID());
+        var binding = new dev.distantstock.block.RemoteBinding(
+                remote, distantScope, UUID.randomUUID(), "remote-door", "home-door");
+        original.bind(first, binding);
+        original.setDistantNetworkScope(first, distantScope);
+
+        var second = FactoryPanelBlock.PanelSlot.TOP_LEFT;
+        Vec3 hit = hitForSlot(pos, state, second);
+        h.assertTrue(hit != null, "no hit position maps to the second remote gauge slot");
+        ItemStack gauge = new ItemStack(ModItems.REMOTE_GAUGE.get(), 2);
+        CompoundTag data = new CompoundTag();
+        data.putUUID("Freq", UUID.randomUUID());
+        gauge.set(DataComponents.BLOCK_ENTITY_DATA, CustomData.of(data));
+        player.setItemInHand(InteractionHand.MAIN_HAND, gauge);
+        GaugePlacementEvents.install(new PlayerInteractEvent.RightClickBlock(player,
+                InteractionHand.MAIN_HAND, pos, new BlockHitResult(hit, Direction.NORTH, pos, false)));
+
+        h.assertTrue(level.getBlockEntity(pos) instanceof SignalPanelBlockEntity,
+                "second remote gauge did not produce the mixed-panel host");
+        var mixed = (SignalPanelBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(mixed.isRemoteGauge(first) && mixed.isRemoteGauge(second),
+                "one of the two remote gauges lost its remote identity");
+        h.assertTrue(binding.equals(mixed.binding(first)),
+                "existing remote gauge lost its warehouse binding during board conversion");
+        h.assertTrue(distantScope.equals(mixed.distantNetworkScope(first)),
+                "existing remote gauge lost its Distant Stock scope during board conversion");
         h.succeed();
     }
 

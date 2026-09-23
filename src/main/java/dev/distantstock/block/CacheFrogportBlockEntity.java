@@ -1,22 +1,34 @@
 package dev.distantstock.block;
 
 import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
+import com.simibubi.create.content.logistics.box.PackageItem;
+import com.simibubi.create.content.logistics.packagePort.PackagePortAutomationInventoryWrapper;
 import com.simibubi.create.content.logistics.packagePort.frogport.FrogportBlockEntity;
+import com.simibubi.create.foundation.item.SmartInventory;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import dev.distantstock.diagnostics.ChainDiagnostics;
+import dev.distantstock.menu.CacheFrogportMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.items.ItemHandlerHelper;
 
 import java.util.List;
 import java.util.Locale;
 
 public final class CacheFrogportBlockEntity extends FrogportBlockEntity implements IHaveGoggleInformation {
+    /** Three vanilla Frogports worth of emergency headroom, still compact enough for one 6x9 UI. */
+    public static final int CACHE_SLOTS = 54;
+
     private String takeoverAddress = "";
     private long nextReleaseTick;
     private int releaseDelaySeconds = 5;
@@ -25,7 +37,18 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
 
     public CacheFrogportBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.CACHE_FROGPORT.get(), pos, state);
+        // PackagePortBlockEntity hard-codes 18 slots.  A cache exists specifically to absorb a
+        // burst while the real receivers are frozen, so give it a real six-row buffer instead of
+        // pretending eighteen emergency parcels are enough.  Keep Create's package-only validator
+        // and automation wrapper semantics.
+        inventory = new SmartInventory(CACHE_SLOTS, this, (slot, stack) -> PackageItem.isPackage(stack));
+        itemHandler = new PackagePortAutomationInventoryWrapper(inventory, this);
         acceptsPackages = true;
+    }
+
+    @Override
+    public AbstractContainerMenu createMenu(int id, Inventory playerInventory, Player player) {
+        return CacheFrogportMenu.server(id, playerInventory, this);
     }
 
     @Override
@@ -97,10 +120,65 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
     }
 
     @Override
+    public void destroy() {
+        // FROZEN is runtime routing state. If the mitigation block disappears, thaw the original
+        // Frogports *before* Create deregisters this block, otherwise the public address can remain
+        // stolen by a fault that no longer has a cache to serve it.
+        if (level != null && !level.isClientSide) {
+            ChainDiagnostics.cacheRemoved(this);
+        }
+        ChainDiagnostics.unregister(this);
+        super.destroy();
+    }
+
+    /**
+     * Incoming chain parcels are emergency traffic. Store them immediately instead of serialising
+     * every catch behind Frogport's 10-tick mouth animation. ChainConveyor already checks
+     * {@link #isBackedUp()} before calling this method, so a full cache remains proper back-pressure.
+     */
+    @Override
+    public void startAnimation(ItemStack stack, boolean depositing) {
+        if (depositing || stack == null || stack.isEmpty() || !PackageItem.isPackage(stack)
+                || level == null || level.isClientSide) {
+            super.startAnimation(stack, depositing);
+            return;
+        }
+
+        ItemStack remainder = ItemHandlerHelper.insertItemStacked(inventory, stack.copy(), false);
+        if (!remainder.isEmpty()) {
+            // This should only be reachable if another insertion filled the final slot between
+            // ChainConveyor's isBackedUp() check and this call. Preserve the parcel rather than
+            // silently deleting it.
+            drop(remainder);
+        }
+        setChanged();
+        level.blockEntityChanged(worldPosition);
+        sendData();
+    }
+
+    @Override
     protected void tryPushingToAdjacentInventories() {
-        // Intentionally retain captured parcels in the Frogport's native 18-slot inventory.
-        // The stock 2x9 GUI therefore becomes the cache UI and its native backed-up state is our
-        // hard capacity limit. Never silently drain the cache into an adjacent inventory.
+        // A container below is an explicit operator-provided offload path. Anything it accepts has
+        // left cache custody and will therefore not be auto-replayed later; its package address is
+        // untouched, so a normal Frogport can put it back on the chain at any time.
+        if (level == null || level.isClientSide || isAnimationInProgress()) return;
+        IItemHandler below = getAdjacentInventory(Direction.DOWN);
+        if (below == null) return;
+
+        boolean changed = false;
+        for (int slot = 0; slot < inventory.getSlots(); slot++) {
+            ItemStack candidate = inventory.extractItem(slot, 1, true);
+            if (candidate.isEmpty()) continue;
+            ItemStack remainder = ItemHandlerHelper.insertItemStacked(below, candidate, false);
+            if (!remainder.isEmpty()) continue;
+            inventory.extractItem(slot, 1, false);
+            changed = true;
+        }
+        if (changed) {
+            setChanged();
+            level.blockEntityChanged(worldPosition);
+            sendData();
+        }
     }
 
     @Override
@@ -241,7 +319,7 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
                 ? normalizeReleaseDelaySeconds(tag.getInt("ReleaseDelaySeconds"))
                 : 5;
         lastRedstonePowered = tag.getBoolean("LastRedstonePowered");
-        pendingRedstoneReleases = Math.max(0, Math.min(18, tag.getInt("PendingRedstoneReleases")));
+        pendingRedstoneReleases = Math.max(0, Math.min(CACHE_SLOTS, tag.getInt("PendingRedstoneReleases")));
     }
 
     private static int normalizeReleaseDelaySeconds(int seconds) {

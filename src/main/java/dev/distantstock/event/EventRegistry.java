@@ -68,7 +68,7 @@ public final class EventRegistry extends SavedData {
                          String code, String sourceType, String sourceId, String detail,
                          UUID createFrequency, UUID distantNetworkId,
                          boolean active, boolean acknowledged, long acknowledgedAt,
-                         long clearedAt, int count) {
+                         long printedAt, long clearedAt, int count) {
         public Record {
             if (id == null) throw new IllegalArgumentException("event id is null");
             severity = severity == null ? Severity.INFO : severity;
@@ -77,6 +77,11 @@ public final class EventRegistry extends SavedData {
             sourceId = bounded(sourceId, MAX_SOURCE);
             detail = bounded(detail, MAX_DETAIL);
             count = Math.max(1, count);
+        }
+
+        /** Printing is a later operator step than ACK/silence. */
+        public boolean printed() {
+            return printedAt > 0;
         }
     }
 
@@ -109,7 +114,7 @@ public final class EventRegistry extends SavedData {
                     cleanDetail.isBlank() ? existing.detail() : cleanDetail,
                     createFrequency == null ? existing.createFrequency() : createFrequency,
                     distantNetworkId == null ? existing.distantNetworkId() : distantNetworkId,
-                    true, existing.acknowledged(), existing.acknowledgedAt(), 0,
+                    true, existing.acknowledged(), existing.acknowledgedAt(), existing.printedAt(), 0,
                     existing.count() + 1);
             records.put(updated.id(), updated);
             setDirty();
@@ -117,7 +122,7 @@ public final class EventRegistry extends SavedData {
         }
         Record created = new Record(UUID.randomUUID(), now, now, severity, cleanCode, cleanType,
                 cleanSource, cleanDetail, createFrequency, distantNetworkId,
-                true, false, 0, 0, 1);
+                true, false, 0, 0, 0, 1);
         records.put(created.id(), created);
         pruneHistory();
         setDirty();
@@ -132,7 +137,25 @@ public final class EventRegistry extends SavedData {
         records.put(id, new Record(old.id(), old.createdAt(), old.updatedAt(), old.severity(),
                 old.code(), old.sourceType(), old.sourceId(), old.detail(),
                 old.createFrequency(), old.distantNetworkId(), old.active(), true,
-                now, old.clearedAt(), old.count()));
+                now, old.printedAt(), old.clearedAt(), old.count()));
+        setDirty();
+        return true;
+    }
+
+    /**
+     * Marks the physical incident slip as produced. Printing also implies ACK, but ACK alone never
+     * implies printing: an out-of-paper logger may be silenced while AC remains latched.
+     */
+    public boolean markPrinted(UUID id, long now) {
+        Record old = records.get(id);
+        if (old == null || !old.active() || old.printed()) {
+            return false;
+        }
+        boolean acknowledged = old.acknowledged();
+        records.put(id, new Record(old.id(), old.createdAt(), old.updatedAt(), old.severity(),
+                old.code(), old.sourceType(), old.sourceId(), old.detail(),
+                old.createFrequency(), old.distantNetworkId(), old.active(), true,
+                acknowledged ? old.acknowledgedAt() : now, now, old.clearedAt(), old.count()));
         setDirty();
         return true;
     }
@@ -145,7 +168,7 @@ public final class EventRegistry extends SavedData {
         records.put(old.id(), new Record(old.id(), old.createdAt(), now, old.severity(),
                 old.code(), old.sourceType(), old.sourceId(), old.detail(),
                 old.createFrequency(), old.distantNetworkId(), false,
-                old.acknowledged(), old.acknowledgedAt(), now, old.count()));
+                old.acknowledged(), old.acknowledgedAt(), old.printedAt(), now, old.count()));
         pruneHistory();
         setDirty();
         return true;
@@ -254,6 +277,7 @@ public final class EventRegistry extends SavedData {
             row.putBoolean("Active", record.active());
             row.putBoolean("Acknowledged", record.acknowledged());
             row.putLong("AcknowledgedAt", record.acknowledgedAt());
+            row.putLong("PrintedAt", record.printedAt());
             row.putLong("ClearedAt", record.clearedAt());
             row.putInt("Count", record.count());
             rows.add(row);
@@ -268,6 +292,12 @@ public final class EventRegistry extends SavedData {
         for (int i = 0; i < rows.size(); i++) {
             CompoundTag row = rows.getCompound(i);
             try {
+                boolean acknowledged = row.getBoolean("Acknowledged");
+                long acknowledgedAt = row.getLong("AcknowledgedAt");
+                // Compatibility: before printed/ACK were split, every persisted ACK came from a
+                // successful print. Do not turn old handled incidents back into AC after upgrade.
+                long printedAt = row.contains("PrintedAt") ? row.getLong("PrintedAt")
+                        : acknowledged ? Math.max(1L, acknowledgedAt) : 0L;
                 Record record = new Record(row.getUUID("Id"), row.getLong("CreatedAt"),
                         row.getLong("UpdatedAt"), Severity.valueOf(row.getString("Severity")),
                         row.getString("Code"), row.getString("SourceType"), row.getString("SourceId"),
@@ -275,7 +305,7 @@ public final class EventRegistry extends SavedData {
                         row.hasUUID("CreateFrequency") ? row.getUUID("CreateFrequency") : null,
                         row.hasUUID("DistantNetwork") ? row.getUUID("DistantNetwork") : null,
                         row.getBoolean("Active"),
-                        row.getBoolean("Acknowledged"), row.getLong("AcknowledgedAt"),
+                        acknowledged, acknowledgedAt, printedAt,
                         row.getLong("ClearedAt"), row.getInt("Count"));
                 registry.records.put(record.id(), record);
             } catch (RuntimeException ignored) {

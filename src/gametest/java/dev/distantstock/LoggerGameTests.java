@@ -213,7 +213,7 @@ public final class LoggerGameTests {
 
 
     @GameTest(template = "empty", timeoutTicks = 120)
-    public static void printingEventCreatesReceiptAndAcknowledgesAlarm(GameTestHelper h) {
+    public static void ackSilencesWithoutPaperAndPrintClearsAcLatch(GameTestHelper h) {
         var level = h.getLevel();
         BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
         level.setBlock(pos, ModBlocks.LOGGER.get().defaultBlockState(), 3);
@@ -240,7 +240,27 @@ public final class LoggerGameTests {
         h.assertFalse(noPaper, "an empty logger printed without a replacement roll");
         h.assertTrue(printed.get() == null, "out-of-paper printing still produced a receipt");
         h.assertFalse(registry.find(event.id()).orElseThrow().acknowledged(),
-                "out-of-paper printing acknowledged/silenced the alarm");
+                "failed print unexpectedly acknowledged/silenced the alarm");
+
+        // Physical ACK is independent from paper: silence first, AC remains until the incident
+        // slip is actually printed.
+        h.assertTrue(registry.acknowledge(event.id(), 205),
+                "out-of-paper alarm could not be acknowledged/silenced");
+        logger.operatorEventChanged();
+        EventRegistry.Record silenced = registry.find(event.id()).orElseThrow();
+        h.assertTrue(silenced.acknowledged() && !silenced.printed(),
+                "ACK did not produce the acknowledged-but-unprinted state");
+        h.assertTrue(logger.nextUnacknowledgedAlarm() == null,
+                "ACK did not remove the event from the buzzer queue");
+        h.assertTrue(logger.nextPrintableAlarm() != null,
+                "ACK incorrectly removed the event from the print queue");
+        h.assertTrue(logger.status() == LoggerBlock.Status.ERROR_ACK,
+                "ACK did not move the logger to steady acknowledged ERROR");
+        h.assertTrue("AC".equals(logger.displayCode()),
+                "acknowledged-but-unprinted ERROR did not latch AC");
+        h.assertTrue(dev.distantstock.block.SignalPanelBlockEntity.eventLevel(
+                        registry.activeForFrequency(network)) == dev.distantstock.block.LampState.FATAL_ACK,
+                "ACK did not change the shared ERROR alarm from flashing to steady red");
 
         h.assertTrue(logger.installPaperRoll(), "logger refused a replacement paper roll while empty");
         h.assertTrue(logger.paperRemaining() == LoggerBlockEntity.PAPER_CAPACITY,
@@ -263,13 +283,15 @@ public final class LoggerGameTests {
                 "printed receipt lost event identity");
         h.assertTrue(registry.find(event.id()).orElseThrow().acknowledged(),
                 "printing did not acknowledge the event");
+        h.assertTrue(registry.find(event.id()).orElseThrow().printed(),
+                "printing did not mark the incident slip complete");
         h.assertTrue(dev.distantstock.block.SignalPanelBlockEntity.eventLevel(
                         registry.activeForFrequency(network)) == dev.distantstock.block.LampState.FATAL_ACK,
                 "printing did not change the shared ERROR alarm from flashing to steady red");
         h.assertTrue(logger.status() == LoggerBlock.Status.ERROR_ACK,
                 "printing did not move the logger from flashing ERROR to acknowledged ERROR");
-        h.assertTrue("AC".equals(logger.displayCode()),
-                "acknowledged ERROR did not switch the two nixies to AC");
+        h.assertTrue("ER".equals(logger.displayCode()),
+                "printing did not clear AC while the underlying ERROR remained active");
         h.assertTrue(level.getBlockState(pos).getValue(LoggerBlock.PRINTED),
                 "successful print did not show the logger receipt");
 

@@ -177,6 +177,22 @@ public final class RemoteGaugeBlockEntity extends FactoryPanelBlockEntity implem
         return orders.outstanding(slot);
     }
 
+    /**
+     * Carries the distant-gauge half of this board into a mixed signal-panel board.
+     *
+     * <p>Adding a second panel can legitimately replace the dedicated remote-gauge block entity
+     * with {@link SignalPanelBlockEntity}.  Create's panel NBT only contains the factory-gauge
+     * state; our warehouse binding, Distant Stock scope and in-flight count live in
+     * {@link RemoteOrderBook}.  Copy the whole book so the conversion is an identity-preserving
+     * board migration rather than a silent downgrade to ordinary factory gauges.
+     */
+    public void copyRemoteStateTo(SignalPanelBlockEntity target) {
+        if (target == null || level == null) return;
+        CompoundTag snapshot = new CompoundTag();
+        orders.write(snapshot);
+        target.importRemoteOrderState(snapshot, level.registryAccess());
+    }
+
     public static void serverTick(Level level, BlockPos pos, BlockState state, RemoteGaugeBlockEntity be) {
         be.orders.tickOrders();
     }

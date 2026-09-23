@@ -492,6 +492,14 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
         return orders.outstanding(slot);
     }
 
+    /** Receives the complete distant-gauge state when a dedicated gauge board becomes mixed. */
+    public void importRemoteOrderState(CompoundTag snapshot, HolderLookup.Provider registries) {
+        if (snapshot == null) return;
+        orders.read(snapshot, registries, false);
+        setChanged();
+        sendData();
+    }
+
     /** The ordering beat, run from the block's ticker alongside the lamp sampling. */
     public void tickOrders() {
         orders.tickOrders();
@@ -813,6 +821,24 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
             return !owner.panelDataReady() || isLampSlot();
         }
 
+        /** A mixed board still has real distant gauges, not factory gauges wearing our texture. */
+        private boolean isRemoteGaugeSlot() {
+            return owner.isRemoteGauge(slot);
+        }
+
+        @Override
+        public void displayScreen(Player player) {
+            if (!isRemoteGaugeSlot()) {
+                super.displayScreen(player);
+                return;
+            }
+            if (dev.distantstock.client.TerminalPanelGesture.bindInsteadOfScreen(
+                    player, blockEntity, slot)) {
+                return;
+            }
+            dev.distantstock.client.RemoteGaugeScreen.open(this);
+        }
+
         /**
          * A lamp has no amount, but the andesite one still owns a value panel: the same board
          * picks its mode. The mode lives in {@code count}, which is otherwise unused on a lamp
@@ -903,16 +929,18 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
 
         @Override
         public void tick() {
-            if (!isLampInputBlocked()) {
-                super.tick();
-            }
+            if (isLampInputBlocked()) return;
+            if (isRemoteGaugeSlot()
+                    && !RemoteGaugeBlockEntity.localNetworkConfigured(network)) return;
+            super.tick();
         }
 
         @Override
         public void lazyTick() {
-            if (!isLampInputBlocked()) {
-                super.lazyTick();
-            }
+            if (isLampInputBlocked()) return;
+            if (isRemoteGaugeSlot()
+                    && !RemoteGaugeBlockEntity.localNetworkConfigured(network)) return;
+            super.lazyTick();
         }
     }
 }

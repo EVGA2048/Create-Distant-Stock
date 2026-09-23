@@ -139,19 +139,33 @@ public final class LoggerBlock extends WallPanelBlock implements IWrenchable {
                 && level.getBlockEntity(pos) instanceof LoggerBlockEntity logger) {
             if (!player.isShiftKeyDown()) {
                 EventRegistry.Record alarm = logger.nextPrintableAlarm();
-                if (alarm != null && !logger.hasPaper()) {
-                    player.displayClientMessage(Component.translatable(
-                            "message.distantstock.logger.no_paper"), true);
-                    return InteractionResult.sidedSuccess(false);
-                }
-                if (alarm != null && LoggerActionC2S.printAndAcknowledge(logger,
-                        EventRegistry.get(serverPlayer.getServer()), alarm.id(), stack -> {
-                            if (!serverPlayer.addItem(stack)) serverPlayer.drop(stack, false);
-                        }, System.currentTimeMillis())) {
-                    player.displayClientMessage(Component.translatable(
-                            "message.distantstock.logger.printed", EventReceiptItem.eventLabel(
-                                    alarm.severity(), alarm.id())), true);
-                    return InteractionResult.sidedSuccess(false);
+                if (alarm != null) {
+                    EventRegistry events = EventRegistry.get(serverPlayer.getServer());
+                    long now = System.currentTimeMillis();
+                    if (logger.hasPaper() && LoggerActionC2S.printAndAcknowledge(logger,
+                            events, alarm.id(), stack -> {
+                                if (!serverPlayer.addItem(stack)) serverPlayer.drop(stack, false);
+                            }, now)) {
+                        player.displayClientMessage(Component.translatable(
+                                "message.distantstock.logger.printed", EventReceiptItem.eventLabel(
+                                        alarm.severity(), alarm.id())), true);
+                        return InteractionResult.sidedSuccess(false);
+                    }
+
+                    // No paper: the physical ACK key is still allowed to silence the horn. The
+                    // event remains unprinted, so the front tubes stay on AC until a roll is loaded
+                    // and the incident slip is actually produced.
+                    if (!logger.hasPaper()) {
+                        if (!alarm.acknowledged() && events.acknowledge(alarm.id(), now)) {
+                            logger.operatorEventChanged();
+                            player.displayClientMessage(Component.translatable(
+                                    "message.distantstock.logger.silenced_no_paper"), true);
+                        } else {
+                            player.displayClientMessage(Component.translatable(
+                                    "message.distantstock.logger.no_paper"), true);
+                        }
+                        return InteractionResult.sidedSuccess(false);
+                    }
                 }
             }
             PacketDistributor.sendToPlayer(serverPlayer, OpenLoggerS2C.from(logger));

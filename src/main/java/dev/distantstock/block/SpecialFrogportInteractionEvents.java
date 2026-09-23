@@ -12,7 +12,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
  * Reliable empty-hand inventory access for diagnostic/cache Frogports.
  *
  * NeoForge 1.21 splits empty-hand use from item use. Create's FrogportBlock only implements the
- * item-use path, so our 18-slot diagnostic/cache inventory would otherwise be unreachable with an
+ * item-use path, so our diagnostic/cache inventories would otherwise be unreachable with an
  * empty hand. This event deliberately handles only empty-hand clicks on our two block entities.
  */
 @EventBusSubscriber(modid = DistantStock.MODID)

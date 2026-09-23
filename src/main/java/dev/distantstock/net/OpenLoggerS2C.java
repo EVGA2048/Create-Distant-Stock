@@ -73,11 +73,11 @@ public record OpenLoggerS2C(BlockPos source, EventRegistry.Severity minimumSever
 
     public record Row(UUID id, long createdAt, long updatedAt, EventRegistry.Severity severity,
                       String code, String sourceType, String sourceId, String detail,
-                      boolean active, boolean acknowledged, int count) {
+                      boolean active, boolean acknowledged, boolean printed, int count) {
         private static Row from(EventRegistry.Record record) {
             return new Row(record.id(), record.createdAt(), record.updatedAt(), record.severity(),
                     record.code(), record.sourceType(), record.sourceId(), record.detail(),
-                    record.active(), record.acknowledged(), record.count());
+                    record.active(), record.acknowledged(), record.printed(), record.count());
         }
 
         private void write(RegistryFriendlyByteBuf buf) {
@@ -91,6 +91,7 @@ public record OpenLoggerS2C(BlockPos source, EventRegistry.Severity minimumSever
             buf.writeUtf(detail, 256);
             buf.writeBoolean(active);
             buf.writeBoolean(acknowledged);
+            buf.writeBoolean(printed);
             buf.writeVarInt(count);
         }
 
@@ -101,7 +102,8 @@ public record OpenLoggerS2C(BlockPos source, EventRegistry.Severity minimumSever
             int severity = Math.clamp(buf.readVarInt(), 0, EventRegistry.Severity.values().length - 1);
             return new Row(id, created, updated, EventRegistry.Severity.values()[severity],
                     buf.readUtf(64), buf.readUtf(64), buf.readUtf(160), buf.readUtf(256),
-                    buf.readBoolean(), buf.readBoolean(), Math.max(1, buf.readVarInt()));
+                    buf.readBoolean(), buf.readBoolean(), buf.readBoolean(),
+                    Math.max(1, buf.readVarInt()));
         }
     }
 }

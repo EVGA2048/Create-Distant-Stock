@@ -248,7 +248,8 @@ public final class SignalLampClientSmoke {
             // opens with blank captions, and the only place that shows up is in front of a player.
             var language = net.minecraft.locale.Language.getInstance();
             for (var entry : java.util.Map.of(
-                    "export", 5, "import", 3, "tune", 3, "status", 5, "tower", 8, "replenish", 6)
+                    "export", 4, "import", 3, "tune", 3, "status", 3,
+                    "tower", 6, "replenish", 4, "diagnostics", 5, "logger", 4)
                     .entrySet()) {
                 String scene = entry.getKey();
                 var id = ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "ponder/" + scene + ".nbt");
@@ -356,13 +357,13 @@ public final class SignalLampClientSmoke {
         var rows = java.util.List.of(
                 new dev.distantstock.net.OpenLoggerS2C.Row(java.util.UUID.randomUUID(), now - 5000, now,
                         dev.distantstock.event.EventRegistry.Severity.ERROR, "PARCEL_QUARANTINED",
-                        "parcel", "deadbeef", "ownership conflict", true, false, 2),
+                        "parcel", "deadbeef", "ownership conflict", true, false, false, 2),
                 new dev.distantstock.net.OpenLoggerS2C.Row(java.util.UUID.randomUUID(), now - 9000, now - 3000,
                         dev.distantstock.event.EventRegistry.Severity.WARN, "DOCK_NO_ADDRESS",
-                        "dock", "minecraft:overworld@1,2,3", "no receiving address", true, true, 1),
+                        "dock", "minecraft:overworld@1,2,3", "no receiving address", true, true, false, 1),
                 new dev.distantstock.net.OpenLoggerS2C.Row(java.util.UUID.randomUUID(), now - 12000, now - 6000,
                         dev.distantstock.event.EventRegistry.Severity.INFO, "TEST_CLEARED",
-                        "test", "smoke", "cleared event", false, false, 1));
+                        "test", "smoke", "cleared event", false, false, false, 1));
         var snapshot = new dev.distantstock.net.OpenLoggerS2C(source,
                 dev.distantstock.event.EventRegistry.Severity.INFO,
                 dev.distantstock.block.LoggerBlockEntity.AlarmSoundMode.DING_DONG,

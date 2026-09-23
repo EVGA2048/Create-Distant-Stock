@@ -279,9 +279,24 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
     /** Highest-priority active warning/error that has not been printed/acknowledged yet. */
     public EventRegistry.Record nextPrintableAlarm() {
         for (EventRegistry.Record record : scopedActive()) {
+            if (record.severity() != EventRegistry.Severity.INFO && !record.printed()) return record;
+        }
+        return null;
+    }
+
+    /** Highest-priority active alarm that still needs the operator's silence/ACK gesture. */
+    public EventRegistry.Record nextUnacknowledgedAlarm() {
+        for (EventRegistry.Record record : scopedActive()) {
             if (record.severity() != EventRegistry.Severity.INFO && !record.acknowledged()) return record;
         }
         return null;
+    }
+
+    /** Re-evaluates lamps/nixies immediately after an operator ACK or print changes the event ledger. */
+    public void operatorEventChanged() {
+        if (level == null || level.isClientSide) return;
+        sync();
+        updateStatus();
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, LoggerBlockEntity be) {
@@ -300,6 +315,9 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
     /** Shows the physical paper output briefly after a successful print/ack operation. */
     public void showPrintedReceipt() {
         if (level == null || level.isClientSide) return;
+        // The half-ticket represented "this incident still needs a print". A full print replaces
+        // it; if another event is pending, the next server tick starts a fresh half-ticket for it.
+        alarmReceiptStartedTick = Long.MIN_VALUE;
         printedStartedTick = level.getGameTime();
         printedUntilTick = printedStartedTick + 60;
         setPrinted(true);
@@ -330,8 +348,9 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
 
         LoggerBlock.Status status = state.hasProperty(LoggerBlock.STATUS)
                 ? state.getValue(LoggerBlock.STATUS) : LoggerBlock.Status.NORMAL;
-        boolean unacknowledgedAlarm = status == LoggerBlock.Status.WARN || status == LoggerBlock.Status.ERROR;
-        if (!unacknowledgedAlarm || !hasPaper() || alarmReceiptStartedTick == Long.MIN_VALUE) return 0f;
+        boolean activeAlarm = status == LoggerBlock.Status.WARN || status == LoggerBlock.Status.ERROR
+                || status == LoggerBlock.Status.WARN_ACK || status == LoggerBlock.Status.ERROR_ACK;
+        if (!activeAlarm || !hasPaper() || alarmReceiptStartedTick == Long.MIN_VALUE) return 0f;
         double feed = Math.clamp((now - alarmReceiptStartedTick) / 10.0, 0.0, 1.0);
         return (float) (.5 * smooth(feed));
     }
@@ -364,27 +383,47 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         if (status == LoggerBlock.Status.OFFLINE) return "--";
         if (status == LoggerBlock.Status.NORMAL) return "OK";
         if (status == LoggerBlock.Status.ERROR) return "ER";
-        if (status == LoggerBlock.Status.ERROR_ACK || status == LoggerBlock.Status.WARN_ACK) return "AC";
+        if (status == LoggerBlock.Status.ERROR_ACK) {
+            return hasAcknowledgedUnprinted(EventRegistry.Severity.ERROR) ? "AC" : "ER";
+        }
+        if (status == LoggerBlock.Status.WARN_ACK) {
+            return hasAcknowledgedUnprinted(EventRegistry.Severity.WARN) ? "AC" : "AL";
+        }
         // WARN with no active warning record is the local paper-empty condition.
         boolean activeWarning = scopedActive().stream()
                 .anyMatch(row -> row.severity() == EventRegistry.Severity.WARN);
         return activeWarning ? "AL" : "PE";
     }
 
+    /** AC is the operator-action latch: ACK/silenced, but the mandatory incident slip is not out. */
+    private boolean hasAcknowledgedUnprinted(EventRegistry.Severity severity) {
+        for (EventRegistry.Record record : scopedActive()) {
+            if (record.severity() == severity && record.acknowledged() && !record.printed()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void tickBuzzer() {
         if (level == null || level.isClientSide) return;
-        EventRegistry.Record alarm = nextPrintableAlarm();
-        if (alarm == null) {
+        EventRegistry.Record printable = nextPrintableAlarm();
+        if (printable == null) {
             if (alarmReceiptStartedTick != Long.MIN_VALUE) {
                 alarmReceiptStartedTick = Long.MIN_VALUE;
                 sync();
             }
-            nextBuzzerTick = level.getGameTime();
-            return;
-        }
-        if (hasPaper() && alarmReceiptStartedTick == Long.MIN_VALUE) {
+        } else if (hasPaper() && alarmReceiptStartedTick == Long.MIN_VALUE) {
             alarmReceiptStartedTick = level.getGameTime();
             sync();
+        }
+
+        // Paper/printing and sound acknowledgement are deliberately independent. An out-of-paper
+        // logger may be silenced; AC stays latched because nextPrintableAlarm still finds the event.
+        EventRegistry.Record alarm = nextUnacknowledgedAlarm();
+        if (alarm == null) {
+            nextBuzzerTick = level.getGameTime();
+            return;
         }
         long now = level.getGameTime();
         if (now < nextBuzzerTick) return;

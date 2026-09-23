@@ -76,6 +76,87 @@ public final class ChainDiagnosticsGameTests {
         h.succeed();
     }
 
+    @GameTest(template = "empty", timeoutTicks = 1200)
+    public static void multipleCacheFrogportsMitigateIndependentAddresses(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos chainPos = h.absolutePos(new BlockPos(5, 2, 5));
+        BlockPos diagnosticPos = h.absolutePos(new BlockPos(5, 2, 2));
+        BlockPos cacheAPos = h.absolutePos(new BlockPos(4, 2, 7));
+        BlockPos cacheBPos = h.absolutePos(new BlockPos(6, 2, 7));
+        BlockPos receiverAPos = h.absolutePos(new BlockPos(2, 2, 5));
+        BlockPos receiverBPos = h.absolutePos(new BlockPos(8, 2, 5));
+        String addressA = "MULTI-CACHE-A";
+        String addressB = "MULTI-CACHE-B";
+
+        var chainBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "chain_conveyor"));
+        var frogportBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "package_frogport"));
+        level.setBlock(chainPos, chainBlock.defaultBlockState(), 3);
+        level.setBlock(diagnosticPos, ModBlocks.DIAGNOSTIC_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(cacheAPos, ModBlocks.CACHE_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(cacheBPos, ModBlocks.CACHE_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(receiverAPos, frogportBlock.defaultBlockState(), 3);
+        level.setBlock(receiverBPos, frogportBlock.defaultBlockState(), 3);
+
+        ChainConveyorBlockEntity chain = (ChainConveyorBlockEntity) level.getBlockEntity(chainPos);
+        DiagnosticFrogportBlockEntity diagnostic = (DiagnosticFrogportBlockEntity) level.getBlockEntity(diagnosticPos);
+        CacheFrogportBlockEntity cacheA = (CacheFrogportBlockEntity) level.getBlockEntity(cacheAPos);
+        CacheFrogportBlockEntity cacheB = (CacheFrogportBlockEntity) level.getBlockEntity(cacheBPos);
+        FrogportBlockEntity receiverA = (FrogportBlockEntity) level.getBlockEntity(receiverAPos);
+        FrogportBlockEntity receiverB = (FrogportBlockEntity) level.getBlockEntity(receiverBPos);
+        h.assertTrue(chain != null && diagnostic != null && cacheA != null && cacheB != null
+                        && receiverA != null && receiverB != null,
+                "multi-cache fixture failed to create its block entities");
+
+        chain.setSpeed(128);
+        chain.preventSpeedUpdate = 2500;
+        attachLoopPort(level, chainPos, diagnosticPos, diagnostic, 0);
+        attachLoopPort(level, chainPos, receiverAPos, receiverA, 72);
+        attachLoopPort(level, chainPos, receiverBPos, receiverB, 144);
+        attachLoopPort(level, chainPos, cacheAPos, cacheA, 216);
+        attachLoopPort(level, chainPos, cacheBPos, cacheB, 288);
+        receiverA.addressFilter = addressA;
+        receiverB.addressFilter = addressB;
+        receiverA.acceptsPackages = receiverB.acceptsPackages = true;
+        receiverA.filterChanged();
+        receiverB.filterChanged();
+
+        ItemStack busy = new ItemStack(ModItems.PING_PACKAGE.get());
+        h.onEachTick(() -> {
+            chain.setSpeed(128);
+            receiverA.animatedPackage = busy;
+            receiverB.animatedPackage = busy;
+            receiverA.animationProgress.startWithValue(0).chase(1, .1, LerpedFloat.Chaser.LINEAR);
+            receiverB.animationProgress.startWithValue(0).chase(1, .1, LerpedFloat.Chaser.LINEAR);
+        });
+        ChainDiagnostics.register(diagnostic);
+        ChainDiagnostics.register(cacheA);
+        ChainDiagnostics.register(cacheB);
+        ChainDiagnostics.tick(level.getServer());
+
+        h.runAfterDelay(760, () -> {
+            java.util.Set<String> owners = java.util.Set.of(cacheA.takeoverAddress(), cacheB.takeoverAddress());
+            h.assertTrue(owners.contains(addressA) && owners.contains(addressB),
+                    "two failed addresses did not receive two independent caches: " + owners);
+            h.assertTrue(!cacheA.takeoverAddress().equals(cacheB.takeoverAddress()),
+                    "both caches were assigned to the same failed address");
+
+            CacheFrogportBlockEntity ownerA = addressA.equals(cacheA.takeoverAddress()) ? cacheA : cacheB;
+            CacheFrogportBlockEntity ownerB = ownerA == cacheA ? cacheB : cacheA;
+            BlockPos ownerAPos = ownerA.getBlockPos();
+            level.destroyBlock(ownerAPos, false);
+
+            h.assertTrue(addressA.equals(receiverA.getFilterString()),
+                    "removing cache A did not thaw address A");
+            h.assertTrue(ChainDiagnostics.recoveryAddress(receiverBPos).equals(receiverB.getFilterString()),
+                    "removing cache A incorrectly thawed address B");
+            h.assertTrue(addressB.equals(ownerB.takeoverAddress()),
+                    "removing one cache cleared the other cache's takeover");
+            h.succeed();
+        });
+    }
+
     @GameTest(template = "empty", timeoutTicks = 40)
     public static void diagnosticFrogportItemCopiesCreateNetworkFromStockLink(GameTestHelper h) {
         var level = h.getLevel();
@@ -204,10 +285,16 @@ public final class ChainDiagnosticsGameTests {
 
         ChainDiagnostics.tick(level.getServer());
         h.assertTrue(EventRegistry.get(level.getServer())
+                        .active(EventRegistry.Codes.CHAIN_NO_ROUTE, "chain", alarm.sourceId()).isPresent(),
+                "ACK alone cleared a one-off no-route fault before its incident slip was printed");
+        h.assertTrue(EventRegistry.get(level.getServer()).markPrinted(alarm.id(), level.getGameTime()),
+                "could not mark the handled one-off no-route incident as printed");
+        ChainDiagnostics.tick(level.getServer());
+        h.assertTrue(EventRegistry.get(level.getServer())
                         .active(EventRegistry.Codes.CHAIN_NO_ROUTE, "chain", alarm.sourceId()).isEmpty(),
-                "acknowledged one-off no-route fault did not clear after the parcel was handled");
+                "printed one-off no-route fault did not clear after the parcel was handled");
         h.assertTrue(logger.status() == dev.distantstock.block.LoggerBlock.Status.NORMAL,
-                "Logger stayed AC after the handled one-off fault was resolved: " + logger.status());
+                "Logger stayed faulted after the printed one-off incident was resolved: " + logger.status());
         h.assertTrue(ChainDiagnostics.lampState(level, address) == null,
                 "Andon/lamp stayed faulted after the handled one-off fault was resolved");
 
@@ -386,7 +473,7 @@ public final class ChainDiagnosticsGameTests {
     }
 
     @GameTest(template = "empty")
-    public static void specialFrogportsExposeNativeEighteenSlotMenu(GameTestHelper h) {
+    public static void specialFrogportsExposeInspectablePackageMenus(GameTestHelper h) {
         var level = h.getLevel();
         BlockPos diagnosticPos = h.absolutePos(new BlockPos(2, 2, 2));
         BlockPos cachePos = h.absolutePos(new BlockPos(5, 2, 2));
@@ -403,14 +490,80 @@ public final class ChainDiagnosticsGameTests {
         var cacheMenu = cache.createMenu(2, player.getInventory(), player);
         h.assertTrue(diagnosticMenu instanceof com.simibubi.create.content.logistics.packagePort.PackagePortMenu,
                 "diagnostic Frogport did not create Create's PackagePortMenu");
-        h.assertTrue(cacheMenu instanceof com.simibubi.create.content.logistics.packagePort.PackagePortMenu,
-                "cache Frogport did not create Create's PackagePortMenu");
+        h.assertTrue(cacheMenu instanceof dev.distantstock.menu.CacheFrogportMenu,
+                "cache Frogport did not create its six-row package menu");
         h.assertTrue(diagnosticMenu.slots.size() == 54,
                 "diagnostic Frogport menu is not 18 device slots + 36 player slots: " + diagnosticMenu.slots.size());
-        h.assertTrue(cacheMenu.slots.size() == 54,
-                "cache Frogport menu is not 18 device slots + 36 player slots: " + cacheMenu.slots.size());
-        h.assertTrue(diagnostic.inventory.getSlots() == 18 && cache.inventory.getSlots() == 18,
-                "special Frogport native inventories are not 18 slots");
+        h.assertTrue(cacheMenu.slots.size() == CacheFrogportBlockEntity.CACHE_SLOTS + 36,
+                "cache Frogport menu does not expose every buffered parcel: " + cacheMenu.slots.size());
+        h.assertTrue(diagnostic.inventory.getSlots() == 18,
+                "diagnostic Frogport no longer uses Create's native 18 slots");
+        h.assertTrue(cache.inventory.getSlots() == CacheFrogportBlockEntity.CACHE_SLOTS,
+                "cache Frogport did not expand to " + CacheFrogportBlockEntity.CACHE_SLOTS + " slots");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void cacheFrogportFastIntakeBypassesVanillaCatchSerialization(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos cachePos = h.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos normalPos = h.absolutePos(new BlockPos(5, 2, 2));
+        var frogportBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "package_frogport"));
+        level.setBlock(cachePos, ModBlocks.CACHE_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(normalPos, frogportBlock.defaultBlockState(), 3);
+
+        CacheFrogportBlockEntity cache = (CacheFrogportBlockEntity) level.getBlockEntity(cachePos);
+        FrogportBlockEntity normal = (FrogportBlockEntity) level.getBlockEntity(normalPos);
+        h.assertTrue(cache != null && normal != null, "fast-intake fixture did not create Frogports");
+
+        ItemStack first = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        PackageItem.addAddress(first, "BURST-CACHE");
+        cache.startAnimation(first, false);
+        h.assertTrue(cache.cachedCount() == 1,
+                "cache Frogport did not store an incoming package immediately");
+        h.assertFalse(cache.isAnimationInProgress(),
+                "cache Frogport still serializes incoming packages behind the vanilla catch animation");
+
+        ItemStack second = first.copy();
+        cache.startAnimation(second, false);
+        h.assertTrue(cache.cachedCount() == 2,
+                "cache Frogport could not accept a second package immediately after the first");
+
+        normal.startAnimation(first.copy(), false);
+        h.assertTrue(normal.isAnimationInProgress(),
+                "control Frogport unexpectedly stopped using Create's normal catch animation");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void cacheFrogportCanOffloadPackagesToContainerBelow(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos cachePos = h.absolutePos(new BlockPos(3, 3, 3));
+        BlockPos chestPos = cachePos.below();
+        level.setBlock(cachePos, ModBlocks.CACHE_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(chestPos, Blocks.CHEST.defaultBlockState(), 3);
+        CacheFrogportBlockEntity cache = (CacheFrogportBlockEntity) level.getBlockEntity(cachePos);
+        h.assertTrue(cache != null, "cache offload fixture did not create its block entity");
+
+        ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        PackageItem.addAddress(parcel, "MANUAL-RECOVERY-ADDRESS");
+        cache.inventory.setStackInSlot(0, parcel);
+        cache.lazyTick();
+
+        var below = level.getCapability(Capabilities.ItemHandler.BLOCK, chestPos, Direction.UP);
+        h.assertTrue(below != null, "chest below cache did not expose an item handler");
+        h.assertTrue(cache.cachedCount() == 0,
+                "cache Frogport did not hand its buffered parcel to the container below");
+        boolean found = false;
+        for (int slot = 0; slot < below.getSlots(); slot++) {
+            ItemStack stack = below.getStackInSlot(slot);
+            if (!stack.isEmpty() && "MANUAL-RECOVERY-ADDRESS".equals(PackageItem.getAddress(stack))) {
+                found = true;
+                break;
+            }
+        }
+        h.assertTrue(found, "offloaded parcel lost its original address or never reached the container");
         h.succeed();
     }
 
@@ -541,12 +694,13 @@ public final class ChainDiagnosticsGameTests {
         h.runAfterDelay(140, () -> {
             h.assertTrue(address.equals(cache.takeoverAddress()),
                     "fixture never reached cache takeover before testing full capacity");
-            for (int slot = 0; slot < 18; slot++) {
+            for (int slot = 0; slot < CacheFrogportBlockEntity.CACHE_SLOTS; slot++) {
                 ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
                 PackageItem.addAddress(parcel, address);
                 cache.inventory.setStackInSlot(slot, parcel);
             }
-            h.assertTrue(cache.isBackedUp(), "18 occupied native Frogport slots did not report backed up");
+            h.assertTrue(cache.isBackedUp(), CacheFrogportBlockEntity.CACHE_SLOTS
+                    + " occupied cache slots did not report backed up");
             ChainDiagnostics.tick(level.getServer());
 
             boolean event = EventRegistry.get(level.getServer()).active().stream()
@@ -556,6 +710,83 @@ public final class ChainDiagnosticsGameTests {
             h.assertTrue(ChainDiagnostics.lampState(level, address) == LampState.FATAL,
                     "full cache did not elevate the brass Andon state to fatal/red");
             h.succeed();
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 360)
+    public static void breakingCacheImmediatelyThawsFrozenReceivers(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos chainPos = h.absolutePos(new BlockPos(5, 2, 5));
+        BlockPos diagnosticPos = h.absolutePos(new BlockPos(5, 2, 3));
+        BlockPos cachePos = h.absolutePos(new BlockPos(5, 2, 7));
+        BlockPos receiverPos = h.absolutePos(new BlockPos(3, 2, 5));
+        String address = "CACHE-REMOVAL-RECOVERY";
+
+        var chainBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "chain_conveyor"));
+        var frogportBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "package_frogport"));
+        level.setBlock(chainPos, chainBlock.defaultBlockState(), 3);
+        level.setBlock(diagnosticPos, ModBlocks.DIAGNOSTIC_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(cachePos, ModBlocks.CACHE_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(receiverPos, frogportBlock.defaultBlockState(), 3);
+
+        ChainConveyorBlockEntity chain = (ChainConveyorBlockEntity) level.getBlockEntity(chainPos);
+        DiagnosticFrogportBlockEntity diagnostic =
+                (DiagnosticFrogportBlockEntity) level.getBlockEntity(diagnosticPos);
+        CacheFrogportBlockEntity cache = (CacheFrogportBlockEntity) level.getBlockEntity(cachePos);
+        FrogportBlockEntity receiver = (FrogportBlockEntity) level.getBlockEntity(receiverPos);
+        h.assertTrue(chain != null && diagnostic != null && cache != null && receiver != null,
+                "cache-removal fixture did not create block entities");
+
+        chain.setSpeed(128);
+        chain.preventSpeedUpdate = 1000;
+        h.onEachTick(() -> chain.setSpeed(128));
+        attachLoopPort(level, chainPos, diagnosticPos, diagnostic, 0);
+        attachLoopPort(level, chainPos, receiverPos, receiver, 90);
+        attachLoopPort(level, chainPos, cachePos, cache, 180);
+        receiver.addressFilter = address;
+        receiver.acceptsPackages = true;
+        receiver.filterChanged();
+
+        ItemStack busyMarker = new ItemStack(ModItems.PING_PACKAGE.get());
+        java.util.concurrent.atomic.AtomicBoolean blocked = new java.util.concurrent.atomic.AtomicBoolean(true);
+        h.onEachTick(() -> {
+            if (blocked.get()) {
+                receiver.animatedPackage = busyMarker;
+                receiver.animationProgress.startWithValue(0).chase(1, .1, LerpedFloat.Chaser.LINEAR);
+            }
+        });
+        ChainDiagnostics.register(diagnostic);
+        ChainDiagnostics.register(cache);
+        ChainDiagnostics.tick(level.getServer());
+
+        h.runAfterDelay(150, () -> {
+            h.assertTrue(address.equals(cache.takeoverAddress()),
+                    "fixture never reached cache takeover");
+            h.assertTrue(ChainDiagnostics.recoveryAddress(receiverPos).equals(receiver.getFilterString()),
+                    "receiver was not frozen before cache removal");
+
+            blocked.set(false);
+            level.destroyBlock(cachePos, false);
+
+            h.assertTrue(address.equals(receiver.getFilterString()),
+                    "breaking the cache left the real Frogport frozen on its private recovery address");
+            h.assertTrue(EventRegistry.get(level.getServer()).active().stream()
+                            .noneMatch(row -> EventRegistry.Codes.CHAIN_CACHE_FULL.equals(row.code())
+                                    && address.equals(row.detail())),
+                    "cache-full event survived after its cache block was removed");
+            // Filter restoration is synchronous; Create rebuilds the conveyor routing table on a
+            // later tick. Assert the actual public route after that normal refresh window.
+            h.runAfterDelay(8, () -> {
+                long publicRoutes = chain.routingTable.entriesByDistance.stream()
+                        .filter(ChainConveyorRoutingTable.RoutingTableEntry::endOfRoute)
+                        .filter(row -> address.equals(row.port()))
+                        .count();
+                h.assertTrue(publicRoutes >= 1,
+                        "breaking the cache did not restore the original public destination route");
+                h.succeed();
+            });
         });
     }
 

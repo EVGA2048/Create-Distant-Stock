@@ -90,6 +90,63 @@ public final class ChainDiagnostics {
         CACHES.remove(be);
     }
 
+    /**
+     * Permanent cache removal is a fail-open boundary. A fault may have rewritten several normal
+     * Frogports to private recovery addresses; leaving those mappings behind after the cache is
+     * gone makes valid parcels lose their destination and fall into diagnostics. Thaw every fault
+     * owned by this cache before the block itself deregisters from Create.
+     */
+    public static void cacheRemoved(CacheFrogportBlockEntity cache) {
+        if (cache == null || !(cache.getLevel() instanceof ServerLevel level)) return;
+        BlockPos cachePos = cache.getBlockPos();
+        long now = level.getGameTime();
+        List<Fault> owned = FAULTS.values().stream()
+                .filter(fault -> fault.cachePos != null
+                        && fault.key.controller().dimension().equals(level.dimension())
+                        && fault.cachePos.equals(cachePos))
+                .toList();
+        for (Fault fault : owned) {
+            abandonCacheMitigation(level, fault, now);
+        }
+        unregister(cache);
+    }
+
+    private static void abandonCacheMitigation(ServerLevel level, Fault fault, long now) {
+        FAULTS.remove(fault.key);
+        PROBES.entrySet().removeIf(entry -> entry.getValue().recovery()
+                && entry.getValue().controller().equals(fault.key.controller())
+                && entry.getValue().address().equals(fault.key.address()));
+
+        thawTargets(level, fault);
+
+        FULL_CACHES.remove(fault.key);
+        EventRegistry registry = EventRegistry.get(level.getServer());
+        registry.clear(EventRegistry.Codes.CHAIN_CACHE_FULL, "chain",
+                sourceId(level, fault.key.controller().pos(), fault.key.address()) + "/cache", now);
+        registry.clear(EventRegistry.Codes.CHAIN_PING_TIMEOUT, "chain",
+                sourceId(level, fault.key.controller().pos(), fault.key.address()), now);
+
+        RuntimeState runtime = RUNTIME.computeIfAbsent(fault.key.controller(), ignored -> new RuntimeState());
+        runtime.nextScanTick = now;
+        DiagnosticFrogportBlockEntity controller = controller(fault.key.controller());
+        if (controller != null) {
+            controller.recordDiagnosticResult("cache_removed", fault.key.address());
+        }
+    }
+
+    private static void thawTargets(ServerLevel level, Fault fault) {
+        for (BlockPos pos : fault.targets) {
+            if (level.getBlockEntity(pos) instanceof FrogportBlockEntity frog && frog.target != null) {
+                // Deregister the private recovery address while FROZEN still controls getFilterString().
+                frog.target.deregister(frog, level, pos);
+            }
+            FROZEN.remove(new PortKey(level.dimension(), pos));
+            if (level.getBlockEntity(pos) instanceof FrogportBlockEntity frog && frog.target != null) {
+                frog.target.register(frog, level, pos);
+            }
+        }
+    }
+
     public static void observeGauge(FactoryPanelBehaviour gauge) {
         if (gauge == null || gauge.panelBE() == null || gauge.panelBE().getLevel() == null
                 || gauge.panelBE().getLevel().isClientSide || gauge.network == null || !gauge.isActive()) return;
@@ -161,7 +218,7 @@ public final class ChainDiagnostics {
         CACHES.removeIf(be -> be == null || be.isRemoved() || be.getLevel() == null);
         // Fault ownership is runtime state, while the Frogport inventory/takeover address is saved.
         // After a crash or hard kill, an orphaned cache must give the public address back instead of
-        // competing with the restored real Frogports. Its 18 cached parcels stay put for slow replay.
+        // competing with the restored real Frogports. Its cached parcels stay put for slow replay.
         for (CacheFrogportBlockEntity cache : new ArrayList<>(CACHES)) {
             if (cache.getLevel() == null || cache.takeoverAddress().isBlank()) continue;
             boolean owned = FAULTS.values().stream().anyMatch(fault -> fault.cachePos != null
@@ -311,11 +368,11 @@ public final class ChainDiagnostics {
 
                 // A one-off malformed parcel has no persistent configuration source to repair.
                 // Once it has physically left the quarantine (normally into the Packager below)
-                // and the operator has acknowledged the alarm, the incident is considered handled.
+                // and the operator has printed the incident slip, the incident is considered handled.
                 // A future parcel with the same bad address will raise a fresh alarm.
                 if (!diagnostic.badAddressWasGaugeBacked(address)
                         && !quarantinedNow.contains(address)
-                        && active != null && active.acknowledged()) {
+                        && active != null && active.printed()) {
                     clearBadAddress(level, controller, address, level.getGameTime());
                     continue;
                 }
@@ -699,16 +756,7 @@ public final class ChainDiagnostics {
     private static void restore(DiagnosticFrogportBlockEntity controller, Fault fault, long now) {
         if (!(controller.getLevel() instanceof ServerLevel level)) return;
         FAULTS.remove(fault.key);
-        for (BlockPos pos : fault.targets) {
-            if (level.getBlockEntity(pos) instanceof FrogportBlockEntity frog && frog.target != null) {
-                // Deregister the private recovery address while the frozen mapping still exists.
-                frog.target.deregister(frog, level, pos);
-            }
-            FROZEN.remove(new PortKey(level.dimension(), pos));
-            if (level.getBlockEntity(pos) instanceof FrogportBlockEntity frog) {
-                if (frog.target != null) frog.target.register(frog, level, pos);
-            }
-        }
+        thawTargets(level, fault);
         if (fault.cachePos != null && level.getBlockEntity(fault.cachePos) instanceof CacheFrogportBlockEntity cache) {
             cache.setTakeoverAddress("");
         }

@@ -6,6 +6,7 @@ import dev.distantstock.config.StockConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -45,6 +46,28 @@ public final class CasingGameTests {
             lit(h, 5, "a casing four along");
             lit(h, LAST_X, "the far end of the run");
             h.succeed();
+        });
+    }
+
+    /** Batch state updates must still invalidate Minecraft's block-light engine. */
+    @GameTest(template = "empty", timeoutTicks = 200)
+    public static void windowLightAppearsAndDisappearsWithPower(GameTestHelper h) {
+        layRun(h);
+        BlockPos litPos = h.absolutePos(new BlockPos(FIRST_X, Y, Z));
+        int baseline = h.getLevel().getBrightness(LightLayer.BLOCK, litPos);
+        h.setBlock(SOURCE_X, Y, Z, Blocks.REDSTONE_BLOCK.defaultBlockState());
+        settle(h, () -> {
+            int poweredLight = h.getLevel().getBrightness(LightLayer.BLOCK, litPos);
+            h.assertTrue(poweredLight > baseline,
+                    "powered casing changed state but did not emit block light");
+            h.setBlock(SOURCE_X, Y, Z, Blocks.AIR.defaultBlockState());
+            settle(h, () -> {
+                int after = h.getLevel().getBrightness(LightLayer.BLOCK, litPos);
+                h.assertTrue(after <= baseline,
+                        "unpowered casing left stale block light behind: baseline=" + baseline
+                                + ", powered=" + poweredLight + ", after=" + after);
+                h.succeed();
+            });
         });
     }
 
@@ -147,8 +170,8 @@ public final class CasingGameTests {
     }
 
     /**
-     * The window settles over block ticks, one casing further along per tick as each state change
-     * wakes its neighbours, so the wait is the run length plus room to spare.
+     * The component is settled as a batch now; keep a generous wait so this helper also covers
+     * Minecraft's asynchronous light propagation before assertions inspect block light.
      */
     private static void settle(GameTestHelper h, Runnable then) {
         h.runAfterDelay(40, then);

@@ -85,7 +85,9 @@ class NbtWriter:
     # flat string and int pairs the texture script got away with.
 
     def value(self, key, value):
-        if isinstance(value, int):
+        if isinstance(value, IntArray):
+            self.tag(11, key, lambda: self._int_array(value))
+        elif isinstance(value, int):
             self.int_tag(key, value)
         elif isinstance(value, float):
             self.tag(5, key, lambda: self.raw(struct.pack(">f", value)))
@@ -103,19 +105,35 @@ class NbtWriter:
             self.u8(10)
             self.i32(0)
             return
-        typ = 3 if isinstance(values[0], int) else 10
+        if isinstance(values[0], IntArray):
+            typ = 11
+        elif isinstance(values[0], int):
+            typ = 3
+        else:
+            typ = 10
         self.u8(typ)
         self.i32(len(values))
         for item in values:
             if typ == 3:
                 self.i32(item)
+            elif typ == 11:
+                self._int_array(item)
             else:
                 self._compound_body(item)
                 self.end()
 
+    def _int_array(self, values):
+        self.i32(len(values))
+        for value in values:
+            self.i32(value)
+
     def _compound_body(self, value):
         for k, v in value.items():
             self.value(k, v)
+
+
+class IntArray(list):
+    """Explicit TAG_Int_Array, needed by Create's chain and Frogport codecs."""
 
 
 def write_structure(path: Path, size, palette, blocks):
@@ -148,7 +166,9 @@ def write_structure(path: Path, size, palette, blocks):
     w.int_tag("DataVersion", DATAVERSION)
     w.end()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(gzip.compress(bytes(w.buf)))
+    # Deterministic assets: gzip otherwise embeds the current timestamp and makes every generator
+    # run dirty all Ponder NBT files even when the structure bytes are identical.
+    path.write_bytes(gzip.compress(bytes(w.buf), mtime=0))
 
 
 class Scene:
@@ -271,115 +291,104 @@ def storage(scene, x):
     scene.place((x, 1, 4), "minecraft:polished_andesite")
 
 
-def export_scene():
-    """Storage, then a belt, then the dock.
+def chain_conveyor(scene, pos, connections, speed=32.0):
+    """A real connected Chain Conveyor node, not three decorative sprockets pretending to be one."""
+    scene.place(pos, "create:chain_conveyor", None, {
+        "id": "create:chain_conveyor",
+        "Connections": [IntArray(connection) for connection in connections],
+        "Speed": speed,
+        "TravellingPackages": [],
+        "LoopingPackages": [],
+    })
 
-    The dock sits at the end of a line rather than under a chute. A warehouse already has a way of
-    moving goods around, and a scene that teaches the roof as the input is teaching a layout nobody
-    builds twice.
-    """
-    scene = Scene(8, 6)
-    storage(scene, 3)
-    belt_line(scene, [(1, 1, 2), (2, 1, 2), (3, 1, 2), (4, 1, 2), (5, 1, 2)], "east", (1, 1, 2))
-    shaft((1, 1, 3), scene)
-    dock((6, 1, 2), scene, facing="south")
+
+def frogport(scene, pos, block, target_pos, connection, address, slots):
+    """Attach a normal or Distant Stock Frogport to a Chain Conveyor segment."""
+    relative = [target_pos[i] - pos[i] for i in range(3)]
+    scene.place(pos, block, None, {
+        "id": block,
+        "Target": {
+            "flipped": 0,
+            "chain_pos": 1.0,
+            "connection": IntArray(connection),
+            "type": "create:chain_conveyor",
+            "relative_pos": IntArray(relative),
+        },
+        "AcceptsPackages": 1,
+        "AddressFilter": address,
+        "PlacedYaw": 0.0,
+        "Inventory": {"Size": slots, "Items": []},
+    })
+
+
+def export_scene():
+    """One readable flow: inventory -> Distant Packager -> belt -> dock."""
+    scene = Scene(9, 7)
+    chest((2, 2, 5), scene, facing="west")
+    packager((2, 2, 4), scene, facing="north")
+    funnel((2, 2, 3), scene, facing="north", shape="pulling")
+    scene.place((2, 1, 4), "minecraft:polished_andesite")
+    scene.place((2, 1, 5), "minecraft:polished_andesite")
+    belt_line(scene, [(2, 1, 3), (3, 1, 3), (4, 1, 3), (5, 1, 3), (6, 1, 3)],
+              "east", (2, 1, 3), speed=24.0)
+    shaft((2, 1, 4), scene)
+    dock((7, 1, 3), scene, facing="south")
     return scene
 
 
 def import_scene():
-    """A dock that hands its arrivals off and a line that carries them into storage."""
-    scene = Scene(8, 6)
-    # Vanilla hoppers only take from the block straight above, which is how the dock hands cargo
-    # out of its underside; it then feeds the belt it points into.
-    scene.place((2, 1, 2), "minecraft:hopper", {"facing": "east", "enabled": "true"},
+    """The receiving side makes the dock's underside and local handoff obvious."""
+    scene = Scene(9, 7)
+    scene.place((2, 1, 3), "minecraft:hopper", {"facing": "east", "enabled": "true"},
                 {"id": "minecraft:hopper", "TransferCooldown": -1, "Enabled": 1})
-    belt_line(scene, [(3, 1, 2), (4, 1, 2), (5, 1, 2)], "east", (3, 1, 2))
-    shaft((3, 1, 3), scene)
-    chest((6, 1, 2), scene, facing="west")
-    dock((2, 2, 2), scene, facing="south", status="standby")
+    belt_line(scene, [(3, 1, 3), (4, 1, 3), (5, 1, 3), (6, 1, 3)],
+              "east", (3, 1, 3), speed=24.0)
+    shaft((3, 1, 4), scene)
+    chest((7, 1, 3), scene, facing="west")
+    dock((2, 2, 3), scene, facing="south", status="inactive")
     return scene
 
 
 def tune_scene():
-    """The request desk that carries the order, standing well clear of the dock.
-
-    They are two different pieces of furniture with two different jobs, and the first version of
-    this scene stacked them against each other until they read as one machine.
-    """
+    """A dock and a request desk are deliberately separate pieces of equipment."""
     scene = Scene(8, 6)
-    dock((1, 1, 3), scene, facing="south", status="standby")
+    dock((2, 1, 3), scene, facing="south", status="inactive")
     scene.place((5, 1, 3), "distantstock:gauge", {"facing": "south", "lit": "true"})
     return scene
 
 
 def status_scene():
-    """A wall carrying the monitor, with the dock it reports on beside it.
-
-    A wall panel is mounted on the face it was placed against and looks the other way, so the
-    monitor faces north and the wall stands to its south. Cardboard rather than stone, because the
-    wall is the console's own casing material everywhere else in the mod.
-    """
+    """A compact status station: monitor on the wall, dock in front."""
     scene = Scene(8, 6)
     for x in range(3, 7):
         for y in (1, 2):
             scene.place((x, y, 4), "create:cardboard_block", {"axis": "x"})
-    scene.place((4, 1, 3), "distantstock:monitor", {"facing": "north", "status": "green"})
+    scene.place((4, 1, 3), "distantstock:monitor",
+                {"facing": "north", "status": "green", "link": "online"})
     dock((4, 1, 2), scene, facing="south", status="fault")
     return scene
 
 
 def tower_scene():
-    """An interlink tower: shaft, 3x3 base, five couplers, a resonator, and a lever on the skirt.
-
-    The mast stops at five segments, the first rung of tier I. Seventeen would push the cap out of
-    frame, and "taller is better" is not something a structure can say — that is the text's job, and
-    the structure only has to be unambiguous.
-
-    Every block in it has to be placeable exactly as shown: the shaft directly under the base, the
-    couplers meeting end to end, the resonator on the top of the mast, the lever on the skirt's top
-    face. One block missing or one square out and a player who copies it gets a tower that is not a
-    tower.
-    """
-    scene = Scene(8, 6, height=9)
-
-    # Power enters from underneath. The core only takes a shaft on its bottom face, so the shaft
-    # stands directly below it. 32 rpm is a medium network and just clears the speed the core asks
-    # for; what a tower really costs is stress, not speed.
-    scene.place((4, 1, 3), "create:shaft", {"axis": "y"},
+    """Five-coupler tier-I tower, centred so the complete 3x3 skirt stays readable."""
+    scene = Scene(9, 9, height=10)
+    scene.place((4, 1, 4), "create:shaft", {"axis": "y"},
                 {"id": "create:simple_kinetic", "Speed": 32.0,
-                 "Source": {"X": 4, "Y": 1, "Z": 3}})
-
-    # The centre of the base. The block entity carries the numbers the server would have synced:
-    # how many couplers, which tier, how fast the shaft turns. The light on the cap reads them, and
-    # without them the scene would show a tower that has not been recognised as one.
-    scene.place((4, 2, 3), "distantstock:tower_core", None,
+                 "Source": {"X": 4, "Y": 1, "Z": 4}})
+    scene.place((4, 2, 4), "distantstock:tower_core", None,
                 {"id": "distantstock:tower_core", "Speed": 32.0,
-                 "Source": {"X": 4, "Y": 1, "Z": 3}, "Couplers": 5, "Tier": "I"})
-
-    # The 3x3 skirt, with the base in the middle square - that square is the core, not a casing.
+                 "Source": {"X": 4, "Y": 1, "Z": 4}, "Couplers": 5, "Tier": "I"})
     for x in range(3, 6):
-        for z in range(2, 5):
-            if (x, z) != (4, 3):
-                scene.place((x, 2, z), "distantstock:tower_casing", {"powered": "false"})
-
-    # The mast. above/below describe the neighbours rather than the block: the coupler draws a
-    # different model at each end, so only the bottom segment has below=false and only the top one
-    # has above=false.
+        for z in range(3, 6):
+            if (x, z) != (4, 4):
+                scene.place((x, 2, z), "distantstock:tower_casing",
+                            {"port": "none", "powered": "false"})
     for y in range(3, 8):
-        scene.place((4, y, 3), "distantstock:tower_coupler",
+        scene.place((4, y, 4), "distantstock:tower_coupler",
                     {"above": "true" if y < 7 else "false",
                      "below": "true" if y > 3 else "false"})
-
-    # The cap. 1 is the "turning, nothing crossing it" light: what stands in the scene is a finished
-    # tower with power going into it.
-    scene.place((4, 8, 3), "distantstock:ether_resonator", None,
+    scene.place((4, 8, 4), "distantstock:ether_resonator", None,
                 {"id": "distantstock:ether_resonator", "Beam": 1})
-
-    # A lever on a skirt corner. A floor-facing lever sits on the casing's top face and feeds
-    # redstone into the skirt through it, which is what the window shot needs. It stands at
-    # (3,3,3), directly above the casing at (3,2,3).
-    scene.place((3, 3, 3), "minecraft:lever",
-                {"face": "floor", "facing": "north", "powered": "false"})
     return scene
 
 
@@ -394,9 +403,17 @@ def known_states(block_id):
     namespace, _, path = block_id.partition(":")
     states = []
     for candidate in (ROOT / "src/main/resources/assets" / namespace / "blockstates").glob(f"{path}.json"):
-        variants = json.loads(candidate.read_text()).get("variants", {})
+        blockstate = json.loads(candidate.read_text())
+        variants = blockstate.get("variants", {})
         for key in variants:
             states.append(dict(part.split("=", 1) for part in key.split(",") if "=" in part))
+        # Logger and sounders use multipart blockstates. Their `when` maps are just as useful for
+        # validating authored properties as a variants key, and ignoring them was how old scenes
+        # could silently ship impossible states.
+        for part in blockstate.get("multipart", []):
+            when = part.get("when", {})
+            if when and all(isinstance(value, str) for value in when.values()):
+                states.append(dict(when))
     return states
 
 
@@ -425,35 +442,60 @@ def verify(scene, name):
 
 
 def replenish_scene():
-    """A gauge board on a wall, a requester beside it, and the dock their orders come out of.
+    """Automatic ordering devices on a wall, with their receiving dock visible in the foreground."""
+    scene = Scene(9, 7)
+    for x in range(2, 8):
+        for y in (1, 2):
+            scene.place((x, y, 5), "create:cardboard_block", {"axis": "x"})
+    scene.place((3, 1, 4), "distantstock:remote_gauge")
+    scene.place((6, 1, 4), "distantstock:remote_redstone_requester",
+                {"axis": "x", "powered": "false"})
+    scene.place((2, 1, 2), "minecraft:hopper", {"facing": "east", "enabled": "true"},
+                {"id": "minecraft:hopper", "TransferCooldown": -1, "Enabled": 1})
+    belt_line(scene, [(3, 1, 2), (4, 1, 2), (5, 1, 2), (6, 1, 2)],
+              "east", (3, 1, 2), speed=16.0)
+    shaft((3, 1, 3), scene)
+    chest((7, 1, 2), scene, facing="west")
+    dock((2, 2, 2), scene, facing="south", status="standby")
+    return scene
 
-    The two devices sit together because they answer the same question — where do my goods come from
-    — and the scene is about the binding gesture rather than about either machine. The board hangs on
-    the wall the way the monitor does: a wall panel is mounted on the face it was placed against and
-    looks the other way, so the wall stands to its south.
 
-    No panel is written into the board's block entity. Create's panel data is a versioned structure
-    this script has no business inventing, and a scene that showed a filter it had guessed at would
-    teach the wrong shape; the text says what to put on the panel instead.
-    """
+def diagnostics_scene():
+    """Three real connected chain nodes, each with a Frogport attached to the route."""
+    scene = Scene(9, 7)
+    a, b, c = (2, 1, 4), (4, 1, 4), (6, 1, 4)
+    chain_conveyor(scene, a, [(2, 0, 0)])
+    chain_conveyor(scene, b, [(-2, 0, 0), (2, 0, 0)])
+    chain_conveyor(scene, c, [(-2, 0, 0)])
+    frogport(scene, (2, 2, 2), "distantstock:diagnostic_frogport", a, (2, 0, 0),
+             "__distantstock_diag__/ponder", 18)
+    frogport(scene, (4, 2, 2), "distantstock:cache_frogport", b, (2, 0, 0),
+             "__distantstock_cache__/ponder", 54)
+    frogport(scene, (6, 2, 2), "create:package_frogport", c, (-2, 0, 0),
+             "ASSEMBLY", 18)
+    return scene
+
+
+def logger_scene():
     scene = Scene(8, 6)
     for x in range(2, 7):
         for y in (1, 2):
             scene.place((x, y, 4), "create:cardboard_block", {"axis": "x"})
-    scene.place((3, 1, 3), "distantstock:remote_gauge")
-    scene.place((5, 1, 3), "distantstock:remote_redstone_requester",
-                {"axis": "x", "powered": "false"})
-    scene.place((2, 1, 2), "minecraft:hopper", {"facing": "east", "enabled": "true"},
-                {"id": "minecraft:hopper", "TransferCooldown": -1, "Enabled": 1})
-    chest((6, 1, 2), scene, facing="west")
-    dock((2, 2, 2), scene, facing="south", status="standby")
+    scene.place((3, 1, 3), "distantstock:logger", {"facing": "north", "status": "error"},
+                {"id": "distantstock:logger"})
+    scene.place((5, 1, 3), "distantstock:stack_light",
+                {"face": "wall", "facing": "north", "green": "false",
+                 "yellow": "false", "red": "true"})
+    scene.place((6, 1, 3), "distantstock:red_wall_sounder",
+                {"facing": "north", "lit": "true"})
     return scene
 
 
 def main():
     for name, build in (("export", export_scene), ("import", import_scene),
                         ("tune", tune_scene), ("status", status_scene),
-                        ("tower", tower_scene), ("replenish", replenish_scene)):
+                        ("tower", tower_scene), ("replenish", replenish_scene),
+                        ("diagnostics", diagnostics_scene), ("logger", logger_scene)):
         scene = build()
         verify(scene, name)
         scene.save(f"{name}.nbt")

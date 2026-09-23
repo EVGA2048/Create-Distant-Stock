@@ -17,6 +17,10 @@ public final class ModMenus {
     public static final DeferredHolder<MenuType<?>, MenuType<MonitorMenu>> LAMP_MONITOR = MENUS.register("lamp_monitor",
             () -> IMenuTypeExtension.create(MonitorMenu::fromNetwork));
 
+    public static final DeferredHolder<MenuType<?>, MenuType<CacheFrogportMenu>> CACHE_FROGPORT =
+            MENUS.register("cache_frogport",
+                    () -> IMenuTypeExtension.create(ModMenus::cacheFrogportMenu));
+
     /**
      * 远仓红石请求器：Create 那个请求器界面，加上我们那两行。
      *
@@ -37,6 +41,12 @@ public final class ModMenus {
             int id, net.minecraft.world.entity.player.Inventory inventory,
             net.minecraft.network.RegistryFriendlyByteBuf buffer) {
         return new RemoteRedstoneRequesterMenu(REMOTE_REQUESTER.get(), id, inventory, buffer);
+    }
+
+    private static CacheFrogportMenu cacheFrogportMenu(
+            int id, net.minecraft.world.entity.player.Inventory inventory,
+            net.minecraft.network.RegistryFriendlyByteBuf buffer) {
+        return new CacheFrogportMenu(CACHE_FROGPORT.get(), id, inventory, buffer);
     }
 
     private ModMenus() {

@@ -205,20 +205,25 @@ public final class LoggerScreen extends Screen {
         if (!row.active()) {
             g.drawString(font, Component.translatable("gui.distantstock.logger.cleared"),
                     ax, y + 3, GOOD, false);
-        } else if (row.acknowledged()) {
-            g.drawString(font, Component.translatable("gui.distantstock.logger.acknowledged"),
+        } else if (row.printed()) {
+            g.drawString(font, Component.translatable("gui.distantstock.logger.printed"),
                     ax, y + 3, MUTED, false);
         } else if (row.severity() != EventRegistry.Severity.INFO) {
             boolean paperAvailable = snapshot.paperRemaining() > 0;
-            boolean over = inside(mouseX, mouseY, ax - 3, y + 1, 42, 14);
-            g.fill(ax - 3, y + 1, ax + 39, y + 15,
-                    !paperAvailable ? 0xFF2E3436 : over ? 0xFF5A4B36 : 0xFF463A2E);
-            Component print = Component.translatable("gui.distantstock.logger.print");
-            g.drawString(font, print, ax + 18 - font.width(print) / 2, y + 4,
-                    paperAvailable ? WARN : MUTED, false);
             if (paperAvailable) {
+                boolean over = inside(mouseX, mouseY, ax - 3, y + 1, 42, 14);
+                g.fill(ax - 3, y + 1, ax + 39, y + 15,
+                        over ? 0xFF5A4B36 : 0xFF463A2E);
+                Component print = Component.translatable("gui.distantstock.logger.print");
+                g.drawString(font, print, ax + 18 - font.width(print) / 2, y + 4,
+                        WARN, false);
                 hits.add(new Hit(ax - 3, y + 1, 42, 14,
                         () -> PacketDistributor.sendToServer(LoggerActionC2S.print(source(), row.id()))));
+            } else {
+                Component pending = Component.translatable(row.acknowledged()
+                        ? "gui.distantstock.logger.pending_print"
+                        : "gui.distantstock.logger.no_paper_short");
+                g.drawString(font, pending, ax, y + 3, row.acknowledged() ? WARN : MUTED, false);
             }
         }
     }
