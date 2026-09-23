@@ -7,6 +7,7 @@ import dev.distantstock.item.ModItems;
 import dev.distantstock.client.RemoteGaugeRenderer;
 import dev.distantstock.client.ResonatorRenderer;
 import dev.distantstock.client.SignalPanelRenderer;
+import dev.distantstock.client.WallSounderRenderer;
 import dev.engine_room.flywheel.lib.model.baked.PartialModel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.model.BakedModel;
@@ -76,6 +77,53 @@ public final class SignalLampClientSmoke {
             LogUtils.getLogger().info(
                     "DISTANTSTOCK_SPECIAL_FROGPORT_SELECTION_OK: tuned diagnostic/cache Frogports participate in Create chain targeting");
 
+            // Dynamic sounder glow must use the inverse Catnip Y convention. North/south hide a
+            // sign error (0/180 are their own opposites), so explicitly pin the east/west cases.
+            float eps = 0.0001f;
+            if (Math.abs(WallSounderRenderer.rotationRadians(Direction.NORTH)) > eps
+                    || Math.abs(WallSounderRenderer.rotationRadians(Direction.SOUTH) - (float) Math.PI) > eps
+                    || Math.abs(WallSounderRenderer.rotationRadians(Direction.EAST) + (float) (Math.PI / 2)) > eps
+                    || Math.abs(WallSounderRenderer.rotationRadians(Direction.WEST) - (float) (Math.PI / 2)) > eps) {
+                throw new AssertionError("Wall sounder emissive rotation does not match baked blockstate facing");
+            }
+            LogUtils.getLogger().info(
+                    "DISTANTSTOCK_WALL_SOUNDER_ROTATION_OK: east/west emissive glow matches baked model orientation");
+
+            // The remote requester follows Create's original visual contract: redstone toggles the
+            // POWERED blockstate and that state must bake to a genuinely different side texture.
+            var requesterStates = ModBlocks.REMOTE_REDSTONE_REQUESTER.get().getStateDefinition().getPossibleStates();
+            var unpoweredState = requesterStates.stream()
+                    .filter(s -> s.getValue(com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlock.AXIS)
+                            == Direction.Axis.Z)
+                    .filter(s -> !s.getValue(com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlock.POWERED))
+                    .findFirst().orElseThrow();
+            var poweredState = requesterStates.stream()
+                    .filter(s -> s.getValue(com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlock.AXIS)
+                            == Direction.Axis.Z)
+                    .filter(s -> s.getValue(com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlock.POWERED))
+                    .findFirst().orElseThrow();
+            var unpoweredModel = mc.getBlockRenderer().getBlockModel(unpoweredState);
+            var poweredModel = mc.getBlockRenderer().getBlockModel(poweredState);
+            verify(unpoweredModel, mc);
+            verify(poweredModel, mc);
+            var unpoweredSprites = spriteNames(unpoweredModel, unpoweredState);
+            var poweredSprites = spriteNames(poweredModel, poweredState);
+            var expectedOff = ResourceLocation.fromNamespaceAndPath(DistantStock.MODID,
+                    "block/remote_redstone_requester_unpowered");
+            var expectedOn = ResourceLocation.fromNamespaceAndPath(DistantStock.MODID,
+                    "block/remote_redstone_requester_powered");
+            if (!unpoweredSprites.contains(expectedOff) || !poweredSprites.contains(expectedOn)
+                    || unpoweredSprites.equals(poweredSprites)) {
+                throw new AssertionError("Remote requester powered/unpowered baked models are not visually distinct: off="
+                        + unpoweredSprites + " on=" + poweredSprites);
+            }
+            if (!com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlockEntity.class
+                    .isAssignableFrom(dev.distantstock.block.RemoteRedstoneRequesterBlockEntity.class)) {
+                throw new AssertionError("Create requester effect packet cannot recognise the remote requester BE");
+            }
+            LogUtils.getLogger().info(
+                    "DISTANTSTOCK_REMOTE_REQUESTER_EFFECT_OK: powered model is distinct and Create effect packet accepts remote requester BE");
+
             if (net.neoforged.fml.ModList.get().isLoaded("fluidlogistics")) {
                 if (Arrays.stream(com.simibubi.create.content.logistics.box.PackageRenderer.class.getDeclaredMethods())
                         .noneMatch(m -> m.getName().contains("distantstock$renderRemoteFluidPackage"))) {
@@ -99,6 +147,20 @@ public final class SignalLampClientSmoke {
                     throw new AssertionError("Distant casing is not using a connected-texture model: " + state);
                 }
             }
+            for (boolean powered : new boolean[]{false, true}) {
+                var topPort = ModBlocks.TOWER_CASING.get().defaultBlockState()
+                        .setValue(dev.distantstock.block.TowerCasingBlock.POWERED, powered)
+                        .setValue(dev.distantstock.block.TowerCasingBlock.PORT,
+                                dev.distantstock.block.TowerCasingBlock.Port.UP);
+                try {
+                    verify(mc.getBlockRenderer().getBlockModel(topPort), mc);
+                } catch (AssertionError failure) {
+                    throw new AssertionError("Tower casing UP fluid-port model is missing/broken: " + topPort,
+                            failure);
+                }
+            }
+            LogUtils.getLogger().info(
+                    "DISTANTSTOCK_TOWER_TOP_FLUID_PORT_OK: UP casing port baked for inactive/active states");
             int states = 0;
             for (var block : java.util.List.of(ModBlocks.CYAN_INDICATOR_LAMP.get(), ModBlocks.ORANGE_INDICATOR_LAMP.get(),
                     ModBlocks.RED_INDICATOR_LAMP.get(), ModBlocks.GREEN_INDICATOR_LAMP.get(),
@@ -225,6 +287,17 @@ public final class SignalLampClientSmoke {
         } finally {
             mc.stop();
         }
+    }
+
+    private static java.util.Set<ResourceLocation> spriteNames(BakedModel model,
+                                                                net.minecraft.world.level.block.state.BlockState state) {
+        java.util.Set<ResourceLocation> out = new java.util.LinkedHashSet<>();
+        RandomSource random = RandomSource.create(0xD157A17L);
+        for (Direction side : Direction.values()) {
+            for (var quad : model.getQuads(state, side, random)) out.add(quad.getSprite().contents().name());
+        }
+        for (var quad : model.getQuads(state, null, random)) out.add(quad.getSprite().contents().name());
+        return out;
     }
 
     /**

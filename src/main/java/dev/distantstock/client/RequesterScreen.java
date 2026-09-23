@@ -65,7 +65,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private net.minecraft.client.gui.components.Button renameButton;
     private net.minecraft.client.gui.components.Button warehouseButton;
     private net.minecraft.client.gui.components.Button distantNetworkButton;
-    private net.minecraft.client.gui.components.Button createLockButton;
     private boolean createLockVisible;
     private boolean createLockAdmin;
     private boolean createLocked;
@@ -91,16 +90,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         createLockVisible = state != null && state.visible();
         createLockAdmin = state != null && state.admin();
         createLocked = state != null && state.locked();
-        updateCreateLockButton();
-    }
-
-    private void updateCreateLockButton() {
-        if (createLockButton == null) return;
-        createLockButton.visible = createLockVisible;
-        createLockButton.active = createLockVisible && createLockAdmin;
-        createLockButton.setMessage(Component.translatable(createLocked
-                ? "gui.distantstock.create_network.unlock"
-                : "gui.distantstock.create_network.lock"));
     }
 
     @Override
@@ -135,13 +124,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                     minecraft.setScreen(new DistantNetworkScreen(this));
                 })
                 .bounds(leftPos + WINDOW_W - 61, topPos + 20, 34, 13).build());
-        createLockButton = addRenderableWidget(net.minecraft.client.gui.components.Button
-                .builder(Component.empty(), b -> {
-                    PacketDistributor.sendToServer(
-                            new SetCreateNetworkLockC2S(true, !createLocked));
-                })
-                .bounds(leftPos + 69, topPos + 20, 54, 13).build());
-        updateCreateLockButton();
         PacketDistributor.sendToServer(new SetCreateNetworkLockC2S(false, false));
 
         address = new EditBox(font, leftPos + 27, topPos + imageHeight - 36, 92, 10,
@@ -738,6 +720,21 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         }
         if (!hover.isEmpty()) {
             g.renderTooltip(font, hover, mouseX, mouseY);
+        } else if (createLockHovered(mouseX, mouseY)) {
+            // Match Create's StockKeeperRequestScreen verbatim in meaning and presentation.  This
+            // is Create's network lock, so inventing a Distant Stock text button here only made the
+            // control look like a different feature (and the wording "from here" was misleading).
+            g.renderComponentTooltip(font, List.of(
+                    Component.translatable(createLocked
+                            ? "create.gui.stock_keeper.network_locked"
+                            : "create.gui.stock_keeper.network_open"),
+                    Component.translatable("create.gui.stock_keeper.network_lock_tip")
+                            .withStyle(ChatFormatting.GRAY),
+                    Component.translatable("create.gui.stock_keeper.network_lock_tip_1")
+                            .withStyle(ChatFormatting.GRAY),
+                    Component.translatable("create.gui.stock_keeper.network_lock_tip_2")
+                            .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC)
+            ), mouseX, mouseY);
         } else if (address.getValue().isBlank() && !address.isFocused() && address.isHovered()) {
             g.renderComponentTooltip(font, List.of(
                     Component.translatable("create.gui.factory_panel.restocker_address"),
@@ -762,6 +759,12 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
         Component title = Component.translatable("gui.distantstock.title");
         g.drawString(font, title, x + WINDOW_W / 2 - font.width(title) / 2, y + 4, TITLE, false);
+        if (showCreateLock()) {
+            (createLocked
+                    ? com.simibubi.create.foundation.gui.AllGuiTextures.STOCK_KEEPER_REQUEST_LOCKED
+                    : com.simibubi.create.foundation.gui.AllGuiTextures.STOCK_KEEPER_REQUEST_UNLOCKED)
+                    .render(g, createLockX(), createLockY());
+        }
         if (!menu.tuned(minecraft.player) || warehousePickerOpen) {
             renderNetworks(g, x, y);
             return;
@@ -1083,6 +1086,14 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (groupListClick(mx, my)) {
             return true;
         }
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && createLockHovered(mx, my)) {
+            // Create's own screen flips immediately and lets the server-authoritative packet correct
+            // it if necessary.  Do the same so this control feels exactly like the native one.
+            createLocked = !createLocked;
+            PacketDistributor.sendToServer(new SetCreateNetworkLockC2S(true, createLocked));
+            uiSound(SoundEvents.UI_BUTTON_CLICK.value(), 1f, 1f);
+            return true;
+        }
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
             focusTheRowUnder(mx, my);
         }
@@ -1126,6 +1137,28 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             return true;
         }
         return super.mouseClicked(mx, my, button);
+    }
+
+    /** Create draws this as a 15x15 texture, not a vanilla text button. */
+    private boolean showCreateLock() {
+        return createLockVisible && createLockAdmin && !warehousePickerOpen;
+    }
+
+    private int createLockX() {
+        // The Distant Network button occupies Create's original x+186 slot on this derived header,
+        // so keep the native 15x15 artwork but move it to the otherwise-empty right margin.
+        return leftPos + WINDOW_W - 23;
+    }
+
+    private int createLockY() {
+        return topPos + 18;
+    }
+
+    private boolean createLockHovered(double mx, double my) {
+        if (!showCreateLock()) return false;
+        int x = createLockX();
+        int y = createLockY();
+        return mx > x && mx <= x + 15 && my > y && my <= y + 15;
     }
 
     @Override

@@ -31,6 +31,7 @@ import json
 import math
 import shutil
 from pathlib import Path
+from casing_ct import repair_atlas
 
 ROOT = Path(__file__).resolve().parents[1]
 HANDOFF = ROOT / "docs/design/tower-art-handoff-2026-09-15"
@@ -350,6 +351,9 @@ def copy_textures():
     for source in sources:
         out = TEX_OUT / source.name
         shutil.copyfile(source, out)
+        if source.stem in {"ct_active", "ct_inactive"}:
+            from PIL import Image
+            repair_atlas(Image.open(out).convert("RGBA")).save(out)
         if source.stem == "ct_active":
             from PIL import Image
             opaque_window(Image.open(out).convert("RGBA")).save(out)

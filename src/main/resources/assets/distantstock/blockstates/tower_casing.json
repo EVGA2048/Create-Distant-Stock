@@ -15,6 +15,9 @@
     "port=west,powered=false": {
       "model": "distantstock:block/tower/tower_casing_port_west"
     },
+    "port=up,powered=false": {
+      "model": "distantstock:block/tower/tower_casing_port_up"
+    },
     "port=none,powered=true": {
       "model": "distantstock:block/tower/tower_casing_active"
     },
@@ -29,6 +32,9 @@
     },
     "port=west,powered=true": {
       "model": "distantstock:block/tower/tower_casing_port_west_active"
+    },
+    "port=up,powered=true": {
+      "model": "distantstock:block/tower/tower_casing_port_up_active"
     }
   }
 }

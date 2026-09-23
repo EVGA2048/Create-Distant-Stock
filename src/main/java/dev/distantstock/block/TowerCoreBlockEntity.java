@@ -305,6 +305,12 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
     public void onLoad() {
         super.onLoad();
         LoadedTowers.add(this);
+        // A casing may live in the neighbouring chunk and have cached "no tank" while this core
+        // was unloaded. Chunk-load invalidation only covers the chunk that loaded, so explicitly
+        // wake the eight proxy ports around the core as soon as the BE really exists again.
+        if (level != null) {
+            TowerCoreBlock.invalidateSkirtCapabilities(level, worldPosition);
+        }
         // A mast that grew while the chunk was unloaded is only visible now, and the snapshot has
         // been deciding without it in the meantime.
         TowerActivation.markDirty();
@@ -320,6 +326,11 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
     @Override
     public void onChunkUnloaded() {
         LoadedTowers.remove(this);
+        // Symmetric with onLoad: a casing across a chunk boundary must stop caching this tank when
+        // the core disappears from memory, otherwise it keeps a stale FluidTank instance alive.
+        if (level != null) {
+            TowerCoreBlock.invalidateSkirtCapabilities(level, worldPosition);
+        }
         TowerActivation.markDirty();
         super.onChunkUnloaded();
     }

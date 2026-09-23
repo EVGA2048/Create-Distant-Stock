@@ -44,6 +44,49 @@ import io.netty.buffer.Unpooled;
 public final class RequesterFlowGameTests {
 
     @GameTest(template = "empty", timeoutTicks = 40)
+    public static void remoteRedstoneRequesterMirrorsRedstoneIntoPoweredBlockstate(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos powerPos = pos.east();
+        level.setBlock(pos, ModBlocks.REMOTE_REDSTONE_REQUESTER.get().defaultBlockState(), 3);
+
+        level.setBlock(powerPos, Blocks.REDSTONE_BLOCK.defaultBlockState(), 3);
+        ModBlocks.REMOTE_REDSTONE_REQUESTER.get().neighborChanged(
+                level.getBlockState(pos), level, pos, Blocks.REDSTONE_BLOCK, powerPos, false);
+        h.assertTrue(level.getBlockState(pos)
+                        .getValue(com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlock.POWERED),
+                "远仓红石请求器收到红石后没有切换到 powered 模型状态");
+        var requester = (dev.distantstock.block.RemoteRedstoneRequesterBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(requester != null, "远仓红石请求器没有方块实体");
+        try {
+            var redstonePowered = com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlockEntity.class
+                    .getDeclaredField("redstonePowered");
+            redstonePowered.setAccessible(true);
+            h.assertTrue(redstonePowered.getBoolean(requester),
+                    "远仓红石请求器外壳变亮了，但原版 requester 的红石触发状态没有收到上升沿");
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+
+        level.setBlock(powerPos, Blocks.AIR.defaultBlockState(), 3);
+        ModBlocks.REMOTE_REDSTONE_REQUESTER.get().neighborChanged(
+                level.getBlockState(pos), level, pos, Blocks.REDSTONE_BLOCK, powerPos, false);
+        h.assertTrue(!level.getBlockState(pos)
+                        .getValue(com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlock.POWERED),
+                "远仓红石请求器失去红石后没有退出 powered 模型状态");
+        try {
+            var redstonePowered = com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlockEntity.class
+                    .getDeclaredField("redstonePowered");
+            redstonePowered.setAccessible(true);
+            h.assertTrue(!redstonePowered.getBoolean(requester),
+                    "远仓红石请求器外壳熄灭了，但原版 requester 的红石触发状态没有收到下降沿");
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
     public static void remoteRedstoneRequesterDropKeepsDistantScopeWithoutWarehouseBinding(GameTestHelper h) {
         var level = h.getLevel();
         BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));

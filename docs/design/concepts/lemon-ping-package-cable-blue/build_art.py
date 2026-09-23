@@ -22,29 +22,30 @@ base=lemon(Image.open(original/'remote_package_original.png'))
 # Half-unit pixel grid for a crisp printed symbol; preserve original box texels.
 im=base.resize((128,128),Image.Resampling.NEAREST)
 d=ImageDraw.Draw(im)
-# Only east/west side islands carry the mark; taped north/south stay clean.
-for y0 in (1,13):
- top,bottom=y0*2+9,y0*2+17
- # Paired grey values give the narrow printed track the same stepped
- # highlight/shadow language as Create's industrial texture details.
- d.line([(79,top+1),(85,top+1),(85,bottom+1),(89,bottom+1)],fill='#74786d',width=1)
- d.line([(79,top),(84,top),(84,bottom),(89,bottom)],fill='#bfc0ad',width=1)
- d.point((82,top),fill='#a3a693')
- d.point((84,top+5),fill='#a5a895')
- d.point((87,bottom),fill='#a5a895')
- for x,y in ((79,top),(89,bottom)):
-  # Original cross terminals; change only the lower-right terminal colour.
-  if y==bottom:
-   palette=('#d4eff5','#c3e5ee','#daf3f8','#add5e3','#88b4c7')
-  else:
-   palette=('#fff9e6','#f7f0db','#fff9e6','#e8e4cf','#c9c5b0')
-  for point,color in zip(((x,y-1),(x-1,y),(x,y),(x+1,y),(x,y+1)),palette):
-   d.point(point,fill=color)
+# Keep Create's eye-bearing east/west faces completely untouched.  The 12x12
+# package model maps north/south to the shared atlas island x=72..96,
+# y=50..74 (south mirrors U), so the diagnostic mark belongs there instead.
+top,bottom=57,65
+# Paired grey values give the narrow printed track the same stepped
+# highlight/shadow language as Create's industrial texture details.
+d.line([(79,top+1),(85,top+1),(85,bottom+1),(89,bottom+1)],fill='#74786d',width=1)
+d.line([(79,top),(84,top),(84,bottom),(89,bottom)],fill='#bfc0ad',width=1)
+d.point((82,top),fill='#a3a693')
+d.point((84,top+5),fill='#a5a895')
+d.point((87,bottom),fill='#a5a895')
+for x,y in ((79,top),(89,bottom)):
+ # Original cross terminals; change only the lower-right terminal colour.
+ if y==bottom:
+  palette=('#d4eff5','#c3e5ee','#daf3f8','#add5e3','#88b4c7')
+ else:
+  palette=('#fff9e6','#f7f0db','#fff9e6','#e8e4cf','#c9c5b0')
+ for point,color in zip(((x,y-1),(x-1,y),(x,y),(x+1,y),(x,y+1)),palette):
+  d.point(point,fill=color)
 plain=base.resize((128,128),Image.Resampling.NEAREST)
 for py in range(128):
  for px in range(128):
   if im.getpixel((px,py)) != plain.getpixel((px,py)):
-   assert 72 <= px < 96 and (2 <= py < 26 or 26 <= py < 50)
+   assert 72 <= px < 96 and 50 <= py < 74
 im.save(OUT/'remote_package_ping.png')
 lemon(Image.open(original/'remote_package_particle_original.png')).save(OUT/'remote_package_particle.png')
 refs=CreateReferences()
@@ -56,6 +57,6 @@ def texture(name):
  return refs.texture(name)
 mesh,tex=load_minecraft_model(model,texture,refs.model)
 render(mesh,tex,size=(480,480),yaw=-32,pitch=24,center=(8,6,8),scale=24).transpose(Image.Transpose.FLIP_LEFT_RIGHT).save(OUT/'preview.png')
-im.crop((72,2,96,26)).resize((288,288),Image.Resampling.NEAREST).save(OUT/'side_pixels.png')
-(OUT/'README.md').write_text('恢复 lemon-ping-package-side 的线条、明暗、图标大小和位置，仅将右下十字端点换成淡蓝色，左上保持暖白色。保留柠檬黄箱体，仅两个无胶带侧面带图标。旧版保留，未修改正式游戏资源。\n')
+im.crop((72,50,96,74)).resize((288,288),Image.Resampling.NEAREST).save(OUT/'side_pixels.png')
+(OUT/'README.md').write_text('Ping 标志从带眼睛的东西侧面移到另一组南北侧面；眼睛面恢复为原始柠檬黄包裹纹理。线条、明暗、图标大小与暖白/淡蓝十字端点保持不变。模型和 UV 不变。\n')
 print(OUT/'preview.png')

@@ -8,6 +8,7 @@ import dev.distantstock.stock.CreateNetworkAccess;
 import dev.distantstock.link.TranserverBridge;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.world.level.GameType;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -18,6 +19,27 @@ import java.util.UUID;
 @GameTestHolder("distantstock")
 @PrefixGameTestTemplate(false)
 public final class CreateNetworkAccessGameTests {
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void lockedCreateNetworkRemainsDiscoverableForDistantDirectory(GameTestHelper h) {
+        UUID node = TranserverBridge.localNodeUuid();
+        h.assertTrue(node != null, "Transerver stable node identity is unavailable");
+        UUID freq = UUID.randomUUID();
+        var logistics = new LogisticsNetwork(freq);
+        logistics.owner = UUID.randomUUID();
+        logistics.locked = true;
+        logistics.loadedLinks.add(GlobalPos.of(h.getLevel().dimension(), h.absolutePos(net.minecraft.core.BlockPos.ZERO)));
+        Create.LOGISTICS.logisticsNetworks.put(freq, logistics);
+        try {
+            var visible = dev.distantstock.stock.CreateStock.openNetworks(
+                    h.getLevel().getServer(), "gametest", node);
+            h.assertTrue(visible.stream().anyMatch(entry -> freq.equals(entry.freq())),
+                    "locking a Create network removed it from Distant Stock discovery");
+        } finally {
+            Create.LOGISTICS.logisticsNetworks.remove(freq);
+        }
+        h.succeed();
+    }
+
     @GameTest(template = "empty", timeoutTicks = 20)
     public static void distantStockUsesCreateOwnershipAndLockSemantics(GameTestHelper h) {
         UUID node = TranserverBridge.localNodeUuid();

@@ -50,13 +50,14 @@ public final class TowerCasingBlock extends Block
     public static final net.minecraft.world.level.block.state.properties.EnumProperty<Port> PORT =
             net.minecraft.world.level.block.state.properties.EnumProperty.create("port", Port.class);
 
-    /** Which face carries the port. Up and down are left out: one is the coupler, one the ground. */
+    /** Which face carries the port. Down stays closed for the shaft/ground; the top is a valid pipe face. */
     public enum Port implements net.minecraft.util.StringRepresentable {
         NONE(null),
         NORTH(Direction.NORTH),
         EAST(Direction.EAST),
         SOUTH(Direction.SOUTH),
-        WEST(Direction.WEST);
+        WEST(Direction.WEST),
+        UP(Direction.UP);
 
         private final Direction face;
 
@@ -164,11 +165,15 @@ public final class TowerCasingBlock extends Block
             // The clicked face, not the block: a pipe arrives at one side of one casing. Clicking
             // the face that is already open closes it; clicking another moves the port there, which
             // is one gesture instead of "close it first, then open it where you meant".
-            Port wanted = hit.getDirection().getAxis().isHorizontal()
+            Port wanted = hit.getDirection() != Direction.DOWN
                     && state.getValue(PORT) != Port.of(hit.getDirection())
                     ? Port.of(hit.getDirection()) : Port.NONE;
             boolean open = wanted != Port.NONE;
             level.setBlock(pos, state.setValue(PORT, wanted), 3);
+            // Block capabilities are cached by pipes. A closed casing answers null, so opening or
+            // moving the port must invalidate that cached answer immediately or a pipe that looked
+            // one tick too early can believe this casing has no tank forever.
+            level.invalidateCapabilities(pos);
             level.playSound(null, pos, open ? net.minecraft.sounds.SoundEvents.IRON_TRAPDOOR_OPEN
                     : net.minecraft.sounds.SoundEvents.IRON_TRAPDOOR_CLOSE,
                     net.minecraft.sounds.SoundSource.BLOCKS, 0.6f, 1.2f);
@@ -237,7 +242,7 @@ public final class TowerCasingBlock extends Block
         }
         TowerCoreBlockEntity core = coreFor(level, pos);
         // The core's own underside is where the shaft enters, and a port on that face would be a
-        // pipe arriving at a driveshaft. Every other side of a port is fair game.
+        // pipe arriving at a driveshaft. Every other side of a port, including the top, is fair game.
         return core == null || side == Direction.DOWN ? null : core.tank();
     }
 

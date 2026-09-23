@@ -215,7 +215,7 @@ public final class RemoteGaugeBlock extends FactoryPanelBlock {
                                        boolean willHarvest, FluidState fluid) {
         if (!level.isClientSide
                 && level.getBlockEntity(pos) instanceof FactoryPanelBlockEntity be
-                && be.activePanels() > 1) {
+                && be.activePanels() > 0) {
             List<PanelSlot> active = Arrays.stream(PanelSlot.values())
                     .filter(slot -> be.panels.get(slot).isActive())
                     .toList();
@@ -226,7 +226,13 @@ public final class RemoteGaugeBlock extends FactoryPanelBlock {
                 player.getInventory().placeItemBackInInventory(new ItemStack(ModItems.REMOTE_GAUGE.get()));
             }
             be.sendData();
-            return false;
+            // More panels remain: this hit peeled exactly one remote gauge and the board stays.
+            if (be.activePanels() > 0) {
+                return false;
+            }
+            // Last panel: its identity has already been handled above. The now-empty board may be
+            // destroyed by Create's normal path, but with zero active panels there is nothing left
+            // for FactoryPanelBlockEntity.destroy() to convert into a factory_gauge drop.
         }
         return super.onDestroyedByPlayer(state, level, pos, player, willHarvest, fluid);
     }

@@ -257,7 +257,7 @@ public final class TowerGameTests {
                 "a port opened more than the face it was put on");
         h.assertTrue(dev.distantstock.block.TowerCasingBlock.portTank(h.getLevel(), casing, open,
                         net.minecraft.core.Direction.UP) == null,
-                "the port opened onto the face the driveshaft uses");
+                "a north port also opened on the top face");
 
         // Asked the way a pipe asks: through the capability registry, by the block entity it
         // requires. Create's pipes refuse to connect to a block with no block entity at all, so a
@@ -273,6 +273,76 @@ public final class TowerGameTests {
         h.assertTrue(filled == 250, "the port took " + filled + " mB instead of 250");
         h.assertTrue(core.ether() == 250,
                 "the ether did not arrive in the tower: " + core.ether() + " mB");
+
+        // The top of each skirt casing is exposed and is a valid place to bring a pipe down from
+        // above. Only DOWN stays forbidden because the tower's shaft/ground owns the underside.
+        h.getLevel().setBlock(casing, open.setValue(dev.distantstock.block.TowerCasingBlock.PORT,
+                dev.distantstock.block.TowerCasingBlock.Port.UP), 3);
+        h.getLevel().invalidateCapabilities(casing);
+        var topTank = h.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.BLOCK,
+                casing, net.minecraft.core.Direction.UP);
+        h.assertTrue(topTank != null, "an UP casing port exposed no tank");
+        int topFilled = topTank.fill(new net.neoforged.neoforge.fluids.FluidStack(
+                        dev.distantstock.fluid.ModFluids.ETHER.get(), 250),
+                net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+        h.assertTrue(topFilled == 250, "the UP port took " + topFilled + " mB instead of 250");
+        h.assertTrue(core.ether() == 500,
+                "ether inserted from the top did not reach the core: " + core.ether() + " mB");
+        h.succeed();
+    }
+
+    /**
+     * A pipe cache that looked before the core existed must be woken when the core is added.
+     *
+     * <p>This is the real failure mode behind towers that sat at 0/4000 forever: NeoForge block
+     * capabilities cache a null provider result. The casing's PORT state did not change when the
+     * centre core was added later, so nothing invalidated that null and the pipe never asked again.
+     */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void addingTowerCoreInvalidatesCachedCasingFluidCapability(GameTestHelper h) {
+        BlockPos corePos = h.absolutePos(new BlockPos(X, 1, Z));
+        BlockPos casingPos = h.absolutePos(new BlockPos(X + 1, 1, Z));
+
+        h.getLevel().setBlock(casingPos, ModBlocks.TOWER_CASING.get().defaultBlockState()
+                .setValue(dev.distantstock.block.TowerCasingBlock.PORT,
+                        dev.distantstock.block.TowerCasingBlock.Port.NORTH), 3);
+
+        var cache = net.neoforged.neoforge.capabilities.BlockCapabilityCache.create(
+                net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.BLOCK,
+                h.getLevel(), casingPos, net.minecraft.core.Direction.NORTH);
+        h.assertTrue(cache.getCapability() == null,
+                "a casing with no core already exposed a fluid tank");
+
+        h.getLevel().setBlock(corePos, ModBlocks.TOWER_CORE.get().defaultBlockState(), 3);
+        var core = (dev.distantstock.block.TowerCoreBlockEntity) h.getLevel().getBlockEntity(corePos);
+        h.assertTrue(core != null, "the core did not appear after the cached-null probe");
+
+        var refreshed = cache.getCapability();
+        h.assertTrue(refreshed != null,
+                "casing fluid capability stayed cached as null after the tower core was added");
+        int filled = refreshed.fill(new net.neoforged.neoforge.fluids.FluidStack(
+                        dev.distantstock.fluid.ModFluids.ETHER.get(), 125),
+                net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+        h.assertTrue(filled == 125, "refreshed casing capability accepted " + filled + " mB instead of 125");
+        h.assertTrue(core.ether() == 125,
+                "refreshed casing capability did not feed the new core: " + core.ether() + " mB");
+
+        h.getLevel().setBlock(corePos, Blocks.AIR.defaultBlockState(), 3);
+        h.assertTrue(cache.getCapability() == null,
+                "casing kept a stale tower tank after the core was removed");
+
+        h.getLevel().setBlock(corePos, ModBlocks.TOWER_CORE.get().defaultBlockState(), 3);
+        var rebuilt = (dev.distantstock.block.TowerCoreBlockEntity) h.getLevel().getBlockEntity(corePos);
+        h.assertTrue(rebuilt != null, "rebuilt tower core did not create its block entity");
+        var afterRebuild = cache.getCapability();
+        h.assertTrue(afterRebuild != null,
+                "casing fluid capability did not recover after the tower core was rebuilt");
+        int rebuiltFill = afterRebuild.fill(new net.neoforged.neoforge.fluids.FluidStack(
+                        dev.distantstock.fluid.ModFluids.ETHER.get(), 75),
+                net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+        h.assertTrue(rebuiltFill == 75 && rebuilt.ether() == 75,
+                "rebuilt tower did not accept ether through the existing casing port");
         h.succeed();
     }
 

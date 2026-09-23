@@ -43,16 +43,20 @@ public final class WallSounderRenderer implements BlockEntityRenderer<WallSounde
         if (!state.getValue(WallSounderBlock.LIT)) return;
 
         PartialModel model = state.is(ModBlocks.RED_WALL_SOUNDER.get()) ? RED_GLOW : ORANGE_GLOW;
-        float rotation = (float) Math.toRadians(switch (state.getValue(WallSounderBlock.FACING)) {
-            case EAST -> 90;
-            case SOUTH -> 180;
-            case WEST -> 270;
-            default -> 0;
-        });
+        // Catnip/Flywheel's positive Y rotation is opposite to vanilla blockstate-model Y.
+        // Using the blockstate degrees directly makes 0/180 look correct while swapping east and
+        // west, which is exactly the detached mirrored glow seen in-game. Create's own dynamic
+        // renderers use the same 180 - toYRot() conversion.
+        float rotation = rotationRadians(state.getValue(WallSounderBlock.FACING));
         CachedBuffers.partial(model, state)
                 .rotateCentered(rotation, Direction.UP)
                 .light(LightTexture.FULL_BRIGHT)
                 .overlay(packedOverlay)
                 .renderInto(pose, buffers.getBuffer(RenderType.translucent()));
+    }
+
+    /** Matches vanilla blockstate-model Y rotation in Catnip/Flywheel transform space. */
+    public static float rotationRadians(Direction facing) {
+        return (float) Math.toRadians(180.0f - facing.toYRot());
     }
 }

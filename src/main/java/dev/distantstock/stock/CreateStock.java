@@ -44,7 +44,13 @@ public final class CreateStock {
         for (Map.Entry<UUID, com.simibubi.create.content.logistics.packagerLink.LogisticsNetwork> row
                 : Create.LOGISTICS.logisticsNetworks.entrySet()) {
             var network = row.getValue();
-            if (network == null || network.locked || network.loadedLinks == null || network.loadedLinks.isEmpty()) {
+            // A Create lock is an access-control bit, not a discovery bit.  Hiding locked
+            // networks here makes Distant Stock delete the warehouse from its local directory and
+            // therefore from every cross-server announcement.  Worse, the request desk then loses
+            // the very lock control that could unlock it again.  Keep the network discoverable and
+            // enforce Create's owner/lock semantics at the player action boundary instead
+            // (CreateNetworkAccess.mayInteract / mayAdministrate).
+            if (network == null || network.loadedLinks == null || network.loadedLinks.isEmpty()) {
                 continue;
             }
             RemoteNetworkId networkId = null;
