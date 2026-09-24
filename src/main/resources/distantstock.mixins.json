@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "LampConnectionMixin",
+    "PackagerBlockEntityMixin",
     "compat.FluidPackagerBlockEntityMixin",
     "ChainConveyorAccessor",
     "ChainConveyorBlockEntityMixin",
@@ -18,6 +19,7 @@
   ],
   "client": [
     "client.PackagerRendererMixin",
+    "client.PackageItemTooltipMixin",
     "client.LampConnectionHandlerMixin",
     "client.RemoteFluidPackageRendererMixin",
     "client.FrogportVisualTintMixin",

@@ -50,13 +50,16 @@ public final class OrderRouteDirectory extends SavedData {
          * one address to give.
          */
         final String homeAddress;
+        /** Human-readable Distant Dock receiving address selected by the requester. */
+        final String receivingAddress;
         final Map<Integer, java.util.Set<Integer>> received = new LinkedHashMap<>();
         final Map<Integer, Integer> lastPackage = new LinkedHashMap<>();
         int lastLink = -1;
 
-        Entry(RemoteRoute route, String homeAddress, long createdAt) {
+        Entry(RemoteRoute route, String homeAddress, String receivingAddress, long createdAt) {
             this.route = route;
             this.homeAddress = homeAddress == null ? "" : homeAddress;
+            this.receivingAddress = receivingAddress == null ? "" : receivingAddress;
             this.createdAt = createdAt;
         }
         RemoteRoute route() { return route; }
@@ -70,7 +73,7 @@ public final class OrderRouteDirectory extends SavedData {
     }
 
     public boolean remember(Collection<PackagingRequest> requests, RemoteRoute route) {
-        return remember(requests, route, "");
+        return remember(requests, route, "", "");
     }
 
     /**
@@ -85,6 +88,11 @@ public final class OrderRouteDirectory extends SavedData {
      * second.
      */
     public boolean remember(Collection<PackagingRequest> requests, RemoteRoute route, String homeAddress) {
+        return remember(requests, route, homeAddress, "");
+    }
+
+    public boolean remember(Collection<PackagingRequest> requests, RemoteRoute route,
+                            String homeAddress, String receivingAddress) {
         long now = System.currentTimeMillis();
         expire(now);
         var newIds = new java.util.HashSet<Integer>();
@@ -99,7 +107,7 @@ public final class OrderRouteDirectory extends SavedData {
         if (routes.size() + newIds.size() > MAX_ENTRIES) {
             return false;
         }
-        for (Integer id : newIds) routes.put(id, new Entry(route, homeAddress, now));
+        for (Integer id : newIds) routes.put(id, new Entry(route, homeAddress, receivingAddress, now));
         if (!newIds.isEmpty()) setDirty();
         return true;
     }
@@ -166,6 +174,11 @@ public final class OrderRouteDirectory extends SavedData {
         return entry == null ? "" : entry.homeAddress;
     }
 
+    public String receivingAddress(int createOrderId) {
+        Entry entry = routes.get(createOrderId);
+        return entry == null ? "" : entry.receivingAddress;
+    }
+
     /** Removes a completely accounted-for order, never just its first parcel. */
     public boolean consume(int createOrderId) {
         if (routes.remove(createOrderId) != null) {
@@ -191,6 +204,9 @@ public final class OrderRouteDirectory extends SavedData {
             // 只在有东西可写的时候写：老存档读回来仍是「没有第二个地址」，而不是空字符串。
             if (!row.getValue().homeAddress.isEmpty()) {
                 saved.putString("HomeAddress", row.getValue().homeAddress);
+            }
+            if (!row.getValue().receivingAddress.isEmpty()) {
+                saved.putString("ReceivingAddress", row.getValue().receivingAddress);
             }
             saved.putInt("LastLink", row.getValue().lastLink);
             ListTag progress = new ListTag();
@@ -229,7 +245,8 @@ public final class OrderRouteDirectory extends SavedData {
                         saved.getUUID("Correlation"),
                         saved.getUUID("ChildOrder"));
                 // 缺键 = 这个订单只有一个地址（老存档，或者货根本不过海），读回来是空串。
-                Entry entry = new Entry(route, saved.getString("HomeAddress"), saved.getLong("CreatedAt"));
+                Entry entry = new Entry(route, saved.getString("HomeAddress"),
+                        saved.getString("ReceivingAddress"), saved.getLong("CreatedAt"));
                 entry.lastLink = saved.contains("LastLink", Tag.TAG_INT) ? saved.getInt("LastLink") : -1;
                 ListTag progress = saved.getList("Progress", Tag.TAG_COMPOUND);
                 for (int j = 0; j < progress.size(); j++) {

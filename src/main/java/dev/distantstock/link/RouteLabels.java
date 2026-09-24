@@ -37,6 +37,11 @@ public final class RouteLabels {
         return node.isEmpty() ? group : node + " · " + group;
     }
 
+    /** Exact player-facing receiving address carried by a routed parcel. */
+    public static String receivingAddress(MinecraftServer server, RemoteRoute route) {
+        return server == null || route == null ? "" : groupName(server, route.receivingDockGroupId());
+    }
+
     /**
      * The group's name: its own if this server holds it, the remembered one if a peer announced
      * it, and its uuid prefix if it is neither — a route can name a group this server has no

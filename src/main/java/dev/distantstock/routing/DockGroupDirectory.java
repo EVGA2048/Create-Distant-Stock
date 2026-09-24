@@ -103,6 +103,25 @@ public final class DockGroupDirectory extends SavedData {
         return matches.size() == 1 ? Optional.of(matches.getFirst()) : Optional.empty();
     }
 
+    /**
+     * Player-facing receiving addresses are names, scoped by one Distant Stock network. The UUID
+     * remains an internal routing identity only. Typing the same address on two docks therefore
+     * resolves to the same group automatically; the first use creates it.
+     */
+    public DockGroup resolveAddress(UUID distantNetworkId, String name) {
+        UUID scope = distantNetworkId == null
+                ? DistantNetworkDirectory.LEGACY_NETWORK_ID : distantNetworkId;
+        String clean = name == null ? "" : name.trim();
+        if (clean.isBlank()) {
+            return groups.get(DEFAULT_GROUP_ID);
+        }
+        Optional<DockGroup> existing = findByName(scope, clean);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        return create(clean, null, true, scope, DockGroup.Visibility.PUBLIC);
+    }
+
     /** Every local address carrying this name inside one Distant Stock network. */
     public List<DockGroup> named(UUID distantNetworkId, String name) {
         if (name == null || name.isBlank()) {

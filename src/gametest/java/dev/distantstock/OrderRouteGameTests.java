@@ -42,6 +42,94 @@ public final class OrderRouteGameTests {
         h.succeed();
     }
 
+    /** The wire request itself freezes all three player-facing addresses before it leaves home. */
+    @GameTest(template = "empty")
+    public static void orderRequestCodecCarriesThreeAddresses(GameTestHelper h) throws Exception {
+        UUID node = UUID.randomUUID();
+        var network = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA,
+                node, UUID.randomUUID(), "minecraft:overworld", UUID.randomUUID());
+        var request = new dev.distantstock.link.OrderRequestCodec.Request(
+                network, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                UUID.randomUUID(), UUID.randomUUID(),
+                "111", "接收港-甲", "222",
+                List.of(new dev.distantstock.link.LinkQueues.Line("minecraft:iron_ingot", 3)));
+
+        var decoded = dev.distantstock.link.OrderRequestCodec.decode(
+                dev.distantstock.link.OrderRequestCodec.encode(request));
+        h.assertTrue("111".equals(decoded.address()), "wire request lost pre-crossing address");
+        h.assertTrue("接收港-甲".equals(decoded.receivingAddress()),
+                "wire request lost Distant Dock receiving address");
+        h.assertTrue("222".equals(decoded.homeAddress()), "wire request lost post-crossing/local address");
+        h.succeed();
+    }
+
+    /** Remote packager colour is cosmetic: transmuting to blue must preserve all route metadata. */
+    @GameTest(template = "empty")
+    public static void blueRemotePackageKeepsSameThreeAddresses(GameTestHelper h) {
+        int orderId = 42;
+        RemoteRoute route = RemoteRoute.create(UUID.randomUUID(), UUID.randomUUID());
+        OrderRouteDirectory directory = OrderRouteDirectory.get(h.getLevel().getServer());
+        h.assertTrue(directory.remember(List.of(request(orderId)), route, "222", "接收港-乙"),
+                "remote order route could not be remembered");
+
+        ItemStack ordinary = com.simibubi.create.content.logistics.box.PackageStyles.getDefaultBox();
+        PackageItem.addAddress(ordinary, "111");
+        PackageItem.setOrder(ordinary, orderId, 0, true, 0, true,
+                PackageOrderWithCrafts.simple(List.of()));
+        h.assertTrue(dev.distantstock.routing.RemoteOrderParcelStamp.stamp(
+                ordinary, h.getLevel().getServer()), "ordinary parcel was not stamped first");
+
+        ItemStack blue = ordinary.transmuteCopy(ModItems.REMOTE_PACKAGE.get());
+        h.assertTrue(blue.is(ModItems.REMOTE_PACKAGE.get()), "remote packager did not select blue package item");
+        h.assertTrue("111".equals(PackageItem.getAddress(blue)), "blue transmute lost current address");
+        h.assertTrue("接收港-乙".equals(dev.distantstock.routing.RemoteRouteData.receivingAddress(blue)),
+                "blue transmute lost receiving address");
+        h.assertTrue("222".equals(dev.distantstock.routing.RemoteRouteData.homeAddress(blue)),
+                "blue transmute lost local/home address");
+        h.assertTrue(dev.distantstock.routing.RemoteRouteData.read(blue).orElseThrow().equals(route),
+                "blue transmute lost machine route");
+        h.succeed();
+    }
+
+    /**
+     * Remote-terminal routing is order metadata, not a package colour. A vanilla Create packager's
+     * ordinary cardboard box must keep its item type while carrying all three address semantics.
+     */
+    @GameTest(template = "empty")
+    public static void ordinaryCreatePackageKeepsColourAndGetsThreeAddressRoute(GameTestHelper h) {
+        int orderId = 41;
+        String remoteAddress = "111";
+        String receivingAddress = "接收港-甲";
+        String homeAddress = "222";
+        RemoteRoute route = RemoteRoute.create(UUID.randomUUID(), UUID.randomUUID());
+        OrderRouteDirectory directory = OrderRouteDirectory.get(h.getLevel().getServer());
+        h.assertTrue(directory.remember(List.of(request(orderId)), route, homeAddress, receivingAddress),
+                "remote order route could not be remembered");
+
+        ItemStack ordinary = com.simibubi.create.content.logistics.box.PackageStyles.getDefaultBox();
+        var originalItem = ordinary.getItem();
+        PackageItem.addAddress(ordinary, remoteAddress);
+        PackageItem.setOrder(ordinary, orderId, 0, true, 0, true,
+                PackageOrderWithCrafts.simple(List.of()));
+
+        h.assertTrue(dev.distantstock.routing.RemoteOrderParcelStamp.stamp(
+                        ordinary, h.getLevel().getServer()),
+                "ordinary Create package was not stamped as a Distant Stock order");
+        h.assertTrue(ordinary.getItem() == originalItem,
+                "routing metadata changed an ordinary package into the blue remote package");
+        h.assertTrue(remoteAddress.equals(PackageItem.getAddress(ordinary)),
+                "stamping changed the pre-crossing/Create address");
+        h.assertTrue(receivingAddress.equals(
+                        dev.distantstock.routing.RemoteRouteData.receivingAddress(ordinary)),
+                "package lost the Distant Dock receiving address");
+        h.assertTrue(homeAddress.equals(dev.distantstock.routing.RemoteRouteData.homeAddress(ordinary)),
+                "package lost the post-crossing/local address");
+        h.assertTrue(dev.distantstock.routing.RemoteRouteData.read(ordinary).orElseThrow().equals(route),
+                "package lost the machine route behind the receiving address");
+        h.succeed();
+    }
+
     @GameTest(template = "empty")
     public static void collisionNeverOverwritesExistingRoute(GameTestHelper h) {
         var directory = new OrderRouteDirectory();

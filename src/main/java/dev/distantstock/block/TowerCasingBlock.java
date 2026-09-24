@@ -144,6 +144,13 @@ public final class TowerCasingBlock extends Block
         return ModBlockEntities.TOWER_CASING.get();
     }
 
+    @Override
+    protected net.minecraft.world.InteractionResult useWithoutItem(
+            BlockState state, Level level, BlockPos pos,
+            net.minecraft.world.entity.player.Player player, net.minecraft.world.phys.BlockHitResult hit) {
+        return TowerControl.open(level, pos, player);
+    }
+
     /**
      * The wrench opens and closes a fluid port.
      *

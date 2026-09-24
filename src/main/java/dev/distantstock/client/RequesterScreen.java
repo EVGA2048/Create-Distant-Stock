@@ -62,7 +62,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
      */
     private EditBox homeAddress;
     private EditBox receivingGroup;
-    private net.minecraft.client.gui.components.Button renameButton;
     private net.minecraft.client.gui.components.Button warehouseButton;
     private net.minecraft.client.gui.components.Button distantNetworkButton;
     private boolean createLockVisible;
@@ -137,10 +136,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
 
 
-        // The field stops short of the plate's right edge so the rename button beside it has
-        // somewhere to sit: it used to hang twenty pixels off the end of the artwork, which is
-        // what "突兀且错位" was about.
-        int groupField = Math.max(60, imageWidth - 144);
+        int groupField = Math.max(60, imageWidth - 116);
 
         // 本端地址：和收货港组同一套版式的一行，紧挨在它上面。放在这里是因为它和港组回答的是
         // 同一个问题（货落在哪一边），而底下那个地址回答的是另一个（包裹在对面被谁认领）。
@@ -158,17 +154,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 Component.translatable("gui.distantstock.route.group"));
         receivingGroup.setBordered(false);
         receivingGroup.setTextColor(INK);
-        // Editable, and it starts on what this requester already carries. Typing a name nobody has
-        // used makes that system; typing one that exists points at it. One field for both, because
-        // the design has the player never see a UUID and there is nothing else to type.
+        // Editable search/selection field. Receiving addresses are authored by Distant Docks now;
+        // typing an unknown name is rejected by the server rather than silently creating a hidden
+        // group object behind the player's back.
         receivingGroup.setMaxLength(dev.distantstock.routing.DockGroup.MAX_NAME_LENGTH);
-        // Renaming needs a gesture of its own. Typing a new name and pressing Enter means "point at
-        // this", and pointing at a name nobody has used makes a new system — so without a button,
-        // renaming one is not reachable at all: it would quietly make a second system instead.
-        renameButton = addRenderableWidget(net.minecraft.client.gui.components.Button
-                .builder(net.minecraft.network.chat.Component.translatable("gui.distantstock.group.rename"),
-                        b -> commitDockGroup(dev.distantstock.net.SetDockGroupC2S.RENAME))
-                .bounds(leftPos + groupField + 84, topPos + this.imageHeight - 89, 28, 14).build());
         receivingGroup.setValue(keepGroup);
         // Remember what was put in the box, so closing an untouched screen sends nothing. Without
         // this the field's contents were compared against an empty string, so every close looked
@@ -258,9 +247,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     /**
      * Sends the field to the server when the player is done with it.
      *
-     * <p>On Enter and on close, not on every keystroke: the field is a name, and the server turns an
-     * unknown name into a new group. Committing per key would leave a trail of systems called "甲",
-     * "甲站", "甲站二".
+     * <p>On Enter and on close, not on every keystroke. The server resolves this against addresses
+     * already authored by Distant Docks; unknown names are never created from the terminal.
      */
     private void commitDockGroup(int action) {
         if (minecraft == null || minecraft.player == null || receivingGroup == null) {
@@ -707,9 +695,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (distantNetworkButton != null) {
             distantNetworkButton.visible = !warehousePickerOpen;
         }
-        if (renameButton != null) {
-            renameButton.visible = routeVisible;
-        }
         renderBackground(g, mouseX, mouseY, partial);
         super.render(g, mouseX, mouseY, partial);
         // After everything, because a dropdown that the widgets behind it paint over is not one.
@@ -904,7 +889,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             ms.pushPose();
             ms.translate(sx, sy, 0);
             CreateSheets.SLOT.render(g, 0, 0);
-            renderEntry(g, e.stack(), e.count,
+            renderEntry(g, e.stack(), remainingFor(e),
                     mouseX >= sx && mouseX < sx + SLOT && mouseY >= sy && mouseY < sy + SLOT);
             ms.popPose();
         }
@@ -1322,6 +1307,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (n <= 0) {
             return;
         }
+        int remaining = Math.max(0, availableFor(stack) - selectedFor(stack));
+        n = Math.min(n, remaining);
+        if (n <= 0) {
+            return;
+        }
         for (CartLine line : cart) {
             if (ItemStack.isSameItemSameComponents(line.stack, stack)) {
                 line.count += n;
@@ -1334,6 +1324,29 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         cart.add(new CartLine(stack.copyWithCount(1), n));
         uiSound(SoundEvents.WOOL_STEP, 0.75f, 1.2f);
         uiSound(SoundEvents.BAMBOO_WOOD_STEP, 0.75f, 0.8f);
+    }
+
+    private int selectedFor(ItemStack stack) {
+        int selected = 0;
+        for (CartLine line : cart) {
+            if (ItemStack.isSameItemSameComponents(line.stack, stack)) {
+                selected += line.count;
+            }
+        }
+        return selected;
+    }
+
+    private int availableFor(ItemStack stack) {
+        for (StockCache.Entry entry : menu.stock) {
+            if (ItemStack.isSameItemSameComponents(entry.stack(), stack)) {
+                return Math.max(0, entry.count);
+            }
+        }
+        return 0;
+    }
+
+    private int remainingFor(StockCache.Entry entry) {
+        return Math.max(0, entry.count - selectedFor(entry.stack()));
     }
 
     private void removeCart(int index, int n) {

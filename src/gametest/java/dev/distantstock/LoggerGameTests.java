@@ -16,6 +16,18 @@ import java.util.UUID;
 @PrefixGameTestTemplate(false)
 public final class LoggerGameTests {
 
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void loggerIsARealCreateDisplayLinkSource(GameTestHelper h) {
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        h.getLevel().setBlock(pos, ModBlocks.LOGGER.get().defaultBlockState(), 3);
+        boolean found = com.simibubi.create.api.behaviour.display.DisplaySource
+                .getAll(h.getLevel(), pos).stream()
+                .anyMatch(source -> source instanceof dev.distantstock.display.LoggerDisplaySource);
+        h.assertTrue(found,
+                "Create Display Link 没有把远仓日志台识别成数据源");
+        h.succeed();
+    }
+
     @GameTest(template = "empty", timeoutTicks = 120)
     public static void loggerScopesEventsAndDrivesItsStatusLamp(GameTestHelper h) {
         var level = h.getLevel();
@@ -130,6 +142,32 @@ public final class LoggerGameTests {
         h.succeed();
     }
 
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void networkLockNoticeIsHistoryOnlyAndNeverPrintable(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.LOGGER.get().defaultBlockState(), 3);
+        LoggerBlockEntity logger = (LoggerBlockEntity) level.getBlockEntity(pos);
+        UUID network = UUID.randomUUID();
+        logger.setCreateFrequency(network);
+        EventRegistry registry = EventRegistry.get(level.getServer());
+        String source = "network:" + network;
+
+        long now = System.currentTimeMillis();
+        EventRegistry.Record notice = registry.raise(EventRegistry.Severity.INFO,
+                EventRegistry.Codes.NETWORK_LOCKED, "network", source,
+                "operator locked the Create logistics network", network, null, now);
+        registry.clear(EventRegistry.Codes.NETWORK_LOCKED, "network", source, now);
+
+        h.assertTrue(logger.rows().stream().anyMatch(row -> row.id().equals(notice.id()) && !row.active()),
+                "completed lock operation did not remain in logger history");
+        h.assertTrue(logger.nextPrintableAlarm() == null,
+                "network lock operation entered the incident-slip print queue");
+        h.assertTrue(logger.status() == LoggerBlock.Status.NORMAL,
+                "network lock operation changed the logger into WARN/ERROR state");
+        h.succeed();
+    }
+
     @GameTest(template = "empty", timeoutTicks = 120)
     public static void loggerFeedsHalfTicketForAlarmThenFinishesPrint(GameTestHelper h) {
         var level = h.getLevel();
@@ -185,8 +223,8 @@ public final class LoggerGameTests {
         UUID network = UUID.randomUUID();
         UUID distantNetwork = UUID.randomUUID();
         logger.setCreateFrequency(network);
-        h.assertTrue(logger.status() == LoggerBlock.Status.WARN,
-                "an empty logger still reported NORMAL instead of paper-empty warning");
+        h.assertTrue(logger.status() == LoggerBlock.Status.NORMAL,
+                "paper empty incorrectly promoted the logger into a process WARN state");
         h.assertTrue("PE".equals(logger.displayCode()),
                 "an empty logger did not show PE on the two status tubes");
         EventRegistry registry = EventRegistry.get(level.getServer());

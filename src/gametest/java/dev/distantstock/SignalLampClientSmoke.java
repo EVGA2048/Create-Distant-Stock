@@ -274,6 +274,11 @@ public final class SignalLampClientSmoke {
                 scenes++;
             }
             LogUtils.getLogger().info("DISTANTSTOCK_PONDER_OK: {} scenes have a structure and their text", scenes);
+            var dockGui = ResourceLocation.fromNamespaceAndPath(
+                    DistantStock.MODID, "textures/gui/remote_dock.png");
+            mc.getResourceManager().getResource(dockGui).orElseThrow(
+                    () -> new AssertionError("Distant Dock GUI texture is missing: " + dockGui));
+            LogUtils.getLogger().info("DISTANTSTOCK_DOCK_GUI_OK: remote dock panel texture is present");
             checkDockGroupPage(mc);
             checkDistantNetworkPage(mc);
             checkLoggerPage(mc);
@@ -334,16 +339,16 @@ public final class SignalLampClientSmoke {
         page.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
 
         page.apply(new dev.distantstock.net.DistantNetworkStateS2C(
-                true, null, "", false, ""));
+                true, null, "", false, "", "", false));
         page.render(graphics, 0, 0, 0f);
 
         var networkId = java.util.UUID.randomUUID();
         page.apply(new dev.distantstock.net.DistantNetworkStateS2C(
-                true, networkId, "Nexus", false, ""));
+                true, networkId, "Nexus", false, "", "未命名仓库", true));
         page.render(graphics, 0, 0, 0f);
 
         page.apply(new dev.distantstock.net.DistantNetworkStateS2C(
-                true, networkId, "Nexus", true, "1F2A-5B7G"));
+                true, networkId, "Nexus", true, "1F2A-5B7G", "中控仓", true));
         page.render(graphics, 0, 0, 0f);
         LogUtils.getLogger().info(
                 "DISTANTSTOCK_DISTANT_NETWORK_PAGE_OK: 未加入、成员、创建者三种状态均可绘制");

@@ -36,6 +36,7 @@ public final class ClientSetup {
             e.register(ModMenus.REQUESTER.get(), RequesterScreen::new);
             e.register(ModMenus.LAMP_MONITOR.get(), LampMonitorScreen::new);
             e.register(ModMenus.CACHE_FROGPORT.get(), CacheFrogportScreen::new);
+            e.register(ModMenus.DOCK.get(), DockScreen::new);
             e.register(ModMenus.REMOTE_REQUESTER.get(), RemoteRedstoneRequesterScreen::new);
         }
 
@@ -141,6 +142,7 @@ public final class ClientSetup {
         public static void renderers(EntityRenderersEvent.RegisterRenderers e) {
             e.registerBlockEntityRenderer(ModBlockEntities.REMOTE_GAUGE.get(),
                     RemoteGaugeRenderer::new);
+            e.registerBlockEntityRenderer(ModBlockEntities.GAUGE.get(), GaugeFlapRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.REMOTE_PACKAGER.get(), PackagerRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.DOCK.get(), DockParcelRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.DIAGNOSTIC_FROGPORT.get(), FrogportRenderer::new);

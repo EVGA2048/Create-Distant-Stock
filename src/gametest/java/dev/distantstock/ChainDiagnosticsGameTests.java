@@ -25,6 +25,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.level.GameType;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -144,17 +145,100 @@ public final class ChainDiagnosticsGameTests {
 
             CacheFrogportBlockEntity ownerA = addressA.equals(cacheA.takeoverAddress()) ? cacheA : cacheB;
             CacheFrogportBlockEntity ownerB = ownerA == cacheA ? cacheB : cacheA;
-            BlockPos ownerAPos = ownerA.getBlockPos();
-            level.destroyBlock(ownerAPos, false);
 
-            h.assertTrue(addressA.equals(receiverA.getFilterString()),
-                    "removing cache A did not thaw address A");
-            h.assertTrue(ChainDiagnostics.recoveryAddress(receiverBPos).equals(receiverB.getFilterString()),
-                    "removing cache A incorrectly thawed address B");
-            h.assertTrue(addressB.equals(ownerB.takeoverAddress()),
-                    "removing one cache cleared the other cache's takeover");
-            h.succeed();
+            // Real packages, not direct inventory seeding: both addresses enter the running Create
+            // chain and must be consumed by the cache that owns that public takeover route.
+            ItemStack parcelA = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+            ItemStack parcelB = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+            PackageItem.addAddress(parcelA, addressA);
+            PackageItem.addAddress(parcelB, addressB);
+            chain.addLoopingPackage(new ChainConveyorPackage(20, parcelA));
+            chain.addLoopingPackage(new ChainConveyorPackage(40, parcelB));
+
+            h.runAfterDelay(100, () -> {
+                h.assertTrue(countAddress(ownerA, addressA) > 0,
+                        "address A package did not enter the cache that owns A");
+                h.assertTrue(countAddress(ownerA, addressB) == 0,
+                        "cache A consumed a package belonging to address B");
+                h.assertTrue(countAddress(ownerB, addressB) > 0,
+                        "address B package did not enter the cache that owns B");
+                h.assertTrue(countAddress(ownerB, addressA) == 0,
+                        "cache B consumed a package belonging to address A");
+
+                int bBefore = ownerB.cachedCount();
+                BlockPos ownerAPos = ownerA.getBlockPos();
+                level.destroyBlock(ownerAPos, false);
+
+                h.assertTrue(addressA.equals(receiverA.getFilterString()),
+                        "removing cache A did not thaw address A");
+                h.assertTrue(ChainDiagnostics.recoveryAddress(receiverBPos).equals(receiverB.getFilterString()),
+                        "removing cache A incorrectly thawed address B");
+                h.assertTrue(addressB.equals(ownerB.takeoverAddress()),
+                        "removing one cache cleared the other cache's takeover");
+
+                ItemStack parcelBAfter = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+                PackageItem.addAddress(parcelBAfter, addressB);
+                chain.addLoopingPackage(new ChainConveyorPackage(60, parcelBAfter));
+                h.runAfterDelay(100, () -> {
+                    h.assertTrue(ownerB.cachedCount() > bBefore,
+                            "surviving cache stopped accepting B after cache A was removed");
+                    h.assertTrue(countAddress(ownerB, addressB) == ownerB.cachedCount(),
+                            "surviving cache contains parcels from an address it does not own");
+                    h.succeed();
+                });
+            });
         });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 80)
+    public static void cacheFrogportMenuOpensAndSlotsAreIndependentlyAccessible(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(3, 2, 3));
+        level.setBlock(pos, ModBlocks.CACHE_FROGPORT.get().defaultBlockState(), 3);
+        CacheFrogportBlockEntity cache = (CacheFrogportBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(cache != null, "cache Frogport did not create its block entity");
+
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        player.setPos(pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5);
+        player.setShiftKeyDown(false);
+        player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false);
+        var result = level.getBlockState(pos).useWithoutItem(level, player, hit);
+        h.assertTrue(result.consumesAction(), "empty-hand click on cache Frogport was not consumed");
+
+        // FakePlayer does not guarantee a network-backed menu open, so validate the exact server
+        // menu factory as well. These are the 54 real SmartInventory slots used by real players.
+        var menu = dev.distantstock.menu.CacheFrogportMenu.server(1, player.getInventory(), cache);
+        h.assertTrue(menu.slots.size() >= CacheFrogportBlockEntity.CACHE_SLOTS,
+                "cache menu did not expose all 54 cache slots");
+
+        ItemStack a = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        ItemStack b = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        ItemStack c = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        PackageItem.addAddress(a, "UI-A");
+        PackageItem.addAddress(b, "UI-B");
+        PackageItem.addAddress(c, "UI-C");
+        menu.getSlot(0).set(a);
+        menu.getSlot(1).set(b);
+        menu.getSlot(2).set(c);
+
+        h.assertTrue("UI-A".equals(PackageItem.getAddress(cache.inventory.getStackInSlot(0))),
+                "menu slot 0 did not persist independently");
+        h.assertTrue("UI-B".equals(PackageItem.getAddress(cache.inventory.getStackInSlot(1))),
+                "menu slot 1 did not persist independently");
+        h.assertTrue("UI-C".equals(PackageItem.getAddress(cache.inventory.getStackInSlot(2))),
+                "menu slot 2 did not persist independently");
+
+        ItemStack removed = menu.getSlot(1).remove(1);
+        h.assertTrue("UI-B".equals(PackageItem.getAddress(removed)),
+                "taking one cached parcel returned the wrong slot");
+        h.assertTrue(cache.inventory.getStackInSlot(1).isEmpty(),
+                "taking slot 1 did not clear exactly that cache slot");
+        h.assertTrue("UI-A".equals(PackageItem.getAddress(cache.inventory.getStackInSlot(0)))
+                        && "UI-C".equals(PackageItem.getAddress(cache.inventory.getStackInSlot(2))),
+                "taking one cached parcel disturbed neighbouring cached parcels");
+        menu.removed(player);
+        h.succeed();
     }
 
     @GameTest(template = "empty", timeoutTicks = 40)
@@ -332,26 +416,34 @@ public final class ChainDiagnosticsGameTests {
     public static void emptyHandRightClickOpensSpecialFrogportInventory(GameTestHelper h) {
         var level = h.getLevel();
         var player = h.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
-        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
-        level.setBlock(pos, ModBlocks.CACHE_FROGPORT.get().defaultBlockState(), 3);
+        BlockPos diagnosticPos = h.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos cachePos = h.absolutePos(new BlockPos(5, 2, 2));
+        level.setBlock(diagnosticPos, ModBlocks.DIAGNOSTIC_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(cachePos, ModBlocks.CACHE_FROGPORT.get().defaultBlockState(), 3);
         player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
 
-        var event = new PlayerInteractEvent.RightClickBlock(player, InteractionHand.MAIN_HAND, pos,
-                new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false));
+        // Diagnostic Frogport still uses the NeoForge event bridge for empty-hand menu access.
+        var event = new PlayerInteractEvent.RightClickBlock(player, InteractionHand.MAIN_HAND, diagnosticPos,
+                new BlockHitResult(Vec3.atCenterOf(diagnosticPos), Direction.UP, diagnosticPos, false));
         SpecialFrogportInteractionEvents.openInventory(event);
+        h.assertTrue(event.isCanceled(), "empty-hand diagnostic Frogport click was not consumed");
 
-        h.assertTrue(event.isCanceled(), "empty-hand special Frogport click was not consumed");
-        CacheFrogportBlockEntity cache = (CacheFrogportBlockEntity) level.getBlockEntity(pos);
+        // Cache Frogport owns its menu path directly so its sneak interaction can remain reserved
+        // for release-delay Value Settings.
+        var cacheResult = level.getBlockState(cachePos).useWithoutItem(level, player,
+                new BlockHitResult(Vec3.atCenterOf(cachePos), Direction.UP, cachePos, false));
+        h.assertTrue(cacheResult.consumesAction(), "empty-hand cache Frogport click was not consumed");
+        CacheFrogportBlockEntity cache = (CacheFrogportBlockEntity) level.getBlockEntity(cachePos);
         h.assertTrue(cache != null, "cache Frogport disappeared during empty-hand interaction");
-        h.assertTrue(cache.createMenu(7, player.getInventory(), player) instanceof PackagePortMenu,
-                "empty-hand special Frogport interaction does not target Create's PackagePortMenu");
+        h.assertTrue(cache.createMenu(7, player.getInventory(), player)
+                        instanceof dev.distantstock.menu.CacheFrogportMenu,
+                "cache Frogport interaction does not target the 54-slot CacheFrogportMenu");
 
         player.setShiftKeyDown(true);
-        var sneakEvent = new PlayerInteractEvent.RightClickBlock(player, InteractionHand.MAIN_HAND, pos,
-                new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false));
-        SpecialFrogportInteractionEvents.openInventory(sneakEvent);
-        h.assertTrue(!sneakEvent.isCanceled(),
-                "sneaking empty-hand click was stolen by the inventory UI; Value Settings cannot long-press");
+        var sneakResult = level.getBlockState(cachePos).useWithoutItem(level, player,
+                new BlockHitResult(Vec3.atCenterOf(cachePos), Direction.UP, cachePos, false));
+        h.assertTrue(!sneakResult.consumesAction(),
+                "sneaking cache click was stolen by inventory UI; Value Settings cannot long-press");
         h.succeed();
     }
 
@@ -1165,6 +1257,17 @@ public final class ChainDiagnosticsGameTests {
         frog.target = target;
         target.setup(frog, level, frogPos);
         target.register(frog, level, frogPos);
+    }
+
+    private static int countAddress(CacheFrogportBlockEntity cache, String address) {
+        int count = 0;
+        for (int slot = 0; slot < cache.inventory.getSlots(); slot++) {
+            ItemStack stack = cache.inventory.getStackInSlot(slot);
+            if (!stack.isEmpty() && address.equals(PackageItem.getAddress(stack))) {
+                count++;
+            }
+        }
+        return count;
     }
 
 }

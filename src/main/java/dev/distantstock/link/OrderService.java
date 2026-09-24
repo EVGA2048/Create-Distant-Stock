@@ -140,9 +140,12 @@ public final class OrderService {
         UUID correlationId = UUID.randomUUID();
         UUID childOrderId = UUID.randomUUID();
         try {
+            RemoteRoute route = new RemoteRoute(RemoteRoute.CURRENT_SCHEMA, destinationNode,
+                    receivingDockGroupId, correlationId, childOrderId);
+            String receivingAddress = RouteLabels.receivingAddress(server, route);
             OrderRequestCodec.Request request = new OrderRequestCodec.Request(sourceNetwork,
                     scope, receivingDockGroupId, destinationNode, correlationId, childOrderId,
-                    address == null ? "" : address,
+                    address == null ? "" : address, receivingAddress,
                     homeAddress == null ? "" : homeAddress, lines);
             UUID messageId = TranserverBridge.send(sourceNetwork.nodeId().toString(), RoutingChannels.ORDER_REQUEST,
                     OrderRequestCodec.encode(request), correlationId.toString());
@@ -190,9 +193,15 @@ public final class OrderService {
                 UUID.randomUUID(), UUID.randomUUID());
         UUID localNode = TranserverBridge.localNodeUuid();
         if (localNode == null) return Result.FAIL;
-        boolean crosses = !localNode.equals(destinationNode);
+        // Address translation belongs to the Distant Stock *dock crossing*, not specifically to a
+        // cross-server transport. A same-node route still leaves one Distant Dock and lands at
+        // another receiving group, so the parcel must be packed with the source-side address and
+        // carry the configured destination-side address for applyHomeAddress() at the receiving
+        // dock. Dropping homeAddress merely because both docks share a node leaves e.g. 111 on the
+        // parcel after the crossing instead of translating it to 222.
         boolean ok = CreateStock.request(frequency, items, address, server, route,
-                crosses ? (homeAddress == null ? "" : homeAddress) : "");
+                homeAddress == null ? "" : homeAddress,
+                RouteLabels.receivingAddress(server, route));
         LinkQueues.lastPack(frequency, ok ? LinkQueues.PackResult.SUCCESS : LinkQueues.PackResult.NO_STOCK);
         return ok ? Result.QUEUED : Result.FAIL;
     }

@@ -59,6 +59,7 @@ public final class MonitorScreen extends Screen {
     /** Rows are built during render and read back on click, so the two cannot disagree. */
     private final java.util.List<Hit> hits = new java.util.ArrayList<>();
     private final BlockPos source;
+    private final boolean towerOnly;
     private LinkSnapshot.View view;
     /** Which half of the dashboard is showing. The tower half needs room the link half is using. */
     private boolean towerPage;
@@ -79,9 +80,17 @@ public final class MonitorScreen extends Screen {
     private int top;
 
     public MonitorScreen(BlockPos source, LinkSnapshot.View view) {
-        super(Component.translatable("gui.distantstock.monitor"));
+        this(source, view, false);
+    }
+
+    public MonitorScreen(BlockPos source, LinkSnapshot.View view, boolean towerOnly) {
+        super(Component.translatable(towerOnly
+                ? "gui.distantstock.tower.control"
+                : "gui.distantstock.monitor"));
         this.source = source.immutable();
         this.view = view;
+        this.towerOnly = towerOnly;
+        this.towerPage = towerOnly;
     }
 
     public boolean isSource(BlockPos source) {
@@ -102,6 +111,11 @@ public final class MonitorScreen extends Screen {
         super.tick();
         if (flipTicks > 0) {
             flipTicks--;
+        }
+        if (towerOnly && minecraft != null && minecraft.level != null
+                && minecraft.level.getGameTime() % 20 == 0) {
+            net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                    new dev.distantstock.net.RequestTowerSnapshotC2S(source));
         }
     }
     /** 当前这一页的底图有多高。切页时整块要重新居中 —— 塔页比链路页高 66 像素。 */
@@ -127,11 +141,13 @@ public final class MonitorScreen extends Screen {
         g.fill(0, 0, width, height, 0x4208171B);
         g.blit(towerPage ? PANEL_TOWER : PANEL, left, top, 0, 0, W, panelH(), W, panelH());
 
-        Component title = Component.translatable("gui.distantstock.monitor");
+        Component title = Component.translatable(towerOnly
+                ? "gui.distantstock.tower.control"
+                : "gui.distantstock.monitor");
         g.drawString(font, title, left + 14, top + 13, HEADER, false);
-        drawStatus(g);
+        if (!towerOnly) drawStatus(g);
         hits.clear();
-        drawPageToggle(g, mouseX, mouseY);
+        if (!towerOnly) drawPageToggle(g, mouseX, mouseY);
         if (towerPage) {
             drawTowerPage(g);
             super.render(g, mouseX, mouseY, partial);

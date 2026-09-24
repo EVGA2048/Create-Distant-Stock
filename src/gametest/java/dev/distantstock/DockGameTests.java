@@ -71,6 +71,85 @@ public final class DockGameTests {
         }
     }
 
+    /** A human receiving address on the parcel is a route, not merely tooltip decoration. */
+    @GameTest(template = "empty", timeoutTicks = 300)
+    public static void receivingAddressRoutesBidirectionalAlphaToBeta(GameTestHelper h) {
+        var level = h.getLevel();
+        UUID node = dev.distantstock.link.TranserverBridge.localNodeUuid();
+        h.assertTrue(node != null, "stable local node identity is unavailable");
+
+        BlockPos alphaPos = h.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos betaPos = h.absolutePos(new BlockPos(6, 2, 2));
+        level.setBlock(alphaPos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        level.setBlock(betaPos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        DockBlockEntity alpha = (DockBlockEntity) level.getBlockEntity(alphaPos);
+        DockBlockEntity beta = (DockBlockEntity) level.getBlockEntity(betaPos);
+        h.assertTrue(alpha != null && beta != null, "alpha/beta docks did not create");
+
+        String stamp = UUID.randomUUID().toString().substring(0, 8);
+        UUID alphaFreq = UUID.randomUUID();
+        UUID betaFreq = UUID.randomUUID();
+        var alphaMember = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA, node,
+                dev.distantstock.routing.WorldIdentity.get(level),
+                level.dimension().location().toString(), alphaFreq);
+        var betaMember = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA, node,
+                dev.distantstock.routing.WorldIdentity.get(level),
+                level.dimension().location().toString(), betaFreq);
+        var networkDirectory = dev.distantstock.routing.DistantNetworkDirectory.get(level.getServer());
+        var distant = networkDirectory.create("addr-hop-" + stamp, node, UUID.randomUUID(), alphaMember);
+        h.assertTrue(networkDirectory.attach(betaMember, distant.id()),
+                "second Create warehouse could not join the same Distant Stock network");
+        var groups = dev.distantstock.routing.DockGroupDirectory.get(level.getServer());
+        var alphaGroup = groups.createForNetwork("alpha-" + stamp, null, distant.id(),
+                dev.distantstock.routing.DockGroup.Visibility.PUBLIC);
+        var betaGroup = groups.createForNetwork("beta-" + stamp, null, distant.id(),
+                dev.distantstock.routing.DockGroup.Visibility.PUBLIC);
+
+        alpha.setGroupId(alphaGroup.id());
+        beta.setGroupId(betaGroup.id());
+        alpha.setBidirectional(alphaFreq);
+        beta.setBidirectional(betaFreq);
+        h.assertTrue(!alpha.freq().equals(beta.freq()),
+                "test accidentally used one Create frequency for alpha and beta");
+        dev.distantstock.block.LoadedDocks.add(alpha);
+        dev.distantstock.block.LoadedDocks.add(beta);
+        TestTowers.carried(h, alphaPos);
+        TestTowers.carried(h, betaPos);
+
+        ItemStack parcel = com.simibubi.create.content.logistics.box.PackageStyles.getDefaultBox();
+        com.simibubi.create.content.logistics.box.PackageItem.addAddress(parcel, "111");
+        // Deliberately write only the player-facing receiving address. No destination node/group
+        // UUIDs exist yet; alpha must resolve beta inside their shared Distant Stock network.
+        var custom = parcel.getOrDefault(net.minecraft.core.component.DataComponents.CUSTOM_DATA,
+                net.minecraft.world.item.component.CustomData.EMPTY).copyTag();
+        var routeHint = new net.minecraft.nbt.CompoundTag();
+        routeHint.putString("ReceivingAddress", betaGroup.name());
+        custom.put("DistantStockRoute", routeHint);
+        parcel.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA,
+                net.minecraft.world.item.component.CustomData.of(custom));
+        h.assertTrue(dev.distantstock.routing.RemoteRouteData.read(parcel).isEmpty(),
+                "test parcel accidentally already had a UUID route");
+        h.assertTrue(betaGroup.name().equals(dev.distantstock.routing.RemoteRouteData.receivingAddress(parcel)),
+                "test parcel lost its beta receiving address hint");
+
+        var intake = level.getCapability(Capabilities.ItemHandler.BLOCK, alphaPos, Direction.UP);
+        h.assertTrue(intake != null && intake.insertItem(0, parcel, false).isEmpty(),
+                "parcel could not enter alpha");
+
+        h.runAfterDelay(160, () -> {
+            h.assertTrue(alpha.displayedStack().isEmpty(),
+                    "alpha kept a parcel whose receiving address resolved to beta");
+            h.assertTrue(!beta.displayedStack().isEmpty(),
+                    "parcel with receiving address beta never reached beta");
+            h.assertTrue(betaGroup.name().equals(
+                            dev.distantstock.routing.RemoteRouteData.receivingAddress(beta.displayedStack())),
+                    "resolved parcel lost the human receiving address beta");
+            h.succeed();
+        });
+    }
+
     /** Handing a parcel to the dock by hand has to use the same slot a hopper fills. */
     @GameTest(template = "empty", timeoutTicks = 40)
     public static void packageRightClickEntersDock(GameTestHelper h) {
@@ -89,6 +168,49 @@ public final class DockGameTests {
         h.assertTrue(dock != null && dock.displayedStack().is(ModItems.REMOTE_PACKAGE.get()),
                 "parcel did not enter the dock");
         h.assertTrue(parcel.isEmpty(), "survival right click did not consume the parcel");
+        h.succeed();
+    }
+
+    /** Ordinary empty-hand right click must be consumed by the dock immediately; no sneak workaround. */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void emptyHandRightClickOpensDockMenu(GameTestHelper h) {
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        h.getLevel().setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        DockBlockEntity dock = (DockBlockEntity) h.getLevel().getBlockEntity(pos);
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        player.setPos(pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5);
+        player.setShiftKeyDown(false);
+        player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        var hit = new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false);
+
+        var result = h.getLevel().getBlockState(pos).useWithoutItem(h.getLevel(), player, hit);
+        h.assertTrue(result.consumesAction(), "ordinary empty-hand right click was not consumed");
+        // GameTest's mock player is not a ServerPlayer, so it cannot exercise the network-backed
+        // ServerPlayer#openMenu branch used by real players. Validate the exact menu factory the
+        // production branch calls instead of weakening production code just for the fixture.
+        h.assertTrue(dock != null, "dock block entity is missing");
+        var menu = dev.distantstock.menu.DockMenu.server(1, player.getInventory(), dock);
+        h.assertTrue(menu.stillValid(player), "DockMenu factory produced an invalid menu");
+        h.succeed();
+    }
+
+    /**
+     * Dock configuration must have exactly one UX path: its Package-Port-style screen.
+     * Re-registering a Create ValueSettingsBehaviour would steal ordinary right-clicks and bring
+     * back the old hold-to-adjust overlay before DockBlock.useWithoutItem can open the menu.
+     */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void dockDoesNotExposeHoldRightClickValueSettings(GameTestHelper h) {
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        h.getLevel().setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        DockBlockEntity dock = (DockBlockEntity) h.getLevel().getBlockEntity(pos);
+        h.assertTrue(dock != null, "dock block entity is missing");
+        dock.initialize();
+        boolean hasValueSettings = dock.getAllBehaviours().stream()
+                .anyMatch(behaviour -> behaviour instanceof
+                        com.simibubi.create.foundation.blockEntity.behaviour.ValueSettingsBehaviour);
+        h.assertFalse(hasValueSettings,
+                "distant dock registered a ValueSettingsBehaviour and will intercept normal right click");
         h.succeed();
     }
 
@@ -146,7 +268,7 @@ public final class DockGameTests {
      * the sending bay.
      */
     @GameTest(template = "empty", timeoutTicks = 140)
-    public static void routelessPackageMovesToFallback(GameTestHelper h) {
+    public static void routelessPackageStaysInBayAndReports(GameTestHelper h) {
         var level = h.getLevel();
         BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
         level.setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
@@ -155,16 +277,23 @@ public final class DockGameTests {
         dock.setExport(UUID.randomUUID());
         h.assertTrue(dock.canSend(), "dock did not enter send mode");
         var handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, Direction.UP);
-        h.assertTrue(handler != null && handler.insertItem(0, new ItemStack(ModItems.REMOTE_PACKAGE.get()), false).isEmpty(),
+        ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        com.simibubi.create.content.logistics.box.PackageItem.addAddress(parcel, "111");
+        h.assertTrue(handler != null && handler.insertItem(0, parcel, false).isEmpty(),
                 "parcel did not enter the outgoing slot");
         // Long enough for the dock to reach the end of its transmit window and try to ship.
         h.runAfterDelay(100, () -> {
             h.assertTrue(!dock.displayedStack().isEmpty(),
-                    "routeless parcel vanished instead of being returned");
-            h.assertTrue(dock.fallbackSlots() == 1,
-                    "routeless parcel stayed in the outbound bay instead of moving to fallback");
+                    "routeless parcel vanished instead of remaining recoverable");
+            h.assertTrue(dock.fallbackSlots() == 0,
+                    "routeless parcel was silently moved to fallback instead of staying in the bay");
             h.assertTrue(dock.status() == DockStatus.BLOCKED,
-                    "undrained fallback did not raise the blocked lamp, got " + dock.status());
+                    "routeless parcel did not raise the blocked lamp, got " + dock.status());
+            String source = dev.distantstock.event.EventRegistry.blockSource(level, pos);
+            h.assertTrue(dev.distantstock.event.EventRegistry.get(level.getServer())
+                            .active(dev.distantstock.event.EventRegistry.Codes.DOCK_NO_ROUTE,
+                                    "dock", source).isPresent(),
+                    "routeless parcel did not report DOCK_NO_ROUTE");
             h.succeed();
         });
     }
@@ -242,7 +371,7 @@ public final class DockGameTests {
      * to another server has to name a group a human chose.
      */
     @GameTest(template = "empty", timeoutTicks = 140)
-    public static void aParcelWithNoGroupDoesNotLeaveTheNode(GameTestHelper h) {
+    public static void aParcelWithNoGroupStaysInDockAndReports(GameTestHelper h) {
         var level = h.getLevel();
         BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
         level.setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
@@ -261,8 +390,8 @@ public final class DockGameTests {
         h.runAfterDelay(100, () -> {
             h.assertTrue(!dock.displayedStack().isEmpty(),
                     "a parcel with an address and no group was sent to another node anyway");
-            h.assertTrue(dock.fallbackSlots() == 1,
-                    "a parcel with no receiving address was not moved to the bottom fallback");
+            h.assertTrue(dock.fallbackSlots() == 0,
+                    "a routing-error parcel was silently moved out of the operator bay");
             h.assertTrue(dock.status() == DockStatus.BLOCKED,
                     "a parcel with no group did not raise the blocked lamp, got " + dock.status());
             String source = dev.distantstock.event.EventRegistry.blockSource(level, pos);
@@ -270,16 +399,16 @@ public final class DockGameTests {
             h.assertTrue(events.active(dev.distantstock.event.EventRegistry.Codes.DOCK_NO_ADDRESS,
                             "dock", source).isPresent(),
                     "missing receiving address did not raise a shared WARN event");
-            h.assertTrue(events.active(dev.distantstock.event.EventRegistry.Codes.DOCK_RETURN_BLOCKED,
-                            "dock", source).isPresent(),
-                    "blocked fallback did not raise a shared WARN event");
+            h.assertTrue(events.active(dev.distantstock.event.EventRegistry.Codes.DOCK_OUTBOUND_STUCK,
+                            "dock", source).isEmpty(),
+                    "specific routing error also produced a duplicate generic stuck event");
             h.succeed();
         });
     }
 
-    /** A hopper/chute-equivalent inventory below the dock receives an invalid outbound parcel. */
+    /** An invalid ordinary Create parcel is accepted physically, then held and logged. */
     @GameTest(template = "empty", timeoutTicks = 160)
-    public static void noAddressParcelIsAutomaticallyReturnedBelow(GameTestHelper h) {
+    public static void invalidOrdinaryPackageIsHeldAndCanBeRecovered(GameTestHelper h) {
         var level = h.getLevel();
         BlockPos pos = h.absolutePos(new BlockPos(2, 3, 2));
         BlockPos below = pos.below();
@@ -291,36 +420,36 @@ public final class DockGameTests {
         dock.setDefaultDestination(UUID.randomUUID(),
                 dev.distantstock.routing.DockGroupDirectory.DEFAULT_GROUP_ID);
 
-        ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        ItemStack parcel = com.simibubi.create.content.logistics.box.PackageStyles.getDefaultBox();
+        var ordinaryItem = parcel.getItem();
         com.simibubi.create.content.logistics.box.PackageItem.addAddress(parcel, "111");
+        dock.clearDefaultDestination();
         var handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, Direction.UP);
         h.assertTrue(handler != null && handler.insertItem(0, parcel, false).isEmpty(),
-                "parcel did not enter the outgoing bay");
+                "ordinary/error parcel was rejected at the dock intake");
 
-        h.runAfterDelay(120, () -> {
+        h.runAfterDelay(80, () -> {
             var chest = level.getBlockEntity(below);
             h.assertTrue(chest instanceof net.minecraft.world.Container,
                     "the return container disappeared");
             net.minecraft.world.Container inventory = (net.minecraft.world.Container) chest;
             boolean found = false;
             for (int i = 0; i < inventory.getContainerSize(); i++) {
-                if (inventory.getItem(i).is(ModItems.REMOTE_PACKAGE.get())) {
+                if (inventory.getItem(i).getItem() == ordinaryItem) {
                     found = true;
                     break;
                 }
             }
-            h.assertTrue(found, "the invalid parcel was not returned into the inventory below");
-            h.assertTrue(dock.displayedStack().isEmpty(),
-                    "the dock kept a duplicate after returning the parcel below");
+            h.assertFalse(found, "invalid parcel leaked out through the fallback face instead of staying visible");
+            h.assertTrue(!dock.displayedStack().isEmpty(), "invalid parcel disappeared from the dock bay");
             String source = dev.distantstock.event.EventRegistry.blockSource(level, pos);
             var events = dev.distantstock.event.EventRegistry.get(level.getServer());
-            h.assertTrue(events.active(dev.distantstock.event.EventRegistry.Codes.DOCK_NO_ADDRESS,
-                            "dock", source).isEmpty(),
-                    "resolved no-address return stayed active in the event registry");
-            h.assertTrue(events.recent(64).stream().anyMatch(event ->
-                            event.code().equals(dev.distantstock.event.EventRegistry.Codes.DOCK_NO_ADDRESS)
-                                    && event.sourceId().equals(source) && !event.active()),
-                    "resolved no-address return disappeared instead of remaining in history");
+            h.assertTrue(events.active(dev.distantstock.event.EventRegistry.Codes.DOCK_NO_ROUTE,
+                            "dock", source).isPresent(),
+                    "invalid ordinary parcel did not report DOCK_NO_ROUTE to the shared logger");
+            ItemStack recovered = dock.menuBay().extractItem(0, 1, false);
+            h.assertTrue(recovered.getItem() == ordinaryItem,
+                    "operator could not recover the same ordinary package from the bay");
             h.succeed();
         });
     }
@@ -387,8 +516,10 @@ public final class DockGameTests {
 
             var handler = level.getCapability(net.neoforged.neoforge.capabilities.Capabilities.ItemHandler.BLOCK,
                     senderPos, net.minecraft.core.Direction.UP);
+            ItemStack travelling = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+            com.simibubi.create.content.logistics.box.PackageItem.addAddress(travelling, "tower-hop");
             h.assertTrue(handler != null && handler
-                            .insertItem(0, new ItemStack(ModItems.REMOTE_PACKAGE.get()), false).isEmpty(),
+                            .insertItem(0, travelling, false).isEmpty(),
                     "the parcel did not enter the sending dock");
 
             // Long enough for the dock's transmit window to open, close, and the transport to hand
@@ -473,6 +604,96 @@ public final class DockGameTests {
                 "收货模式港里的包裹从下面取不走 —— 智能溜槽就是这么接的");
         h.assertTrue(dock.takeStuck(h.makeMockPlayer(GameType.SURVIVAL)),
                 "手动能拿走的包裹，溜槽却拿不走 —— 两条路的规矩不一致");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void dockMenuExposesOnePhysicalParcelBay(GameTestHelper h) {
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        h.getLevel().setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        DockBlockEntity dock = (DockBlockEntity) h.getLevel().getBlockEntity(pos);
+        h.assertTrue(dock != null, "港没有出现");
+        TestTowers.carried(h, pos);
+        dock.setExport(java.util.UUID.randomUUID());
+
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        player.setPos(pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5);
+        var menu = dev.distantstock.menu.DockMenu.server(1, player.getInventory(), dock);
+        var bay = dock.menuBay();
+        h.assertTrue(bay.getSlots() == 1, "远仓港菜单暴露了不止一个物理舱位");
+        ItemStack first = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        ItemStack second = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        com.simibubi.create.content.logistics.box.PackageItem.addAddress(first, "菜单测试地址");
+        com.simibubi.create.content.logistics.box.PackageItem.addAddress(second, "菜单测试地址");
+        // Exercise the actual SlotItemHandler#set path used by mouse placement, not a helper that
+        // bypasses the menu layer. It requires IItemHandlerModifiable and used to target a plain
+        // IItemHandler proxy, which is exactly how the GUI parcel could appear to vanish.
+        menu.getSlot(0).set(first);
+        menu.removed(player);
+        h.assertTrue(!bay.getStackInSlot(0).isEmpty(), "通过菜单 set 路径放入的包裹没有持久化到港内");
+        h.assertTrue(!bay.insertItem(0, second, false).isEmpty(),
+                "第一件包裹还没离港，第二件已经挤进来了");
+        h.assertTrue(!bay.extractItem(0, 1, false).isEmpty(),
+                "未进入传输窗口的包裹不能从远仓港 UI 取出");
+        h.succeed();
+    }
+
+    /** Invalid packages enter the physical bay, then the dock diagnoses/reports them. */
+    @GameTest(template = "empty", timeoutTicks = 100)
+    public static void invalidPackageEntersDockAndRaisesSpecificAlarm(GameTestHelper h) {
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        h.getLevel().setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        DockBlockEntity dock = (DockBlockEntity) h.getLevel().getBlockEntity(pos);
+        h.assertTrue(dock != null, "港没有出现");
+        TestTowers.carried(h, pos);
+        dock.setExport(java.util.UUID.randomUUID());
+        ItemStack blank = com.simibubi.create.content.logistics.box.PackageStyles.getDefaultBox();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        player.setPos(pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5);
+        var menu = dev.distantstock.menu.DockMenu.server(1, player.getInventory(), dock);
+        menu.getSlot(0).set(blank);
+        h.assertTrue(!dock.menuBay().getStackInSlot(0).isEmpty(),
+                "错误包裹仍然在 UI 入口被拒绝，没有进入远仓港诊断流程");
+
+        h.runAfterDelay(70, () -> {
+            String source = dev.distantstock.event.EventRegistry.blockSource(h.getLevel(), pos);
+            var events = dev.distantstock.event.EventRegistry.get(h.getLevel().getServer());
+            h.assertTrue(events.active(dev.distantstock.event.EventRegistry.Codes.DOCK_NO_ADDRESS,
+                            "dock", source).isPresent(),
+                    "无地址错误包进入港后没有向日志系统报告 DOCK_NO_ADDRESS");
+            h.assertTrue(!dock.displayedStack().isEmpty(),
+                    "错误包在报告故障时从港里消失了");
+            h.assertTrue(!dock.menuBay().extractItem(0, 1, false).isEmpty(),
+                    "错误包报告后无法从远仓港 UI 取回");
+            menu.removed(player);
+            h.succeed();
+        });
+    }
+
+    /** The bay is physical storage: tower state must not make UI/hopper insertion impossible. */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void dockAcceptsPhysicalPackagesWithoutTowerCoverage(GameTestHelper h) {
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        h.getLevel().setBlock(pos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        DockBlockEntity dock = (DockBlockEntity) h.getLevel().getBlockEntity(pos);
+        h.assertTrue(dock != null, "港没有出现");
+
+        // Deliberately do NOT TestTowers.carried(): this is the regression condition.
+        ItemStack viaUi = com.simibubi.create.content.logistics.box.PackageStyles.getDefaultBox();
+        com.simibubi.create.content.logistics.box.PackageItem.addAddress(viaUi, "NO-TOWER-UI");
+        dock.menuBay().setStackInSlot(0, viaUi);
+        h.assertTrue(!dock.menuBay().getStackInSlot(0).isEmpty(),
+                "没有塔覆盖时 UI 仍然拒绝物理放入包裹");
+        dock.menuBay().extractItem(0, 1, false);
+
+        ItemStack viaHopper = com.simibubi.create.content.logistics.box.PackageStyles.getDefaultBox();
+        com.simibubi.create.content.logistics.box.PackageItem.addAddress(viaHopper, "NO-TOWER-HOPPER");
+        var handler = h.getLevel().getCapability(Capabilities.ItemHandler.BLOCK, pos, Direction.DOWN);
+        h.assertTrue(handler != null, "远仓港底面没有物品能力");
+        h.assertTrue(handler.insertItem(0, viaHopper, false).isEmpty(),
+                "没有塔覆盖时漏斗/能力仍然拒绝物理放入包裹");
+        h.assertTrue(!dock.menuBay().getStackInSlot(0).isEmpty(),
+                "漏斗报告接受包裹，但远仓港舱位仍为空");
         h.succeed();
     }
 }

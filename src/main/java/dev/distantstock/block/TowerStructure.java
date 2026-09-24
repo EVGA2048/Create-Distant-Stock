@@ -66,6 +66,40 @@ public final class TowerStructure {
                 : Optional.empty();
     }
 
+    /**
+     * Resolves any structural tower block to its core.
+     *
+     * <p>The control UI is opened from all four authored tower parts, but every setting belongs to
+     * the core. Returning one canonical position keeps the screen, packets and permission checks
+     * from having four slightly different ideas of what was clicked.
+     */
+    public static Optional<BlockPos> coreForPart(Level level, BlockPos part) {
+        if (level == null || part == null) return Optional.empty();
+        if (level.getBlockState(part).is(ModBlocks.TOWER_CORE.get())) {
+            return Optional.of(part.immutable());
+        }
+        if (level.getBlockState(part).is(ModBlocks.TOWER_CASING.get())) {
+            TowerCoreBlockEntity core = TowerCasingBlock.coreFor(level, part);
+            return core == null ? Optional.empty() : Optional.of(core.getBlockPos().immutable());
+        }
+        if (level.getBlockState(part).is(ModBlocks.ETHER_RESONATOR.get())) {
+            return coreUnder(level, part).map(BlockPos::immutable);
+        }
+        if (level.getBlockState(part).is(ModBlocks.TOWER_COUPLER.get())) {
+            BlockPos cursor = part;
+            for (int i = 0; i < 64; i++) {
+                cursor = cursor.below();
+                if (level.getBlockState(cursor).is(ModBlocks.TOWER_CORE.get())) {
+                    return Optional.of(cursor.immutable());
+                }
+                if (!level.getBlockState(cursor).is(ModBlocks.TOWER_COUPLER.get())) {
+                    return Optional.empty();
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
     /** Whether the mast under this cap is complete and tall enough to be a tower. */
     public static boolean assembled(Level level, BlockPos cap) {
         return coreUnder(level, cap).flatMap(core -> mast(level, core)).isPresent();

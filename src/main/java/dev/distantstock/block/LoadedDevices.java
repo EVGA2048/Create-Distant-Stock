@@ -29,18 +29,22 @@ public final class LoadedDevices {
 
     public static void add(MonitorBlockEntity be) {
         MONITORS.add(be);
+        dev.distantstock.routing.TowerActivation.markDirty();
     }
 
     public static void remove(MonitorBlockEntity be) {
         MONITORS.remove(be);
+        dev.distantstock.routing.TowerActivation.markDirty();
     }
 
     public static void add(RemotePackagerBlockEntity be) {
         PACKAGERS.add(be);
+        dev.distantstock.routing.TowerActivation.markDirty();
     }
 
     public static void remove(RemotePackagerBlockEntity be) {
         PACKAGERS.remove(be);
+        dev.distantstock.routing.TowerActivation.markDirty();
     }
 
     /** Loaded monitors, server side, sorted so the activation snapshot is rebuilt identically. */

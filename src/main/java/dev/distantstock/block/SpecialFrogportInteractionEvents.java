@@ -9,11 +9,12 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
 /**
- * Reliable empty-hand inventory access for diagnostic/cache Frogports.
+ * Reliable empty-hand inventory access for the diagnostic Frogport.
  *
  * NeoForge 1.21 splits empty-hand use from item use. Create's FrogportBlock only implements the
- * item-use path, so our diagnostic/cache inventories would otherwise be unreachable with an
- * empty hand. This event deliberately handles only empty-hand clicks on our two block entities.
+ * item-use path, so the diagnostic inventory would otherwise be unreachable with an empty hand.
+ * CacheFrogportBlock owns its own empty-hand menu path because it also reserves sneak interaction
+ * for its release-delay value settings.
  */
 @EventBusSubscriber(modid = DistantStock.MODID)
 public final class SpecialFrogportInteractionEvents {
@@ -23,8 +24,7 @@ public final class SpecialFrogportInteractionEvents {
         if (event.getHand() != InteractionHand.MAIN_HAND
                 || !event.getEntity().getMainHandItem().isEmpty()
                 || event.getEntity().isShiftKeyDown()) return;
-        if (!(event.getLevel().getBlockEntity(event.getPos()) instanceof FrogportBlockEntity frog)) return;
-        if (!(frog instanceof DiagnosticFrogportBlockEntity) && !(frog instanceof CacheFrogportBlockEntity)) return;
+        if (!(event.getLevel().getBlockEntity(event.getPos()) instanceof DiagnosticFrogportBlockEntity frog)) return;
 
         if (!event.getLevel().isClientSide) {
             event.getEntity().openMenu(frog, event.getPos());

@@ -2,18 +2,19 @@ package dev.distantstock.block;
 
 import com.simibubi.create.content.equipment.wrench.IWrenchable;
 import com.mojang.serialization.MapCodec;
-import dev.distantstock.link.TranserverBridge;
-import dev.distantstock.routing.DockGroupDirectory;
-import dev.distantstock.routing.DockMode;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.item.RequesterItem;
+import dev.distantstock.menu.DockMenu;
 import dev.distantstock.routing.RemoteNetworkId;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
@@ -196,102 +197,22 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                             dockNetwork.shortLabel()), true);
                     return ItemInteractionResult.sidedSuccess(false);
                 }
-                if (player.isShiftKeyDown()) {
-                    // 潜行右键：把这个港挂到终端携带的那个接收港组上，并切成收货。
-                    //
-                    // **只写组，不写地址**：港的收件条件从此只有组一个（见 LoadedDocks.importFor）。
-                    // 同组的港互相顶替 —— 包裹来了按优先级挑一个空闲的 —— 若再让每个港按自己的地址
-                    // 各筛一半，"一组多个港"就退化成了"几个各管一半的港"。地址是包裹身上的东西：
-                    // 落地之后由本机物流（蛙港、溜槽、传送带）按它继续分拣。
-                    //
-                    // 没设组的终端按默认组算，和模组里其它地方的解释一致；否则这一下会什么都不做，
-                    // 而玩家在动作栏里看到的是"已加入"。
-                    java.util.UUID group = RequesterData.receivingGroup(stack)
-                            .orElse(DockGroupDirectory.DEFAULT_GROUP_ID);
-                    // Joining someone else's group means their parcels come out of this dock. A
-                    // closed group refuses, and says so out loud: a click that is silently ignored
-                    // reads as a broken item, not as a locked door.
-                    if (admits(level, group, scope, player)) {
-                        be.setImport();
-                        be.setGroupId(group);
-                        // 整个手势的全部效果就是方块上的一行字，不说出来玩家不知道写进去没有。
-                        player.displayClientMessage(Component.translatable(
-                                "message.distantstock.dock.joined",
-                                RequesterData.receivingGroupName(stack)
-                                        .orElse(Component.translatable(
-                                                "gui.distantstock.group.default").getString())), true);
-                    } else {
-                        player.displayClientMessage(
-                                Component.translatable("gui.distantstock.group.closed"), true);
-                    }
-                } else {
-                    be.setMode(DockMode.SEND);
-                    // What the requester carries is the destination. Sneak-click is what sets a
-                    // dock's own group, so the two gestures read as one sentence: sneak to say
-                    // "this dock belongs here", plain to say "this dock sends there".
-                    java.util.UUID carried = RequesterData.receivingGroup(stack)
-                            .orElse(DockGroupDirectory.DEFAULT_GROUP_ID);
-                    // The real name, looked up, not the default's. An older requester carries an id
-                    // with no name on it, and falling back to the default group's name would write
-                    // that wrong name back onto the item — a label that is worse than none, because
-                    // it looks like an answer.
-                    String carriedName = RequesterData.receivingGroupName(stack)
-                            .orElseGet(() -> level.getServer() == null ? DockGroupDirectory.DEFAULT_GROUP_NAME
-                                    : DockGroupDirectory.get(level.getServer()).find(carried)
-                                            .map(dev.distantstock.routing.DockGroup::name)
-                                            .orElse(DockGroupDirectory.DEFAULT_GROUP_NAME));
-                    // The node is this one unless a network is bound, which is what makes an
-                    // in-save pair of systems work with no Transerver anywhere: the destination is
-                    // (my node, that group), and the node delivers it to itself.
-                    //
-                    // This used to be written twice — once here and once inside a network check
-                    // below that always paired the network's node with the *default* group. A
-                    // player who picked a system and then bound a network got the system silently
-                    // replaced, which is the sort of thing that reads as "groups do not work".
-                    //
-                    // 「发到本机」本身并不非法：同一个存档里的两个接收地址就是两套系统，服内互传
-                    // 靠的正是本机节点身份。节点身份与 Transerver transport 是否在线是两回事。
-                    java.util.UUID node = destinationNode(level, scope, carried);
-                    if (node == null) {
-                        player.displayClientMessage(
-                                Component.translatable("gui.distantstock.group.unknown"), true);
-                        return ItemInteractionResult.sidedSuccess(level.isClientSide);
-                    }
-                    be.setDefaultDestination(node, carried);
-                    RequesterData.setReceivingGroup(stack, carried, carriedName);
-                    // Say what was just written, in the bar rather than only on the goggles. The
-                    // gesture's whole effect is a line of text on a block the player is not looking
-                    // at while they hold a terminal, and the failure it used to have — a terminal
-                    // holding no group silently aiming the dock at the wildcard group — is
-                    // indistinguishable from success without being told which group it was.
-                    boolean noGroup = RequesterData.receivingGroup(stack).isEmpty();
-                    if (noGroup && !dev.distantstock.link.TranserverBridge.isLocal(node.toString())) {
-                        // The one combination that cannot work, said before the player walks away:
-                        // a terminal holding no group aims a dock at the wildcard group, and a
-                        // parcel leaving this node towards it is refused at the dock. Better to
-                        // say so now than to leave them watching a parcel that will not go.
-                        player.displayClientMessage(Component.translatable(
-                                "message.distantstock.dock.target.no_group", carriedName), true);
-                    } else {
-                        player.displayClientMessage(Component.translatable(
-                                "message.distantstock.dock.target",
-                                carriedName, nodeLabel(level, node)), true);
-                    }
-                }
+                // Network binding ends here. Receiving address, mode and priority now belong to
+                // the dock's own one-page UI; a terminal click must not secretly rewrite any of
+                // those settings depending on whether the player happened to be sneaking.
+                player.displayClientMessage(Component.translatable(
+                        "message.distantstock.dock.bound_open_ui"), true);
             }
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
         if (isWrench(stack)) {
             if (!level.isClientSide && !player.isShiftKeyDown()) {
                 be.clearFault();
-                // Reports only. The mode itself is set in the value settings panel, which holding
-                // the wrench opens — adding a click gesture here as well would be a second writer
-                // for one piece of state, and the two would disagree: the panel marks the current
-                // row, and a click would move it without the panel knowing.
+                // Wrench is maintenance-only. Configuration lives exclusively in DockScreen;
+                // keeping a second writer here would reintroduce the old split interaction model.
                 player.displayClientMessage(be.modeMessage(), true);
             }
-            // Never consume the wrench: Create removes blocks with sneak-right-click and opens the value
-            // settings panel by holding it, both of which need this click to fall through.
+            // Never consume the wrench: IWrenchable still owns removal/rotation semantics.
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
         if (PackageItem.isPackage(stack)) {
@@ -313,30 +234,6 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
             }
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
-        if (stack.isEmpty()) {
-            if (!level.isClientSide && player.isShiftKeyDown()) {
-                be.clearNetwork();
-                player.displayClientMessage(Component.translatable("gui.distantstock.dock_unbound"), true);
-                return ItemInteractionResult.sidedSuccess(false);
-            }
-            // An empty hand takes whatever is in the dock: what arrived, or what is stuck in it and
-            // cannot leave. The second half was missing, which left a refused parcel with no way out
-            // short of breaking the block.
-            String someoneElse = !level.isClientSide && !player.isShiftKeyDown()
-                    ? be.heldForSomeoneElse(player) : null;
-            if (someoneElse != null) {
-                // 拿不走就说清楚是给谁的。地址写成 @名字 的包裹只有那个人能取 —— 一句"没反应"
-                // 会让人以为港坏了。
-                player.displayClientMessage(Component.translatable(
-                        "message.distantstock.parcel.for_other", someoneElse), true);
-                return ItemInteractionResult.sidedSuccess(level.isClientSide);
-            }
-            if (!level.isClientSide && !player.isShiftKeyDown()
-                    && (be.takeReceived(player) || be.takeStuck(player))) {
-                return ItemInteractionResult.sidedSuccess(false);
-            }
-            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
-        }
         // Holding something the dock has no use for is worth saying out loud: it is the only way to
         // tell "the dock looked at this item and shrugged" apart from "the dock never saw the
         // click".
@@ -347,59 +244,29 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
         return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
     }
 
+    /**
+     * Empty-hand interaction is a different Minecraft hook from {@link #useItemOn}. The first UI
+     * implementation incorrectly put this path in useItemOn, which made the menu perfectly valid
+     * but unreachable in play. Distant Dock configuration now has one interaction: empty-hand
+     * right-click opens the Package-Port-style screen, sneaking or not.
+     */
+    @Override
+    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
+                                               Player player, BlockHitResult hit) {
+        if (!(level.getBlockEntity(pos) instanceof DockBlockEntity dock)) {
+            return InteractionResult.PASS;
+        }
+        if (!level.isClientSide && player instanceof ServerPlayer serverPlayer) {
+            serverPlayer.openMenu(new SimpleMenuProvider(
+                    (id, inv, ignored) -> DockMenu.server(id, inv, dock),
+                    Component.translatable("gui.distantstock.dock.title")),
+                    buf -> DockMenu.writeOpenData(buf, dock));
+        }
+        return InteractionResult.sidedSuccess(level.isClientSide);
+    }
+
     static boolean isWrench(ItemStack stack) {
         return stack.is(net.neoforged.neoforge.common.Tags.Items.TOOLS_WRENCH);
     }
 
-    /**
-     * Whether this player may point anything at that group.
-     *
-     * <p>One check for both gestures, because from the group's side they are the same act: a dock
-     * that joins it receives into it, and a dock that sends to it fills it. Both make machinery work
-     * for a group the player does not own, and a lock that allowed half of that would not be one.
-     */
-    /**
-     * How to name the node a dock is aimed at: "this server", or the other server's short label.
-     *
-     * <p>Read from the remote destinations this server has been let into, which is where the label
-     * the player saw in the list came from — the same name for the same thing, rather than a UUID.
-     */
-    private static String nodeLabel(Level level, java.util.UUID node) {
-        if (level.getServer() == null || dev.distantstock.link.TranserverBridge.isLocal(node.toString())) {
-            return Component.translatable("gui.distantstock.local").getString();
-        }
-        return dev.distantstock.routing.RemoteGroups.get(level.getServer()).all().stream()
-                .filter(entry -> entry.node().equals(node))
-                .map(entry -> entry.display().split("·")[0])
-                .findFirst()
-                .orElse(node.toString().substring(0, 8));
-    }
-
-    private static boolean admits(Level level, java.util.UUID group, java.util.UUID scope, Player player) {
-        if (level.getServer() == null) {
-            return false;
-        }
-        if (dev.distantstock.routing.ReceivingAddressResolver.conflicted(level.getServer(), group)) {
-            return false;
-        }
-        dev.distantstock.routing.DockGroup found = DockGroupDirectory.get(level.getServer()).find(group).orElse(null);
-        // A group that is gone cannot be joined, and saying yes would leave a dock pointed at
-        // nothing while reporting success.
-        return found != null && found.distantNetworkId().equals(scope) && found.admits(player.getUUID());
-    }
-
-    /** The node that actually owns this receiving address, inside the selected Distant network. */
-    private static java.util.UUID destinationNode(Level level, java.util.UUID scope, java.util.UUID group) {
-        if (level.getServer() == null || !dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope)
-                || group == null || group.equals(DockGroupDirectory.DEFAULT_GROUP_ID)) {
-            return null;
-        }
-        var local = DockGroupDirectory.get(level.getServer()).find(group).orElse(null);
-        if (local != null) {
-            return local.distantNetworkId().equals(scope)
-                    ? TranserverBridge.localNodeUuid() : null;
-        }
-        var remote = dev.distantstock.routing.RemoteGroups.get(level.getServer()).find(group).orElse(null);
-        return remote != null && remote.distantNetworkId().equals(scope) ? remote.node() : null;
-    }
 }

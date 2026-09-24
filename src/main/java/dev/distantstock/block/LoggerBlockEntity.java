@@ -43,6 +43,8 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
     private boolean networkKnown = true;
     private String displayCode = "PE";
     private int paperRemaining;
+    /** Most recent completed lock-operation notice announced by this console. */
+    private long lastLockNoticeAt = System.currentTimeMillis();
 
     public LoggerBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.LOGGER.get(), pos, state);
@@ -265,9 +267,9 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         if (worst == EventRegistry.Severity.WARN) {
             return unacknowledged ? LoggerBlock.Status.WARN : LoggerBlock.Status.WARN_ACK;
         }
-        // Running out of paper is itself an operator-actionable warning. It must never leave the
-        // panel advertising OK while the logger is unable to print/acknowledge the next alarm.
-        if (!hasPaper()) return LoggerBlock.Status.WARN;
+        // Paper empty is a maintenance condition, not a process alarm. It only changes the
+        // two-character maintenance code (OK -> PE); it must not turn the panel yellow, start the
+        // buzzer or enter the ACK/printing state machine on its own.
         return LoggerBlock.Status.NORMAL;
     }
 
@@ -307,6 +309,7 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         }
         if (level.getGameTime() % 20 == 0) {
             be.sampleNetworkHealth();
+            be.tickOperationNotices();
             be.updateStatus();
         }
         be.tickBuzzer();
@@ -381,7 +384,7 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
 
     private String codeFor(LoggerBlock.Status status) {
         if (status == LoggerBlock.Status.OFFLINE) return "--";
-        if (status == LoggerBlock.Status.NORMAL) return "OK";
+        if (status == LoggerBlock.Status.NORMAL) return hasPaper() ? "OK" : "PE";
         if (status == LoggerBlock.Status.ERROR) return "ER";
         if (status == LoggerBlock.Status.ERROR_ACK) {
             return hasAcknowledgedUnprinted(EventRegistry.Severity.ERROR) ? "AC" : "ER";
@@ -389,10 +392,7 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         if (status == LoggerBlock.Status.WARN_ACK) {
             return hasAcknowledgedUnprinted(EventRegistry.Severity.WARN) ? "AC" : "AL";
         }
-        // WARN with no active warning record is the local paper-empty condition.
-        boolean activeWarning = scopedActive().stream()
-                .anyMatch(row -> row.severity() == EventRegistry.Severity.WARN);
-        return activeWarning ? "AL" : "PE";
+        return "AL";
     }
 
     /** AC is the operator-action latch: ACK/silenced, but the mandatory incident slip is not out. */
@@ -450,6 +450,26 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         }
     }
 
+    /** One quiet control-room chime for each newly completed network-lock operation in scope. */
+    private void tickOperationNotices() {
+        if (level == null || level.isClientSide || level.getServer() == null) return;
+        long newest = lastLockNoticeAt;
+        for (EventRegistry.Record record : EventRegistry.get(level.getServer()).recent(32)) {
+            if (!EventRegistry.Codes.NETWORK_LOCKED.equals(record.code())
+                    || record.severity() != EventRegistry.Severity.INFO
+                    || record.createdAt() <= lastLockNoticeAt
+                    || !inScope(record)) {
+                continue;
+            }
+            newest = Math.max(newest, record.createdAt());
+        }
+        if (newest == lastLockNoticeAt) return;
+        lastLockNoticeAt = newest;
+        level.playSound(null, worldPosition, ModSounds.WALL_SOUNDER_B2.get(),
+                SoundSource.BLOCKS, 0.52f, 1.12f);
+        setChanged();
+    }
+
     private void sampleNetworkHealth() {
         if (level == null || level.isClientSide || level.getServer() == null
                 || createFrequency == null || networkId == null) return;
@@ -463,8 +483,10 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         condition(events, EventRegistry.Codes.NETWORK_LINKS_OFFLINE, EventRegistry.Severity.WARN,
                 health.known() && health.offline() > 0, source,
                 health.offline() + " / " + health.totalLinks() + " logistics links offline", now);
-        condition(events, EventRegistry.Codes.NETWORK_LOCKED, EventRegistry.Severity.WARN,
-                health.known() && health.locked(), source, "Create logistics network is locked", now);
+        // Old builds modelled a deliberate access-control lock as a persistent WARN. Clear that
+        // legacy condition; new lock operations are completed INFO notices raised at the moment
+        // the operator actually toggles the network.
+        events.clear(EventRegistry.Codes.NETWORK_LOCKED, "network", source, now);
 
         if (health.known() && !health.idle()) promiseBusySeconds++;
         else promiseBusySeconds = 0;
@@ -508,6 +530,7 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         tag.putInt("PromiseBusySeconds", promiseBusySeconds);
         tag.putBoolean("NetworkKnown", networkKnown);
         tag.putString("DisplayCode", displayCode);
+        tag.putLong("LastLockNoticeAt", lastLockNoticeAt);
         tag.putInt("PaperRemaining", paperRemaining());
     }
 
@@ -539,6 +562,8 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         promiseBusySeconds = tag.getInt("PromiseBusySeconds");
         networkKnown = !tag.contains("NetworkKnown") || tag.getBoolean("NetworkKnown");
         displayCode = tag.contains("DisplayCode") ? tag.getString("DisplayCode") : "OK";
+        lastLockNoticeAt = tag.contains("LastLockNoticeAt")
+                ? tag.getLong("LastLockNoticeAt") : System.currentTimeMillis();
         paperRemaining = Math.clamp(tag.getInt("PaperRemaining"), 0, PAPER_CAPACITY);
     }
 

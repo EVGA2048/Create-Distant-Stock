@@ -5,6 +5,7 @@ import dev.distantstock.DistantStock;
 import dev.distantstock.menu.RequesterMenu;
 import dev.distantstock.stock.CreateNetworkAccess;
 import dev.distantstock.stock.NetworkDirectory;
+import dev.distantstock.event.EventRegistry;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -53,8 +54,23 @@ public record SetCreateNetworkLockC2S(boolean change, boolean locked) implements
                 }
                 var logistics = Create.LOGISTICS.logisticsNetworks.get(freq);
                 if (logistics != null) {
+                    boolean changed = logistics.locked != msg.locked();
                     logistics.locked = msg.locked();
                     Create.LOGISTICS.markDirty();
+                    if (changed && msg.locked()) {
+                        // Locking a warehouse is an operator action, not a fault. Keep one completed
+                        // INFO row for the control room and let bound loggers chime once when they
+                        // observe it. Because the record is cleared immediately it can never enter
+                        // the alarm/ACK/printing path or consume incident paper.
+                        long now = System.currentTimeMillis();
+                        EventRegistry events = EventRegistry.get(player.getServer());
+                        String source = "network:" + freq;
+                        String detail = player.getGameProfile().getName()
+                                + " locked the Create logistics network";
+                        events.raise(EventRegistry.Severity.INFO, EventRegistry.Codes.NETWORK_LOCKED,
+                                "network", source, detail, freq, null, now);
+                        events.clear(EventRegistry.Codes.NETWORK_LOCKED, "network", source, now);
+                    }
                 }
             }
             CreateNetworkLockS2C.send(player, menu);

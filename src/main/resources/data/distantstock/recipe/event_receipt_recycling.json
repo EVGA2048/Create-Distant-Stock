@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "RRR",
+    "RRR",
+    "RRR"
+  ],
+  "key": {
+    "R": {
+      "item": "distantstock:event_receipt"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "minecraft:paper"
+  }
+}

@@ -21,6 +21,9 @@ public final class ModMenus {
             MENUS.register("cache_frogport",
                     () -> IMenuTypeExtension.create(ModMenus::cacheFrogportMenu));
 
+    public static final DeferredHolder<MenuType<?>, MenuType<DockMenu>> DOCK = MENUS.register("dock",
+            () -> IMenuTypeExtension.create(DockMenu::fromNetwork));
+
     /**
      * 远仓红石请求器：Create 那个请求器界面，加上我们那两行。
      *

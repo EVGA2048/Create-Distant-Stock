@@ -36,6 +36,24 @@ public final class CreateStock {
         return Create.LOGISTICS.logisticsNetworks.containsKey(freq);
     }
 
+    /**
+     * Final server-side stock gate for an order. Public so the invariant can be regression-tested
+     * without fabricating an entire Create logistics network: the live request path always feeds
+     * this method the exact one-tick summary immediately before broadcasting the order.
+     */
+    public static boolean canFulfillExact(InventorySummary exact, List<StockCache.Entry> items) {
+        if (exact == null || items == null || items.isEmpty()) return false;
+        boolean any = false;
+        for (StockCache.Entry e : items) {
+            if (e == null || e.count <= 0) continue;
+            Item item = BuiltInRegistries.ITEM.get(ResourceLocation.parse(e.itemId));
+            if (item == null || item == Items.AIR) continue;
+            any = true;
+            if (e.count > exact.getCountOf(new ItemStack(item))) return false;
+        }
+        return any;
+    }
+
     public static List<NetworkDirectory.Entry> openNetworks(MinecraftServer server, String serverId, UUID nodeId) {
         if (Create.LOGISTICS == null || Create.LOGISTICS.logisticsNetworks == null) {
             return List.of();
@@ -194,7 +212,23 @@ public final class CreateStock {
      */
     public static boolean request(UUID freq, List<StockCache.Entry> items, String address,
                                   MinecraftServer server, RemoteRoute route, String homeAddress) {
+        return request(freq, items, address, server, route, homeAddress,
+                route == null || server == null ? ""
+                        : dev.distantstock.link.RouteLabels.receivingAddress(server, route));
+    }
+
+    /** Complete three-address remote-terminal request. */
+    public static boolean request(UUID freq, List<StockCache.Entry> items, String address,
+                                  MinecraftServer server, RemoteRoute route, String homeAddress,
+                                  String receivingAddress) {
         if (!hasNetwork(freq) || items == null || items.isEmpty()) {
+            return false;
+        }
+        // The terminal stock list is allowed to be up to one second old, and clients are never an
+        // authority anyway. Re-count once at the actual order boundary so a stale screen, two
+        // simultaneous users or a forged C2S cannot request more than this Create network owns.
+        InventorySummary exact = LogisticsManager.getSummaryOfNetwork(freq, true);
+        if (!canFulfillExact(exact, items)) {
             return false;
         }
         List<BigItemStack> stacks = new ArrayList<>();
@@ -203,7 +237,8 @@ public final class CreateStock {
             if (item == null || item == Items.AIR || e.count <= 0) {
                 continue;
             }
-            stacks.add(new BigItemStack(new ItemStack(item), e.count));
+            ItemStack requested = new ItemStack(item);
+            stacks.add(new BigItemStack(requested, e.count));
         }
         if (stacks.isEmpty()) {
             return false;
@@ -227,7 +262,9 @@ public final class CreateStock {
             }
         }
         try {
-            if (!OrderRouteDirectory.get(server).remember(requests.values(), route, homeAddress)) {
+            if (!OrderRouteDirectory.get(server).remember(
+                    requests.values(), route, homeAddress,
+                    receivingAddress == null ? "" : receivingAddress)) {
                 // 记不下路线就不发这个订单。以前这里是一句"满了就抛"，抛出来的东西被下面
                 // catch 住、变成同一个 false —— 结果一样，但异常当控制流，而且满了之后**每**
                 // 一单都这样，没有任何提示。现在满了会先清掉过期的（见 OrderRouteDirectory.expire），

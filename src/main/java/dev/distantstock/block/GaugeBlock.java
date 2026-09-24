@@ -132,7 +132,8 @@ public final class GaugeBlock extends BaseEntityBlock implements IWrenchable {
     @Nullable
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        return level.isClientSide ? null : createTickerHelper(type, ModBlockEntities.GAUGE.get(), GaugeBlockEntity::serverTick);
+        return createTickerHelper(type, ModBlockEntities.GAUGE.get(),
+                level.isClientSide ? GaugeBlockEntity::clientTick : GaugeBlockEntity::serverTick);
     }
 
     @Override

@@ -1,26 +1,22 @@
 package dev.distantstock.block;
 
 import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
+import com.simibubi.create.content.trains.display.FlapDisplayBlockEntity;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.link.OrderService;
 import dev.distantstock.stock.StockCache;
-import dev.distantstock.config.StockConfig;
-import dev.distantstock.link.LinkSnapshot;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
 import java.util.UUID;
 import dev.distantstock.routing.RemoteNetworkId;
 
-public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleInformation {
+public final class GaugeBlockEntity extends FlapDisplayBlockEntity implements IHaveGoggleInformation {
     private UUID freq;
     private RemoteNetworkId networkId;
     private UUID distantNetworkId = dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
@@ -37,12 +33,71 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
      */
     private UUID receivingGroup;
     private OrderService.Result lastOrder;
+    /** Short command-accepted flash for the bulb on top of the desk; deliberately not persisted. */
+    private int requestPulseTicks;
+    /** Transient mechanical status board. Old saves and freshly loaded desks always resume at RDY. */
+    private DeskDisplay display = DeskDisplay.RDY;
+    private int displayTicks;
+    private OrderService.Result pendingDisplayResult;
     private int catalog;
     private boolean dataLocal;
     private int cacheAgeSec = -1;
 
     public GaugeBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.GAUGE.get(), pos, state);
+        updateSpeed = false;
+    }
+
+    private void tickRequestDisplay() {
+        if (level == null || level.isClientSide || displayTicks <= 0) return;
+        displayTicks--;
+        if (displayTicks > 0) return;
+        if (display == DeskDisplay.SND && pendingDisplayResult != null) {
+            showOrderResult(pendingDisplayResult);
+            return;
+        }
+        if (display == DeskDisplay.OK || display == DeskDisplay.ERR) {
+            showDisplay(DeskDisplay.RDY);
+        }
+    }
+
+    public enum DeskDisplay {
+        RDY, SND, OK, ERR
+    }
+
+    public DeskDisplay displayState() {
+        return display;
+    }
+
+    @Override
+    public void updateControllerStatus() {
+        isController = true;
+        xSize = 1;
+        ySize = 1;
+        if (lines == null) initDefaultSections();
+    }
+
+    @Override
+    public Direction getDirection() {
+        BlockState state = getBlockState();
+        return state.hasProperty(GaugeBlock.FACING)
+                ? state.getValue(GaugeBlock.FACING).getOpposite() : Direction.NORTH;
+    }
+
+    private void showDisplay(DeskDisplay next) {
+        if (next == null) next = DeskDisplay.RDY;
+        display = next;
+        updateControllerStatus();
+        applyTextManually(0, Component.literal("REQ"));
+        applyTextManually(1, Component.literal(next.name()));
+    }
+
+    /** Starts the visible send phase before OrderService performs the actual request. */
+    public void orderStarted() {
+        if (level == null || level.isClientSide) return;
+        pendingDisplayResult = null;
+        displayTicks = 6;
+        showDisplay(DeskDisplay.SND);
     }
 
     public UUID freq() {
@@ -136,8 +191,31 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
 
     public void lastOrder(OrderService.Result result) {
         this.lastOrder = result;
+        if (result == OrderService.Result.QUEUED) {
+            pulseRequestLamp();
+        }
+        if (display == DeskDisplay.SND && displayTicks > 0) {
+            pendingDisplayResult = result;
+        } else {
+            showOrderResult(result);
+        }
         refreshCache();
         sync();
+    }
+
+    private void showOrderResult(OrderService.Result result) {
+        pendingDisplayResult = null;
+        displayTicks = 30;
+        showDisplay(result == OrderService.Result.QUEUED ? DeskDisplay.OK : DeskDisplay.ERR);
+    }
+
+    private void pulseRequestLamp() {
+        if (level == null || level.isClientSide) return;
+        requestPulseTicks = 4;
+        BlockState state = getBlockState();
+        if (state.hasProperty(GaugeBlock.LIT) && !state.getValue(GaugeBlock.LIT)) {
+            level.setBlock(worldPosition, state.setValue(GaugeBlock.LIT, true), 3);
+        }
     }
 
     public void refreshCache() {
@@ -159,16 +237,22 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
         cacheAgeSec = age < 0 ? -1 : (int) (age / 1000);
     }
 
+    public static void clientTick(net.minecraft.world.level.Level level, BlockPos pos, BlockState state, GaugeBlockEntity be) {
+        be.tick();
+    }
+
     public static void serverTick(net.minecraft.world.level.Level level, BlockPos pos, BlockState state, GaugeBlockEntity be) {
+        be.tick();
+        be.tickRequestLamp();
+        be.tickRequestDisplay();
         if (level.getGameTime() % 20 != 0) {
             return;
         }
         be.refreshCache();
-        be.updateLit();
         be.sync();
     }
 
-    private void updateLit() {
+    private void tickRequestLamp() {
         if (level == null || level.isClientSide) {
             return;
         }
@@ -176,9 +260,17 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
         if (!state.hasProperty(GaugeBlock.LIT)) {
             return;
         }
-        boolean lit = LinkSnapshot.peerUp || !StockConfig.hasPeer();
-        if (state.getValue(GaugeBlock.LIT) != lit) {
-            level.setBlock(worldPosition, state.setValue(GaugeBlock.LIT, lit), 3);
+        if (requestPulseTicks > 0) {
+            requestPulseTicks--;
+            if (requestPulseTicks == 0 && state.getValue(GaugeBlock.LIT)) {
+                level.setBlock(worldPosition, state.setValue(GaugeBlock.LIT, false), 3);
+            }
+            return;
+        }
+        // LIT is transient. A save/reload or an interrupted tick must never leave the command lamp
+        // glowing as a false status indication.
+        if (state.getValue(GaugeBlock.LIT)) {
+            level.setBlock(worldPosition, state.setValue(GaugeBlock.LIT, false), 3);
         }
     }
 
@@ -205,17 +297,28 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
         super.onLoad();
         LoadedDocks.add(this);
         refreshCache();
+        if (level != null && !level.isClientSide) {
+            displayTicks = 0;
+            pendingDisplayResult = null;
+            showDisplay(DeskDisplay.RDY);
+        }
     }
 
     @Override
-    public void setRemoved() {
+    public void onChunkUnloaded() {
         LoadedDocks.remove(this);
-        super.setRemoved();
+        super.onChunkUnloaded();
     }
 
     @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider regs) {
-        super.saveAdditional(tag, regs);
+    public void invalidate() {
+        LoadedDocks.remove(this);
+        super.invalidate();
+    }
+
+    @Override
+    protected void write(CompoundTag tag, HolderLookup.Provider regs, boolean clientPacket) {
+        super.write(tag, regs, clientPacket);
         if (freq != null) {
             tag.putUUID("Freq", freq);
         }
@@ -239,8 +342,8 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
     }
 
     @Override
-    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider regs) {
-        super.loadAdditional(tag, regs);
+    protected void read(CompoundTag tag, HolderLookup.Provider regs, boolean clientPacket) {
+        super.read(tag, regs, clientPacket);
         freq = tag.hasUUID("Freq") ? tag.getUUID("Freq") : null;
         networkId = tag.contains("RemoteNetwork")
                 ? RemoteNetworkId.read(tag.getCompound("RemoteNetwork")).orElse(null) : null;
@@ -260,16 +363,6 @@ public final class GaugeBlockEntity extends BlockEntity implements IHaveGoggleIn
         catalog = tag.getInt("Catalog");
         dataLocal = tag.getBoolean("Local");
         cacheAgeSec = tag.contains("CacheAge") ? tag.getInt("CacheAge") : -1;
-    }
-
-    @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider regs) {
-        return saveWithoutMetadata(regs);
-    }
-
-    @Override
-    public Packet<ClientGamePacketListener> getUpdatePacket() {
-        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     private void sync() {

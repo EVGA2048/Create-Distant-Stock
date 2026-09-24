@@ -40,6 +40,7 @@ public final class EventRegistry extends SavedData {
         public static final String DOCK_RETURN_BLOCKED = "DOCK_RETURN_BLOCKED";
         public static final String DOCK_OUTBOUND_STUCK = "DOCK_OUTBOUND_STUCK";
         public static final String DOCK_NO_RECEIVER = "DOCK_NO_RECEIVER";
+        public static final String DOCK_NO_TOWER = "DOCK_NO_TOWER";
         public static final String ADDRESS_CONFLICT = "ADDRESS_CONFLICT";
         public static final String LINK_OFFLINE = "LINK_OFFLINE";
         public static final String TOWER_STOPPED = "TOWER_STOPPED";

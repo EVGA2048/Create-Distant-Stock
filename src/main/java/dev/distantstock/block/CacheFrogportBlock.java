@@ -18,8 +18,16 @@ public final class CacheFrogportBlock extends FrogportBlock {
             net.minecraft.core.BlockPos pos,
             net.minecraft.world.entity.player.Player player,
             net.minecraft.world.phys.BlockHitResult hit) {
-        if (level.getBlockEntity(pos) instanceof FrogportBlockEntity frog) {
-            frog.use(player);
+        // Sneak interaction belongs to CacheFrogportReleaseBehaviour's Create-native value
+        // settings board. Ordinary empty-hand right click has exactly one meaning: open the 54-slot
+        // cache inventory.
+        if (player.isShiftKeyDown()) {
+            return net.minecraft.world.InteractionResult.PASS;
+        }
+        if (level.getBlockEntity(pos) instanceof CacheFrogportBlockEntity cache) {
+            if (!level.isClientSide) {
+                player.openMenu(cache, pos);
+            }
             return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide);
         }
         return net.minecraft.world.InteractionResult.PASS;

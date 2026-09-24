@@ -2,8 +2,8 @@ package dev.distantstock.compat.fluidlogistics;
 
 import com.simibubi.create.content.logistics.box.PackageItem;
 import dev.distantstock.DistantStock;
-import dev.distantstock.link.RouteLabels;
 import dev.distantstock.routing.OrderRouteDirectory;
+import dev.distantstock.routing.RemoteOrderParcelStamp;
 import dev.distantstock.routing.RemoteRouteData;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
@@ -63,17 +63,12 @@ public final class FluidLogisticsCompat {
 
         int orderId = PackageItem.getOrderId(stack);
         OrderRouteDirectory directory = OrderRouteDirectory.get(server);
-        var route = directory.find(orderId).orElse(null);
-        if (route == null) {
+        if (directory.find(orderId).isEmpty()) {
             return stack;
         }
 
         ItemStack remote = alreadyRemote ? stack : stack.transmuteCopy(REMOTE_FLUID_PACKAGE.get());
-        if (RemoteRouteData.read(remote).isEmpty()) {
-            RemoteRouteData.write(remote, route,
-                    RouteLabels.describe(server, route),
-                    directory.homeAddress(orderId));
-        }
+        RemoteOrderParcelStamp.stamp(remote, server);
         return remote;
     }
 }

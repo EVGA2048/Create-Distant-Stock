@@ -16,7 +16,8 @@ import java.util.UUID;
 
 /** Current Distant Stock network membership for the warehouse selected by an open terminal. */
 public record DistantNetworkStateS2C(boolean localWarehouse, UUID networkId, String networkName,
-                                     boolean owner, String joinCode) implements CustomPacketPayload {
+                                     boolean owner, String joinCode, String warehouseName,
+                                     boolean warehouseRenameAllowed) implements CustomPacketPayload {
     public static final Type<DistantNetworkStateS2C> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "distant_network_state"));
     public static final StreamCodec<RegistryFriendlyByteBuf, DistantNetworkStateS2C> STREAM_CODEC =
@@ -41,7 +42,7 @@ public record DistantNetworkStateS2C(boolean localWarehouse, UUID networkId, Str
                 .anyMatch(entry -> member.equals(entry.networkId()));
         if (member == null) {
             PacketDistributor.sendToPlayer(player,
-                    new DistantNetworkStateS2C(false, null, "", false, ""));
+                    new DistantNetworkStateS2C(false, null, "", false, "", "", false));
             return;
         }
         DistantNetworkDirectory directory = DistantNetworkDirectory.get(player.getServer());
@@ -55,14 +56,19 @@ public record DistantNetworkStateS2C(boolean localWarehouse, UUID networkId, Str
         var network = directory.find(scope).orElse(null);
         if (network == null || network.legacy()) {
             PacketDistributor.sendToPlayer(player,
-                    new DistantNetworkStateS2C(local, null, "", false, ""));
+                    new DistantNetworkStateS2C(local, null, "", false, "", "", false));
             return;
         }
         java.util.UUID localNode = dev.distantstock.link.TranserverBridge.localNodeUuid();
         boolean owner = localNode != null && network.ownedBy(player.getUUID())
                 && network.authoritativeOn(localNode);
+        NetworkDirectory.Entry row = local ? NetworkDirectory.find(member).orElse(null) : null;
+        String warehouseName = local ? directory.memberName(member).orElse("") : "";
+        boolean canRename = row != null && dev.distantstock.stock.CreateNetworkAccess
+                .mayAdministrate(member, row.freq(), player);
         PacketDistributor.sendToPlayer(player, new DistantNetworkStateS2C(
-                local, network.id(), network.name(), owner, owner ? network.joinCode() : ""));
+                local, network.id(), network.name(), owner, owner ? network.joinCode() : "",
+                warehouseName, canRename));
     }
 
     /** State of the terminal's Distant Stock network itself, independent of any selected warehouse. */
@@ -71,7 +77,7 @@ public record DistantNetworkStateS2C(boolean localWarehouse, UUID networkId, Str
                 || !DistantNetworkDirectory.isFormalId(scope)) {
             if (player != null) {
                 PacketDistributor.sendToPlayer(player,
-                        new DistantNetworkStateS2C(false, null, "", false, ""));
+                        new DistantNetworkStateS2C(false, null, "", false, "", "", false));
             }
             return;
         }
@@ -79,14 +85,15 @@ public record DistantNetworkStateS2C(boolean localWarehouse, UUID networkId, Str
         var network = directory.find(scope).orElse(null);
         if (network == null || network.legacy()) {
             PacketDistributor.sendToPlayer(player,
-                    new DistantNetworkStateS2C(false, null, "", false, ""));
+                    new DistantNetworkStateS2C(false, null, "", false, "", "", false));
             return;
         }
         UUID localNode = dev.distantstock.link.TranserverBridge.localNodeUuid();
         boolean owner = localNode != null && network.ownedBy(player.getUUID())
                 && network.authoritativeOn(localNode);
         PacketDistributor.sendToPlayer(player, new DistantNetworkStateS2C(
-                false, network.id(), network.name(), owner, owner ? network.joinCode() : ""));
+                false, network.id(), network.name(), owner, owner ? network.joinCode() : "",
+                "", false));
     }
 
     public static void handle(DistantNetworkStateS2C msg, IPayloadContext ctx) {
@@ -105,6 +112,9 @@ public record DistantNetworkStateS2C(boolean localWarehouse, UUID networkId, Str
         buf.writeUtf(msg.networkName == null ? "" : msg.networkName, DistantNetworkDirectory.MAX_NAME_LENGTH);
         buf.writeBoolean(msg.owner);
         buf.writeUtf(msg.joinCode == null ? "" : msg.joinCode, 9);
+        buf.writeUtf(msg.warehouseName == null ? "" : msg.warehouseName,
+                DistantNetworkDirectory.MAX_NAME_LENGTH);
+        buf.writeBoolean(msg.warehouseRenameAllowed);
     }
 
     private static DistantNetworkStateS2C read(RegistryFriendlyByteBuf buf) {
@@ -113,6 +123,8 @@ public record DistantNetworkStateS2C(boolean localWarehouse, UUID networkId, Str
         String name = buf.readUtf(DistantNetworkDirectory.MAX_NAME_LENGTH);
         boolean owner = buf.readBoolean();
         String code = buf.readUtf(9);
-        return new DistantNetworkStateS2C(local, id, name, owner, code);
+        String warehouseName = buf.readUtf(DistantNetworkDirectory.MAX_NAME_LENGTH);
+        boolean renameAllowed = buf.readBoolean();
+        return new DistantNetworkStateS2C(local, id, name, owner, code, warehouseName, renameAllowed);
     }
 }

@@ -17,12 +17,15 @@ public final class OrderRequestCodec {
     private static final int MAGIC = 0x44534f52;
     /**
      * Version 1 carried one package address; 2 appended the post-crossing address; 3 carries the
-     * node that owns the receiving address; 4 carries the Distant Stock network scope as well.
+     * node that owns the receiving address; 4 carries the Distant Stock network scope as well;
+     * 5 carries the player-facing Distant Dock receiving address explicitly. The latter must not be
+     * reconstructed on the packing server from a possibly stale remote directory.
      * The packing server must not infer either from "local vs source" — a Distant Stock network may
      * have three or more server nodes, and the source warehouse must be able to reject a request
      * arriving from a different Distant Stock network without trusting the ordering client.
      */
-    private static final int VERSION = 4;
+    private static final int VERSION = 5;
+    private static final int VERSION_WITH_RECEIVING_ADDRESS = 5;
     private static final int VERSION_WITH_DISTANT_NETWORK = 4;
     private static final int VERSION_WITH_DESTINATION_NODE = 3;
     private static final int VERSION_WITH_HOME_ADDRESS = 2;
@@ -42,12 +45,23 @@ public final class OrderRequestCodec {
      */
     public record Request(RemoteNetworkId networkId, UUID distantNetworkId,
                           UUID receivingDockGroupId, UUID destinationNodeId,
-                          UUID correlationId, UUID childOrderId, String address, String homeAddress,
+                          UUID correlationId, UUID childOrderId, String address,
+                          String receivingAddress, String homeAddress,
                           List<LinkQueues.Line> lines) {
         public Request {
             address = address == null ? "" : address;
+            receivingAddress = receivingAddress == null ? "" : receivingAddress;
             homeAddress = homeAddress == null ? "" : homeAddress;
             lines = List.copyOf(lines);
+        }
+
+        /** Version-4-shaped constructor retained for source compatibility. */
+        public Request(RemoteNetworkId networkId, UUID distantNetworkId,
+                       UUID receivingDockGroupId, UUID destinationNodeId,
+                       UUID correlationId, UUID childOrderId,
+                       String address, String homeAddress, List<LinkQueues.Line> lines) {
+            this(networkId, distantNetworkId, receivingDockGroupId, destinationNodeId,
+                    correlationId, childOrderId, address, "", homeAddress, lines);
         }
 
         /** Version-3-shaped constructor retained for source compatibility. */
@@ -55,7 +69,7 @@ public final class OrderRequestCodec {
                        UUID correlationId, UUID childOrderId, String address, String homeAddress,
                        List<LinkQueues.Line> lines) {
             this(networkId, null, receivingDockGroupId, destinationNodeId, correlationId,
-                    childOrderId, address, homeAddress, lines);
+                    childOrderId, address, "", homeAddress, lines);
         }
 
         /** Version-2-shaped constructor retained for source compatibility. */
@@ -63,14 +77,14 @@ public final class OrderRequestCodec {
                        UUID childOrderId, String address, String homeAddress,
                        List<LinkQueues.Line> lines) {
             this(networkId, null, receivingDockGroupId, null, correlationId, childOrderId,
-                    address, homeAddress, lines);
+                    address, "", homeAddress, lines);
         }
 
         /** An order with one address: what a build before home addresses sent, and still sends. */
         public Request(RemoteNetworkId networkId, UUID receivingDockGroupId, UUID correlationId,
                        UUID childOrderId, String address, List<LinkQueues.Line> lines) {
             this(networkId, null, receivingDockGroupId, null, correlationId, childOrderId,
-                    address, "", lines);
+                    address, "", "", lines);
         }
     }
 
@@ -100,6 +114,7 @@ public final class OrderRequestCodec {
         writeUuid(out, request.childOrderId());
         writeString(out, request.address());
         writeString(out, request.homeAddress());
+        writeString(out, request.receivingAddress());
         out.writeInt(request.lines().size());
         for (LinkQueues.Line line : request.lines()) {
             if (line.count() <= 0) {
@@ -142,6 +157,7 @@ public final class OrderRequestCodec {
         // and the sender are usually the same build, but a rolling restart is exactly when this
         // matters — the two halves of a pair are restarted one at a time.
         String homeAddress = version >= VERSION_WITH_HOME_ADDRESS ? readString(in) : "";
+        String receivingAddress = version >= VERSION_WITH_RECEIVING_ADDRESS ? readString(in) : "";
         int count = in.readInt();
         if (count <= 0 || count > MAX_LINES) {
             throw new IOException("Order line count is invalid");
@@ -159,7 +175,7 @@ public final class OrderRequestCodec {
             throw new IOException("Order payload contains trailing data");
         }
         return new Request(networkId, distantNetworkId, group, destinationNode, correlation, child,
-                address, homeAddress, lines);
+                address, receivingAddress, homeAddress, lines);
     }
 
     private static void writeString(DataOutputStream out, String value) throws IOException {

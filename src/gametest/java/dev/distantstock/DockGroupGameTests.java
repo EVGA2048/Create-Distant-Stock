@@ -441,12 +441,11 @@ public final class DockGroupGameTests {
         h.assertTrue(DockGroupDirectory.DEFAULT_GROUP_ID.equals(desk.receivingGroup()),
                 "a fresh desk was pointed somewhere other than the default group");
 
-        // A name nobody has used before. The test world is a save like any other and keeps its dock
-        // groups between runs: a fixed name here made a group owned by the previous run's player,
-        // and every run after that was silently refused entry to its own fixture — the write went
-        // nowhere and the failure looked like a bug in the desk.
+        // Receiving addresses are authored by docks now. A requester is only a selector, so make
+        // the address the same way a player does: type it into a Distant Dock on this formal network.
         String name = "甲站收货-" + UUID.randomUUID();
         DockGroupDirectory directory = DockGroupDirectory.get(h.getLevel().getServer());
+        directory.resolveAddress(distant.id(), name);
         menu.writeDockGroup(player, name, SetDockGroupC2S.SELECT);
         DockGroup stored = directory.find(desk.receivingGroup()).orElse(null);
         h.assertTrue(stored != null && stored.name().equals(name),
@@ -582,6 +581,26 @@ public final class DockGroupGameTests {
                     "港还留在被删掉的系统里");
             h.succeed();
         });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void receivingAddressNamesAreScopedByDistantNetwork(GameTestHelper h) {
+        DockGroupDirectory directory = new DockGroupDirectory();
+        UUID networkA = UUID.randomUUID();
+        UUID networkB = UUID.randomUUID();
+        String address = "主仓-" + UUID.randomUUID().toString().substring(0, 6);
+
+        DockGroup a1 = directory.resolveAddress(networkA, address);
+        DockGroup a2 = directory.resolveAddress(networkA, "  " + address + "  ");
+        DockGroup b = directory.resolveAddress(networkB, address);
+
+        h.assertTrue(a1.id().equals(a2.id()),
+                "同一个远仓网络输入相同接收地址却创建了两个内部组");
+        h.assertTrue(!a1.id().equals(b.id()),
+                "两个不同远仓网络的同名接收地址串成了同一个组");
+        h.assertTrue(a1.distantNetworkId().equals(networkA) && b.distantNetworkId().equals(networkB),
+                "自动解析的接收地址丢失了远仓网络命名空间");
+        h.succeed();
     }
 
 }

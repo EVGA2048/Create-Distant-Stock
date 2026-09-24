@@ -57,6 +57,23 @@ public final class TowerGameTests {
         h.succeed();
     }
 
+    @GameTest(template = "empty", timeoutTicks = 80)
+    public static void everyTowerStructurePartResolvesToTheSameControlCore(GameTestHelper h) {
+        build(h, TowerTier.I.couplers(), true);
+        BlockPos core = h.absolutePos(new BlockPos(X, 0, Z));
+        BlockPos casing = h.absolutePos(new BlockPos(X + 1, 0, Z));
+        h.getLevel().setBlock(casing, ModBlocks.TOWER_CASING.get().defaultBlockState(), 3);
+        BlockPos coupler = h.absolutePos(new BlockPos(X, 1, Z));
+        BlockPos resonator = h.absolutePos(new BlockPos(X, TowerTier.I.couplers() + 1, Z));
+
+        for (BlockPos part : java.util.List.of(core, casing, coupler, resonator)) {
+            BlockPos resolved = TowerStructure.coreForPart(h.getLevel(), part).orElse(null);
+            h.assertTrue(core.equals(resolved),
+                    "塔结构方块 " + part.toShortString() + " 没有解析到同一个核心");
+        }
+        h.succeed();
+    }
+
     @GameTest(template = "empty", timeoutTicks = 40)
     public static void theShortestTowerIsATower(GameTestHelper h) {
         build(h, TowerTier.I.couplers(), true);

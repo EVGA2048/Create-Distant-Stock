@@ -61,7 +61,7 @@ public record DistantNetworkActionC2S(int action, String value) implements Custo
                     ? directory.find(scope).orElse(null) : null;
             boolean joined = current != null && !current.legacy();
             if (msg.action == REFRESH) {
-                DistantNetworkStateS2C.sendScope(player, joined ? current.id() : null);
+                sendCurrentState(player, menu, joined ? current.id() : null);
                 return;
             }
             if (menu.isGauge() && !joined) {
@@ -150,7 +150,7 @@ public record DistantNetworkActionC2S(int action, String value) implements Custo
                 say(player, "message.distantstock.network.rename_ok", msg.value.trim());
                 PacketDistributor.sendToPlayer(player, StockSyncS2C.of(
                         menu.demo, menu.stock, current.id()));
-                DistantNetworkStateS2C.sendScope(player, current.id());
+                DistantNetworkStateS2C.send(player, member, current.id());
                 return;
             }
 
@@ -171,8 +171,17 @@ public record DistantNetworkActionC2S(int action, String value) implements Custo
                 menu.refresh(player);
                 say(player, "message.distantstock.network.left", current.name());
             }
-            DistantNetworkStateS2C.sendScope(player, menu.distantNetworkId(player));
+            sendCurrentState(player, menu, menu.distantNetworkId(player));
         });
+    }
+
+    private static void sendCurrentState(ServerPlayer player, RequesterMenu menu, UUID scope) {
+        RemoteNetworkId member = MenuSync.resolve(menu.networkId(player), menu.freq(player));
+        if (member != null) {
+            DistantNetworkStateS2C.send(player, member, scope);
+        } else {
+            DistantNetworkStateS2C.sendScope(player, scope);
+        }
     }
 
     private static void say(ServerPlayer player, String key, Object... args) {

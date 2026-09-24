@@ -43,6 +43,59 @@ import io.netty.buffer.Unpooled;
 @PrefixGameTestTemplate(false)
 public final class RequesterFlowGameTests {
 
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void exactStockGateRejectsTerminalOverSelection(GameTestHelper h) {
+        var summary = new com.simibubi.create.content.logistics.packager.InventorySummary();
+        summary.add(new ItemStack(net.minecraft.world.item.Items.POTATO), 63);
+        var exactly = java.util.List.of(new dev.distantstock.stock.StockCache.Entry("minecraft:potato", 63));
+        var tooMany = java.util.List.of(new dev.distantstock.stock.StockCache.Entry("minecraft:potato", 64));
+        h.assertTrue(dev.distantstock.stock.CreateStock.canFulfillExact(summary, exactly),
+                "63 个土豆的仓库连 63 个都被拒了");
+        h.assertFalse(dev.distantstock.stock.CreateStock.canFulfillExact(summary, tooMany),
+                "63 个土豆的仓库接受了 64 个的终端订单");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void networkWithOnlyRemotePackagerIsRecognisedAsPackable(GameTestHelper h) {
+        var level = h.getLevel();
+        UUID freq = UUID.randomUUID();
+        BlockPos linkPos = h.absolutePos(new BlockPos(4, 2, 4));
+
+        var stockLinkBlock = net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                .get(ResourceLocation.parse("create:stock_link"));
+        var linkState = stockLinkBlock.defaultBlockState()
+                .setValue(BlockStateProperties.ATTACH_FACE, AttachFace.FLOOR);
+        level.setBlock(linkPos, linkState, 3);
+        PackagerLinkBlockEntity link = (PackagerLinkBlockEntity) level.getBlockEntity(linkPos);
+        h.assertTrue(link != null, "Create stock link did not create");
+
+        Direction connected = com.simibubi.create.content.logistics.packagerLink.PackagerLinkBlock
+                .getConnectedDirection(linkState);
+        BlockPos packagerPos = linkPos.relative(connected.getOpposite());
+        level.setBlock(packagerPos, ModBlocks.REMOTE_PACKAGER.get().defaultBlockState(), 3);
+        h.assertTrue(level.getBlockEntity(packagerPos)
+                        instanceof dev.distantstock.block.RemotePackagerBlockEntity,
+                "remote packager did not create beside stock link");
+        h.assertTrue(link.getPackager() instanceof dev.distantstock.block.RemotePackagerBlockEntity,
+                "Create stock link does not recognise RemotePackagerBlockEntity as its packager");
+
+        var logistics = new com.simibubi.create.content.logistics.packagerLink.LogisticsNetwork(freq);
+        com.simibubi.create.Create.LOGISTICS.logisticsNetworks.put(freq, logistics);
+        try {
+            LogisticallyLinkedBehaviour.remove(link.behaviour);
+            link.behaviour.freqId = freq;
+            logistics.loadedLinks.add(GlobalPos.of(level.dimension(), linkPos));
+            LogisticallyLinkedBehaviour.keepAlive(link.behaviour);
+            h.assertTrue(dev.distantstock.block.RemotePackagerBlockEntity.canPack(freq),
+                    "network containing only a remote packager was advertised as having no packager");
+        } finally {
+            LogisticallyLinkedBehaviour.remove(link.behaviour);
+            com.simibubi.create.Create.LOGISTICS.logisticsNetworks.remove(freq);
+        }
+        h.succeed();
+    }
+
     @GameTest(template = "empty", timeoutTicks = 40)
     public static void remoteRedstoneRequesterMirrorsRedstoneIntoPoweredBlockstate(GameTestHelper h) {
         var level = h.getLevel();
@@ -412,7 +465,7 @@ public final class RequesterFlowGameTests {
                             && localNode.equals(scanned.networkId().nodeId()),
                     "singleplayer StockScanner published the local Create network without a stable RemoteNetworkId");
             h.assertTrue(OrderService.place(level.getServer(), network, frequency, distant.id(),
-                    "factory", to, List.of(new LinkQueues.Line("minecraft:iron_ingot", 640)), "")
+                    "111", to, List.of(new LinkQueues.Line("minecraft:iron_ingot", 640)), "222")
                     == OrderService.Result.QUEUED,
                     "request was not queued");
         });
@@ -426,6 +479,11 @@ public final class RequesterFlowGameTests {
             var receiving = level.getCapability(Capabilities.ItemHandler.BLOCK, target.getBlockPos(), Direction.UP);
             ItemStack arrived = receiving.extractItem(0, 1, false);
             if (!arrived.isEmpty()) {
+                h.assertTrue("222".equals(PackageItem.getAddress(arrived)),
+                        "same-node Distant Dock crossing kept the source address instead of 111 -> 222: "
+                                + PackageItem.getAddress(arrived));
+                h.assertTrue(dev.distantstock.routing.RemoteRouteData.homeAddress(arrived).isEmpty(),
+                        "same-node crossing applied 222 but left HomeAddress armed for a second rewrite");
                 parcels[0]++;
                 var contents = PackageItem.getContents(arrived);
                 for (int i = 0; i < contents.getSlots(); i++) {
@@ -441,6 +499,50 @@ public final class RequesterFlowGameTests {
                     "completed order route was not cleaned up");
             h.assertTrue(barrel.isEmpty() && packager.heldBox.isEmpty() && sender.displayedStack().isEmpty(),
                     "items were duplicated or left at the source");
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 70)
+    public static void requestDeskLampAndFlapReportOrderLifecycle(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos successPos = h.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos failPos = h.absolutePos(new BlockPos(4, 2, 2));
+        level.setBlock(successPos, ModBlocks.GAUGE.get().defaultBlockState(), 3);
+        level.setBlock(failPos, ModBlocks.GAUGE.get().defaultBlockState(), 3);
+        var success = (dev.distantstock.block.GaugeBlockEntity) level.getBlockEntity(successPos);
+        var fail = (dev.distantstock.block.GaugeBlockEntity) level.getBlockEntity(failPos);
+        h.assertTrue(success != null && fail != null, "request desk block entities are missing");
+        h.assertTrue(success.displayState() == dev.distantstock.block.GaugeBlockEntity.DeskDisplay.RDY
+                        && fail.displayState() == dev.distantstock.block.GaugeBlockEntity.DeskDisplay.RDY,
+                "request desk flap does not start at RDY");
+
+        h.runAfterDelay(1, () -> {
+            success.orderStarted();
+            fail.orderStarted();
+            success.lastOrder(OrderService.Result.QUEUED);
+            fail.lastOrder(OrderService.Result.FAIL);
+            h.assertTrue(success.displayState() == dev.distantstock.block.GaugeBlockEntity.DeskDisplay.SND
+                            && fail.displayState() == dev.distantstock.block.GaugeBlockEntity.DeskDisplay.SND,
+                    "request desk did not hold SND long enough to be visible");
+            h.assertTrue(level.getBlockState(successPos).getValue(dev.distantstock.block.GaugeBlock.LIT),
+                    "accepted request did not flash the command lamp");
+            h.assertFalse(level.getBlockState(failPos).getValue(dev.distantstock.block.GaugeBlock.LIT),
+                    "failed request flashed the command lamp");
+        });
+
+        h.runAfterDelay(8, () -> {
+            h.assertFalse(level.getBlockState(successPos).getValue(dev.distantstock.block.GaugeBlock.LIT),
+                    "request desk command lamp stayed lit after its short pulse");
+            h.assertTrue(success.displayState() == dev.distantstock.block.GaugeBlockEntity.DeskDisplay.OK,
+                    "accepted request did not advance SND -> OK");
+            h.assertTrue(fail.displayState() == dev.distantstock.block.GaugeBlockEntity.DeskDisplay.ERR,
+                    "failed request did not advance SND -> ERR");
+        });
+        h.runAfterDelay(39, () -> {
+            h.assertTrue(success.displayState() == dev.distantstock.block.GaugeBlockEntity.DeskDisplay.RDY
+                            && fail.displayState() == dev.distantstock.block.GaugeBlockEntity.DeskDisplay.RDY,
+                    "request desk flap did not return to RDY after its result hold");
+            h.succeed();
         });
     }
 

@@ -281,12 +281,11 @@ public final class RequesterMenu extends AbstractContainerMenu {
     }
 
     /**
-     * Points the requester at a group, making or renaming one if that is what the name asks for.
+     * Points the requester at an existing receiving address.
      *
-     * <p>Three outcomes from one field, because the screen has one field: an existing name selects,
-     * an unused name creates, and a rename renames whatever the requester is already carrying. The
-     * rename case is why the flag is here rather than being inferred — without it, renaming a group
-     * to a name nobody has used would create a second group and leave the original behind.
+     * <p>Receiving addresses are created implicitly by configuring Distant Docks, scoped by one
+     * Distant Stock network. The requester is only a selector: typing an unknown address must never
+     * create a second routing object behind the user's back.
      */
     public void writeDockGroup(Player player, String name, int action) {
         ItemStack stack = device(player);
@@ -426,20 +425,13 @@ public final class RequesterMenu extends AbstractContainerMenu {
             sendGroupList(player, stack);
             return;
         }
-        dev.distantstock.routing.DockGroup existing =
-                resolved.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.LOCAL
-                        ? resolved.local() : null;
-        // A group made here belongs to whoever made it, and starts closed. See
-        // DockGroupDirectory.createFor for why the default is the quiet one.
-        dev.distantstock.routing.DockGroup group = existing != null
-                ? existing : directory.createForNetwork(trimmed, who, addressScope,
-                dev.distantstock.routing.DockGroup.Visibility.PUBLIC);
-        // findByName above and createFor here both run on the server thread, so nothing can slip
-        // between them. The duplicate check inside createFor is what keeps that an argument rather
-        // than a hope.
-        setCarriedGroup(player, stack, group);
-        // Push the list again: a system just made does not exist on the client until it is told,
-        // and the one now carried has to stop being drawn as somebody else's.
+        if (resolved.kind() != dev.distantstock.routing.ReceivingAddressResolver.Kind.LOCAL) {
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "gui.distantstock.group.unknown_name", trimmed), true);
+            sendGroupList(player, stack);
+            return;
+        }
+        setCarriedGroup(player, stack, resolved.local());
         sendGroupList(player, stack);
     }
 

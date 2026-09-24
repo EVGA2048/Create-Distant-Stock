@@ -22,7 +22,7 @@ public final class DistantNetworkScreen extends Screen {
     private final RequesterScreen parent;
     private final boolean requestStateOnInit;
     private DistantNetworkStateS2C state =
-            new DistantNetworkStateS2C(false, null, "", false, "");
+            new DistantNetworkStateS2C(false, null, "", false, "", "", false);
 
     private EditBox nameInput;
     private EditBox codeInput;
@@ -50,13 +50,11 @@ public final class DistantNetworkScreen extends Screen {
     }
 
     public void apply(DistantNetworkStateS2C next) {
-        state = next == null ? new DistantNetworkStateS2C(false, null, "", false, "") : next;
+        state = next == null
+                ? new DistantNetworkStateS2C(false, null, "", false, "", "", false) : next;
         if (warehouseNameInput != null && !warehouseNameInput.isFocused()) {
-            String current = selectedLocalWarehouseName();
-            if (!current.isBlank()) {
-                warehouseNameDraft = current;
-                warehouseNameInput.setValue(current);
-            }
+            warehouseNameDraft = state.warehouseName();
+            warehouseNameInput.setValue(warehouseNameDraft);
         }
         updateWidgets();
     }
@@ -98,7 +96,7 @@ public final class DistantNetworkScreen extends Screen {
         });
         addRenderableWidget(codeInput);
 
-        String currentWarehouseName = selectedLocalWarehouseName();
+        String currentWarehouseName = state.warehouseName();
         if (warehouseNameDraft.isBlank() && !currentWarehouseName.isBlank()) {
             warehouseNameDraft = currentWarehouseName;
         }
@@ -155,35 +153,20 @@ public final class DistantNetworkScreen extends Screen {
         }
     }
 
-    private dev.distantstock.stock.NetworkDirectory.Entry selectedLocalWarehouse() {
-        if (parent == null || minecraft == null || minecraft.player == null || !state.joined()) {
-            return null;
-        }
-        java.util.UUID freq = parent.getMenu().freq(minecraft.player);
-        if (freq == null) return null;
-        return parent.getMenu().networks.stream()
-                .filter(entry -> entry.local() && freq.equals(entry.freq()))
-                .filter(entry -> state.networkId().equals(entry.distantNetworkId()))
-                .findFirst().orElse(null);
-    }
-
-    private String selectedLocalWarehouseName() {
-        var entry = selectedLocalWarehouse();
-        return entry == null ? "" : entry.warehouseName();
-    }
-
     private void updateWidgets() {
         if (nameInput == null) return;
         boolean joined = state.joined();
         boolean portable = parent == null || !parent.getMenu().isGauge();
         boolean canJoinHere = portable && !joined;
-        boolean canRenameWarehouse = joined && selectedLocalWarehouse() != null;
+        boolean localWarehouse = joined && state.localWarehouse();
+        boolean canRenameWarehouse = localWarehouse && state.warehouseRenameAllowed();
         nameInput.visible = canJoinHere;
         codeInput.visible = canJoinHere;
-        warehouseNameInput.visible = canRenameWarehouse;
+        warehouseNameInput.visible = localWarehouse;
+        warehouseNameInput.active = canRenameWarehouse;
         createButton.visible = canJoinHere;
         joinButton.visible = canJoinHere;
-        renameWarehouseButton.visible = canRenameWarehouse;
+        renameWarehouseButton.visible = localWarehouse;
         createButton.active = canJoinHere && !nameDraft.trim().isEmpty();
         joinButton.active = canJoinHere && normalizedCodeDraft() != null;
         renameWarehouseButton.active = canRenameWarehouse && !warehouseNameDraft.trim().isEmpty();
@@ -216,7 +199,7 @@ public final class DistantNetworkScreen extends Screen {
                                 "gui.distantstock.distant_network.code_owner_only"),
                         x + 10, y + 59, HINT, false);
             }
-            if (selectedLocalWarehouse() != null) {
+            if (state.localWarehouse()) {
                 field(g, warehouseNameInput, Component.translatable(
                         "gui.distantstock.distant_network.warehouse_name_hint").getString(), mouseX, mouseY);
             }

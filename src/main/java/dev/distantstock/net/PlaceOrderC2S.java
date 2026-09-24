@@ -157,6 +157,9 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
                     items.add(new LinkQueues.Line(line.itemId, line.count));
                 }
             }
+            if (desk != null) {
+                desk.orderStarted();
+            }
             OrderService.Result result = p instanceof ServerPlayer serverPlayer
                     ? OrderService.place(serverPlayer.getServer(), menu.networkId(p), freq,
                     distantNetworkId, address, group, items, homeAddress)

@@ -9,7 +9,8 @@ import net.minecraft.client.Minecraft;
 /** Client-only packet effects, isolated so dedicated servers never resolve GUI classes. */
 public final class ClientPayloadHandlers {
     public static void openMonitor(OpenMonitorS2C message) {
-        Minecraft.getInstance().setScreen(new MonitorScreen(message.source(), message.view()));
+        Minecraft.getInstance().setScreen(new MonitorScreen(
+                message.source(), message.view(), message.towerOnly()));
     }
 
     public static void updateMonitor(LinkSnapshotS2C message) {

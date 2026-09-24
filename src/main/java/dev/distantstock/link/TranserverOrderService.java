@@ -89,7 +89,8 @@ public final class TranserverOrderService {
                 boolean crosses = !here.equals(destination);
                 boolean applied = CreateStock.request(record.request().networkId().createFrequency(), items,
                         record.request().address(), server, route,
-                        crosses ? record.request().homeAddress() : "");
+                        crosses ? record.request().homeAddress() : "",
+                        record.request().receivingAddress());
                 inbox.state(record.childOrderId(), applied ? InboundOrderInbox.State.APPLIED
                         : InboundOrderInbox.State.RECEIVED, applied ? "" : "network busy or stock unavailable");
                 if (applied) {

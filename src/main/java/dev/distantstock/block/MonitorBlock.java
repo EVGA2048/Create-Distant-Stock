@@ -177,7 +177,7 @@ public final class MonitorBlock extends WallPanelBlock implements IWrenchable,
                 // readout is built for the monitor that asked.
                 PacketDistributor.sendToPlayer(sp,
                         new OpenMonitorS2C(pos, LinkSnapshot.view(
-                                dev.distantstock.routing.TowerReadout.survey(level, pos))));
+                                dev.distantstock.routing.TowerReadout.survey(level, pos)), false));
             }
         }
     }

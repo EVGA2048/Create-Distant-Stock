@@ -11,19 +11,11 @@ import net.minecraft.world.entity.player.Player;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * Names the receiving dock group a requester points at.
- *
- * <p>A name, not an id. The design has players seeing a renameable display name and never a UUID,
- * so the name is what travels and the server is what turns it into an identity. A name nobody has
- * used yet becomes a new group: that is the whole of "creating a system", and it is deliberately
- * the same gesture as selecting one, because a player who has to first create a system and then
- * select it is being asked to do one thing twice.
- *
- * <p>The world half of the pairing is in {@link dev.distantstock.block.DockBlock}: sneak to make a
- * dock join the carried group, plain click to make it send there.
+ * Selects a receiving address on a requester. The address string is resolved inside the currently
+ * selected Distant Stock network; only Distant Docks create addresses.
  */
 public record SetDockGroupC2S(String name, int action) implements CustomPacketPayload {
-    /** Point the requester at this name, making the system if nobody has used the name yet. */
+    /** Point the requester at this already-existing receiving address. */
     public static final int SELECT = 0;
     /** Give the requester's current system this name. */
     public static final int RENAME = 1;

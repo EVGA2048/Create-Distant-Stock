@@ -40,7 +40,7 @@ public final class LoggerBlock extends WallPanelBlock implements IWrenchable {
     public LoggerBlock(Properties props) {
         super(props);
         registerDefaultState(defaultBlockState()
-                .setValue(STATUS, Status.WARN)
+                .setValue(STATUS, Status.NORMAL)
                 .setValue(PRINTED, false));
     }
 

@@ -13,6 +13,8 @@ public final class EventText {
                     Component.translatable("event.distantstock.chain.ping_timeout.title");
             case EventRegistry.Codes.CHAIN_CACHE_FULL ->
                     Component.translatable("event.distantstock.chain.cache_full.title");
+            case EventRegistry.Codes.DOCK_NO_TOWER ->
+                    Component.translatable("event.distantstock.dock.no_tower.title");
             default -> Component.literal(code);
         };
     }
@@ -26,6 +28,8 @@ public final class EventText {
                     Component.translatable("event.distantstock.chain.ping_timeout.detail", value);
             case EventRegistry.Codes.CHAIN_CACHE_FULL ->
                     Component.translatable("event.distantstock.chain.cache_full.detail", value);
+            case EventRegistry.Codes.DOCK_NO_TOWER ->
+                    Component.translatable("event.distantstock.dock.no_tower.detail");
             default -> value.isBlank() ? Component.empty() : Component.translatable(value);
         };
     }

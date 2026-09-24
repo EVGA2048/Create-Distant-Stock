@@ -3,7 +3,7 @@
   "category": "redstone",
   "key": {
     "A": { "item": "create:andesite_alloy" },
-    "Q": { "item": "distantstock:ether_quartz" }
+    "Q": { "item": "distantstock:polished_ether_quartz" }
   },
   "pattern": [
     " A ",

@@ -28,6 +28,8 @@ public final class RemoteRouteData {
      */
     private static final String LABEL = "DestinationLabel";
     private static final int MAX_LABEL = 96;
+    /** Human-readable Distant Dock receiving address selected by the requester. */
+    private static final String RECEIVING_ADDRESS = "ReceivingAddress";
     /**
      * The address the parcel wears once it is on the other side — its address at home.
      *
@@ -68,6 +70,16 @@ public final class RemoteRouteData {
         } catch (IllegalArgumentException exception) {
             return Optional.empty();
         }
+    }
+
+    /** The Distant Dock receiving address selected by the requester, or empty on old parcels. */
+    public static String receivingAddress(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "";
+        }
+        CompoundTag custom = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        return custom.contains(ROOT, CompoundTag.TAG_COMPOUND)
+                ? custom.getCompound(ROOT).getString(RECEIVING_ADDRESS) : "";
     }
 
     /** The destination in words, or empty when the parcel carries no label. */
@@ -141,7 +153,7 @@ public final class RemoteRouteData {
     }
 
     public static void write(ItemStack stack, RemoteRoute value) {
-        write(stack, value, "", "");
+        write(stack, value, "", "", "");
     }
 
     /**
@@ -151,7 +163,7 @@ public final class RemoteRouteData {
      * nothing to say leaves the parcel exactly as the id-only version would have.
      */
     public static void write(ItemStack stack, RemoteRoute value, String label) {
-        write(stack, value, label, "");
+        write(stack, value, label, "", "");
     }
 
     /**
@@ -164,10 +176,24 @@ public final class RemoteRouteData {
      * the route usable.
      */
     public static void write(ItemStack stack, RemoteRoute value, String label, String homeAddress) {
+        write(stack, value, label, "", homeAddress);
+    }
+
+    /**
+     * Writes the complete Distant Stock address set carried by a remote-terminal parcel.
+     *
+     * <p>The Create package address itself remains in Create's own component. This payload stores
+     * the other two player-facing addresses plus the machine route:
+     * receivingAddress = which Distant Dock address the crossing targets;
+     * homeAddress = which Create address the parcel wears after the crossing.
+     */
+    public static void write(ItemStack stack, RemoteRoute value, String label,
+                             String receivingAddress, String homeAddress) {
         if (stack == null || stack.isEmpty()) {
             throw new IllegalArgumentException("Cannot route an empty item stack");
         }
         String described = bounded(label, MAX_LABEL);
+        String receiving = bounded(receivingAddress, MAX_ADDRESS);
         // 地址原样保留两端空白以外的部分：空白地址与「没有地址」是同一件事，都不写。
         String home = bounded(homeAddress, MAX_ADDRESS);
         stack.update(DataComponents.CUSTOM_DATA, CustomData.EMPTY, current -> {
@@ -180,6 +206,9 @@ public final class RemoteRouteData {
             route.putUUID(CHILD_ORDER, value.childOrderId());
             if (!described.isEmpty()) {
                 route.putString(LABEL, described);
+            }
+            if (!receiving.isEmpty()) {
+                route.putString(RECEIVING_ADDRESS, receiving);
             }
             if (!home.isEmpty()) {
                 route.putString(HOME_ADDRESS, home);
