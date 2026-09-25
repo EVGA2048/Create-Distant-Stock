@@ -1,0 +1,14 @@
+{
+  "type": "create:mechanical_crafting",
+  "accept_mirrored": false,
+  "category": "equipment",
+  "key": {
+    "P": { "item": "distantstock:polished_ether_quartz" },
+    "E": { "item": "distantstock:ether_mechanism" },
+    "C": { "item": "distantstock:tower_casing" },
+    "N": { "item": "minecraft:netherite_helmet" }
+  },
+  "pattern": ["PPPPP", "ECNCE", "PPPPP"],
+  "result": { "count": 1, "id": "distantstock:ether_casing_helmet" },
+  "show_notification": true
+}

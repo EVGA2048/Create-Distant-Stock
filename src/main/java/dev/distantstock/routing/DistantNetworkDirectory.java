@@ -196,6 +196,16 @@ public final class DistantNetworkDirectory extends SavedData {
         return Optional.ofNullable(networks.get(id));
     }
 
+    /** Find one real Distant Stock network by its player-facing name. */
+    public Optional<Network> findByName(String name) {
+        if (name == null || name.isBlank()) return Optional.empty();
+        String wanted = name.trim();
+        return networks.values().stream()
+                .filter(network -> !network.legacy())
+                .filter(network -> network.name().equalsIgnoreCase(wanted))
+                .findFirst();
+    }
+
     public Optional<Network> findByCode(String code) {
         String wanted;
         try {
@@ -240,6 +250,14 @@ public final class DistantNetworkDirectory extends SavedData {
     /** A real player-created/joined network membership, never the hidden legacy compatibility scope. */
     public Optional<UUID> formalNetworkOf(RemoteNetworkId member) {
         return networkOf(member).filter(this::isFormalNetwork);
+    }
+
+    public List<RemoteNetworkId> members(UUID networkId) {
+        if (networkId == null) return List.of();
+        return memberships.entrySet().stream()
+                .filter(entry -> networkId.equals(entry.getValue()))
+                .map(Map.Entry::getKey)
+                .toList();
     }
 
     public Optional<String> memberName(RemoteNetworkId member) {
@@ -323,6 +341,29 @@ public final class DistantNetworkDirectory extends SavedData {
         memberNames.remove(member);
         setDirty();
         return true;
+    }
+
+    /**
+     * Permanently removes one formal Distant Stock network and detaches every membership stored on
+     * this node. The hidden Legacy scope is deliberately undeletable because it remains the
+     * compatibility/fallback namespace for unjoined warehouses.
+     *
+     * @return the memberships that were detached, for callers that also maintain live snapshots
+     */
+    public List<RemoteNetworkId> delete(UUID id) {
+        if (id == null || LEGACY_NETWORK_ID.equals(id) || networks.remove(id) == null) {
+            return List.of();
+        }
+        List<RemoteNetworkId> detached = memberships.entrySet().stream()
+                .filter(entry -> id.equals(entry.getValue()))
+                .map(Map.Entry::getKey)
+                .toList();
+        for (RemoteNetworkId member : detached) {
+            memberships.remove(member);
+            memberNames.remove(member);
+        }
+        setDirty();
+        return detached;
     }
 
     /**

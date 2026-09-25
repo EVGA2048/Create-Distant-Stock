@@ -44,6 +44,26 @@ public final class DistantNetworkGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 20)
+    public static void deletingNetworkRemovesItsSavedMembershipsButNeverLegacy(GameTestHelper h) {
+        DistantNetworkDirectory directory = new DistantNetworkDirectory();
+        RemoteNetworkId first = member();
+        RemoteNetworkId second = member();
+        var network = directory.create("Delete Me", OWNER_NODE, OWNER_PLAYER, first);
+        h.assertTrue(directory.attach(second, network.id()), "fixture could not attach second warehouse");
+
+        var detached = directory.delete(network.id());
+        h.assertTrue(detached.contains(first) && detached.contains(second) && detached.size() == 2,
+                "delete did not report both detached memberships");
+        h.assertTrue(directory.find(network.id()).isEmpty(), "deleted network row still exists");
+        h.assertTrue(directory.networkOf(first).isEmpty() && directory.networkOf(second).isEmpty(),
+                "deleted network left a warehouse membership behind");
+        h.assertTrue(directory.delete(DistantNetworkDirectory.LEGACY_NETWORK_ID).isEmpty()
+                        && directory.find(DistantNetworkDirectory.LEGACY_NETWORK_ID).isPresent(),
+                "network delete was allowed to remove the Legacy fallback scope");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
     public static void localIdentityUpgradeMigratesMembershipAndAuthority(GameTestHelper h) {
         var directory = new DistantNetworkDirectory();
         UUID freq = UUID.randomUUID();

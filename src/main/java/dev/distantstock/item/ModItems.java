@@ -10,6 +10,7 @@ import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ArmorItem;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -59,6 +60,15 @@ public final class ModItems {
                     SignalLampPanelItem.Material.BRASS,
                     SignalLampPanelItem.Color.WHITE));
     public static final DeferredHolder<Item, BlockItem> TOWER_CASING = block("tower_casing", ModBlocks.TOWER_CASING);
+    private static final int ETHER_ARMOR_DURABILITY = 42;
+    public static final DeferredHolder<Item, EtherCasingArmorItem> ETHER_CASING_HELMET = ITEMS.register(
+            "ether_casing_helmet", () -> etherArmor(ArmorItem.Type.HELMET));
+    public static final DeferredHolder<Item, EtherCasingArmorItem> ETHER_CASING_CHESTPLATE = ITEMS.register(
+            "ether_casing_chestplate", () -> etherArmor(ArmorItem.Type.CHESTPLATE));
+    public static final DeferredHolder<Item, EtherCasingArmorItem> ETHER_CASING_LEGGINGS = ITEMS.register(
+            "ether_casing_leggings", () -> etherArmor(ArmorItem.Type.LEGGINGS));
+    public static final DeferredHolder<Item, EtherCasingArmorItem> ETHER_CASING_BOOTS = ITEMS.register(
+            "ether_casing_boots", () -> etherArmor(ArmorItem.Type.BOOTS));
     public static final DeferredHolder<Item, BlockItem> TOWER_CORE = block("tower_core", ModBlocks.TOWER_CORE);
     public static final DeferredHolder<Item, BlockItem> TOWER_COUPLER = block("tower_coupler", ModBlocks.TOWER_COUPLER);
     public static final DeferredHolder<Item, BlockItem> ETHER_RESONATOR = block("ether_resonator", ModBlocks.ETHER_RESONATOR);
@@ -129,6 +139,10 @@ public final class ModItems {
                 out.accept(WHITE_INDICATOR_LAMP.get());
                 out.accept(BRASS_SIGNAL_LAMP.get());
                 out.accept(TOWER_CASING.get());
+                out.accept(ETHER_CASING_HELMET.get());
+                out.accept(ETHER_CASING_CHESTPLATE.get());
+                out.accept(ETHER_CASING_LEGGINGS.get());
+                out.accept(ETHER_CASING_BOOTS.get());
                 out.accept(TOWER_CORE.get());
                 out.accept(TOWER_COUPLER.get());
                 out.accept(ETHER_RESONATOR.get());
@@ -155,6 +169,12 @@ public final class ModItems {
     private static DeferredHolder<Item, BlockItem> block(String name,
                                                           DeferredHolder<net.minecraft.world.level.block.Block, ? extends net.minecraft.world.level.block.Block> block) {
         return ITEMS.register(name, () -> new BlockItem(block.get(), new Item.Properties()));
+    }
+
+    private static EtherCasingArmorItem etherArmor(ArmorItem.Type type) {
+        return new EtherCasingArmorItem(type, new Item.Properties()
+                .fireResistant()
+                .durability(type.getDurability(ETHER_ARMOR_DURABILITY)));
     }
 
     private static DeferredHolder<Item, SignalLampPanelItem> lamp(String name, SignalLampPanelItem.Color color) {

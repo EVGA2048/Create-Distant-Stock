@@ -49,6 +49,21 @@ public final class CasingGameTests {
         });
     }
 
+    /** The efficient component planner must still reveal the window as a visible travelling wave. */
+    @GameTest(template = "empty", timeoutTicks = 80)
+    public static void signalWindowRipplesOutwardInsteadOfOpeningAllAtOnce(GameTestHelper h) {
+        layRun(h);
+        h.setBlock(SOURCE_X, Y, Z, Blocks.REDSTONE_BLOCK.defaultBlockState());
+        h.runAfterDelay(3, () -> {
+            lit(h, FIRST_X, "the first ripple step");
+            dark(h, LAST_X, "the far end before the ripple arrived");
+            h.runAfterDelay(8, () -> {
+                lit(h, LAST_X, "the far end after the ripple arrived");
+                h.succeed();
+            });
+        });
+    }
+
     /** Batch state updates must still invalidate Minecraft's block-light engine. */
     @GameTest(template = "empty", timeoutTicks = 200)
     public static void windowLightAppearsAndDisappearsWithPower(GameTestHelper h) {

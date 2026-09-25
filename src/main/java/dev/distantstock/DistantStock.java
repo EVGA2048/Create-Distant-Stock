@@ -6,11 +6,14 @@ import dev.distantstock.config.StockConfig;
 import dev.distantstock.display.ModDisplaySources;
 import dev.distantstock.fluid.ModFluids;
 import dev.distantstock.item.ModItems;
+import dev.distantstock.item.ModArmorMaterials;
 import dev.distantstock.menu.ModMenus;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraft.world.entity.EquipmentSlot;
 
 @Mod(DistantStock.MODID)
 public final class DistantStock {
@@ -22,11 +25,13 @@ public final class DistantStock {
         ModFluids.FLUIDS.register(bus);
         ModBlocks.BLOCKS.register(bus);
         ModBlockEntities.BES.register(bus);
+        ModArmorMaterials.MATERIALS.register(bus);
         ModItems.ITEMS.register(bus);
         ModSounds.SOUNDS.register(bus);
         ModItems.TABS.register(bus);
         ModMenus.MENUS.register(bus);
         ModDisplaySources.register(bus);
+        bus.addListener(DistantStock::commonSetup);
         /*
          * Create: Deployer lets a panel type live on any board. It is optional, and the check is
          * what makes it optional: the class holding every reference to it is only named inside this
@@ -41,5 +46,11 @@ public final class DistantStock {
         if (net.neoforged.fml.ModList.get().isLoaded("fluidlogistics")) {
             dev.distantstock.compat.fluidlogistics.FluidLogisticsCompat.register(bus);
         }
+    }
+
+    private static void commonSetup(FMLCommonSetupEvent event) {
+        event.enqueueWork(() -> com.simibubi.create.content.equipment.goggles.GogglesItem
+                .addIsWearingPredicate(player -> player.getItemBySlot(EquipmentSlot.HEAD)
+                        .is(ModItems.ETHER_CASING_HELMET.get())));
     }
 }

@@ -120,6 +120,12 @@ public final class AdminCommand {
                         .then(Commands.literal("create")
                                 .then(Commands.argument("name", StringArgumentType.string())
                                         .executes(AdminCommand::distantNetworkCreate)))
+                        .then(Commands.literal("delete")
+                                .then(Commands.argument("name", StringArgumentType.string())
+                                        .suggests((ctx, builder) -> suggestDistantNetworkNames(ctx, builder))
+                                        .executes(ctx -> distantNetworkDelete(ctx, false))
+                                        .then(Commands.literal("confirm")
+                                                .executes(ctx -> distantNetworkDelete(ctx, true)))))
                         .then(Commands.literal("code").executes(AdminCommand::distantNetworkCode))
                         .then(Commands.literal("reset-code").executes(AdminCommand::distantNetworkResetCode))
                         .then(Commands.literal("join")
@@ -189,6 +195,7 @@ public final class AdminCommand {
                 "  /distantstock help                  这一页",
                 "  /distantstock tower                 每座塔的状态 + 哪些设备没被带载、为什么",
                 "  /distantstock network create <名字>  用当前终端绑定的本地仓储网络创建远仓网络",
+                "  /distantstock network delete <名字>  删除远仓网络（要再输一次 confirm）",
                 "  /distantstock network code           查看自己当前远仓网络的长期加入码",
                 "  /distantstock network join <加入码>  把当前本地仓储网络加入远仓网络",
                 "  /distantstock network reset-code     重置加入码，现有成员不掉线",
@@ -261,6 +268,45 @@ public final class AdminCommand {
         } catch (IllegalArgumentException exception) {
             return failure(ctx, exception.getMessage());
         }
+    }
+
+    /** Admin-only destructive removal of a Distant Stock network. */
+    private static int distantNetworkDelete(CommandContext<CommandSourceStack> ctx, boolean confirmed) {
+        String name = StringArgumentType.getString(ctx, "name");
+        MinecraftServer server = ctx.getSource().getServer();
+        var directory = dev.distantstock.routing.DistantNetworkDirectory.get(server);
+        var network = directory.findByName(name).orElse(null);
+        if (network == null) {
+            return failure(ctx, "没有这个远仓网络：" + name);
+        }
+        UUID localNode = TranserverBridge.localNodeUuid();
+        if (network.ownerNode() != null && localNode != null && !network.ownerNode().equals(localNode)) {
+            return failure(ctx, "这个远仓网络的主节点不在本服；请到主节点服务器执行删除。主节点："
+                    + network.ownerNode().toString().substring(0, 8));
+        }
+
+        List<DockGroup> groups = DockGroupDirectory.get(server).all().stream()
+                .filter(group -> network.id().equals(group.distantNetworkId()))
+                .toList();
+        int loadedDocks = groups.stream().mapToInt(group -> LoadedDocks.allInGroup(group.id()).size()).sum();
+        int members = directory.members(network.id()).size();
+        if (!confirmed) {
+            ctx.getSource().sendSuccess(() -> Component.literal(
+                    "将删除远仓网络「" + network.name() + "」：本机成员 " + members
+                            + "，收货港组 " + groups.size() + "，已加载港 " + loadedDocks + "。"
+                            + "\n本机仓储会退出该网络，相关收货港组会删除，已加载港退回默认组。确认请执行："
+                            + "\n/distantstock network delete \"" + network.name() + "\" confirm"), false);
+            return Command.SINGLE_SUCCESS;
+        }
+
+        dev.distantstock.link.DistantNetworkDeleteService.broadcast(network);
+        dev.distantstock.routing.DistantNetworkDeletion.apply(server, network.id());
+        // Push the changed local warehouse/group snapshot immediately instead of waiting for the
+        // next heartbeat, so peers stop offering this network's destinations quickly.
+        dev.distantstock.link.NetworkAnnouncementService.publish();
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "已删除远仓网络「" + network.name() + "」。"), true);
+        return Command.SINGLE_SUCCESS;
     }
 
     private static int distantNetworkCode(CommandContext<CommandSourceStack> ctx)
@@ -1072,6 +1118,17 @@ public final class AdminCommand {
         List<String> names = DockGroupDirectory.get(ctx.getSource().getServer()).all().stream()
                 .limit(MAX_SUGGESTIONS)
                 .map(DockGroup::name)
+                .toList();
+        return SharedSuggestionProvider.suggest(names, builder);
+    }
+
+    private static CompletableFuture<Suggestions> suggestDistantNetworkNames(
+            CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
+        List<String> names = dev.distantstock.routing.DistantNetworkDirectory
+                .get(ctx.getSource().getServer()).all().stream()
+                .filter(network -> !network.legacy())
+                .limit(MAX_SUGGESTIONS)
+                .map(dev.distantstock.routing.DistantNetworkDirectory.Network::name)
                 .toList();
         return SharedSuggestionProvider.suggest(names, builder);
     }

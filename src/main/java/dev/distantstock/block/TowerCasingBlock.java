@@ -4,6 +4,8 @@ import com.mojang.serialization.MapCodec;
 import dev.distantstock.config.StockConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
@@ -18,8 +20,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Queue;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * The distant casing: the tower's 3x3 skirt and the decorative panel everywhere else.
@@ -92,6 +96,18 @@ public final class TowerCasingBlock extends Block
     private static final Direction[] DIRECTIONS = Direction.values();
     /** Hard stop for an accidentally gigantic connected decorative shell. */
     private static final int COMPONENT_LIMIT = 65536;
+    /**
+     * Planned visual changes, bucketed by game tick. A redstone change does one O(N) component
+     * scan, then these cheap buckets reveal the windows one graph step per tick. Old entries are
+     * invalidated by the generation stored on each casing BE, so changing the source mid-ripple
+     * never requires removing thousands of queued entries.
+     */
+    private static final Map<ResourceKey<Level>, NavigableMap<Long, List<WindowChange>>> WINDOW_WAVES =
+            new HashMap<>();
+    private static long nextWindowWaveGeneration;
+
+    private record WindowChange(BlockPos pos, boolean powered, long generation) {
+    }
 
     public TowerCasingBlock(Properties props) {
         super(props);
@@ -283,37 +299,83 @@ public final class TowerCasingBlock extends Block
         settleConnectedComponent(level, pos);
     }
 
+    /** Apply only the due layer of each already-planned ripple. Called once from the server clock. */
+    public static void tickWindowRipples(MinecraftServer server) {
+        if (server == null || WINDOW_WAVES.isEmpty()) return;
+        var dimensions = new ArrayList<>(WINDOW_WAVES.keySet());
+        for (ResourceKey<Level> dimension : dimensions) {
+            ServerLevel level = server.getLevel(dimension);
+            NavigableMap<Long, List<WindowChange>> waves = WINDOW_WAVES.get(dimension);
+            if (level == null || waves == null) continue;
+            long now = level.getGameTime();
+            while (!waves.isEmpty() && waves.firstKey() <= now) {
+                List<WindowChange> due = waves.pollFirstEntry().getValue();
+                for (WindowChange change : due) {
+                    BlockState current = level.getBlockState(change.pos());
+                    if (!(current.getBlock() instanceof TowerCasingBlock)
+                            || !(level.getBlockEntity(change.pos()) instanceof TowerCasingBlockEntity casing)
+                            || casing.windowWaveGeneration() != change.generation()
+                            || current.getValue(POWERED) == change.powered()) {
+                        continue;
+                    }
+                    level.setBlock(change.pos(), current.setValue(POWERED, change.powered()), Block.UPDATE_CLIENTS);
+                    level.getChunkSource().getLightEngine().checkBlock(change.pos());
+                }
+            }
+            if (waves.isEmpty()) WINDOW_WAVES.remove(dimension);
+        }
+    }
+
+    public static void clearWindowRipples() {
+        WINDOW_WAVES.clear();
+        nextWindowWaveGeneration = 0;
+    }
+
+    public static void forgetWindowRipples(Level level) {
+        if (level != null) WINDOW_WAVES.remove(level.dimension());
+    }
+
     /**
-     * Recompute one whole connected casing component in one pass.
+     * Recompute one whole connected casing component in one pass, then animate the answer as a
+     * ripple instead of changing every block in the same tick.
      *
      * <p>The old implementation asked this question independently for every casing. Turning a large
      * wall on often looked cheap because each search found a powered source and returned early;
      * turning it off was pathological because every casing had to prove that no source existed by
      * walking the same wall again. On a control-room shell that is effectively O(N^2).
      *
-     * <p>Now we discover the component once, collect all directly-powered casings, and run one
-     * multi-source breadth-first search. Every casing reached within the configured graph distance
-     * is lit. State changes are client updates only: POWERED is a visual/light state, not a redstone
-     * conductor, so notifying all six neighbours for every changed pane only creates another storm
-     * of redundant scheduled ticks.
+     * <p>We still discover the component once and run one multi-source breadth-first search, so the
+     * expensive part remains O(N). The distance result doubles as animation timing: activation
+     * walks outward from the actual powered casings; deactivation walks outward from the casing
+     * whose neighbour changed. That restores the old ritual-like wave without restoring the old
+     * O(N²) "every casing searches the whole wall" cost.
      */
     private static void settleConnectedComponent(ServerLevel level, BlockPos origin) {
         if (!(level.getBlockState(origin).getBlock() instanceof TowerCasingBlock)) {
             return;
         }
+        long now = level.getGameTime();
+        if (level.getBlockEntity(origin) instanceof TowerCasingBlockEntity originCasing
+                && originCasing.lastWindowPlanTick() == now) {
+            return;
+        }
 
         Set<BlockPos> component = new HashSet<>();
         Queue<BlockPos> discover = new ArrayDeque<>();
+        Map<BlockPos, Integer> distanceFromOrigin = new HashMap<>();
         component.add(origin);
         discover.add(origin);
+        distanceFromOrigin.put(origin, 0);
 
         while (!discover.isEmpty() && component.size() < COMPONENT_LIMIT) {
             BlockPos pos = discover.remove();
+            int nextOriginDistance = distanceFromOrigin.get(pos) + 1;
             for (Direction direction : DIRECTIONS) {
                 BlockPos neighbour = pos.relative(direction);
                 if (component.add(neighbour)) {
                     if (level.getBlockState(neighbour).getBlock() instanceof TowerCasingBlock) {
                         discover.add(neighbour);
+                        distanceFromOrigin.put(neighbour, nextOriginDistance);
                     } else {
                         component.remove(neighbour);
                     }
@@ -343,16 +405,23 @@ public final class TowerCasingBlock extends Block
             }
         }
 
+        long generation = ++nextWindowWaveGeneration;
         for (BlockPos pos : component) {
+            if (level.getBlockEntity(pos) instanceof TowerCasingBlockEntity casing) {
+                // Marks the whole component, not only changed blocks. This invalidates a previous
+                // half-finished ripple even where the new desired state already matches today.
+                casing.markWindowPlan(now, generation);
+            }
             BlockState current = level.getBlockState(pos);
             boolean lit = distance.containsKey(pos);
             if (current.getValue(POWERED) == lit) continue;
-            level.setBlock(pos, current.setValue(POWERED, lit), Block.UPDATE_CLIENTS);
-            // UPDATE_CLIENTS deliberately avoids waking every neighbouring casing again, but that
-            // also means vanilla does not enqueue the light-source delta for us. Tell the light
-            // engine directly: keep the real 12-level room light without reintroducing the redstone
-            // neighbour-update storm this batch algorithm exists to remove.
-            level.getChunkSource().getLightEngine().checkBlock(pos);
+            int graphDistance = lit
+                    ? distance.getOrDefault(pos, 0)
+                    : distanceFromOrigin.getOrDefault(pos, 0);
+            long due = now + 1L + graphDistance;
+            WINDOW_WAVES.computeIfAbsent(level.dimension(), ignored -> new TreeMap<>())
+                    .computeIfAbsent(due, ignored -> new ArrayList<>())
+                    .add(new WindowChange(pos.immutable(), lit, generation));
         }
     }
 }

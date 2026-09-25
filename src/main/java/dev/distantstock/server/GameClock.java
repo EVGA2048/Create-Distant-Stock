@@ -23,6 +23,7 @@ import dev.distantstock.routing.WorldIdentity;
 import dev.distantstock.link.NetworkAnnouncementService;
 import dev.distantstock.link.TranserverStockService;
 import dev.distantstock.link.DistantNetworkJoinService;
+import dev.distantstock.link.DistantNetworkDeleteService;
 import dev.distantstock.link.ReceiverProbeService;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -58,6 +59,7 @@ public final class GameClock {
             NetworkAnnouncementService.register();
             TranserverStockService.register();
             DistantNetworkJoinService.register();
+            DistantNetworkDeleteService.register();
             ReceiverProbeService.register();
             TranserverBridge.start(e.getServer());
             LOG.info("[DistantStock] Transerver channels registered, bridge started");
@@ -73,6 +75,7 @@ public final class GameClock {
     public static void stopping(ServerStoppingEvent e) {
         AlarmSampler.stop();
         dev.distantstock.diagnostics.ChainDiagnostics.stop();
+        dev.distantstock.block.TowerCasingBlock.clearWindowRipples();
         if (transerverActive) {
             DistantNetworkJoinService.stop();
             ReceiverProbeService.stop();
@@ -112,12 +115,14 @@ public final class GameClock {
             dev.distantstock.block.LoadedTowers.forget(level);
             dev.distantstock.block.LoadedDevices.forget(level);
             dev.distantstock.diagnostics.ChainDiagnostics.forget(level);
+            dev.distantstock.block.TowerCasingBlock.forgetWindowRipples(level);
         }
     }
 
     @SubscribeEvent
     public static void tick(ServerTickEvent.Post e) {
         ticks++;
+        dev.distantstock.block.TowerCasingBlock.tickWindowRipples(e.getServer());
         LinkSnapshot.tickLocal(e.getServer());
         // 塔的地基：激活快照每秒重算一次（港每 tick 都要读），区块票每 tick 处理队列、每 20 tick 对齐。
         // The activation snapshot is what canSend/canReceive read, and the ticket queue is drained
@@ -135,6 +140,7 @@ public final class GameClock {
             if (ticks % 20 == 0) {
                 NetworkAnnouncementService.publish();
                 DistantNetworkJoinService.tick(e.getServer());
+                DistantNetworkDeleteService.tick();
                 ReceiverProbeService.tick();
             }
             if (ticks % 40 == 0) {

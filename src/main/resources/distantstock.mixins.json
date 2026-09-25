@@ -15,7 +15,8 @@
     "ChainPackageInteractionPacketMixin",
     "FactoryPanelDiagnosticsMixin",
     "ChainConveyorFrogportTargetMixin",
-    "PackagePortConfigurationPacketMixin"
+    "PackagePortConfigurationPacketMixin",
+    "PlayerCloakTargetMixin"
   ],
   "client": [
     "client.PackagerRendererMixin",
@@ -25,7 +26,9 @@
     "client.FrogportVisualTintMixin",
     "client.PackagePortScreenMixin",
     "client.ChainConveyorFrogportSelectionMixin",
-    "client.PackagePortTargetSelectionMixin"
+    "client.PackagePortTargetSelectionMixin",
+    "client.LivingEntityRendererCloakMixin",
+    "client.HumanoidArmorLayerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
