@@ -36,6 +36,8 @@ public final class ModNet {
         r.playToServer(SetCreateNetworkLockC2S.TYPE, SetCreateNetworkLockC2S.STREAM_CODEC,
                 SetCreateNetworkLockC2S::handle);
         r.playToServer(LoggerActionC2S.TYPE, LoggerActionC2S.STREAM_CODEC, LoggerActionC2S::handle);
+        r.playToServer(SetCacheFrogportReleaseC2S.TYPE, SetCacheFrogportReleaseC2S.STREAM_CODEC,
+                SetCacheFrogportReleaseC2S::handle);
         r.playToClient(RemoteGroupsS2C.TYPE, RemoteGroupsS2C.STREAM_CODEC, RemoteGroupsS2C::handle);
         r.playToClient(OpenMonitorS2C.TYPE, OpenMonitorS2C.STREAM_CODEC, OpenMonitorS2C::handle);
         r.playToClient(LinkSnapshotS2C.TYPE, LinkSnapshotS2C.STREAM_CODEC, LinkSnapshotS2C::handle);

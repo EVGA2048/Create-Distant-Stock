@@ -34,6 +34,8 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
     private int releaseDelaySeconds = 5;
     private boolean lastRedstonePowered;
     private int pendingRedstoneReleases;
+    /** One-shot client animation marker; the real parcel is inserted immediately on the server. */
+    private ItemStack visualIncomingPackage = ItemStack.EMPTY;
 
     public CacheFrogportBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.CACHE_FROGPORT.get(), pos, state);
@@ -151,8 +153,13 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
             // silently deleting it.
             drop(remainder);
         }
+        // Keep the high-throughput cache semantics above, but still let the client play Create's
+        // normal inward tongue animation. Sending a one-shot visual marker avoids making server
+        // storage wait for Frogport's animation to finish.
+        visualIncomingPackage = stack.copyWithCount(1);
         setChanged();
         level.blockEntityChanged(worldPosition);
+        ChainDiagnostics.cacheAcceptedPackage(this);
         sendData();
     }
 
@@ -308,6 +315,10 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
         tag.putInt("ReleaseDelaySeconds", releaseDelaySeconds);
         tag.putBoolean("LastRedstonePowered", lastRedstonePowered);
         tag.putInt("PendingRedstoneReleases", pendingRedstoneReleases);
+        if (clientPacket && !visualIncomingPackage.isEmpty()) {
+            tag.put("CacheVisualIncoming", visualIncomingPackage.saveOptional(registries));
+            visualIncomingPackage = ItemStack.EMPTY;
+        }
     }
 
     @Override
@@ -321,6 +332,14 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
                 : 5;
         lastRedstonePowered = tag.getBoolean("LastRedstonePowered");
         pendingRedstoneReleases = Math.max(0, Math.min(CACHE_SLOTS, tag.getInt("PendingRedstoneReleases")));
+        if (clientPacket && level != null && level.isClientSide && tag.contains("CacheVisualIncoming")) {
+            ItemStack visual = ItemStack.parseOptional(registries, tag.getCompound("CacheVisualIncoming"));
+            if (!visual.isEmpty()) {
+                // Client-side only: FrogportBlockEntity's tick clears this animation without
+                // inserting the package again, so this is purely the tongue/mouth visual.
+                super.startAnimation(visual, false);
+            }
+        }
     }
 
     /**

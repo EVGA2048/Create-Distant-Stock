@@ -13,6 +13,7 @@
   "block.distantstock.diagnostic_frogport": "Diagnostic Frogport",
   "block.distantstock.cache_frogport": "Cache Frogport",
   "gui.distantstock.cache_frogport": "Cache Frogport",
+  "gui.distantstock.cache_frogport.replay": "Replay",
   "block.distantstock.gauge": "Distant Request Desk",
   "goggle.distantstock.remote_gauge.inflight": "  on order: %s",
   "goggle.distantstock.remote_gauge.stock": "  in the network: %s",

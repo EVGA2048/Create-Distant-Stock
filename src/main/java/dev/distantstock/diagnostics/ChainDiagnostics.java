@@ -101,12 +101,17 @@ public final class ChainDiagnostics {
         BlockPos cachePos = cache.getBlockPos();
         long now = level.getGameTime();
         List<Fault> owned = FAULTS.values().stream()
-                .filter(fault -> fault.cachePos != null
+                .filter(fault -> !fault.cachePositions.isEmpty()
                         && fault.key.controller().dimension().equals(level.dimension())
-                        && fault.cachePos.equals(cachePos))
+                        && fault.cachePositions.contains(cachePos))
                 .toList();
         for (Fault fault : owned) {
-            abandonCacheMitigation(level, fault, now);
+            fault.cachePositions.remove(cachePos);
+            if (!Objects.equals(fault.activeCachePos, cachePos)) continue;
+            fault.activeCachePos = null;
+            if (!assignNextCacheOwner(level, fault, cachePos)) {
+                abandonCacheMitigation(level, fault, now);
+            }
         }
         unregister(cache);
     }
@@ -118,6 +123,11 @@ public final class ChainDiagnostics {
                 && entry.getValue().address().equals(fault.key.address()));
 
         thawTargets(level, fault);
+        for (BlockPos cachePos : fault.cachePositions) {
+            if (level.getBlockEntity(cachePos) instanceof CacheFrogportBlockEntity cache) {
+                cache.setTakeoverAddress("");
+            }
+        }
 
         FULL_CACHES.remove(fault.key);
         EventRegistry registry = EventRegistry.get(level.getServer());
@@ -132,6 +142,59 @@ public final class ChainDiagnostics {
         if (controller != null) {
             controller.recordDiagnosticResult("cache_removed", fault.key.address());
         }
+    }
+
+    /**
+     * One Create routing-table entry wins for a given address, so simply giving two cache Frogports
+     * the same public address does not load-balance them. Rotate ownership after every accepted
+     * parcel instead. With one fault and several spare caches this makes the frogs take turns; with
+     * several simultaneous faults, caches already reserved by another fault are never stolen.
+     */
+    public static void cacheAcceptedPackage(CacheFrogportBlockEntity cache) {
+        if (cache == null || !(cache.getLevel() instanceof ServerLevel level)) return;
+        String address = cache.takeoverAddress();
+        if (address.isBlank()) return;
+
+        Fault fault = FAULTS.values().stream()
+                .filter(candidate -> candidate.key.controller().dimension().equals(level.dimension())
+                        && candidate.key.address().equals(address)
+                        && cache.getBlockPos().equals(candidate.activeCachePos))
+                .findFirst().orElse(null);
+        if (fault == null) return;
+        assignNextCacheOwner(level, fault, cache.getBlockPos());
+    }
+
+    private static boolean assignNextCacheOwner(ServerLevel level, Fault fault, BlockPos currentPos) {
+        DiagnosticFrogportBlockEntity controller = controller(fault.key.controller());
+        if (controller == null) return false;
+        Graph graph = graph(controller);
+
+        List<CacheFrogportBlockEntity> candidates = graph.caches().stream()
+                .filter(candidate -> !candidate.getBlockPos().equals(currentPos))
+                .filter(candidate -> candidate.takeoverAddress().isBlank())
+                .filter(candidate -> !candidate.isBackedUp())
+                .filter(candidate -> FAULTS.values().stream().noneMatch(other -> other != fault
+                        && other.key.controller().dimension().equals(level.dimension())
+                        && other.cachePositions.contains(candidate.getBlockPos())))
+                .sorted(Comparator.comparingLong(candidate -> candidate.getBlockPos().asLong()))
+                .toList();
+        if (candidates.isEmpty()) return false;
+
+        long currentOrder = currentPos == null ? Long.MIN_VALUE : currentPos.asLong();
+        CacheFrogportBlockEntity next = candidates.stream()
+                .filter(candidate -> candidate.getBlockPos().asLong() > currentOrder)
+                .findFirst().orElse(candidates.get(0));
+
+        if (currentPos != null
+                && level.getBlockEntity(currentPos) instanceof CacheFrogportBlockEntity current
+                && fault.key.address().equals(current.takeoverAddress())) {
+            current.setTakeoverAddress("");
+        }
+        fault.cachePositions.add(next.getBlockPos());
+        fault.activeCachePos = next.getBlockPos();
+        next.setTakeoverAddress(fault.key.address());
+        FULL_CACHES.remove(fault.key);
+        return true;
     }
 
     private static void thawTargets(ServerLevel level, Fault fault) {
@@ -221,9 +284,9 @@ public final class ChainDiagnostics {
         // competing with the restored real Frogports. Its cached parcels stay put for slow replay.
         for (CacheFrogportBlockEntity cache : new ArrayList<>(CACHES)) {
             if (cache.getLevel() == null || cache.takeoverAddress().isBlank()) continue;
-            boolean owned = FAULTS.values().stream().anyMatch(fault -> fault.cachePos != null
+            boolean owned = FAULTS.values().stream().anyMatch(fault -> fault.activeCachePos != null
                     && fault.key.controller().dimension().equals(cache.getLevel().dimension())
-                    && fault.cachePos.equals(cache.getBlockPos())
+                    && fault.activeCachePos.equals(cache.getBlockPos())
                     && fault.key.address().equals(cache.takeoverAddress()));
             if (!owned) cache.setTakeoverAddress("");
         }
@@ -268,7 +331,7 @@ public final class ChainDiagnostics {
                     .filter(owners -> owners.contains(key)).count();
             boolean cacheMitigating = FAULTS.values().stream()
                     .anyMatch(fault -> fault.key.controller().equals(key)
-                            && fault.mitigated && fault.cachePos != null);
+                            && fault.mitigated() && fault.activeCachePos != null);
             controller.setDiagnosticHealth(liveFaults, cacheMitigating);
 
             // One diagnostic Frogport runs one probe at a time. This makes the cycle deterministic
@@ -458,7 +521,7 @@ public final class ChainDiagnostics {
                 .orElse(null);
 
         Fault fault = new Fault(key, new LinkedHashSet<>(), cache == null ? null : cache.getBlockPos(),
-                cache != null, now + RETRY_INTERVAL);
+                now + RETRY_INTERVAL);
         for (FrogportBlockEntity target : targets) {
             fault.targets.add(target.getBlockPos());
         }
@@ -492,9 +555,17 @@ public final class ChainDiagnostics {
         for (Fault fault : faults) {
             if (!(controller.getLevel() instanceof ServerLevel level)) continue;
 
-            if (fault.cachePos != null && level.isLoaded(fault.cachePos)
-                    && level.getBlockEntity(fault.cachePos) instanceof CacheFrogportBlockEntity cache) {
-                if (cache.isBackedUp()) {
+            if (fault.activeCachePos != null && level.isLoaded(fault.activeCachePos)
+                    && level.getBlockEntity(fault.activeCachePos) instanceof CacheFrogportBlockEntity cache) {
+                // A cache is one physical Frogport and Create intentionally keeps one route per
+                // address. Treat multiple Cache Frogports as a rotating pool instead: once the
+                // current owner fills, hand the public address to the next available cache before
+                // declaring the mitigation full.
+                boolean backedUp = cache.isBackedUp();
+                if (backedUp && assignNextCacheOwner(level, fault, cache.getBlockPos())) {
+                    backedUp = false;
+                }
+                if (backedUp) {
                     if (FULL_CACHES.add(fault.key)) {
                         EventRegistry.get(level.getServer()).raise(EventRegistry.Severity.ERROR,
                                 EventRegistry.Codes.CHAIN_CACHE_FULL, "chain",
@@ -510,7 +581,7 @@ public final class ChainDiagnostics {
             if (hasRecoveryProbe(controllerKey, fault.key.address())) continue;
             if (now < fault.nextRetryTick) continue;
 
-            if (fault.mitigated) {
+            if (fault.mitigated()) {
                 // Chunk unload means "unknown", not "healthy" and not "removed". Pause the
                 // recovery round until every target can be inspected again.
                 if (fault.targets.stream().anyMatch(pos -> !level.isLoaded(pos))) {
@@ -676,11 +747,11 @@ public final class ChainDiagnostics {
 
         Fault fault = FAULTS.get(new FaultKey(probe.controller(), probe.address()));
         if (probe.recovery() && fault != null) {
-            if (fault.mitigated && !frog.getBlockPos().equals(probe.targetPos())) {
+            if (fault.mitigated() && !frog.getBlockPos().equals(probe.targetPos())) {
                 fault.nextRetryTick = now + 10;
                 return;
             }
-            if (fault.mitigated) {
+            if (fault.mitigated()) {
                 fault.passed.add(probe.targetPos());
                 fault.nextRetryTick = now + 10;
                 DiagnosticFrogportBlockEntity controller = controller(probe.controller());
@@ -757,8 +828,10 @@ public final class ChainDiagnostics {
         if (!(controller.getLevel() instanceof ServerLevel level)) return;
         FAULTS.remove(fault.key);
         thawTargets(level, fault);
-        if (fault.cachePos != null && level.getBlockEntity(fault.cachePos) instanceof CacheFrogportBlockEntity cache) {
-            cache.setTakeoverAddress("");
+        for (BlockPos cachePos : fault.cachePositions) {
+            if (level.getBlockEntity(cachePos) instanceof CacheFrogportBlockEntity cache) {
+                cache.setTakeoverAddress("");
+            }
         }
         if (FULL_CACHES.remove(fault.key)) {
             EventRegistry.get(level.getServer()).clear(EventRegistry.Codes.CHAIN_CACHE_FULL, "chain",
@@ -810,8 +883,10 @@ public final class ChainDiagnostics {
                         frog.target.register(frog, level, pos);
                     }
                 }
-                if (fault.cachePos != null && level.getBlockEntity(fault.cachePos) instanceof CacheFrogportBlockEntity cache) {
-                    cache.setTakeoverAddress("");
+                for (BlockPos cachePos : fault.cachePositions) {
+                    if (level.getBlockEntity(cachePos) instanceof CacheFrogportBlockEntity cache) {
+                        cache.setTakeoverAddress("");
+                    }
                 }
             }
         }
@@ -960,16 +1035,20 @@ public final class ChainDiagnostics {
         final FaultKey key;
         final Set<BlockPos> targets;
         final Set<BlockPos> passed = new LinkedHashSet<>();
-        final BlockPos cachePos;
-        final boolean mitigated;
+        final Set<BlockPos> cachePositions = new LinkedHashSet<>();
+        BlockPos activeCachePos;
         long nextRetryTick;
 
-        Fault(FaultKey key, Set<BlockPos> targets, BlockPos cachePos, boolean mitigated, long nextRetryTick) {
+        Fault(FaultKey key, Set<BlockPos> targets, BlockPos cachePos, long nextRetryTick) {
             this.key = key;
             this.targets = targets;
-            this.cachePos = cachePos;
-            this.mitigated = mitigated;
+            this.activeCachePos = cachePos;
+            if (cachePos != null) this.cachePositions.add(cachePos);
             this.nextRetryTick = nextRetryTick;
+        }
+
+        boolean mitigated() {
+            return activeCachePos != null;
         }
     }
 
