@@ -313,6 +313,7 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
     @Override
     protected void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.read(tag, registries, clientPacket);
+        migrateLegacyInventorySize();
         takeoverAddress = tag.getString("TakeoverAddress");
         nextReleaseTick = tag.getLong("NextRelease");
         releaseDelaySeconds = tag.contains("ReleaseDelaySeconds")
@@ -320,6 +321,41 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
                 : 5;
         lastRedstonePowered = tag.getBoolean("LastRedstonePowered");
         pendingRedstoneReleases = Math.max(0, Math.min(CACHE_SLOTS, tag.getInt("PendingRedstoneReleases")));
+    }
+
+    /**
+     * PackagePortBlockEntity deserializes directly into its SmartInventory. NeoForge's underlying
+     * ItemStackHandler restores the serialized Size field as well, so a pre-54-slot cache saved as
+     * Size=18 silently shrinks this subclass's constructor-created 54-slot inventory back to 18 on
+     * chunk load/client sync. Expand legacy inventories after the parent read and copy every parcel
+     * into a fresh 54-slot handler. The next normal save permanently writes Size=54.
+     */
+    private void migrateLegacyInventorySize() {
+        if (inventory.getSlots() == CACHE_SLOTS) return;
+
+        SmartInventory previous = inventory;
+        SmartInventory expanded = new SmartInventory(CACHE_SLOTS, this,
+                (slot, stack) -> PackageItem.isPackage(stack));
+        int copySlots = Math.min(previous.getSlots(), CACHE_SLOTS);
+        for (int slot = 0; slot < copySlots; slot++) {
+            ItemStack stack = previous.getStackInSlot(slot);
+            if (!stack.isEmpty()) {
+                expanded.setStackInSlot(slot, stack.copy());
+            }
+        }
+        // Never silently discard data if a future/experimental save somehow contains more than
+        // 54 slots. Move overflow into the first available normal cache slots where possible and
+        // drop only as a last-resort preservation path when running on the server.
+        for (int slot = CACHE_SLOTS; slot < previous.getSlots(); slot++) {
+            ItemStack stack = previous.getStackInSlot(slot);
+            if (stack.isEmpty()) continue;
+            ItemStack remainder = ItemHandlerHelper.insertItemStacked(expanded, stack.copy(), false);
+            if (!remainder.isEmpty() && level != null && !level.isClientSide) {
+                drop(remainder);
+            }
+        }
+        inventory = expanded;
+        itemHandler = new PackagePortAutomationInventoryWrapper(inventory, this);
     }
 
     private static int normalizeReleaseDelaySeconds(int seconds) {

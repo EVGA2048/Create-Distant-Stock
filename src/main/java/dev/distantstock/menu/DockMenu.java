@@ -14,12 +14,13 @@ import net.neoforged.neoforge.items.SlotItemHandler;
 
 /** One-page Frogport-style configuration and the dock's single physical parcel bay. */
 public final class DockMenu extends AbstractContainerMenu {
-    // FROGPORT_SLOT is rendered at (13, 9); the actual item goes one pixel inside its bezel.
+    // Match Create's normal Package Port geometry: 82 px machine body, then player inventory.
+    // The dock's single parcel bay lives in the lower-left control deck.
     public static final int BAY_X = 14;
-    public static final int BAY_Y = 15;
+    public static final int BAY_Y = 59;
     public static final int INV_X = 38;
-    public static final int INV_Y = 126;
-    public static final int HOTBAR_Y = 184;
+    public static final int INV_Y = 108;
+    public static final int HOTBAR_Y = 166;
 
     public final BlockPos dockPos;
     public final String initialName;

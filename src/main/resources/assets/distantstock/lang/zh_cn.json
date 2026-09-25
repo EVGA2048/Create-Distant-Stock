@@ -10,7 +10,7 @@
   "block.distantstock.dock": "远仓港",
   "block.distantstock.diagnostic_frogport": "诊断蛙港",
   "block.distantstock.cache_frogport": "缓存蛙港",
-  "gui.distantstock.cache_frogport": "缓存蛙港 · 包裹缓冲区",
+  "gui.distantstock.cache_frogport": "缓存蛙港",
   "block.distantstock.gauge": "远仓请求台",
   "goggle.distantstock.remote_gauge.inflight": "  在途订单：%s",
   "goggle.distantstock.remote_gauge.stock": "  当前库存：%s",

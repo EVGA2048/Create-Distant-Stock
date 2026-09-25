@@ -12,10 +12,13 @@ import net.neoforged.neoforge.items.SlotItemHandler;
 public final class CacheFrogportMenu extends PackagePortMenu {
     public static final int ROWS = 6;
     public static final int COLUMNS = 9;
-    public static final int DEVICE_X = 8;
-    public static final int DEVICE_Y = 18;
-    public static final int PLAYER_X = 8;
-    public static final int PLAYER_Y = 140;
+    public static final int HEADER_HEIGHT = 17;
+    public static final int DEVICE_X = 27;
+    public static final int DEVICE_Y = HEADER_HEIGHT + 9;
+    public static final int PLAYER_TEXTURE_X = 22;
+    public static final int PLAYER_TEXTURE_Y = 179;
+    public static final int PLAYER_X = 30;
+    public static final int PLAYER_Y = PLAYER_TEXTURE_Y + 18;
 
     public CacheFrogportMenu(MenuType<?> type, int id, Inventory inventory,
                              CacheFrogportBlockEntity cache) {

@@ -8,6 +8,7 @@ import com.simibubi.create.content.logistics.packagePort.PackagePortTarget;
 import com.simibubi.create.content.logistics.packagePort.PackagePortItem;
 import com.simibubi.create.content.logistics.packagePort.PackagePortMenu;
 import com.simibubi.create.content.logistics.packagePort.frogport.FrogportBlockEntity;
+import com.simibubi.create.foundation.item.SmartInventory;
 import dev.distantstock.block.CacheFrogportBlockEntity;
 import dev.distantstock.block.DiagnosticFrogportBlockEntity;
 import dev.distantstock.block.LampState;
@@ -74,6 +75,43 @@ public final class ChainDiagnosticsGameTests {
         DiagnosticFrogportBlockEntity placed = (DiagnosticFrogportBlockEntity) level.getBlockEntity(pos);
         h.assertTrue(placed != null && frequency.equals(placed.createFrequency()),
                 "diagnostic Frogport did not persist its tuned Create frequency into the block entity");
+        h.succeed();
+    }
+
+    /** Old worlds saved cache Frogports with Inventory.Size=18; loading must migrate to 54 safely. */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void legacyEighteenSlotCacheMigratesToFiftyFourWithoutLosingParcels(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(3, 2, 3));
+        level.setBlock(pos, ModBlocks.CACHE_FROGPORT.get().defaultBlockState(), 3);
+        CacheFrogportBlockEntity cache = (CacheFrogportBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(cache != null, "cache Frogport did not create its block entity");
+
+        SmartInventory legacy = new SmartInventory(18, cache,
+                (slot, stack) -> PackageItem.isPackage(stack));
+        ItemStack first = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        ItemStack last = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        PackageItem.addAddress(first, "LEGACY-FIRST");
+        PackageItem.addAddress(last, "LEGACY-LAST");
+        legacy.setStackInSlot(0, first);
+        legacy.setStackInSlot(17, last);
+
+        net.minecraft.nbt.CompoundTag old = new net.minecraft.nbt.CompoundTag();
+        old.put("Inventory", legacy.serializeNBT(level.registryAccess()));
+        old.putBoolean("AcceptsPackages", true);
+        old.putString("AddressFilter", "");
+        cache.loadWithComponents(old, level.registryAccess());
+
+        h.assertTrue(cache.inventory.getSlots() == CacheFrogportBlockEntity.CACHE_SLOTS,
+                "legacy 18-slot cache stayed at " + cache.inventory.getSlots() + " slots after load");
+        h.assertTrue("LEGACY-FIRST".equals(PackageItem.getAddress(cache.inventory.getStackInSlot(0))),
+                "legacy slot 0 parcel was lost during 18 -> 54 migration");
+        h.assertTrue("LEGACY-LAST".equals(PackageItem.getAddress(cache.inventory.getStackInSlot(17))),
+                "legacy slot 17 parcel was lost during 18 -> 54 migration");
+
+        net.minecraft.nbt.CompoundTag saved = cache.saveWithoutMetadata(level.registryAccess());
+        h.assertTrue(saved.getCompound("Inventory").getInt("Size") == CacheFrogportBlockEntity.CACHE_SLOTS,
+                "migrated cache did not persist Inventory.Size=54");
         h.succeed();
     }
 

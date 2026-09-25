@@ -10,9 +10,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.phys.BlockHitResult;
 
 /**
  * One segment of the tower's mast. Stack them to raise a tower's tier.
@@ -75,9 +72,4 @@ public final class TowerCouplerBlock extends Block {
         return level.getBlockState(pos.relative(direction)).getBlock() instanceof TowerCouplerBlock;
     }
 
-    @Override
-    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
-                                               Player player, BlockHitResult hit) {
-        return TowerControl.open(level, pos, player);
-    }
 }

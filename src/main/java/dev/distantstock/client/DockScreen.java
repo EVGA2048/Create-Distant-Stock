@@ -10,6 +10,7 @@ import com.simibubi.create.foundation.gui.widget.Label;
 import com.simibubi.create.foundation.gui.widget.ScrollInput;
 import com.simibubi.create.foundation.gui.widget.SelectionScrollInput;
 import dev.distantstock.block.DockBlockEntity;
+import dev.distantstock.block.ModBlocks;
 import dev.distantstock.menu.DockMenu;
 import dev.distantstock.net.ConfigureDockC2S;
 import dev.distantstock.routing.DockMode;
@@ -20,6 +21,8 @@ import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
+import net.createmod.catnip.gui.element.GuiGameElement;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.List;
@@ -34,11 +37,12 @@ import java.util.List;
  */
 public final class DockScreen extends AbstractSimiContainerScreen<DockMenu> {
     private static final int PANEL_W = 220;
-    private static final int HEADER_H = 18;
-    private static final int PANEL_BODY_H = 100;
-    private static final int PANEL_TEX_H = HEADER_H + PANEL_BODY_H;
+    private static final int HEADER_H = 17;
+    private static final int PANEL_BODY_H = 82;
     private static final ResourceLocation PANEL = ResourceLocation.fromNamespaceAndPath(
             "distantstock", "textures/gui/remote_dock.png");
+    private static final ResourceLocation HEADER = ResourceLocation.fromNamespaceAndPath(
+            "distantstock", "textures/gui/remote_dock_header.png");
 
     /** Exact Create Worldshaper control frames; DockScreen only changes the surrounding panel. */
     private static final int SHAPER_MODE_U = 56;
@@ -53,7 +57,6 @@ public final class DockScreen extends AbstractSimiContainerScreen<DockMenu> {
     private static final int CONTROL_TEXT = 0xFFFFFF;
 
     private EditBox addressBox;
-    private EditBox nameBox;
     private SelectionScrollInput modeInput;
     private ScrollInput priorityInput;
     private Label modeLabel;
@@ -91,18 +94,11 @@ public final class DockScreen extends AbstractSimiContainerScreen<DockMenu> {
         addressBox.setX(nameBoxX(addressBox.getValue(), addressBox));
         addRenderableWidget(addressBox);
 
-        // Create station-style textbox: the visual frame is rendered in renderBg(), while the
-        // EditBox itself remains borderless exactly like Create's own editable names.
-        nameBox = new EditBox(noShadow, x + 52, y + 25, 132, 10,
-                Component.translatable("gui.distantstock.dock.name"));
-        nameBox.setBordered(false);
-        nameBox.setMaxLength(48);
-        nameBox.setTextColor(CONTROL_TEXT);
-        nameBox.setValue(menu.initialName);
-        addRenderableWidget(nameBox);
-
-        int modeX = x + 72;
-        int modeY = y + 56;
+        // customName used to occupy this whole section, but nothing in routing, diagnostics,
+        // terminals or goggles ever reads it. Keep the saved legacy value untouched and give the
+        // useful routing controls the space instead.
+        int modeX = x + 108;
+        int modeY = y + 8;
         modeLabel = new Label(modeX + 16, modeY + 5, Component.empty()).colored(CONTROL_TEXT).withShadow();
         modeInput = (SelectionScrollInput) new SelectionScrollInput(modeX, modeY, SHAPER_MODE_W, SHAPER_MODE_H)
                 .forOptions(List.of(
@@ -114,8 +110,8 @@ public final class DockScreen extends AbstractSimiContainerScreen<DockMenu> {
                 .calling(state -> centerLabel(modeLabel, modeX, SHAPER_MODE_W))
                 .setState(menu.initialMode.ordinal());
 
-        int priorityX = x + 72;
-        int priorityY = y + 78;
+        int priorityX = x + 108;
+        int priorityY = y + 30;
         priorityLabel = new Label(priorityX + 7, priorityY + 5, Component.empty()).colored(CONTROL_TEXT).withShadow();
         priorityInput = new ScrollInput(priorityX, priorityY, SHAPER_PARAM_W, SHAPER_PARAM_H)
                 .withRange(0, DockBlockEntity.MAX_PRIORITY + 1)
@@ -133,11 +129,11 @@ public final class DockScreen extends AbstractSimiContainerScreen<DockMenu> {
         addRenderableWidget(priorityLabel);
         addRenderableWidget(priorityInput);
 
-        confirmButton = new IconButton(x + PANEL_W - 33, y + 76, AllIcons.I_CONFIRM);
+        confirmButton = new IconButton(x + PANEL_W - 33, y + PANEL_BODY_H - 24, AllIcons.I_CONFIRM);
         confirmButton.withCallback(this::onClose);
         addRenderableWidget(confirmButton);
 
-        extraAreas = ImmutableList.of(new Rect2i(x + PANEL_W, y + 50, 70, 60));
+        extraAreas = ImmutableList.of(new Rect2i(x + PANEL_W, y + 24, 76, 64));
     }
 
     private int nameBoxX(String s, EditBox box) {
@@ -150,10 +146,12 @@ public final class DockScreen extends AbstractSimiContainerScreen<DockMenu> {
         int x = getGuiLeft();
         int y = getGuiTop();
 
-        // Distant Stock owns the panel layout; interactive affordances below are rendered from
-        // Create's own GUI sheets, not imitations.
-        graphics.blit(PANEL, x, y - HEADER_H, 0f, 0f,
-                PANEL_W, PANEL_TEX_H, PANEL_W, PANEL_TEX_H);
+        // Distant Dock is not a Frogport: keep Create's blue title strip, but remove the two frog
+        // eye end-caps so the header is a straight, flush machine bar.
+        graphics.blit(HEADER, x, y - HEADER_H, 0f, 0f,
+                PANEL_W, HEADER_H, PANEL_W, HEADER_H);
+        graphics.blit(PANEL, x, y, 0f, 0f,
+                PANEL_W, PANEL_BODY_H, PANEL_W, PANEL_BODY_H);
 
         String addressText = addressBox.getValue();
         if (!addressBox.isFocused()) {
@@ -161,27 +159,29 @@ public final class DockScreen extends AbstractSimiContainerScreen<DockMenu> {
                 addressText = Component.translatable("gui.distantstock.dock.address").getString();
                 graphics.drawString(font, addressText, nameBoxX(addressText, addressBox), y - 11, 4013128, false);
             }
-            AllGuiTextures.STATION_EDIT_NAME.render(graphics,
+            AllGuiTextures.FROGPORT_EDIT_NAME.render(graphics,
                     nameBoxX(addressText, addressBox) + font.width(addressText) + 5, y - 14);
         }
 
-        graphics.drawString(font, Component.translatable("gui.distantstock.dock.name"), x + 45, y + 9,
+        graphics.drawString(font, Component.translatable("gui.distantstock.dock.mode"), x + 45, y + 13,
                 INK, false);
-        AllGuiTextures.STATION_TEXTBOX_TOP.render(graphics, x + 45, y + 20);
-
-        graphics.drawString(font, Component.translatable("gui.distantstock.dock.mode"), x + 14, y + 61,
-                INK, false);
-        graphics.blit(AllGuiTextures.TERRAINZAPPER.getLocation(), x + 72, y + 56,
+        graphics.blit(AllGuiTextures.TERRAINZAPPER.getLocation(), x + 108, y + 8,
                 SHAPER_MODE_U, SHAPER_MODE_V, SHAPER_MODE_W, SHAPER_MODE_H);
 
-        graphics.drawString(font, Component.translatable("gui.distantstock.dock.priority"), x + 14, y + 83,
+        graphics.drawString(font, Component.translatable("gui.distantstock.dock.priority"), x + 45, y + 35,
                 INK, false);
-        graphics.blit(AllGuiTextures.TERRAINZAPPER.getLocation(), x + 72, y + 78,
+        graphics.blit(AllGuiTextures.TERRAINZAPPER.getLocation(), x + 108, y + 30,
                 SHAPER_PARAM_U, SHAPER_PARAM_V, SHAPER_PARAM_W, SHAPER_PARAM_H);
 
-        // One physical parcel bay. The remaining internal inventories are recovery state, not
-        // capacity, so they are intentionally not exposed as extra slots.
-        AllGuiTextures.FROGPORT_SLOT.render(graphics, x + 13, y + 14);
+        // One physical parcel bay, in the lower-left control deck like the target slot on a normal
+        // Frogport. The remaining internal inventories are recovery state and stay hidden.
+        AllGuiTextures.FROGPORT_SLOT.render(graphics, x + DockMenu.BAY_X - 1, y + DockMenu.BAY_Y - 1);
+
+        ItemStack dockIcon = new ItemStack(ModBlocks.DOCK.get().asItem());
+        GuiGameElement.of(dockIcon)
+                .scale(4)
+                .at(x + PANEL_W + 6, y + PANEL_BODY_H - 56, -200)
+                .render(graphics);
 
         int invX = leftPos + 30;
         int invY = topPos + 8 + imageHeight - AllGuiTextures.PLAYER_INVENTORY.getHeight();
@@ -190,12 +190,12 @@ public final class DockScreen extends AbstractSimiContainerScreen<DockMenu> {
         if (!menu.networkBound) {
             graphics.drawString(font,
                     Component.translatable("gui.distantstock.dock.network_unbound").withStyle(ChatFormatting.RED),
-                    x + 96, y + 83, 0xB65E57, false);
+                    x + 42, y + 62, 0xB65E57, false);
         }
         if (!menu.towerActive) {
             graphics.drawString(font,
                     Component.translatable("gui.distantstock.dock.tower_inactive").withStyle(ChatFormatting.RED),
-                    x + 14, y + 103, 0xB65E57, false);
+                    x + 42, y + 71, 0xB65E57, false);
         }
     }
 
@@ -213,7 +213,7 @@ public final class DockScreen extends AbstractSimiContainerScreen<DockMenu> {
         if (configurationSent) return;
         configurationSent = true;
         PacketDistributor.sendToServer(new ConfigureDockC2S(menu.dockPos,
-                nameBox == null ? menu.initialName : nameBox.getValue(),
+                menu.initialName,
                 addressBox == null ? menu.initialAddress : addressBox.getValue(),
                 modeInput == null ? menu.initialMode.ordinal() : modeInput.getState(),
                 priorityInput == null ? menu.initialPriority : priorityInput.getState()));
