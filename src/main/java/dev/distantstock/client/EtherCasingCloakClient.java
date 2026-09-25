@@ -10,17 +10,23 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderHandEvent;
 import net.neoforged.neoforge.client.event.RenderPlayerEvent;
-import net.neoforged.neoforge.event.tick.PlayerTickEvent;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.ClientTickEvent;
 
-/** Client-only optical cloak: the armour shell dissolves in casing-like patches, then the wearer vanishes. */
+/** Client-only rendering for the server-synchronised optical cloak phase. */
 @EventBusSubscriber(modid = DistantStock.MODID, value = Dist.CLIENT)
 public final class EtherCasingCloakClient {
     @SubscribeEvent
-    public static void playerTick(PlayerTickEvent.Post event) {
-        Player player = event.getEntity();
-        if (!player.level().isClientSide) return;
-        boolean cloaking = EtherCasingArmorItem.isCloaking(player);
-        EtherCasingCloakState.tick(player, cloaking);
+    public static void clientTick(ClientTickEvent.Post event) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null) return;
+        // The server only synchronises the boolean state transition. Animation itself stays purely
+        // visual/client-side, so there is no per-tick player packet traffic and no server-side
+        // rendering state mixed into gameplay state.
+        for (Player player : minecraft.level.players()) {
+            EtherCasingCloakState.tick(player,
+                    EtherCasingCloakState.isRequested(player.getUUID()));
+        }
     }
 
     @SubscribeEvent
@@ -28,6 +34,19 @@ public final class EtherCasingCloakClient {
         if (EtherCasingCloakState.fullyCloaked(event.getEntity())) {
             event.setCanceled(true);
         }
+    }
+
+    @SubscribeEvent
+    public static void logout(ClientPlayerNetworkEvent.LoggingOut event) {
+        // RemotePlayer instances are recreated on reconnect. Never carry an animation phase keyed
+        // by an old UUID into the next connection; that stale client-only state is exactly the kind
+        // of asymmetry which can make one observer see a frozen/standing player while another does not.
+        EtherCasingCloakState.clearAll();
+    }
+
+    @SubscribeEvent
+    public static void login(ClientPlayerNetworkEvent.LoggingIn event) {
+        EtherCasingCloakState.clearAll();
     }
 
     @SubscribeEvent

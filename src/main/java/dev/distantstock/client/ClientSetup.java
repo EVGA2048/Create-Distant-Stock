@@ -22,6 +22,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
@@ -31,6 +32,15 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 public final class ClientSetup {
     @EventBusSubscriber(modid = DistantStock.MODID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static final class Screens {
+        @SubscribeEvent
+        public static void goggles(FMLClientSetupEvent e) {
+            // Goggles are a presentation feature. Register this only on the physical client so the
+            // helmet cannot become a server-side behavioural predicate for unrelated Create addons.
+            e.enqueueWork(() -> com.simibubi.create.content.equipment.goggles.GogglesItem
+                    .addIsWearingPredicate(player -> player.getItemBySlot(EquipmentSlot.HEAD)
+                            .is(ModItems.ETHER_CASING_HELMET.get())));
+        }
+
         @SubscribeEvent
         public static void screens(RegisterMenuScreensEvent e) {
             e.register(ModMenus.REQUESTER.get(), RequesterScreen::new);

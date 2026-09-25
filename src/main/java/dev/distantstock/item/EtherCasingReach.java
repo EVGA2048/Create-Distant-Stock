@@ -6,6 +6,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
@@ -29,6 +30,11 @@ public final class EtherCasingReach {
     @SubscribeEvent
     public static void playerTick(PlayerTickEvent.Post event) {
         Player player = event.getEntity();
+        // Attributes are server-authoritative. Mutating the same synced AttributeInstance again on
+        // the logical client makes the client fight the server's attribute packets every tick. In
+        // a large modpack that can poison interaction/ray-trace state (placement helpers, Ultimine,
+        // etc.). Let vanilla/NeoForge sync the server modifier to the client instead.
+        if (!(player instanceof ServerPlayer)) return;
         boolean equipped = EtherCasingArmorItem.hasFullSet(player);
         update(player.getAttribute(Attributes.BLOCK_INTERACTION_RANGE), BLOCK_MODIFIER, equipped);
         update(player.getAttribute(Attributes.ENTITY_INTERACTION_RANGE), ENTITY_MODIFIER, equipped);

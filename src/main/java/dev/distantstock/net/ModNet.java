@@ -51,6 +51,7 @@ public final class ModNet {
         r.playToClient(CreateNetworkLockS2C.TYPE, CreateNetworkLockS2C.STREAM_CODEC,
                 CreateNetworkLockS2C::handle);
         r.playToClient(OpenLoggerS2C.TYPE, OpenLoggerS2C.STREAM_CODEC, OpenLoggerS2C::handle);
+        r.playToClient(CloakStateS2C.TYPE, CloakStateS2C.STREAM_CODEC, CloakStateS2C::handle);
     }
 
     private ModNet() {

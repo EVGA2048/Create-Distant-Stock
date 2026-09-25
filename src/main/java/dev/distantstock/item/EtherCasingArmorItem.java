@@ -29,7 +29,11 @@ public final class EtherCasingArmorItem extends ArmorItem {
     }
 
     public static boolean isCloaking(LivingEntity entity) {
-        return entity != null && entity.isCrouching() && hasFullSet(entity);
+        // Use the synchronized sneak flag, not the resolved CROUCHING pose. The pose is derived
+        // later and is not a reliable cross-client/server trigger (flying players are the obvious
+        // example). The shared shift flag is exactly what the player actually pressed and is sent
+        // to the server/other clients by vanilla.
+        return entity != null && entity.isShiftKeyDown() && hasFullSet(entity);
     }
 
     @Override
