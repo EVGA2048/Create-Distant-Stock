@@ -10,7 +10,10 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 public final class ModNet {
     @SubscribeEvent
     public static void register(RegisterPayloadHandlersEvent e) {
-        PayloadRegistrar r = e.registrar("10");
+        // CloakStateS2C changed wire format after v0.3.12 (phase varint -> boolean state).
+        // Keep incompatible test clients/servers from silently connecting and decoding each
+        // other's payloads as if they matched.
+        PayloadRegistrar r = e.registrar("11");
         r.playToServer(SetAddressC2S.TYPE, SetAddressC2S.STREAM_CODEC, SetAddressC2S::handle);
         r.playToServer(PlaceOrderC2S.TYPE, PlaceOrderC2S.STREAM_CODEC, PlaceOrderC2S::handle);
         r.playToServer(JoinNetworkC2S.TYPE, JoinNetworkC2S.STREAM_CODEC, JoinNetworkC2S::handle);

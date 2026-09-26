@@ -24,8 +24,11 @@ public final class EtherCasingCloakClient {
         // visual/client-side, so there is no per-tick player packet traffic and no server-side
         // rendering state mixed into gameplay state.
         for (Player player : minecraft.level.players()) {
+            boolean cloaking = player == minecraft.player
+                    ? EtherCasingArmorItem.isCloaking(player)
+                    : EtherCasingCloakState.isRequested(player.getUUID());
             EtherCasingCloakState.tick(player,
-                    EtherCasingCloakState.isRequested(player.getUUID()));
+                    cloaking);
         }
     }
 
