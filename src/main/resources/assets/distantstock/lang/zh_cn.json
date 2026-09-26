@@ -219,6 +219,7 @@
   "goggle.distantstock.fallback.parcel": "整包退回：目标无法接收",
   "goggle.distantstock.fault.payload_unreadable": "故障：包裹数据无法读取，已转入隔离库",
   "goggle.distantstock.fault.strip_unmatched": "故障：无法定位不兼容内容，包裹已退回",
+  "gui.distantstock.item.incompatible": "不兼容的物品",
   "goggle.distantstock.fault.strip_limit": "故障：重试次数已达上限，包裹已退回",
   "goggle.distantstock.default_route": "默认目标：%s · %s",
   "goggle.distantstock.default_route.none": "默认目标：未设置",

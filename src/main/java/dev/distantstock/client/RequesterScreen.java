@@ -22,6 +22,7 @@ import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
@@ -659,8 +660,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         }
         List<StockCache.Entry> out = new ArrayList<>();
         for (StockCache.Entry e : all) {
+            ItemStack stack = e.stack();
             if (e.itemId.toLowerCase(Locale.ROOT).contains(q)
-                    || e.stack().getHoverName().getString().toLowerCase(Locale.ROOT).contains(q)) {
+                    || (!stack.isEmpty()
+                    && stack.getHoverName().getString().toLowerCase(Locale.ROOT).contains(q))) {
                 out.add(e);
             }
         }
@@ -699,11 +702,19 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         super.render(g, mouseX, mouseY, partial);
         // After everything, because a dropdown that the widgets behind it paint over is not one.
         drawGroupList(g, mouseX, mouseY);
-        ItemStack hover = hoveredStock(mouseX, mouseY);
+        StockCache.Entry hoveredEntry = hoveredStockEntry(mouseX, mouseY);
+        ItemStack hover = hoveredEntry == null ? ItemStack.EMPTY : hoveredEntry.stack();
         if (hover.isEmpty()) {
             hover = hoveredCart(mouseX, mouseY);
         }
-        if (!hover.isEmpty()) {
+        if (hoveredEntry != null && !compatible(hoveredEntry)) {
+            g.renderComponentTooltip(font, List.of(
+                    Component.translatable("gui.distantstock.item.incompatible")
+                            .withStyle(ChatFormatting.RED),
+                    Component.literal(hoveredEntry.itemId)
+                            .withStyle(ChatFormatting.GRAY)
+            ), mouseX, mouseY);
+        } else if (!hover.isEmpty()) {
             g.renderTooltip(font, hover, mouseX, mouseY);
         } else if (createLockHovered(mouseX, mouseY)) {
             // Match Create's StockKeeperRequestScreen verbatim in meaning and presentation.  This
@@ -889,7 +900,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             ms.pushPose();
             ms.translate(sx, sy, 0);
             CreateSheets.SLOT.render(g, 0, 0);
-            renderEntry(g, e.stack(), remainingFor(e),
+            renderEntry(g, displayStack(e), remainingFor(e),
                     mouseX >= sx && mouseX < sx + SLOT && mouseY >= sy && mouseY < sy + SLOT);
             ms.popPose();
         }
@@ -1116,7 +1127,13 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             removeCart(cartAt, rmb ? 1 : cart.get(cartAt).count);
             return true;
         }
-        ItemStack hit = hoveredStock((int) mx, (int) my);
+        StockCache.Entry stockHit = hoveredStockEntry((int) mx, (int) my);
+        ItemStack hit = stockHit == null ? ItemStack.EMPTY : stockHit.stack();
+        if (stockHit != null && !compatible(stockHit)) {
+            // The barrier is deliberately informational only. The target server cannot materialise
+            // this registry id, so do not let it enter the order cart in the first place.
+            return true;
+        }
         if (!hit.isEmpty()) {
             addCart(hit, amount(rmb));
             return true;
@@ -1365,9 +1382,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         return mx >= cx && mx < cx + 78 && my >= cy && my < cy + 18;
     }
 
-    private ItemStack hoveredStock(int mx, int my) {
+    private StockCache.Entry hoveredStockEntry(int mx, int my) {
         if (my < topPos + 16 || my > topPos + imageHeight - 132) {
-            return ItemStack.EMPTY;
+            return null;
         }
         List<StockCache.Entry> list = filtered();
         int start = scroll * COLS;
@@ -1382,10 +1399,21 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             int sx = ix + (i % COLS) * CELL;
             int sy = iy + (i / COLS) * CELL;
             if (mx >= sx && mx < sx + SLOT && my >= sy && my < sy + SLOT) {
-                return list.get(idx).stack();
+                return list.get(idx);
             }
         }
-        return ItemStack.EMPTY;
+        return null;
+    }
+
+    private static boolean compatible(StockCache.Entry entry) {
+        if (entry == null) return false;
+        var id = net.minecraft.resources.ResourceLocation.tryParse(entry.itemId);
+        return id != null && BuiltInRegistries.ITEM.containsKey(id)
+                && BuiltInRegistries.ITEM.get(id) != Items.AIR;
+    }
+
+    private static ItemStack displayStack(StockCache.Entry entry) {
+        return compatible(entry) ? entry.stack() : new ItemStack(Items.BARRIER);
     }
 
     private int cartIndex(int mx, int my) {

@@ -219,6 +219,7 @@
   "goggle.distantstock.fallback.parcel": "whole parcel out: destination cannot accept it",
   "goggle.distantstock.fault.payload_unreadable": "Fault: escrow record cannot be decoded, moved to quarantine",
   "goggle.distantstock.fault.strip_unmatched": "Fault: incompatible items could not be located, parcel fell out",
+  "gui.distantstock.item.incompatible": "Incompatible item",
   "goggle.distantstock.fault.strip_limit": "Fault: strip limit reached, parcel fell out",
   "goggle.distantstock.default_route": "Default destination: %s · %s",
   "goggle.distantstock.default_route.none": "Default destination: not set (plain parcels stay inside)",
