@@ -1,197 +1,223 @@
-# Create: Distant Stock
+<p align="center">
+  <img src="docs/release/assets/distantstock-icon-256.png" alt="Create: Distant Stock" width="128">
+</p>
 
-跨服仓储与包裹运输附属，让 Create 的仓储网络能够把订单和未拆封包裹送到另一台 Minecraft 服务器。
-
-[English](README.en.md) · [问题反馈](https://github.com/EVGA2048/Create-Distant-Stock/issues) · [版本发布](https://github.com/EVGA2048/Create-Distant-Stock/releases)
-
-[![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-green)](https://www.minecraft.net/)
-[![NeoForge](https://img.shields.io/badge/NeoForge-21.1-blue)](https://neoforged.net/)
-[![Create](https://img.shields.io/badge/Create-6.0.x-orange)](https://modrinth.com/mod/create)
-[![License](https://img.shields.io/github/license/EVGA2048/Create-Distant-Stock)](LICENSE)
+<h1 align="center">Create: Distant Stock · 机械动力：远仓</h1>
+<p align="center">把 Create 仓库、工厂与包裹物流连接到另一台 Minecraft 服务器。</p>
 
 <p align="center">
-  <img src="docs/preview/machines-0.3.7.png" alt="远仓机器与方块预览" width="960">
+  <a href="README.en.md">English</a> ·
+  <a href="https://github.com/EVGA2048/Create-Distant-Stock/releases">下载</a> ·
+  <a href="docs/wiki/README.md">玩法 Wiki</a> ·
+  <a href="https://github.com/EVGA2048/Create-Distant-Stock/issues">Issues</a>
 </p>
 
 <p align="center">
-  <img src="docs/preview/indicator-lamps-0.3.7.png" alt="远仓独立信号灯预览" width="1100">
+  <img src="https://img.shields.io/badge/Minecraft-1.21.1-5c8845" alt="Minecraft 1.21.1">
+  <img src="https://img.shields.io/badge/Loader-NeoForge-d78c44" alt="NeoForge">
+  <img src="https://img.shields.io/badge/Create-6.0.x-85b8be" alt="Create 6.0.x">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-c8af75" alt="MIT License"></a>
 </p>
 
-> 图片使用当前资源文件中的模型 JSON 与 PNG 离线渲染，米色背景仅用于展示，不是游戏截图。
+> [!IMPORTANT]
+> **本模组仍处于开发与多人测试阶段。** 功能、配方、平衡、网络协议与存档数据仍可能调整，重要存档升级前请做好备份。欢迎加入项目交流群参与测试和讨论；如果遇到可以稳定复现的问题，请在 [Issues](https://github.com/EVGA2048/Create-Distant-Stock/issues) 提交日志与复现步骤。
 
-## 远仓是什么？
+![Create: Distant Stock 设备总览](docs/release/assets/machines.png)
 
-**机械动力：远仓（Create: Distant Stock）** 是一个 NeoForge 附属模组。它不把多个 Create 仓储网络强行合并，而是通过远仓港和远仓包裹，在服务器之间传递订单结果与物品。
+**Create: Distant Stock（机械动力：远仓）** 是围绕 Create 仓储物流扩展的一套跨服务器仓储、订单与包裹运输系统。
 
-每台服务器都拥有自己的 Create 仓储网络。远仓只负责跨服边界：
-
-```text
-Create 仓储网络 A → 远仓打包机 → 远仓港 )) 可靠链路 (( 远仓港 → 本地物流 → Create 仓储网络 B
-```
-
-模组的目标是让“仓库服 + 多台生存服”成为可维护的物流系统，同时在断线、重启、目标拒收或模组不一致时优先保住物品。
-
-## 当前包含的设备
-
-### 远仓港 `distantstock:dock`
-
-跨服物流的核心方块。一个港可以设置为出货、收货或双向模式，并支持优先级。它有独立的待发、到货和回退缓存：
-
-- 待发包裹从上方或侧面的 Create 物流进入；
-- 到货包裹从港的输出侧取出；
-- 无法投递的包裹进入底部回退面，而不是被悄悄销毁；
-- 绿、青、橙、红等灯态用于表示待机、发送、回退堵塞和故障；
-- 用工程师护目镜查看节点、港组、缓存和最近错误；
-- 破坏方块时会弹出各类缓存中的物品。
-
-港组使用稳定标识和排序选择，允许一个港组拥有多个接收港，也允许一张本地仓储网络连接多个远仓港。
-
-### 远仓打包机 `distantstock:remote_packager`
-
-Create 打包机的远仓变体，保留打包机式结构和包裹动画，负责生成远仓包裹。它应连接在本地 Create 物流之后，再连接到远仓港。
-
-### 远仓包裹 `distantstock:remote_package`
-
-包含 Create 包裹内容和远程路线的物品。路线使用节点、世界、维度和接收港组等稳定标识，不把 IP、域名或 Router 地址写进物品。
-
-### 远仓请求台 `distantstock:gauge`
-
-落地式请求设备，用于打开仓储请求界面并配置来源网络、目标地址和接收港组。界面风格沿用 Create 的仓储界面。
-
-### 远仓请求器 `distantstock:requester`
-
-便携式请求器，可在不站在请求台旁边时浏览已加入的远程网络并提交订单。Curios 支持为可选依赖；不安装 Curios 时仍可作为普通手持物品使用。
-
-### 远仓监视器 `distantstock:monitor`
-
-贴墙安装的状态显示器，用于查看本端和远端的 TPS、链路状态、队列以及包裹概览。打开界面和周期刷新使用不同的数据包，关闭后不会因为刷新而重新打开。
-
-### 信号灯与信号面板
-
-模组提供五种安山独立信号灯：青、橙、红、绿、白，以及黄铜信号灯。它们可以作为独立墙面灯放置，也可以装入 Create 风格的四分格信号面板。灯格能够读取红石或连接的工厂仪表信号，并显示熄灭与点亮状态。
-
-### 说明书与 Ponder
-
-创造栏中提供远仓说明书。模组还包含出货、收货、状态和调谐相关的 Ponder 场景，用于说明基本结构和物流方向。
-
-## 物品安全设计
-
-远仓不是简单的 HTTP “发一个 NBT 就算成功”。当前实现包含以下保护：
-
-- Transerver 负责节点身份、持久消息、重试、回执和去重；
-- 来源服在交出包裹前使用持久托管记录；
-- 目标服以 `parcelId` 做幂等登记，重复消息不会重复生成物品；
-- 目标港满、区块未加载或暂时不可用时，包裹进入重试流程；
-- 目标缺少物品或数据组件时拒收，并把包裹交给退件流程；
-- 目标明确报告缺失内容时，来源可以剔除缺失条目后限次重发；
-- 原港消失或无法加载时，包裹进入服务器退件箱；
-- 无法解码的内容进入隔离库，保留原始数据与 SHA-256，等待管理员处理；
-- 交接遵循“先写入新的唯一保管方，再删除旧记录”，避免先删后丢。
-
-管理员命令：
+它不是把多台服务器的库存直接合并成一个“无限距离箱子”。每座仓库仍然是一张独立的 Create 物流网络：来源仓库要真实接单和打包，包裹要经过远仓港交给 Transerver，抵达目标服务器后再进入当地的 Create 皮带、锁链、蛙港和分拣系统。
 
 ```text
-/distantstock status
-/distantstock returns list
-/distantstock returns restore <id>
-/distantstock returns give <id>
-/distantstock returns export <id>
-/distantstock quarantine list
-/distantstock quarantine give <id>
-/distantstock quarantine export <id>
-/distantstock quarantine discard <id>
+来源 Create 仓库
+    ↓
+远仓请求 / 自动补货
+    ↓
+远仓打包机 → 远仓港
+    ↓
+──────────── Transerver ────────────
+    ↓
+目标远仓港 → 本地 Create 包裹物流
 ```
 
-## 安装要求
+这套设计适合中央仓库、独立生产服、生存服与大型多人工业区：跨服层负责“把包裹送到另一台服务器”，Create 继续负责“这个包裹在本地怎么生产、怎么打包、怎么分拣”。
 
-当前开发目标：
+## 主要功能
 
-- Minecraft 1.21.1
-- NeoForge 21.1.219 或兼容的 21.1 版本
-- Create 6.0.x（当前以 6.0.10 验证）
-- Transerver 0.1.x（必需前置）
-- Java 21
-- Curios 9.x（可选）
+- **跨服库存浏览与下单**：从便携终端或固定请求台选择远方成员仓库并提交订单。
+- **真实 Create 包裹运输**：来源端由远仓打包机生成包裹，远仓港完成服务器之间的交接，落地后继续使用 Create 地址系统。
+- **自动补货与红石触发**：远仓仪表按本地库存缺口自动请求，远仓红石请求器用红石上升沿触发订单。
+- **远仓网络与成员仓库**：通过加入码建立共享的远仓网络，但每张 Create 仓库仍保留自己的权限、锁定和库存边界。
+- **互通塔基础设施**：旋转动力驱动的多方块塔为附近远仓设备提供覆盖、带载和区块加载能力，并可按包裹消耗以太凝液。
+- **监控与工业信号**：监视器、日志台、工况灯、声光报警器和信号面板用于构建真正可用的控制室。
+- **故障诊断与缓存**：诊断蛙港、缓存蛙港和 Ping 包帮助处理错误地址、链路故障与堵塞恢复。
+- **可靠交接**：订单、包裹、确认、重试、退件与隔离都有持久状态，尽量避免网络中断时出现重复投递或无声丢包。
 
-每一台参与互通的服务器都需要安装 Distant Stock、Transerver、Create 以及对应依赖。客户端也要安装 Distant Stock 和 Create，才能显示方块、界面和 Ponder。
+## 设备与物品
 
-把以下 JAR 放入服务器或客户端的 `mods/`：
+### 请求、自动化与跨服运输
+
+![远仓物流设备](docs/release/assets/logistics.png)
+
+| 设备 | 用途 |
+| --- | --- |
+| **便携式远仓终端** | 创建或加入远仓网络、选择成员仓库、浏览库存、提交订单，并用于给其它远仓设备配对。 |
+| **远仓请求台** | 固定式请求终端，适合仓库柜台、工厂控制台或公共取货点。 |
+| **远仓仪表** | 同时观察本地 Create 库存与远端成员仓库，当库存低于目标值时自动补货。 |
+| **远仓红石请求器** | 远程版 Create 红石请求器；配置物品后由红石上升沿触发一次请求。 |
+| **远仓打包机** | Create 打包机的远仓变体，把跨服订单实际变成可运输的远仓包裹。 |
+| **远仓港** | 跨服包裹离开或进入一台服务器的端口，可按接收港地址组织多台接收港。 |
+| **远仓包裹** | 保留 Create 包裹内容和本地地址，同时携带远仓跨服路由信息。 |
+
+远仓把“跨服目的地”和“Create 包裹地址”分成两个阶段：接收港地址决定包裹在哪一组远仓港落地，包裹离开远仓港以后，再由 Create 自己的地址继续完成本地配送。
+
+### 互通塔
+
+![互通塔组件](docs/release/assets/tower.png)
+
+互通塔由 **互通塔底座、连续的互通塔耦合器和顶部以太谐振器** 构成，底座从下方接收旋转动力。远仓机壳可以围成塔基外观，并承担观察窗、流体端口等结构表现。
+
+塔高决定等级。等级越高，可带载的远仓设备越多，设备激活半径越远，可选择的区块加载范围也越大：
+
+| 等级 | 耦合器 | 最大设备 | 激活半径 | 区块加载上限 | 应力影响 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| I | 5 | 8 | 32 格 | 1×1 | 256 |
+| II | 7 | 16 | 40 格 | 3×3 | 512 |
+| III | 9 | 32 | 48 格 | 3×3 | 1024 |
+| IV | 11 | 48 | 64 格 | 5×5 | 2048 |
+| V | 13 | 64 | 80 格 | 5×5 | 4096 |
+| VI | 15 | 96 | 112 格 | 7×7 | 8192 |
+| VII | 17 | 128 | 144 格 | 7×7 | 16384 |
+
+默认配置下，发送一个跨服包裹需要由发送端互通塔支付 **250 mB 以太凝液**；管理员可以在配置中关闭按包裹计费或调整价格。塔的持续待机消耗默认是 `0 mB/s`。
+
+### 监控、控制与诊断
+
+![监控与诊断设备](docs/release/assets/control.png)
+
+| 设备 | 用途 |
+| --- | --- |
+| **远仓监视器** | 查看本服性能、Transerver 链路、订单/包裹队列，以及互通塔成员、应力、区块加载、以太与流量。 |
+| **远仓日志台** | 记录系统事件、显示告警并打印事件小票；需要纸卷才能正常打印。 |
+| **工况灯 + 工况链接器** | 把红、黄、绿三路状态和独立蜂鸣器使能送到工况灯，适合工厂状态塔和控制室。 |
+| **红/橙声光报警器** | 红石控制的工业告警器，可用于错误包、缺料、停机或其它工况提示。 |
+| **信号灯与信号面板** | 青、橙、红、绿、白和黄铜信号灯，可独立安装或进入四分格面板。 |
+| **诊断蛙港** | 轮询锁链网络地址、发送 Ping 包，并接管无路由包裹作为诊断和隔离出口。 |
+| **缓存蛙港** | 某个业务地址堵塞时临时接管该地址，保存包裹并在恢复后按红石或定时节流重发。 |
+
+诊断蛙港的错误包可以从底面自动取出；缓存蛙港拥有 54 格真实缓存，不使用隐藏的无限队列。更完整的恢复逻辑见 [设备](docs/wiki/设备.md) 与 [监控与日志](docs/wiki/监控与日志.md)。
+
+### 材料与其它内容
+
+远仓还有一套用于制作设备与互通塔的材料链，包括 **末影粉、以太石英、磨制以太石英、半成品以太构件、以太构件、熔融紫水晶和以太凝液**。流体提供桶装与瓶装形式，配方与加工流程见 [材料与制作](docs/wiki/材料与制作.md)。
+
+模组同时包含谐振石英护甲、远仓手册、事件记录、小票纸卷和用于诊断链路的 Ping 包等辅助物品。
+
+## 远仓网络是怎么组织的？
+
+远仓不会把当前服务器上所有 Create 仓储网络直接暴露给玩家。正常流程是：
 
 ```text
-Create-Distant-Stock-<version>+mc1.21.1.jar
-Transerver-<version>.jar
-create-1.21.1-<version>.jar
+终端创建 / 输入加入码加入远仓网络
+        ↓
+玩家到本地仓库，用终端右键已经绑定 Create 网络的远仓港
+        ↓
+这张 Create 仓库成为远仓网络成员
+        ↓
+终端、请求台、仪表和红石请求器
+只从这张远仓网络的成员仓库中选择来源
 ```
 
-不要同时放入旧版本的 Distant Stock。升级前先完全关闭 Minecraft，再替换 JAR。
+一张 Create 仓储网络同时只能属于一张正式远仓网络。远仓网络使用 8 位加入码完成首次授权，成功加入以后设备保存正式网络身份；重置加入码不会让已经加入的成员掉线。
 
-## 基本配置
+## 安装与依赖
 
-服务器首次启动后会生成 `config/distantstock-common.toml`。当前配置核心是：
+| 项目 | 当前要求 |
+| --- | --- |
+| Minecraft | **1.21.1** |
+| 加载器 | **NeoForge**；当前开发与测试环境使用 21.1.231 |
+| Java | **21** |
+| 必需模组 | **Create 6.0.x**、**Transerver 0.1.x** |
+| 安装位置 | 客户端和每台参与远仓互通的服务器 |
 
-- `self.id`：本端稳定节点 ID；每台服务器必须不同；
-- `self.bind`：Transerver 监听地址；
-- `peers`：可达节点列表；
-- `token`：节点之间共享的认证令牌；正式服建议使用随机长字符串；
-- `giveManual`：进入世界时是否赠送说明书；
-- `debug.demoStock`：是否显示演示库存，正式服应关闭。
+从 [GitHub Releases](https://github.com/EVGA2048/Create-Distant-Stock/releases) 获取 JAR，并与 Create、[Transerver](https://github.com/EVGA2048/Transerver) 及其依赖一起放入 `mods/`。当前 NeoForge 依赖声明要求客户端也安装 Transerver。
 
-节点和包裹只保存稳定 ID。主机、端口和认证令牌属于服务器配置，不应写入公开仓库、截图或分享给无关人员。
+真正进行跨服务器运输时，还需要管理员启动 **Transerver Router** 并给参与服务器配置节点连接。游戏内玩家使用的是远仓网络加入码、成员仓库和接收港地址，不需要填写其它服务器的 IP。
 
-## 使用流程
+### 可选兼容
 
-1. 在目标服务器建立并启用 Create 仓储网络。
-2. 将远仓打包机接到本地仓储网络的打包物流上。
-3. 将远仓打包机与远仓港连接，设置港的模式、优先级和默认路线。
-4. 在另一台服务器放置收货港，并配置相同的接收港组。
-5. 使用请求器或请求台选择来源网络、物品、数量、本地地址和接收港组。
-6. 订单被目标仓库处理后，远仓包裹经过可靠链路送到收货港。
-7. 收货港通过漏斗、溜槽、皮带或其他 Create 物流把包裹送入本地网络。
+- **Curios**：允许以饰品方式携带/查找便携式远仓终端。
+- **Create: Deployer**：安装后可让远仓仪表、信号灯等进入兼容的扩展面板系统。
+- **Create: FluidLogistics**：增加远仓流体包裹支持。
 
-普通包裹如果没有明确路线，不会被随机发送，而是保留在发送港并显示缺少目的地。收货港组没有空间时，包裹也不会投到错误的港。
+这些内容都不是基础远仓物流的必需前置。
 
-## 当前状态
+## 快速开始
 
-这是一个仍在开发中的测试版本。核心代码和安全护栏已经覆盖：
+第一次搭建建议按这个顺序：
 
-- 稳定节点、世界、网络和港组路由；
-- Transerver 可靠频道与版本化协议；
-- 远程库存查询和订单请求；
-- 包裹托管、回执、幂等与重复消息处理；
-- 目标缺模组时的清单检查、退件、隔离和限次剔除重发；
-- 远仓港、打包机、请求器、监视器和信号灯的客户端资源。
+1. 在两端准备可正常工作的 Create 仓储物流。
+2. 搭建并驱动互通塔；默认计费下给发送端塔补充以太凝液。
+3. 手持远仓港物品右键本地 Create 物流链接，再放置远仓港，完成本地仓库绑定。
+4. 在便携终端中创建远仓网络；另一端使用同一个 8 位加入码加入。
+5. 分别用已经入网的终端右键两端远仓港，把对应 Create 仓库登记为成员。
+6. 在接收端创建接收港地址并把目标港加入该地址；在发送端选择这个目的地。
+7. 从接收端终端或请求台选择来源仓库和物品，下第一笔订单。
 
-仍未完成或尚未充分验证的部分：
+更详细、带操作顺序与排障说明的教程见：[快速开始](docs/wiki/快速开始.md)。
 
-- 两台真实独立服务器上的完整下单闭环；
-- Router 断线、重启、区块卸载、目标港满等故障矩阵；
-- Multiverse 多世界生命周期与权限系统；
-- 港组调谐工具、地址牌和请求器收货港组交互的进一步完善；
-- 互通塔、以太流体和资源消耗玩法。
+## 网络中断和包裹恢复
 
-请把当前版本视为开发测试版，不要直接用于唯一存档或无人值守的生产服务器。测试时优先使用干净世界，并保留服务器备份。
+远仓为跨服包裹维护持久的保管状态，并包含确认、幂等/重复消息处理、重试、退件与隔离路径。目标服务器离线、接收港堵塞、包裹地址错误或本地链路异常时，系统优先保留包裹并暴露故障状态，而不是静默吞掉物品。
 
-## 开发与验证
+这些机制用于降低跨服物流中的丢失和重复投递风险，但开发测试阶段仍建议重要服务器保持定期备份。提交问题时请附上：
 
-需要 JDK 21。仓库提供资源检查和协议检查：
+- Distant Stock、Create、NeoForge 和 Transerver 版本；
+- 涉及服务器两端的相关日志；
+- 可以稳定复现问题的步骤；
+- 必要的截图或录屏。
+
+分享日志前请删除认证令牌、地址等敏感信息。排障入口：[常见问题与排障](docs/wiki/常见问题与排障.md) · [路由与包裹](docs/wiki/路由与包裹.md) · [多人服务器测试清单](docs/wiki/多人服务器测试清单.md)。
+
+## 文档
+
+- [玩法 Wiki](docs/wiki/README.md)
+- [快速开始](docs/wiki/快速开始.md)
+- [设备](docs/wiki/设备.md)
+- [互通塔](docs/wiki/互通塔.md)
+- [材料与制作](docs/wiki/材料与制作.md)
+- [监控与日志](docs/wiki/监控与日志.md)
+- [服务器与运维](docs/wiki/服务器与运维.md)
+- [常见问题与排障](docs/wiki/常见问题与排障.md)
+
+## 从源码构建
+
+需要 JDK 21。当前开发构建仍使用本地测试环境中的 Create JAR，并从相邻的 `../Transerver` 仓库读取 Transerver 构建产物；在新的开发环境中，需要先调整 `build.gradle` 中对应路径。
 
 ```bash
-./gradlew clean build
-./gradlew verifyWireCodec verifyParcelOwnership verifyClientAssets
+./gradlew build verifyWireCodec verifyParcelOwnership
 ```
 
-`verifyClientAssets` 会检查注册方块、blockstate、模型父项、贴图引用、灯状态和模型几何，避免紫黑方块问题只在游戏里才被发现。
+JAR 输出为：
 
-生成 README 展示图：
+```text
+build/Create-Distant-Stock-<version>+mc1.21.1.jar
+```
+
+## README 与发布插图
+
+README 使用的模组图标和设备插图全部由项目内的 Python 渲染器从**实际发布的 JSON 模型与 PNG 材质**离线生成，不使用生成式图片。图片本身不写设备名、版本号或宣传文字，说明统一保留在 Markdown 中。
 
 ```bash
-python3 scripts/render_readme_showcase.py
+python3 scripts/render_release_art.py
 ```
 
-展示图来自 `src/main/resources/assets/distantstock` 的正式资源，不代表所有未来状态都已经实现。
+渲染脚本需要 Pillow、NumPy，以及 `scripts/render_block.py` 中配置的 Create JAR。
 
-## 许可与致谢
+## 致谢与许可
 
-本项目使用 [MIT License](LICENSE)。
+感谢 **MUL、KNaMg_Rana、w4yw、BSGM** 在项目前期开发和多人测试中提供的反馈与建议。
 
-部分便携请求器物品模型布局改编自 [Create: Mobile Packages](https://github.com/tom5454/Create-Mobile-Packages)，遵循其 MIT 许可证。Create 的仓储界面资源在运行时使用 Create 命名空间，不打包复制到本模组。
+感谢 **Create** 团队提供机械、动能与物流系统。部分便携终端模型布局以及 Bee Port 材质来源于 Tim Heidler 的 [Create: Mobile Packages](https://github.com/timplay33/Create-Mobile-Packages)，并按照其 MIT 许可进行修改和再分发；第三方许可保留在 [LICENSE-mobile-packages.txt](src/main/resources/META-INF/LICENSE-mobile-packages.txt)。
+
+Create: Distant Stock 本身采用 [MIT License](LICENSE)。
