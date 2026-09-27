@@ -202,7 +202,7 @@ public final class ParcelEscrowPump {
         if (api == null) {
             return;
         }
-        for (CompletedSend completed : api.completedSends(64)) {
+        for (CompletedSend completed : TranserverBridge.completedSends(256)) {
             if (!RoutingChannels.PACKAGE_DISPATCH.equals(completed.channel())) {
                 continue;
             }
@@ -222,7 +222,7 @@ public final class ParcelEscrowPump {
                         escrow.rejected(parcelId, completed.detail());
                     }
                 }
-                api.acknowledgeCompletedSend(completed.messageId());
+                TranserverBridge.acknowledgeCompletedSend(completed.messageId());
             } catch (IOException | RuntimeException ignored) {
                 // Leave an undecodable completion visible for administrator diagnosis.
             }

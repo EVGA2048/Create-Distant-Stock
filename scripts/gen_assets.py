@@ -413,7 +413,6 @@ def recolor_remote_packager():
 
 def finish_assets():
     GUI.mkdir(parents=True, exist_ok=True)
-    monitor_panel().save(GUI / "monitor.png")
     # Accepted dock/packager and parcel textures are hand-tuned source assets.
     # Do not quantise or overwrite them when rebuilding unrelated GUI artwork.
 
@@ -561,7 +560,6 @@ def textures():
     manual().save(ITEM / "manual.png")
     requester().save(ITEM / "requester.png")
     panel(brass).save(GUI / "panel.png")
-    monitor_panel().save(GUI / "monitor.png")
     if (BLOCK / "ether_metal.png").exists():
         (BLOCK / "ether_metal.png").unlink()
 

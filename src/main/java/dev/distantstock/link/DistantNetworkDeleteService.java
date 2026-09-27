@@ -42,9 +42,9 @@ public final class DistantNetworkDeleteService {
     public static void tick() {
         var api = TranserverBridge.attachedApi();
         if (api == null) return;
-        for (var completed : api.completedSends(64)) {
+        for (var completed : TranserverBridge.completedSends(256)) {
             if (RoutingChannels.DISTANT_NETWORK_DELETE.equals(completed.channel())) {
-                api.acknowledgeCompletedSend(completed.messageId());
+                TranserverBridge.acknowledgeCompletedSend(completed.messageId());
             }
         }
     }

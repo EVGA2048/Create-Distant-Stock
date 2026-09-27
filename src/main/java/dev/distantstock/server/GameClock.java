@@ -132,7 +132,14 @@ public final class GameClock {
         dev.distantstock.diagnostics.ChainDiagnostics.tick(e.getServer());
 
         if (transerverActive) {
-            TranserverBridge.tick();
+            // Transerver status() is not a cheap in-memory getter in the current runtime: it
+            // computes queue depths by listing the on-disk message-store directories. Calling it
+            // every server tick turns a large outbox into repeated full directory scans. One
+            // status refresh per second is plenty for diagnostics/UI and keeps the hot tick path
+            // off disk.
+            if (ticks % 20 == 0) {
+                TranserverBridge.tick();
+            }
             if (ticks % 10 == 0) {
                 ParcelEscrowPump.tick(e.getServer());
                 TranserverOrderService.tick(e.getServer());

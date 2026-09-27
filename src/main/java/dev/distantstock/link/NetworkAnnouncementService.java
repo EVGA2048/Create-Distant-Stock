@@ -138,9 +138,9 @@ public final class NetworkAnnouncementService {
         if (api == null) {
             return;
         }
-        for (var completed : api.completedSends(64)) {
+        for (var completed : TranserverBridge.completedSends(256)) {
             if (RoutingChannels.NETWORK_ANNOUNCE.equals(completed.channel())) {
-                api.acknowledgeCompletedSend(completed.messageId());
+                TranserverBridge.acknowledgeCompletedSend(completed.messageId());
             }
         }
     }
@@ -165,12 +165,11 @@ public final class NetworkAnnouncementService {
             if (server == null || !server.isRunning()) {
                 return CompletableFuture.completedFuture(DeliveryResult.RETRY);
             }
-            NetworkAnnouncementCodec.Metrics metrics = announcement.metrics();
+            // Metrics stay on the wire for protocol compatibility, but are deliberately not folded
+            // into LinkSnapshot: Transerver can have many peers, so a single process-wide peer TPS
+            // has no stable owner and produces misleading monitor readings.
             List<NetworkAnnouncementCodec.Group> groups = announcement.groups();
             NetworkDirectory.replacePeer(message.source(), entries);
-            if (metrics.known()) {
-                LinkSnapshot.peerMetrics(message.source(), metrics.tps(), metrics.mspt());
-            }
             String alias = entries.stream().map(NetworkDirectory.Entry::server)
                     .filter(name -> name != null && !name.isBlank())
                     .findFirst().orElse("");

@@ -373,10 +373,10 @@ public final class DistantNetworkJoinService {
     private static void acknowledgeCompleted() {
         var api = TranserverBridge.attachedApi();
         if (api == null) return;
-        for (var completed : api.completedSends(64)) {
+        for (var completed : TranserverBridge.completedSends(256)) {
             if (RoutingChannels.DISTANT_NETWORK_JOIN_REQUEST.equals(completed.channel())
                     || RoutingChannels.DISTANT_NETWORK_JOIN_ACCEPT.equals(completed.channel())) {
-                api.acknowledgeCompletedSend(completed.messageId());
+                TranserverBridge.acknowledgeCompletedSend(completed.messageId());
             }
         }
     }

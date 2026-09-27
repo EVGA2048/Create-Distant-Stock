@@ -3,43 +3,36 @@ package dev.distantstock.client;
 import dev.distantstock.block.TowerCoreBlockEntity;
 import dev.distantstock.link.LinkSnapshot;
 import dev.distantstock.routing.TowerReadout;
+import com.simibubi.create.foundation.gui.AllGuiTextures;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
 
-import java.util.Locale;
 
 /** 固定像素布局的 Create 风链路仪表板。 */
 public final class MonitorScreen extends Screen {
-    private static final int W = 272;
-    /** 链路页的高度。那张底图是手绘的，一个像素都不动。 */
-    private static final int H = 190;
-    /**
-     * 塔页的高度，和 {@code scripts/gen_monitor_tower_bg.py} 是一份。
-     *
-     * <p>两页各用各的底图：链路页那张（{@code monitor.png}）下半张是给两个大读数和五个计数器画的
-     * 家具，塔页把一行行塔画上去，那些空框就露在下面 —— 玩家说的是「背景是为链路页设计的，塔页
-     * 完全不适配」。塔页那张是照着同一张图的页眉和底边另拼的，中间是平的，四行塔正好放得下。
-     */
+    private static final int W = 256;
+    /** Link page height, composed entirely from Create's stock-keeper GUI slices. */
+    private static final int H = 176;
+    /** Tower page height; 36 header + 7x20 body strips + 80 footer. */
     private static final int TOWER_H = 256;
     /** 塔页的行位置：摘要（在页签下面）、第一行塔、四行塔的下界、溢出说明、区块选区。 */
     private static final int TOWER_SUMMARY_Y = 52;
     private static final int TOWER_ROWS_Y = 68;
-    private static final int TOWER_ROWS_BOTTOM = TOWER_H - 40;
-    private static final int TOWER_MORE_Y = TOWER_H - 38;
+    private static final int TOWER_ROWS_BOTTOM = TOWER_H - 28;
+    private static final int TOWER_MORE_Y = TOWER_H - 40;
     private static final int TOWER_SELECTION_Y = TOWER_H - 26;
     private static final int INK = 0x263B43;
     private static final int MUTED = 0x68828A;
-    private static final int HEADER = 0xF4FBF8;
+    private static final int HEADER = 0x4B5356;
     private static final int BRASS = 0x718B8B;
     private static final int AETHER = 0x3A9DB0;
     private static final int GOOD = 0x4C9B7A;
     private static final int WARN = 0xC18A4A;
     private static final int BAD = 0xB65E57;
     /** Row pitch on the tower page: three lines of text and the button strip between them. */
-    private static final int ROW_H = 36;
+    private static final int ROW_H = 40;
     /** What a member tower's own tier allows it to load, as a square. */
     private static int memberCeiling(TowerReadout.Member member) {
         try {
@@ -50,12 +43,6 @@ public final class MonitorScreen extends Screen {
             return 0;
         }
     }
-    private static final ResourceLocation PANEL =
-            ResourceLocation.fromNamespaceAndPath("distantstock", "textures/gui/monitor.png");
-    /** 塔页那张：同一套页眉和底边，中间是平的，见 {@link #TOWER_H}。 */
-    private static final ResourceLocation PANEL_TOWER =
-            ResourceLocation.fromNamespaceAndPath("distantstock", "textures/gui/monitor_tower.png");
-
     /** Rows are built during render and read back on click, so the two cannot disagree. */
     private final java.util.List<Hit> hits = new java.util.ArrayList<>();
     private final BlockPos source;
@@ -63,19 +50,7 @@ public final class MonitorScreen extends Screen {
     private LinkSnapshot.View view;
     /** Which half of the dashboard is showing. The tower half needs room the link half is using. */
     private boolean towerPage;
-    private int flipTicks;
-    private int previousTps;
-    /**
-     * The peer's own previous readings.
-     *
-     * <p>Separate from the local pair on purpose. Both endpoints share one flip animation, and one
-     * pair of "the value before this update" between them meant the peer's cells spent the first
-     * fifth of every second showing <em>this</em> server's numbers before falling to their own —
-     * the flicker between 20 and 0 that the operator reported.
-     */
-    private int previousPeerTps;
-    private int previousPeerMspt;
-    private int previousMspt;
+
     private int left;
     private int top;
 
@@ -98,20 +73,12 @@ public final class MonitorScreen extends Screen {
     }
 
     public void update(LinkSnapshot.View next) {
-        previousTps = (int) Math.round(view.localTps() * 10);
-        previousMspt = (int) Math.round(view.localMspt() * 10);
-        previousPeerTps = (int) Math.round(view.peerTps() * 10);
-        previousPeerMspt = (int) Math.round(view.peerMspt() * 10);
         view = next;
-        flipTicks = 8;
     }
 
     @Override
     public void tick() {
         super.tick();
-        if (flipTicks > 0) {
-            flipTicks--;
-        }
         if (towerOnly && minecraft != null && minecraft.level != null
                 && minecraft.level.getGameTime() % 20 == 0) {
             net.neoforged.neoforge.network.PacketDistributor.sendToServer(
@@ -135,11 +102,11 @@ public final class MonitorScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
-        // 每一帧都重算：点一下页签换的是另一张（更高）的底图，位置必须跟着走，否则塔页会顶到屏幕外。
         layout();
-        // A machinery panel should remain part of the world, not open Minecraft's blurred menu backdrop.
-        g.fill(0, 0, width, height, 0x4208171B);
-        g.blit(towerPage ? PANEL_TOWER : PANEL, left, top, 0, 0, W, panelH(), W, panelH());
+        // Keep the world visible behind machinery screens, but let Create's own GUI textures do
+        // all of the panel work. No Distant Stock-authored monitor background is rendered here.
+        g.fill(0, 0, width, height, 0x32000000);
+        renderCreatePanel(g);
 
         Component title = Component.translatable(towerOnly
                 ? "gui.distantstock.tower.control"
@@ -153,45 +120,46 @@ public final class MonitorScreen extends Screen {
             super.render(g, mouseX, mouseY, partial);
             return;
         }
-        drawRoute(g);
 
-        drawEndpoint(g, left + 12, top + 51,
-                Component.translatable("gui.distantstock.local"),
-                view.localTps(), view.localMspt(), null, true, true,
-                previousTps, previousMspt);
-        drawEndpoint(g, left + 142, top + 51,
-                Component.translatable("gui.distantstock.peer"),
-                view.peerTps(), view.peerMspt(),
-                view.peerRttMs() < 0 ? "—" : (int) view.peerRttMs() + " ms",
-                view.linkUp(), view.peerFresh(),
-                previousPeerTps, previousPeerMspt);
-
-        drawCounters(g);
+        drawLinkOverview(g);
         super.render(g, mouseX, mouseY, partial);
+    }
+
+    /**
+     * Create-native scalable panel: stock keeper header + repeated body + footer.
+     * Both page heights are chosen to be exact multiples of the 20px body strip.
+     */
+    private void renderCreatePanel(GuiGraphics g) {
+        AllGuiTextures.STOCK_KEEPER_REQUEST_HEADER.render(g, left, top);
+        int footerY = top + panelH() - AllGuiTextures.STOCK_KEEPER_REQUEST_FOOTER.getHeight();
+        for (int y = top + AllGuiTextures.STOCK_KEEPER_REQUEST_HEADER.getHeight();
+             y < footerY; y += AllGuiTextures.STOCK_KEEPER_REQUEST_BODY.getHeight()) {
+            AllGuiTextures.STOCK_KEEPER_REQUEST_BODY.render(g, left, y);
+        }
+        AllGuiTextures.STOCK_KEEPER_REQUEST_FOOTER.render(g, left, footerY);
     }
 
     /**
      * The switch between the link half and the tower half.
      *
-     * <p>Two pages rather than one longer panel: the dashboard is a fixed 272x190 of authored
-     * artwork and the tower half wants a list where the link half wants two big readouts. Stacking
-     * them would mean either squashing both or drawing past the panel.
+     * <p>Two pages rather than one longer panel: both are composed from Create's stock-keeper
+     * texture slices, but the tower page needs more vertical room for per-tower controls.
      */
     private void drawPageToggle(GuiGraphics g, int mouseX, int mouseY) {
-        toggle(g, left + 12, top + 27, 40, 12, "gui.distantstock.tab.link", !towerPage,
+        toggle(g, left + 12, top + 38, 58, 18, "gui.distantstock.tab.link", !towerPage,
                 () -> towerPage = false, mouseX, mouseY);
-        toggle(g, left + 55, top + 27, 40, 12, "gui.distantstock.tab.tower", towerPage,
+        toggle(g, left + 82, top + 38, 68, 18, "gui.distantstock.tab.tower", towerPage,
                 () -> towerPage = true, mouseX, mouseY);
     }
 
     private void toggle(GuiGraphics g, int x, int y, int w, int h, String key, boolean active,
                         Runnable action, int mouseX, int mouseY) {
         boolean over = mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
-        g.fill(x, y, x + w, y + h, active ? 0xFF3E5A61 : over ? 0xFF44575D : 0xFF38484E);
-        g.fill(x + 1, y + 1, x + w - 1, y + h - 1, active ? 0xFF2E444B : 0xFF2A383E);
+        AllGuiTextures texture = active ? AllGuiTextures.BUTTON_DOWN
+                : over ? AllGuiTextures.BUTTON_HOVER : AllGuiTextures.BUTTON;
+        texture.render(g, x, y);
         Component label = Component.translatable(key);
-        g.drawString(font, label, x + (w - font.width(label)) / 2, y + 3,
-                active ? 0xFFD8EEEA : MUTED, false);
+        g.drawString(font, label, x + 22, y + 5, active ? INK : MUTED, false);
         hits.add(new Hit(x, y, w, h, null, 0, false, false, action));
     }
 
@@ -199,123 +167,57 @@ public final class MonitorScreen extends Screen {
         Component state = Component.translatable(view.linkUp()
                 ? "gui.distantstock.status.online"
                 : "gui.distantstock.status.offline");
-        int color = view.linkUp() ? 0xB8E4D8 : 0xF0B4A8;
         int x = left + W - 15 - font.width(state);
-        g.drawString(font, state, x, top + 13, color, false);
-        int lampX = x - 10;
-        g.fill(lampX, top + 14, lampX + 5, top + 19, 0xFF533E28);
-        g.fill(lampX + 1, top + 15, lampX + 4, top + 18,
-                view.linkUp() ? 0xFF62C8B8 : 0xFF9A5145);
-    }
-
-    private void drawRoute(GuiGraphics g) {
-        String route = fit(view.linkLabel(), W - 38);
-        int color = view.linkUp() ? AETHER : MUTED;
-        g.drawString(font, route, left + W / 2 - font.width(route) / 2, top + 35, color, false);
+        (view.linkUp() ? AllGuiTextures.INDICATOR_GREEN : AllGuiTextures.INDICATOR_RED)
+                .render(g, x - 22, top + 13);
+        g.drawString(font, state, x, top + 13, view.linkUp() ? GOOD : BAD, false);
     }
 
     /**
-     * One endpoint's two readings.
-     *
-     * @param fresh whether this server has heard from that end recently. False is not the same as
-     *              offline: the link answers, but nobody has said what it is doing, and the cells
-     *              show a dash rather than a zero — zero is a reading, and this is the absence of one
+     * Link overview intentionally has no peer TPS/MSPT. Transerver is multi-peer, so one process-wide
+     * "peer" reading has no well-defined owner and was misleading as soon as a third node joined.
      */
-    private void drawEndpoint(GuiGraphics g, int x, int y, Component name,
-                              double tps, double mspt, String rtt, boolean online, boolean fresh,
-                              int previousTenths, int previousMsptTenths) {
-        g.drawString(font, name, x + 10, y + 6, BRASS, false);
-        if (!online) {
-            Component down = Component.translatable("gui.distantstock.link_down");
-            g.drawString(font, down, x + 59 - font.width(down) / 2, y + 39, BAD, false);
-            return;
-        }
-        if (!fresh) {
-            drawFlipReadout(g, "—", "TPS", x + 59, y + 23, MUTED);
-            drawFlipReadout(g, "—", "MSPT", x + 43, y + 53, MUTED);
-            if (rtt != null) {
-                g.drawString(font, rtt, x + 108 - font.width(rtt), y + 55, MUTED, false);
-            }
-            return;
-        }
+    private void drawLinkOverview(GuiGraphics g) {
+        String route = fit(view.linkLabel(), W - 76);
+        g.drawString(font, route, left + 14, top + 64, view.linkUp() ? AETHER : MUTED, false);
 
-        String tpsText = flipValue(n(tps), previousTenths, tps, "");
-        drawFlipReadout(g, tpsText, "TPS", x + 59, y + 23, online ? AETHER : MUTED);
-        meter(g, x + 10, y + 42, 98, tps);
+        double tps = view.localTps();
+        AllGuiTextures perf = tps >= 18 ? AllGuiTextures.INDICATOR_GREEN
+                : tps >= 15 ? AllGuiTextures.INDICATOR_YELLOW : AllGuiTextures.INDICATOR_RED;
+        perf.render(g, left + 14, top + 83);
+        Component local = Component.translatable("gui.distantstock.local");
+        String localPerf = local.getString() + "  " + oneDecimal(view.localTps())
+                + " TPS  ·  " + oneDecimal(view.localMspt()) + " MSPT";
+        g.drawString(font, localPerf, left + 38, top + 86, INK, false);
 
-        String msptText = flipValue(n(mspt), previousMsptTenths, mspt, "");
-        drawFlipReadout(g, msptText, "MSPT", x + 43, y + 53, MUTED);
-        if (rtt != null) {
-            g.drawString(font, rtt, x + 108 - font.width(rtt), y + 55, MUTED, false);
+        int y1 = top + 108;
+        int y2 = top + 124;
+        int y3 = top + 140;
+        drawMetric(g, left + 14, y1, "OUT", view.transerverOutbox(),
+                view.transerverOutbox() == 0 ? INK : WARN);
+        drawMetric(g, left + 90, y1, "IN", view.transerverInbox(),
+                view.transerverInbox() == 0 ? INK : WARN);
+        drawMetric(g, left + 160, y1, "DONE", view.transerverCompleted(), INK);
+
+        drawMetric(g, left + 14, y2, Component.translatable("gui.distantstock.orders.label").getString(),
+                view.orderDepth(), view.orderDepth() == 0 ? INK : WARN);
+        drawMetric(g, left + 90, y2, Component.translatable("gui.distantstock.packages.label").getString(),
+                view.packageDepth(), view.packageDepth() == 0 ? INK : WARN);
+        drawMetric(g, left + 160, y2, Component.translatable("gui.distantstock.in_flight.label").getString(),
+                view.inFlight(), view.inFlight() == 0 ? INK : AETHER);
+
+        if (view.transerverDeadLetters() > 0) {
+            AllGuiTextures.INDICATOR_RED.render(g, left + 14, y3 - 3);
+            g.drawString(font, "DEAD " + view.transerverDeadLetters(), left + 38, y3, BAD, false);
+        } else if (view.transerverAttached()) {
+            AllGuiTextures.INDICATOR_GREEN.render(g, left + 14, y3 - 3);
+            g.drawString(font, "Transerver", left + 38, y3, MUTED, false);
         }
     }
 
-    /** Pixel flip-board cells inspired by Create's display boards; values remain readable at GUI scale 1. */
-    private void drawFlipReadout(GuiGraphics g, String value, String unit, int centreX, int y, int color) {
-        int cellW = 7;
-        int gap = 1;
-        int cellsW = value.length() * (cellW + gap) - gap;
-        int unitW = font.width(unit);
-        int total = cellsW + 4 + unitW;
-        int x = centreX - total / 2;
-        for (int i = 0; i < value.length(); i++) {
-            int cx = x + i * (cellW + gap);
-            g.fill(cx, y, cx + cellW, y + 11, 0xFF43575D);
-            g.fill(cx + 1, y + 1, cx + cellW - 1, y + 5, 0xFF71888E);
-            g.fill(cx + 1, y + 6, cx + cellW - 1, y + 10, 0xFF52676D);
-            g.fill(cx, y + 5, cx + cellW, y + 6, 0xFF2E4147);
-            String glyph = value.substring(i, i + 1);
-            g.drawString(font, glyph, cx + (cellW - font.width(glyph)) / 2, y + 2,
-                    0xFFE8F4F2, false);
-        }
-        g.drawString(font, unit, x + cellsW + 4, y + 2, color, false);
-    }
-
-    private void meter(GuiGraphics g, int x, int y, int w, double tps) {
-        g.fill(x, y, x + w, y + 7, 0xFFBDA982);
-        g.fill(x + 1, y + 1, x + w - 1, y + 6, 0xFFE2D0AA);
-        int fill = Math.max(0, Math.min(w - 2, (int) Math.round((w - 2) * tps / 20.0)));
-        int color = tps >= 18 ? GOOD : tps >= 15 ? WARN : BAD;
-        if (fill > 0) {
-            g.fill(x + 1, y + 1, x + 1 + fill, y + 6, 0xFF000000 | color);
-            g.fill(x + 1, y + 1, x + 1 + fill, y + 2, 0x55FFFFFF);
-        }
-        for (int mark = 1; mark < 4; mark++) {
-            int mx = x + mark * w / 4;
-            g.fill(mx, y + 1, mx + 1, y + 6, 0x55806B55);
-        }
-    }
-
-    private void drawCounters(GuiGraphics g) {
-        g.drawString(font, Component.translatable("gui.distantstock.pressure"),
-                left + 22, top + 135, BRASS, false);
-
-        Component[] labels = {
-                Component.translatable("gui.distantstock.online.label"),
-                Component.translatable("gui.distantstock.orders.label"),
-                Component.translatable("gui.distantstock.packages.label"),
-                Component.translatable("gui.distantstock.in_flight.label"),
-                Component.translatable("gui.distantstock.fails.label")
-        };
-        String[] values = {
-                view.peersUp() + "/" + Math.max(1, view.peersTotal()),
-                Integer.toString(view.orderDepth()),
-                Integer.toString(view.packageDepth()),
-                Integer.toString(view.inFlight()),
-                Integer.toString(view.peerFails())
-        };
-        int[] colors = {
-                view.linkUp() ? GOOD : BAD,
-                view.orderDepth() == 0 ? INK : WARN,
-                view.packageDepth() == 0 ? INK : WARN,
-                view.inFlight() == 0 ? INK : AETHER,
-                view.peerFails() == 0 ? INK : BAD
-        };
-        for (int i = 0; i < labels.length; i++) {
-            int cx = left + 36 + i * 49;
-            g.drawString(font, labels[i], cx - font.width(labels[i]) / 2, top + 151, MUTED, false);
-            g.drawString(font, values[i], cx - font.width(values[i]) / 2, top + 165, colors[i], false);
-        }
+    private void drawMetric(GuiGraphics g, int x, int y, String label, int value, int color) {
+        g.drawString(font, label, x, y, MUTED, false);
+        g.drawString(font, Integer.toString(value), x + 42, y, color, false);
     }
 
     /**
@@ -432,39 +334,36 @@ public final class MonitorScreen extends Screen {
 
         Component ether = Component.translatable("gui.distantstock.tower.ether",
                 member.ether(), TowerCoreBlockEntity.ETHER_CAPACITY);
-        g.drawString(font, ether, left + 14, y + 24, MUTED, false);
+        g.drawString(font, ether, left + 14, y + 30, MUTED, false);
         Component flow = Component.translatable("gui.distantstock.tower.traffic",
                 member.sent(), member.received());
-        g.drawString(font, flow, left + W - 14 - font.width(flow), y + 24, MUTED, false);
+        g.drawString(font, flow, left + W - 14 - font.width(flow), y + 30, MUTED, false);
     }
 
-    /** A radius step. Sends the whole record, because the server stores what it is handed. */
+    /** A radius step, using Create's own 18x18 button textures. */
     private int smallButton(GuiGraphics g, int x, int y, String glyph,
                             TowerReadout.Member member, int radius, boolean live) {
-        int w = 11;
-        g.fill(x, y, x + w, y + 11, live ? 0xFF4A5F66 : 0xFF39474C);
-        g.fill(x + 1, y + 1, x + w - 1, y + 10, live ? 0xFF2E444B : 0xFF232D31);
-        g.drawString(font, glyph, x + (w - font.width(glyph)) / 2, y + 2,
-                live ? 0xFFD8EEEA : 0xFF5C6B70, false);
+        int w = 18;
+        (live ? AllGuiTextures.BUTTON : AllGuiTextures.BUTTON_DISABLED).render(g, x, y);
+        g.drawString(font, glyph, x + (w - font.width(glyph)) / 2, y + 5,
+                live ? INK : MUTED, false);
         if (live) {
-            hits.add(new Hit(x, y, w, 11, member, radius, member.loading(), member.carrying(), null));
+            hits.add(new Hit(x, y, w, 18, member, radius, member.loading(), member.carrying(), null));
         }
         return x + w;
     }
 
     private int switchButton(GuiGraphics g, int x, int y, String key, boolean on,
                              TowerReadout.Member member, boolean loading, boolean carrying) {
-        Component label = Component.translatable(key);
-        Component state = Component.translatable(on
-                ? "gui.distantstock.tower.on" : "gui.distantstock.tower.off");
-        int w = font.width(label) + font.width(state) + 10;
-        g.fill(x, y, x + w, y + 11, 0xFF4A5F66);
-        g.fill(x + 1, y + 1, x + w - 1, y + 10, on ? 0xFF2E5A4B : 0xFF2E444B);
-        g.drawString(font, label, x + 3, y + 2, MUTED, false);
-        g.drawString(font, state, x + w - 3 - font.width(state), y + 2,
-                on ? 0xFF9BE0C4 : 0xFFC0A090, false);
-        hits.add(new Hit(x, y, w, 11, member, member.chunkRadius(), loading, carrying, null));
-        return x + w;
+        String shortKey = key.endsWith("loading")
+                ? "gui.distantstock.tower.loading.short"
+                : "gui.distantstock.tower.carrying.short";
+        Component glyph = Component.translatable(shortKey);
+        (on ? AllGuiTextures.BUTTON_GREEN : AllGuiTextures.BUTTON).render(g, x, y);
+        g.drawString(font, glyph, x + (18 - font.width(glyph)) / 2, y + 5,
+                on ? 0xFF2E5A4B : INK, false);
+        hits.add(new Hit(x, y, 18, 18, member, member.chunkRadius(), loading, carrying, null));
+        return x + 18;
     }
 
     private String fit(String value, int maxWidth) {
@@ -524,19 +423,8 @@ public final class MonitorScreen extends Screen {
         return inside(x, y) || super.mouseDragged(x, y, button, dx, dy);
     }
 
-    private String flipValue(String current, int previousTenths, double value, String suffix) {
-        if (flipTicks == 0 || previousTenths == 0) {
-            return current;
-        }
-        double progress = (8 - flipTicks) / 8.0;
-        if (progress < 0.5) {
-            return n(previousTenths / 10.0) + suffix;
-        }
-        return current;
-    }
-
-    private static String n(double value) {
-        return String.format(Locale.ROOT, "%.1f", value);
+    private static String oneDecimal(double value) {
+        return String.format(java.util.Locale.ROOT, "%.1f", value);
     }
 
     @Override

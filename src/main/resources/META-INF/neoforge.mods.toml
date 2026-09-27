@@ -1,6 +1,7 @@
 modLoader="javafml"
 loaderVersion="${loader_version_range}"
 license="${mod_license}"
+issueTrackerURL="https://github.com/EVGA2048/Create-Distant-Stock/issues"
 
 [[mixins]]
 config="distantstock.mixins.json"
@@ -10,6 +11,9 @@ modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
 authors="${mod_authors}"
+displayURL="https://github.com/EVGA2048/Create-Distant-Stock"
+logoFile="distantstock-icon.png"
+credits="Thanks to MUL, KNaMg_Rana, w4yw and BSGM for early development feedback and suggestions."
 description='''${mod_description}'''
 
 [[dependencies.${mod_id}]]

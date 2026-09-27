@@ -195,10 +195,10 @@ public final class ReceiverProbeService {
     private static void acknowledgeCompleted() {
         TranserverApi api = TranserverBridge.attachedApi();
         if (api == null) return;
-        for (var completed : api.completedSends(64)) {
+        for (var completed : TranserverBridge.completedSends(256)) {
             if (RoutingChannels.RECEIVER_PROBE_REQUEST.equals(completed.channel())
                     || RoutingChannels.RECEIVER_PROBE_RESULT.equals(completed.channel())) {
-                api.acknowledgeCompletedSend(completed.messageId());
+                TranserverBridge.acknowledgeCompletedSend(completed.messageId());
             }
         }
     }

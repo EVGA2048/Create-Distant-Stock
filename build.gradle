@@ -124,6 +124,10 @@ tasks.named('processResources', ProcessResources).configure {
 tasks.named('jar', Jar).configure {
     archiveFileName = "Create-Distant-Stock-${mod_version}+mc1.21.1.jar"
     destinationDirectory = file('build')
+    from('LICENSE') {
+        into 'META-INF'
+        rename { 'LICENSE-distantstock.txt' }
+    }
 }
 
 def modpackMods = file("${System.getProperty('user.home')}/Documents/minecraft_launcher/.minecraft/versions/ES2_Firmament_1.21.1_9th_9.3.2_SunlightSignal/mods")
