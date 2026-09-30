@@ -40,7 +40,8 @@ import java.util.TreeMap;
  */
 public final class TowerCasingBlock extends Block
         implements com.simibubi.create.foundation.block.IBE<TowerCasingBlockEntity>,
-        com.simibubi.create.api.equipment.goggles.IProxyHoveringInformation {
+        com.simibubi.create.api.equipment.goggles.IProxyHoveringInformation,
+        com.simibubi.create.content.equipment.wrench.IWrenchable {
     public static final MapCodec<TowerCasingBlock> CODEC = simpleCodec(TowerCasingBlock::new);
     public static final BooleanProperty POWERED = BooleanProperty.create("powered");
     /**
@@ -58,14 +59,15 @@ public final class TowerCasingBlock extends Block
     public static final net.minecraft.world.level.block.state.properties.EnumProperty<Port> PORT =
             net.minecraft.world.level.block.state.properties.EnumProperty.create("port", Port.class);
 
-    /** Which face carries the port. Down stays closed for the shaft/ground; the top is a valid pipe face. */
+    /** Which face carries the port. The casing is not the core's driveshaft: its underside is usable. */
     public enum Port implements net.minecraft.util.StringRepresentable {
         NONE(null),
         NORTH(Direction.NORTH),
         EAST(Direction.EAST),
         SOUTH(Direction.SOUTH),
         WEST(Direction.WEST),
-        UP(Direction.UP);
+        UP(Direction.UP),
+        DOWN(Direction.DOWN);
 
         private final Direction face;
 
@@ -182,13 +184,27 @@ public final class TowerCasingBlock extends Block
         if (!DockBlock.isWrench(stack) || player.isShiftKeyDown()) {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);
         }
+        setPort(level, pos, state, player, hit.getDirection());
+        return net.minecraft.world.ItemInteractionResult.sidedSuccess(level.isClientSide);
+    }
+
+    // Create's wrench calls IWrenchable.onWrenched before vanilla useItemOn. Without this hook,
+    // its default wrench action consumes the interaction and the port never changes state.
+    @Override
+    public net.minecraft.world.InteractionResult onWrenched(BlockState state,
+            net.minecraft.world.item.context.UseOnContext context) {
+        setPort(context.getLevel(), context.getClickedPos(), state,
+                context.getPlayer(), context.getClickedFace());
+        return net.minecraft.world.InteractionResult.sidedSuccess(context.getLevel().isClientSide);
+    }
+
+    private static void setPort(Level level, BlockPos pos, BlockState state,
+                                net.minecraft.world.entity.player.Player player, Direction face) {
         if (!level.isClientSide) {
             // The clicked face, not the block: a pipe arrives at one side of one casing. Clicking
             // the face that is already open closes it; clicking another moves the port there, which
             // is one gesture instead of "close it first, then open it where you meant".
-            Port wanted = hit.getDirection() != Direction.DOWN
-                    && state.getValue(PORT) != Port.of(hit.getDirection())
-                    ? Port.of(hit.getDirection()) : Port.NONE;
+            Port wanted = state.getValue(PORT) != Port.of(face) ? Port.of(face) : Port.NONE;
             boolean open = wanted != Port.NONE;
             level.setBlock(pos, state.setValue(PORT, wanted), 3);
             // Block capabilities are cached by pipes. A closed casing answers null, so opening or
@@ -198,10 +214,10 @@ public final class TowerCasingBlock extends Block
             level.playSound(null, pos, open ? net.minecraft.sounds.SoundEvents.IRON_TRAPDOOR_OPEN
                     : net.minecraft.sounds.SoundEvents.IRON_TRAPDOOR_CLOSE,
                     net.minecraft.sounds.SoundSource.BLOCKS, 0.6f, 1.2f);
-            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+            if (player != null) player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
                     open ? "message.distantstock.casing.port.open"
                             : "message.distantstock.casing.port.closed"), true);
-            if (open && coreFor(level, pos) == null) {
+            if (player != null && open && coreFor(level, pos) == null) {
                 // The other silent trap: a port only reaches the core of the tower this casing is
                 // part of, and a casing standing on its own opens a socket onto nothing. The click
                 // works and the block looks right, so the player finds out when the pipes will not
@@ -210,7 +226,6 @@ public final class TowerCasingBlock extends Block
                         "message.distantstock.casing.port.no_tower"), false);
             }
         }
-        return net.minecraft.world.ItemInteractionResult.sidedSuccess(level.isClientSide);
     }
 
     /**
@@ -262,9 +277,9 @@ public final class TowerCasingBlock extends Block
             return null;
         }
         TowerCoreBlockEntity core = coreFor(level, pos);
-        // The core's own underside is where the shaft enters, and a port on that face would be a
-        // pipe arriving at a driveshaft. Every other side of a port, including the top, is fair game.
-        return core == null || side == Direction.DOWN ? null : core.tank();
+        // Only the core's underside carries a driveshaft. The skirt's underside is an independent
+        // fluid face, so an open DOWN casing port can connect a pipe below the skirt.
+        return core == null ? null : core.tank();
     }
 
     @Override

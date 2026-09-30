@@ -38,7 +38,7 @@ import java.util.Locale;
  * <p>Two things had to be arranged. Create only lets its <em>own</em> display block be a controller
  * ({@code updateControllerStatus} gives up on anything that is not a {@code FlapDisplayBlock}), so
  * the size is declared here instead. And the board is not driven by a shaft: a block that is not
- * {@code IRotate} answers "speed requirement fulfilled" with true, which is what lets the flaps
+ * {@code IRotate} has no shaft on any face and requests speed level NONE, which lets the flaps
  * turn while {@code updateSpeed} keeps rotation propagation away from us entirely.
  *
  * <p>What it shows is one reading at a time, two lines, turning over every few seconds — see

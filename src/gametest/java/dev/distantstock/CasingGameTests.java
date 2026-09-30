@@ -28,6 +28,22 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @GameTestHolder("distantstock")
 @PrefixGameTestTemplate(false)
 public final class CasingGameTests {
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void undersideFluidPortExposesOnlyTheOpenedFace(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos corePos = h.absolutePos(new BlockPos(3, 2, 3));
+        BlockPos casingPos = corePos.north();
+        level.setBlock(corePos, ModBlocks.TOWER_CORE.get().defaultBlockState(), 3);
+        level.setBlock(casingPos, ModBlocks.TOWER_CASING.get().defaultBlockState()
+                .setValue(TowerCasingBlock.PORT, TowerCasingBlock.Port.DOWN), 3);
+        var core = (dev.distantstock.block.TowerCoreBlockEntity) level.getBlockEntity(corePos);
+        h.assertTrue(core != null, "tower core missing");
+        h.assertTrue(TowerCasingBlock.portTank(level, casingPos, level.getBlockState(casingPos),
+                net.minecraft.core.Direction.DOWN) == core.tank(), "underside port failed to expose tower tank");
+        h.assertTrue(TowerCasingBlock.portTank(level, casingPos, level.getBlockState(casingPos),
+                net.minecraft.core.Direction.UP) == null, "closed top unexpectedly exposed tower tank");
+        h.succeed();
+    }
     private static final int Y = 2;
     private static final int Z = 2;
     /** The redstone block. Casings start one further along and run to the wall of the arena. */

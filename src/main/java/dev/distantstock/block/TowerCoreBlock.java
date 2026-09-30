@@ -50,14 +50,14 @@ public final class TowerCoreBlock extends KineticBlock implements IBE<TowerCoreB
     }
 
     /**
-     * The same bar the chunk loaders set: thirty rpm.
+     * Ordinary Create motors and steam engines can run this tower at slow speed.
      *
      * <p>Deliberately low. A tower's cost is its stress draw, which runs to five figures at the top
      * of the table — how fast it has to spin is not where the difficulty should live.
      */
     @Override
     public IRotate.SpeedLevel getMinimumRequiredSpeedLevel() {
-        return IRotate.SpeedLevel.MEDIUM;
+        return IRotate.SpeedLevel.SLOW;
     }
 
     @Override

@@ -40,6 +40,8 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
     private long printedUntilTick;
     private long nextBuzzerTick;
     private int promiseBusySeconds;
+    /** Do not alarm on Create's briefly missing network registry while chunks are loading. */
+    private int missingNetworkSeconds;
     private boolean networkKnown = true;
     private String displayCode = "PE";
     private int paperRemaining;
@@ -103,6 +105,8 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         this.distantNetworkId = distantNetworkId;
         this.networkKnown = true;
         this.promiseBusySeconds = 0;
+        this.missingNetworkSeconds = 0;
+        this.missingNetworkSeconds = 0;
         sync();
         updateStatus();
     }
@@ -124,6 +128,7 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         distantNetworkId = null;
         networkKnown = true;
         promiseBusySeconds = 0;
+        missingNetworkSeconds = 0;
         sync();
         updateStatus();
     }
@@ -473,13 +478,30 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
     private void sampleNetworkHealth() {
         if (level == null || level.isClientSide || level.getServer() == null
                 || createFrequency == null || networkId == null) return;
+        // An imported remote network has a Create frequency, but its Create logistics registry
+        // lives on the other server. Looking up that frequency locally reports a spurious outage.
+        java.util.UUID localNode = dev.distantstock.link.TranserverBridge.nodeId();
+        if (networkId != null && (localNode == null || !networkId.nodeId().equals(localNode))) {
+            networkKnown = true;
+            missingNetworkSeconds = 0;
+            promiseBusySeconds = 0;
+            // This frequency belongs to a different server, so any previous local-only lookup
+            // failure must not remain latched as this panel's "network disconnected" alarm.
+            EventRegistry.get(level.getServer()).clear(EventRegistry.Codes.NETWORK_OFFLINE,
+                    "network", "network:" + createFrequency, System.currentTimeMillis());
+            return;
+        }
         NetworkHealth health = CreateStock.health(createFrequency, 4);
-        networkKnown = health.known();
+        missingNetworkSeconds = health.known() ? 0 : Math.min(60, missingNetworkSeconds + 1);
+        // A Create network may be registered after this block entity begins ticking. A short
+        // grace period avoids an error ticket on every ordinary world load or chunk transition.
+        boolean offline = !health.known() && missingNetworkSeconds >= 5;
+        networkKnown = !offline;
         EventRegistry events = EventRegistry.get(level.getServer());
         String source = "network:" + createFrequency;
         long now = System.currentTimeMillis();
         condition(events, EventRegistry.Codes.NETWORK_OFFLINE, EventRegistry.Severity.ERROR,
-                !health.known(), source, "Create logistics network is not loaded", now);
+                offline, source, "Create logistics network is not loaded", now);
         condition(events, EventRegistry.Codes.NETWORK_LINKS_OFFLINE, EventRegistry.Severity.WARN,
                 health.known() && health.offline() > 0, source,
                 health.offline() + " / " + health.totalLinks() + " logistics links offline", now);

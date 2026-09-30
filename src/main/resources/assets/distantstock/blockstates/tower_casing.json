@@ -35,6 +35,12 @@
     },
     "port=up,powered=true": {
       "model": "distantstock:block/tower/tower_casing_port_up_active"
+    },
+    "port=down,powered=false": {
+      "model": "distantstock:block/tower/tower_casing_port_down"
+    },
+    "port=down,powered=true": {
+      "model": "distantstock:block/tower/tower_casing_port_down_active"
     }
   }
 }

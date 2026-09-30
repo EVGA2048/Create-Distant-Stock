@@ -17,6 +17,30 @@ import java.util.UUID;
 public final class LoggerGameTests {
 
     @GameTest(template = "empty", timeoutTicks = 40)
+    public static void escalatedAcknowledgedWarningSoundsAgain(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.LOGGER.get().defaultBlockState(), 3);
+        var logger = (LoggerBlockEntity) level.getBlockEntity(pos);
+        UUID frequency = UUID.randomUUID();
+        logger.setCreateFrequency(frequency);
+        var registry = EventRegistry.get(level.getServer());
+        String source = "escalation-test-" + UUID.randomUUID();
+        var warning = registry.raise(EventRegistry.Severity.WARN, "NETWORK", "test", source,
+                "warning", frequency, null, 1);
+        registry.markPrinted(warning.id(), 2);
+        h.assertTrue(logger.nextUnacknowledgedAlarm() == null, "printed WARN was not silenced");
+        var error = registry.raise(EventRegistry.Severity.ERROR, "NETWORK", "test", source,
+                "error", frequency, null, 3);
+        h.assertTrue(!error.acknowledged() && !error.printed(),
+                "ERROR escalation inherited the old WARN silence/print latch");
+        h.assertTrue(logger.nextUnacknowledgedAlarm() != null,
+                "ERROR escalation did not enter the audible alarm queue");
+        registry.clear("NETWORK", "test", source, 4);
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
     public static void loggerIsARealCreateDisplayLinkSource(GameTestHelper h) {
         BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
         h.getLevel().setBlock(pos, ModBlocks.LOGGER.get().defaultBlockState(), 3);

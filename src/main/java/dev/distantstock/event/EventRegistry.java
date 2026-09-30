@@ -110,12 +110,18 @@ public final class EventRegistry extends SavedData {
         String cleanDetail = bounded(detail, MAX_DETAIL);
         Record existing = active(cleanCode, cleanType, cleanSource).orElse(null);
         if (existing != null) {
+            // A previously silenced warning becoming an ERROR is a new safety-relevant condition.
+            // Do not inherit the old ACK/printed latch, or the logger shows ER without ever
+            // sounding its horn or offering a new incident ticket.
+            boolean escalated = severityRank(severity) > severityRank(existing.severity());
             Record updated = new Record(existing.id(), existing.createdAt(), now,
                     stronger(existing.severity(), severity), cleanCode, cleanType, cleanSource,
                     cleanDetail.isBlank() ? existing.detail() : cleanDetail,
                     createFrequency == null ? existing.createFrequency() : createFrequency,
                     distantNetworkId == null ? existing.distantNetworkId() : distantNetworkId,
-                    true, existing.acknowledged(), existing.acknowledgedAt(), existing.printedAt(), 0,
+                    true, !escalated && existing.acknowledged(),
+                    escalated ? 0 : existing.acknowledgedAt(),
+                    escalated ? 0 : existing.printedAt(), 0,
                     existing.count() + 1);
             records.put(updated.id(), updated);
             setDirty();
