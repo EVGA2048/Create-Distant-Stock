@@ -685,5 +685,7 @@
   "message.distantstock.flap_clock.unmuted": "Flap Clock: chime enabled",
   "value.distantstock.clock.hour_mode": "Hour Format",
   "value.distantstock.clock.12h": "12-hour",
-  "value.distantstock.clock.24h": "24-hour"
+  "value.distantstock.clock.24h": "24-hour",
+  "block.distantstock.network_speaker": "Network Speaker",
+  "item.distantstock.network_speaker": "Network Speaker"
 }

@@ -59,6 +59,9 @@ public final class ModBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<NetworkBroadcasterBlockEntity>> NETWORK_BROADCASTER =
             BES.register("network_broadcaster", () -> BlockEntityType.Builder.of(NetworkBroadcasterBlockEntity::new,
                     ModBlocks.NETWORK_BROADCASTER.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<NetworkSpeakerBlockEntity>> NETWORK_SPEAKER =
+            BES.register("network_speaker", () -> BlockEntityType.Builder.of(NetworkSpeakerBlockEntity::new,
+                    ModBlocks.NETWORK_SPEAKER.get()).build(null));
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<NixieClockBlockEntity>> NIXIE_CLOCK =
             BES.register("nixie_clock", () -> BlockEntityType.Builder.of(NixieClockBlockEntity::new,
                     ModBlocks.NIXIE_CLOCK.get()).build(null));

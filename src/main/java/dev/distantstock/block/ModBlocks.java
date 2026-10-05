@@ -53,6 +53,11 @@ public final class ModBlocks {
                     .mapColor(MapColor.COLOR_PURPLE)
                     .strength(2.8f, 6.0f)
                     .sound(SoundType.METAL)));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, NetworkSpeakerBlock> NETWORK_SPEAKER =
+            BLOCKS.register("network_speaker", () -> new NetworkSpeakerBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(2.6f, 5.5f)
+                    .sound(SoundType.METAL)));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, NixieClockBlock> NIXIE_CLOCK =
             BLOCKS.register("nixie_clock", () -> new NixieClockBlock(BlockBehaviour.Properties.of()
                     .mapColor(MapColor.METAL)

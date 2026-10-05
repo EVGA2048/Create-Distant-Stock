@@ -685,5 +685,7 @@
   "message.distantstock.flap_clock.unmuted": "翻牌时钟：报时已开启",
   "value.distantstock.clock.hour_mode": "时间制式",
   "value.distantstock.clock.12h": "12 小时制",
-  "value.distantstock.clock.24h": "24 小时制"
+  "value.distantstock.clock.24h": "24 小时制",
+  "block.distantstock.network_speaker": "网络扬声器",
+  "item.distantstock.network_speaker": "网络扬声器"
 }

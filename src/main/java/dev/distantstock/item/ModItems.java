@@ -52,6 +52,9 @@ public final class ModItems {
     public static final DeferredHolder<Item, com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem> NETWORK_BROADCASTER =
             ITEMS.register("network_broadcaster", () -> new com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem(
                     ModBlocks.NETWORK_BROADCASTER.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem> NETWORK_SPEAKER =
+            ITEMS.register("network_speaker", () -> new com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem(
+                    ModBlocks.NETWORK_SPEAKER.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> NIXIE_CLOCK = block("nixie_clock", ModBlocks.NIXIE_CLOCK);
     public static final DeferredHolder<Item, BlockItem> FLAP_CLOCK = block("flap_clock", ModBlocks.FLAP_CLOCK);
     public static final DeferredHolder<Item, BlockItem> REMOTE_PACKAGER = ITEMS.register("remote_packager",
@@ -139,6 +142,7 @@ public final class ModItems {
                 out.accept(CONDITION_LINKER.get());
                 out.accept(ANNOUNCER.get());
                 out.accept(NETWORK_BROADCASTER.get());
+                out.accept(NETWORK_SPEAKER.get());
                 out.accept(NIXIE_CLOCK.get());
                 out.accept(FLAP_CLOCK.get());
                 out.accept(REMOTE_PACKAGER.get());

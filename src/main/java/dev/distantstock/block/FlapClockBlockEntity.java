@@ -147,7 +147,7 @@ public final class FlapClockBlockEntity extends FlapDisplayBlockEntity {
         setChanged();
         if (muted) return;
         level.playSound(null, worldPosition, ModSounds.NIXIE_CLOCK_WESTMINSTER.get(),
-                SoundSource.BLOCKS, 0.95f, 1.0f);
+                SoundSource.BLOCKS, NixieClockBlockEntity.CHIME_VOLUME, 1.0f);
     }
 
     @Override

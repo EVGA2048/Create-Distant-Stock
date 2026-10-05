@@ -16,6 +16,7 @@ import java.util.Locale;
 
 /** State and Minecraft-time chime logic for the wall-mounted Nixie Clock. */
 public final class NixieClockBlockEntity extends SmartBlockEntity {
+    public static final float CHIME_VOLUME = 0.75f;
     private DyeColor color = DyeColor.ORANGE;
     private boolean twentyFourHour = true;
     private boolean muted;
@@ -116,7 +117,7 @@ public final class NixieClockBlockEntity extends SmartBlockEntity {
         be.setChanged();
         if (be.muted) return;
         level.playSound(null, pos, ModSounds.NIXIE_CLOCK_WESTMINSTER.get(),
-                SoundSource.BLOCKS, 0.95f, 1.0f);
+                SoundSource.BLOCKS, CHIME_VOLUME, 1.0f);
     }
 
     @Override

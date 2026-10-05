@@ -38,6 +38,15 @@ public final class AnnouncerGameTests {
         be.configure(be.template(), be.radius(), 99);
         h.assertTrue(be.soundProfile() == 2,
                 "announcer sound profile was not clamped to a valid choice");
+        h.assertTrue(h.getLevel().getBlockState(absolute).getValue(dev.distantstock.block.AnnouncerBlock.FACING)
+                        == net.minecraft.core.Direction.UP,
+                "announcer default note-box face is not UP");
+        for (net.minecraft.core.Direction direction : net.minecraft.core.Direction.values()) {
+            h.assertTrue(ModBlocks.ANNOUNCER.get().defaultBlockState()
+                            .setValue(dev.distantstock.block.AnnouncerBlock.FACING, direction)
+                            .getValue(dev.distantstock.block.AnnouncerBlock.FACING) == direction,
+                    "announcer does not accept six-way facing: " + direction);
+        }
         h.succeed();
     }
 
@@ -70,6 +79,35 @@ public final class AnnouncerGameTests {
         DisplayTarget target = DisplayTarget.BY_BLOCK.get(ModBlocks.NETWORK_BROADCASTER.get());
         h.assertTrue(target instanceof AnnouncerDisplayTarget,
                 "network broadcaster was not registered as a Display Link target");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void networkSpeakerIsReceiveOnlyCreateNetworkEndpoint(GameTestHelper h) {
+        BlockPos relative = new BlockPos(2, 1, 2);
+        h.setBlock(relative, ModBlocks.NETWORK_SPEAKER.get().defaultBlockState());
+        BlockPos absolute = h.absolutePos(relative);
+        h.assertTrue(h.getLevel().getBlockEntity(absolute) instanceof dev.distantstock.block.NetworkSpeakerBlockEntity,
+                "network speaker did not create its block entity");
+        var be = (dev.distantstock.block.NetworkSpeakerBlockEntity) h.getLevel().getBlockEntity(absolute);
+        h.assertTrue(be.networkId() != null, "network speaker did not expose a Create logistics network UUID");
+        h.assertTrue(com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour.get(
+                        h.getLevel(), absolute,
+                        com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour.TYPE) != null,
+                "network speaker is missing Create LogisticallyLinkedBehaviour");
+        h.assertTrue(be instanceof dev.distantstock.block.NetworkBroadcastBus.Receiver,
+                "network speaker is not registered as a receive endpoint");
+        h.assertTrue(!dev.distantstock.block.BroadcastSource.class.isInstance(be),
+                "network speaker must remain receive-only and may not expose broadcaster settings");
+        h.assertTrue(h.getLevel().getBlockState(absolute).getValue(dev.distantstock.block.NetworkSpeakerBlock.FACING)
+                        == net.minecraft.core.Direction.UP,
+                "network speaker default model face is not UP");
+        for (net.minecraft.core.Direction direction : net.minecraft.core.Direction.values()) {
+            h.assertTrue(ModBlocks.NETWORK_SPEAKER.get().defaultBlockState()
+                            .setValue(dev.distantstock.block.NetworkSpeakerBlock.FACING, direction)
+                            .getValue(dev.distantstock.block.NetworkSpeakerBlock.FACING) == direction,
+                    "network speaker does not accept six-way facing: " + direction);
+        }
         h.succeed();
     }
 
