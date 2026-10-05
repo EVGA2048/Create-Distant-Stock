@@ -125,9 +125,11 @@ public final class SignalLampClientSmoke {
                     "DISTANTSTOCK_REMOTE_REQUESTER_EFFECT_OK: powered model is distinct and Create effect packet accepts remote requester BE");
 
             if (net.neoforged.fml.ModList.get().isLoaded("fluidlogistics")) {
-                if (Arrays.stream(com.simibubi.create.content.logistics.box.PackageRenderer.class.getDeclaredMethods())
+                Class<?> fluidRenderer = Class.forName(
+                        "com.yision.fluidlogistics.content.logistics.fluidPackage.client.FluidAwarePackageRenderer");
+                if (Arrays.stream(fluidRenderer.getDeclaredMethods())
                         .noneMatch(m -> m.getName().contains("distantstock$renderRemoteFluidPackage"))) {
-                    throw new AssertionError("Remote fluid package entity renderer mixin was not applied");
+                    throw new AssertionError("Remote fluid package entity renderer mixin was not applied to FluidLogistics 1.3.x renderer");
                 }
                 var remoteFluidId = ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "remote_fluid_package");
                 var remoteFluidModel = com.simibubi.create.AllPartialModels.PACKAGES.get(remoteFluidId);
@@ -136,7 +138,7 @@ public final class SignalLampClientSmoke {
                 }
                 verify(remoteFluidModel.get(), mc);
                 LogUtils.getLogger().info(
-                        "DISTANTSTOCK_REMOTE_FLUID_ENTITY_RENDERER_OK: mixin applied and blue shell partial baked");
+                        "DISTANTSTOCK_REMOTE_FLUID_ENTITY_RENDERER_OK: 1.3.x renderer mixin applied and blue 12x12 shell partial baked");
             }
             // The casing's connected texture attaches by swapping its baked model, and a swap that
             // silently did not happen leaves a perfectly ordinary-looking block with no connection
@@ -161,6 +163,11 @@ public final class SignalLampClientSmoke {
             }
             LogUtils.getLogger().info(
                     "DISTANTSTOCK_TOWER_TOP_FLUID_PORT_OK: UP casing port baked for inactive/active states");
+            var towerShaftField = dev.distantstock.client.TowerCoreRenderer.class.getDeclaredField("SHAFT");
+            towerShaftField.setAccessible(true);
+            verify(((PartialModel) towerShaftField.get(null)).get(), mc);
+            LogUtils.getLogger().info(
+                    "DISTANTSTOCK_TOWER_SHAFT_RENDERER_OK: dedicated kinetic tower shaft partial baked alongside ether level");
             int states = 0;
             for (var block : java.util.List.of(ModBlocks.CYAN_INDICATOR_LAMP.get(), ModBlocks.ORANGE_INDICATOR_LAMP.get(),
                     ModBlocks.RED_INDICATOR_LAMP.get(), ModBlocks.GREEN_INDICATOR_LAMP.get(),
@@ -385,7 +392,7 @@ public final class SignalLampClientSmoke {
     }
 
     /**
-     * 监视器两页都画得出来，而且**切页之后整块要重新居中**。
+     * 监视器链路 / 塔 / 诊断三页都画得出来，而且切页不能破坏布局。
      *
      * <p>塔页比链路页更高，背景由 Create 原生的 stock-keeper GUI 分片重复拼接：切页时
      * 屏幕顶点的位置得跟着变，否则高的那一页会顶到屏幕外面 —— 玩家截的图里"底部那行区块选区被切掉"
@@ -401,19 +408,22 @@ public final class SignalLampClientSmoke {
                         40, 16, true, 120, 4000, 512, false, 1, true, true, 3, 5)));
         var view = new dev.distantstock.link.LinkSnapshot.View("A", "B", 20, 5, 1, 2, 0,
                 true, 19.5, 6, true, 12, 0, 1, 1,
-                true, true, "node", "A服", "", 0, 0, 0, 0, tower);
+                true, true, "node", "A服", "", 0, 0, 0, 0,
+                12, 10, 1, 1, 0, 4, 1, 2, 1, 0, 0, tower);
 
         var monitor = new dev.distantstock.client.MonitorScreen(
                 new net.minecraft.core.BlockPos(0, 0, 0), view);
         monitor.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
         monitor.render(graphics, 0, 0, 0f);
 
-        // 点一下「塔」那个页签：位置和 MonitorScreen.drawPageToggle 里写的一致。
-        int left = (mc.getWindow().getGuiScaledWidth() - 272) / 2;
-        int top = (mc.getWindow().getGuiScaledHeight() - 190) / 2;
-        monitor.mouseClicked(left + 55 + 20, top + 27 + 6, 0);
+        // 页签命中区直接跟 MonitorScreen 的 220x112 Bee Port 布局一致。
+        int left = (mc.getWindow().getGuiScaledWidth() - 220) / 2;
+        int top = (mc.getWindow().getGuiScaledHeight() - (112 + 24)) / 2 + 24;
+        monitor.mouseClicked(left - 22 + 9, top + 8 + 9, 0);   // 塔
         monitor.render(graphics, 0, 0, 0f);
-        LogUtils.getLogger().info("DISTANTSTOCK_MONITOR_PAGES_OK: 监视器链路页与塔页都画得出来");
+        monitor.mouseClicked(left - 22 + 9, top + 26 + 9, 0);  // 诊
+        monitor.render(graphics, 0, 0, 0f);
+        LogUtils.getLogger().info("DISTANTSTOCK_MONITOR_PAGES_OK: 监视器链路/塔/诊断三页均可绘制");
     }
 
     /**

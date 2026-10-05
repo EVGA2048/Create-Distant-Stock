@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": ["NN", "BP"],
+  "key": {
+    "N": {"item": "create:nixie_tube"},
+    "B": {"item": "create:brass_sheet"},
+    "P": {"item": "create:precision_mechanism"}
+  },
+  "result": {"id": "distantstock:nixie_clock", "count": 1}
+}

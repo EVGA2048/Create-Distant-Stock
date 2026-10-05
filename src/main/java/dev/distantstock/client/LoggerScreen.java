@@ -195,8 +195,11 @@ public final class LoggerScreen extends Screen {
         g.drawString(font, time, x + 7, y + 3, MUTED, false);
         String code = fit(EventText.title(row.code()).getString(), 98);
         g.drawString(font, code, x + 54, y + 3, row.active() ? INK : MUTED, false);
-        String source = fit(row.sourceId(), 78);
-        g.drawString(font, source, x + 154, y + 3, MUTED, false);
+        // Event source ids are stable machine keys, not operator-facing descriptions. Prefer the
+        // event detail (for chain diagnostics this is the actual Frogport address) so the console
+        // tells the operator what failed instead of showing an opaque hashed source id.
+        String context = row.detail() == null || row.detail().isBlank() ? row.sourceId() : row.detail();
+        g.drawString(font, fit(context, 78), x + 154, y + 3, MUTED, false);
         if (row.count() > 1) {
             g.drawString(font, "×" + row.count(), x + 235, y + 3, MUTED, false);
         }

@@ -24,7 +24,7 @@ public final class OrderService {
     private static final Logger LOG = LogManager.getLogger();
 
     public enum Result {
-        QUEUED, FAIL, EMPTY, NO_PEER
+        QUEUED, FAIL, EMPTY, NO_PEER, INCOMPATIBLE
     }
 
     public static Result place(UUID freq, String address, List<LinkQueues.Line> lines) {
@@ -127,6 +127,14 @@ public final class OrderService {
         if (destinationNode == null) {
             return Result.FAIL;
         }
+        // Refuse a known-incompatible destination before Create removes anything from stock. UNKNOWN
+        // remains allowed so a rolling upgrade or a peer that has not sent its first hello yet does
+        // not freeze otherwise compatible warehouses.
+        if (knownIncompatible(destinationNode)) {
+            LOG.warn("[DistantStock/Order] refused before packing: destination node {} is protocol incompatible: {}",
+                    destinationNode, ProtocolHelloService.missingRequired(destinationNode.toString()));
+            return Result.INCOMPATIBLE;
+        }
         if (sourceNetwork == null) {
             return placeLocal(server, legacyFrequency, address, receivingDockGroupId,
                     destinationNode, homeAddress, lines);
@@ -136,6 +144,11 @@ public final class OrderService {
         if (sourceNetwork.nodeId().equals(localNode)) {
             return placeLocal(server, sourceNetwork.createFrequency(), address, receivingDockGroupId,
                     destinationNode, homeAddress, lines);
+        }
+        if (knownIncompatible(sourceNetwork.nodeId())) {
+            LOG.warn("[DistantStock/Order] refused before remote request: source node {} is protocol incompatible: {}",
+                    sourceNetwork.nodeId(), ProtocolHelloService.missingRequired(sourceNetwork.nodeId().toString()));
+            return Result.INCOMPATIBLE;
         }
         UUID correlationId = UUID.randomUUID();
         UUID childOrderId = UUID.randomUUID();
@@ -164,6 +177,13 @@ public final class OrderService {
                     sourceNetwork.nodeId(), sourceNetwork.createFrequency(), receivingDockGroupId, exception);
             return Result.FAIL;
         }
+    }
+
+    /** Known incompatibility is a hard preflight failure; UNKNOWN is deliberately not. */
+    public static boolean knownIncompatible(UUID node) {
+        return node != null && !TranserverBridge.isLocal(node.toString())
+                && ProtocolHelloService.compatibility(node.toString())
+                == ProtocolHelloService.Compatibility.INCOMPATIBLE;
     }
 
     /**

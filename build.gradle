@@ -161,7 +161,9 @@ def extraGaugesJar = new File(modpackMods, 'extra_gauges-2.1.2.jar')
  * our panels are registered into their registries, and this one is a reference, not a dependency.
  */
 def mobilePackagesJar = new File(modpackMods, 'create_mobile_packages-1.21.1-0.7.4.jar')
-def fluidLogisticsJar = new File(modpackMods, 'fluidlogistics-1.0.1.jar')
+def fluidLogisticsPackJar = new File(modpackMods, 'fluidlogistics-1.3.1-mc1.21.1.jar')
+def fluidLogisticsDevJar = file("libs/fluidlogistics-1.3.1-mc1.21.1.jar")
+def fluidLogisticsJar = fluidLogisticsPackJar.exists() ? fluidLogisticsPackJar : fluidLogisticsDevJar
 
 tasks.register('extractPonder') {
     onlyIf { !ponderJar.exists() }

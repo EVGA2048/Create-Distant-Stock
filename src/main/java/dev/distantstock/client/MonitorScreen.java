@@ -47,8 +47,8 @@ public final class MonitorScreen extends Screen {
     private final BlockPos source;
     private final boolean towerOnly;
     private LinkSnapshot.View view;
-    /** Which half of the dashboard is showing. */
-    private boolean towerPage;
+    /** 0=link, 1=tower, 2=diagnostics. Tower-only screens stay on page 1. */
+    private int page;
     private int towerIndex;
 
     private int left;
@@ -65,7 +65,7 @@ public final class MonitorScreen extends Screen {
         this.source = source.immutable();
         this.view = view;
         this.towerOnly = towerOnly;
-        this.towerPage = towerOnly;
+        this.page = towerOnly ? 1 : 0;
     }
 
     public boolean isSource(BlockPos source) {
@@ -122,8 +122,10 @@ public final class MonitorScreen extends Screen {
         hits.add(new Hit(left + W - 33, top + H - 24, 18, 18,
                 null, 0, false, false, this::onClose));
         if (!towerOnly) drawPageToggle(g, mouseX, mouseY);
-        if (towerPage) {
+        if (page == 1) {
             drawTowerPage(g, mouseX, mouseY);
+        } else if (page == 2) {
+            drawDiagnosticPage(g);
         } else {
             drawLinkOverview(g);
         }
@@ -141,8 +143,9 @@ public final class MonitorScreen extends Screen {
 
     /** Bee Port puts its controls on the left rail; the monitor uses the same placement. */
     private void drawPageToggle(GuiGraphics g, int mouseX, int mouseY) {
-        sideButton(g, left - 22, top - 10, "链", !towerPage, () -> towerPage = false, mouseX, mouseY);
-        sideButton(g, left - 22, top + 8, "塔", towerPage, () -> towerPage = true, mouseX, mouseY);
+        sideButton(g, left - 22, top - 10, "链", page == 0, () -> page = 0, mouseX, mouseY);
+        sideButton(g, left - 22, top + 8, "塔", page == 1, () -> page = 1, mouseX, mouseY);
+        sideButton(g, left - 22, top + 26, "诊", page == 2, () -> page = 2, mouseX, mouseY);
     }
 
     private void sideButton(GuiGraphics g, int x, int y, String glyph, boolean active,
@@ -213,6 +216,44 @@ public final class MonitorScreen extends Screen {
             g.drawString(font, transport, left + 36, top + 73,
                     view.transerverAttached() ? MUTED : TRANSPORT_WARN, false);
         }
+    }
+
+    /** Compact control-plane health summary. Detailed address rows live in /distantstock doctor. */
+    private void drawDiagnosticPage(GuiGraphics g) {
+        boolean fault = view.diagnosticFaults() > 0 || view.protocolIncompatible() > 0;
+        boolean degraded = !fault && (view.diagnosticDegraded() > 0 || view.diagnosticUnknown() > 0
+                || view.protocolUnknown() > 0);
+        AllGuiTextures indicator = fault ? AllGuiTextures.INDICATOR_RED
+                : degraded ? AllGuiTextures.INDICATOR_YELLOW : AllGuiTextures.INDICATOR_GREEN;
+        indicator.render(g, left + 12, top + 10);
+        String state = fault ? "FAULT" : degraded ? "DEGRADED" : "HEALTHY";
+        g.drawString(font, state, left + 36, top + 13, fault ? BAD : degraded ? WARN : GOOD, false);
+        String total = Component.translatable("gui.distantstock.monitor.diag.addresses",
+                view.diagnosticAddresses()).getString();
+        g.drawString(font, fit(total, 86), left + W - 14 - font.width(fit(total, 86)), top + 13, MUTED, false);
+
+        drawMetricCentered(g, left + 38, top + 31, "OK", view.diagnosticHealthy(), GOOD);
+        drawMetricCentered(g, left + 110, top + 31, "WARN", view.diagnosticDegraded(),
+                view.diagnosticDegraded() == 0 ? MUTED : WARN);
+        drawMetricCentered(g, left + 182, top + 31, "ERR", view.diagnosticFaults(),
+                view.diagnosticFaults() == 0 ? MUTED : BAD);
+
+        drawMetricCentered(g, left + 38, top + 47, "UNK", view.diagnosticUnknown(),
+                view.diagnosticUnknown() == 0 ? MUTED : WARN);
+        drawMetricCentered(g, left + 110, top + 47, "PING", view.diagnosticInFlight(),
+                view.diagnosticInFlight() == 0 ? MUTED : AETHER);
+        drawMetricCentered(g, left + 182, top + 47, "CACHE", view.diagnosticCacheTakeovers(),
+                view.diagnosticCacheTakeovers() == 0 ? MUTED : WARN);
+
+        String cache = Component.translatable("gui.distantstock.monitor.diag.cache_spare",
+                view.diagnosticCacheAvailable()).getString();
+        g.drawString(font, cache, left + 14, top + 64, MUTED, false);
+
+        String protocol = "PROTO " + view.protocolCompatible() + " OK / "
+                + view.protocolIncompatible() + " BAD / " + view.protocolUnknown() + " ?";
+        int protocolColor = view.protocolIncompatible() > 0 ? BAD
+                : view.protocolUnknown() > 0 ? WARN : MUTED;
+        g.drawString(font, fit(protocol, W - 28), left + 14, top + 76, protocolColor, false);
     }
 
     private void drawMetricCentered(GuiGraphics g, int centerX, int y, String label, int value, int color) {

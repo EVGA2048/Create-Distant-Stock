@@ -4,9 +4,8 @@ import com.simibubi.create.content.logistics.box.PackageItem;
 import dev.distantstock.DistantStock;
 import dev.distantstock.routing.OrderRouteDirectory;
 import dev.distantstock.routing.RemoteOrderParcelStamp;
-import dev.distantstock.routing.RemoteRouteData;
+import com.yision.fluidlogistics.content.logistics.fluidPackage.FluidPackageItem;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -22,9 +21,6 @@ import net.neoforged.neoforge.registries.DeferredRegister;
  * Stock remains loadable without the addon.</p>
  */
 public final class FluidLogisticsCompat {
-    public static final ResourceLocation ORIGINAL_FLUID_PACKAGE =
-            ResourceLocation.fromNamespaceAndPath("fluidlogistics", "rare_fluid_package");
-
     private static final DeferredRegister<Item> ITEMS =
             DeferredRegister.create(Registries.ITEM, DistantStock.MODID);
 
@@ -54,10 +50,9 @@ public final class FluidLogisticsCompat {
             return stack;
         }
 
-        ResourceLocation id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(stack.getItem());
-        boolean original = ORIGINAL_FLUID_PACKAGE.equals(id);
+        boolean fluidPackage = FluidPackageItem.isFluidPackage(stack);
         boolean alreadyRemote = stack.getItem() == REMOTE_FLUID_PACKAGE.get();
-        if (!original && !alreadyRemote) {
+        if (!fluidPackage && !alreadyRemote) {
             return stack;
         }
 

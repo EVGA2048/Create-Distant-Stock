@@ -48,6 +48,12 @@ public final class ModItems {
             ModBlocks.ORANGE_WALL_SOUNDER);
     public static final DeferredHolder<Item, ConditionLinkerItem> CONDITION_LINKER = ITEMS.register("condition_linker",
             () -> new ConditionLinkerItem(ModBlocks.CONDITION_LINKER.get(), new Item.Properties().stacksTo(1)));
+    public static final DeferredHolder<Item, BlockItem> ANNOUNCER = block("announcer", ModBlocks.ANNOUNCER);
+    public static final DeferredHolder<Item, com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem> NETWORK_BROADCASTER =
+            ITEMS.register("network_broadcaster", () -> new com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem(
+                    ModBlocks.NETWORK_BROADCASTER.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, BlockItem> NIXIE_CLOCK = block("nixie_clock", ModBlocks.NIXIE_CLOCK);
+    public static final DeferredHolder<Item, BlockItem> FLAP_CLOCK = block("flap_clock", ModBlocks.FLAP_CLOCK);
     public static final DeferredHolder<Item, BlockItem> REMOTE_PACKAGER = ITEMS.register("remote_packager",
             () -> new BlockItem(ModBlocks.REMOTE_PACKAGER.get(), new Item.Properties()));
     public static final DeferredHolder<Item, SignalLampPanelItem> CYAN_INDICATOR_LAMP = lamp("cyan_indicator_lamp", SignalLampPanelItem.Color.CYAN);
@@ -131,6 +137,10 @@ public final class ModItems {
                 out.accept(RED_WALL_SOUNDER.get());
                 out.accept(ORANGE_WALL_SOUNDER.get());
                 out.accept(CONDITION_LINKER.get());
+                out.accept(ANNOUNCER.get());
+                out.accept(NETWORK_BROADCASTER.get());
+                out.accept(NIXIE_CLOCK.get());
+                out.accept(FLAP_CLOCK.get());
                 out.accept(REMOTE_PACKAGER.get());
                 out.accept(CYAN_INDICATOR_LAMP.get());
                 out.accept(ORANGE_INDICATOR_LAMP.get());

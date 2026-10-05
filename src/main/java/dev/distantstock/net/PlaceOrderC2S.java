@@ -173,6 +173,7 @@ public record PlaceOrderC2S(List<Line> lines, UUID receivingDockGroupId) impleme
                     : Component.translatable(switch (result) {
                         case EMPTY -> "gui.distantstock.need_item";
                         case NO_PEER -> "gui.distantstock.no_peer";
+                        case INCOMPATIBLE -> "gui.distantstock.protocol_incompatible";
                         default -> "gui.distantstock.order_fail";
                     }), true);
         });

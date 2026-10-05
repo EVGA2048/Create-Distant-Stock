@@ -1,0 +1,6 @@
+{
+  "parent": "distantstock:block/network_broadcaster",
+  "textures": {
+    "indicator": "create:block/packager_horizontal_powered"
+  }
+}

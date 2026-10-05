@@ -18,7 +18,10 @@ public final class DistantStockMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void onLoad(String mixinPackage) {
-        fluidLogisticsPresent = resourcePresent("com/yision/fluidlogistics/item/FluidPackageItem.class");
+        fluidLogisticsPresent = resourcePresent(
+                "com/yision/fluidlogistics/content/logistics/fluidPackage/FluidPackageItem.class")
+                && resourcePresent(
+                "com/yision/fluidlogistics/content/logistics/packageResource/ResourcePackagerEngine.class");
     }
 
     @Override
@@ -28,7 +31,8 @@ public final class DistantStockMixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        if (mixinClassName.endsWith(".compat.FluidPackagerBlockEntityMixin")) {
+        if (mixinClassName.endsWith(".compat.FluidPackagerBlockEntityMixin")
+                || mixinClassName.endsWith(".client.RemoteFluidPackageRendererMixin")) {
             return fluidLogisticsPresent;
         }
         return true;

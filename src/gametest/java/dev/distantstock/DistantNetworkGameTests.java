@@ -442,6 +442,47 @@ public final class DistantNetworkGameTests {
                 "minecraft:overworld", UUID.randomUUID());
     }
 
+    @net.minecraft.gametest.framework.GameTest(template = "empty")
+    public static void protocolHelloRoundTripsCapabilitiesAndClassifiesPeers(
+            net.minecraft.gametest.framework.GameTestHelper h) {
+        try {
+            var original = new dev.distantstock.link.ProtocolHelloCodec.Hello(
+                    dev.distantstock.link.ProtocolHelloService.CURRENT_PROTOCOL,
+                    java.util.Set.of("package-dispatch-v1", "manifest-v1", "parcel-return-v1", "parcel-trace-v1"));
+            var decoded = dev.distantstock.link.ProtocolHelloCodec.decode(
+                    dev.distantstock.link.ProtocolHelloCodec.encode(original));
+            h.assertTrue(decoded.protocol() == original.protocol()
+                            && decoded.capabilities().equals(original.capabilities()),
+                    "protocol hello codec did not round-trip");
+
+            String good = java.util.UUID.randomUUID().toString();
+            dev.distantstock.link.ProtocolHelloService.rememberForTesting(good,
+                    dev.distantstock.link.ProtocolHelloService.CURRENT_PROTOCOL,
+                    java.util.Set.of("package-dispatch-v1", "manifest-v1", "parcel-return-v1"));
+            h.assertTrue(dev.distantstock.link.ProtocolHelloService.compatibility(good)
+                            == dev.distantstock.link.ProtocolHelloService.Compatibility.COMPATIBLE,
+                    "peer with required capabilities was not compatible");
+
+            String bad = java.util.UUID.randomUUID().toString();
+            dev.distantstock.link.ProtocolHelloService.rememberForTesting(bad,
+                    dev.distantstock.link.ProtocolHelloService.CURRENT_PROTOCOL,
+                    java.util.Set.of("package-dispatch-v1"));
+            h.assertTrue(dev.distantstock.link.ProtocolHelloService.compatibility(bad)
+                            == dev.distantstock.link.ProtocolHelloService.Compatibility.INCOMPATIBLE,
+                    "peer missing required capabilities was not rejected");
+            h.assertTrue(dev.distantstock.link.ProtocolHelloService.missingRequired(bad).contains("manifest-v1"),
+                    "missing capability report did not name manifest-v1");
+            h.assertTrue(dev.distantstock.link.OrderService.knownIncompatible(java.util.UUID.fromString(bad)),
+                    "order preflight did not reject a known-incompatible peer");
+            String unknown = java.util.UUID.randomUUID().toString();
+            h.assertFalse(dev.distantstock.link.OrderService.knownIncompatible(java.util.UUID.fromString(unknown)),
+                    "order preflight incorrectly rejected an UNKNOWN peer during rolling upgrade");
+            h.succeed();
+        } catch (java.io.IOException failure) {
+            h.fail("protocol hello codec threw: " + failure.getMessage());
+        }
+    }
+
     private DistantNetworkGameTests() {
     }
 }

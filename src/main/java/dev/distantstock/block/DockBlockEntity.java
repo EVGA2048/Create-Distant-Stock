@@ -232,6 +232,16 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                     "Outbound parcel receiving address is ambiguous");
             return;
         }
+        if (route.isPresent()) {
+            String node = route.get().destinationNodeId().toString();
+            if (dev.distantstock.link.ProtocolHelloService.compatibility(node)
+                    == dev.distantstock.link.ProtocolHelloService.Compatibility.INCOMPATIBLE) {
+                holdRoutingFault(NO_ROUTE_ERROR, EventRegistry.Codes.DOCK_NO_ROUTE,
+                        "Remote node protocol incompatible: "
+                                + String.join(", ", dev.distantstock.link.ProtocolHelloService.missingRequired(node)));
+                return;
+            }
+        }
         clearHeldRoutingFaults();
     }
 
@@ -1454,6 +1464,14 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                         "Outbound parcel receiving address is ambiguous");
                 break;
             }
+            String destinationNodeId = route.get().destinationNodeId().toString();
+            if (dev.distantstock.link.ProtocolHelloService.compatibility(destinationNodeId)
+                    == dev.distantstock.link.ProtocolHelloService.Compatibility.INCOMPATIBLE) {
+                holdRoutingFault(NO_ROUTE_ERROR, EventRegistry.Codes.DOCK_NO_ROUTE,
+                        "Remote node protocol incompatible: "
+                                + String.join(", ", dev.distantstock.link.ProtocolHelloService.missingRequired(destinationNodeId)));
+                break;
+            }
             ReceiverProbeService.State receiver = receiverState(route.get());
             if (receiver != ReceiverProbeService.State.AVAILABLE) {
                 if (receiver == ReceiverProbeService.State.UNAVAILABLE) {
@@ -1483,11 +1501,15 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                     break;
                 }
                 try {
-                    ParcelEscrow.get(level.getServer()).hold(
+                    UUID parcelId = ParcelEscrow.get(level.getServer()).hold(
                             stack, destinationAddress, route.get().destinationNodeId().toString(),
                             route.get().receivingDockGroupId(),
                             level.dimension().location().toString(), worldPosition,
                             level.getGameTime(), level.registryAccess());
+                    dev.distantstock.link.ParcelJournal.get(level.getServer()).record(parcelId,
+                            destinationAddress, route.get().destinationNodeId().toString(),
+                            route.get().receivingDockGroupId(), "ESCROWED",
+                            "origin=" + level.dimension().location() + "@" + worldPosition.toShortString());
                     outboundInv.extractItem(slot, 1, false);
                     noteTraffic(level);
                     // Other Create packagers/fragments of this order may still be on their way.

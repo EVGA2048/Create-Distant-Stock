@@ -4,6 +4,7 @@ import dev.distantstock.net.AdminConfigS2C;
 import dev.distantstock.net.LinkSnapshotS2C;
 import dev.distantstock.net.OpenMonitorS2C;
 import dev.distantstock.net.OpenLoggerS2C;
+import dev.distantstock.net.OpenAnnouncerS2C;
 import net.minecraft.client.Minecraft;
 
 /** Client-only packet effects, isolated so dedicated servers never resolve GUI classes. */
@@ -26,6 +27,15 @@ public final class ClientPayloadHandlers {
             logger.update(message);
         } else {
             minecraft.setScreen(new LoggerScreen(message));
+        }
+    }
+
+    public static void openAnnouncer(OpenAnnouncerS2C message) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.screen instanceof AnnouncerScreen screen && screen.isSource(message.source())) {
+            screen.update(message);
+        } else {
+            minecraft.setScreen(new AnnouncerScreen(message));
         }
     }
 

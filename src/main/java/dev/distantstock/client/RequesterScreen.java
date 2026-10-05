@@ -1291,7 +1291,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (cart.isEmpty()) {
             return;
         }
-        // The dual-address transport is not implemented yet: never silently discard an entered route.
+        // Address/home-address are synchronised to the server as the fields change. The order packet
+        // only needs the cart and destination group; its handler reads both addresses back from the
+        // authoritative RequesterMenu state so a stale client packet cannot overwrite either one.
         List<PlaceOrderC2S.Line> lines = new ArrayList<>();
         for (CartLine line : cart) {
             lines.add(new PlaceOrderC2S.Line(BuiltInRegistries.ITEM.getKey(line.stack.getItem()).toString(), line.count));

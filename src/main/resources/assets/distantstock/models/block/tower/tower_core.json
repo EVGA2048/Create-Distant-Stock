@@ -9,8 +9,6 @@
     "crystal": "distantstock:block/tower/crystal",
     "gearbox": "distantstock:block/tower/gearbox",
     "polished": "distantstock:block/tower/polished",
-    "axis": "distantstock:block/tower/axis",
-    "axis_top": "distantstock:block/tower/axis_top",
     "fluid": "distantstock:block/tower/fluid"
   },
   "elements": [
@@ -908,121 +906,6 @@
             10.0
           ],
           "texture": "#gearbox"
-        }
-      }
-    },
-    {
-      "from": [
-        6.0,
-        0.02,
-        6.0
-      ],
-      "to": [
-        10.0,
-        0.02,
-        10.0
-      ],
-      "faces": {
-        "down": {
-          "uv": [
-            6.0,
-            6.0,
-            10.0,
-            10.0
-          ],
-          "texture": "#axis_top"
-        }
-      }
-    },
-    {
-      "from": [
-        6.0,
-        0.02,
-        6.0
-      ],
-      "to": [
-        10.0,
-        16.0,
-        6.0
-      ],
-      "faces": {
-        "north": {
-          "uv": [
-            10.0,
-            15.98,
-            6.0,
-            0.0
-          ],
-          "texture": "#axis"
-        }
-      }
-    },
-    {
-      "from": [
-        6.0,
-        0.02,
-        10.0
-      ],
-      "to": [
-        10.0,
-        16.0,
-        10.0
-      ],
-      "faces": {
-        "south": {
-          "uv": [
-            6.0,
-            0.0,
-            10.0,
-            15.98
-          ],
-          "texture": "#axis"
-        }
-      }
-    },
-    {
-      "from": [
-        6.0,
-        0.02,
-        6.0
-      ],
-      "to": [
-        6.0,
-        16.0,
-        10.0
-      ],
-      "faces": {
-        "west": {
-          "uv": [
-            6.0,
-            15.98,
-            10.0,
-            0.0
-          ],
-          "texture": "#axis"
-        }
-      }
-    },
-    {
-      "from": [
-        10.0,
-        0.02,
-        6.0
-      ],
-      "to": [
-        10.0,
-        16.0,
-        10.0
-      ],
-      "faces": {
-        "east": {
-          "uv": [
-            10.0,
-            15.98,
-            6.0,
-            0.0
-          ],
-          "texture": "#axis"
         }
       }
     },

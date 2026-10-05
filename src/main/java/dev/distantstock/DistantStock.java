@@ -4,6 +4,7 @@ import dev.distantstock.block.ModBlockEntities;
 import dev.distantstock.block.ModBlocks;
 import dev.distantstock.config.StockConfig;
 import dev.distantstock.display.ModDisplaySources;
+import dev.distantstock.display.ModDisplayTargets;
 import dev.distantstock.fluid.ModFluids;
 import dev.distantstock.item.ModItems;
 import dev.distantstock.item.ModArmorMaterials;
@@ -29,6 +30,7 @@ public final class DistantStock {
         ModItems.TABS.register(bus);
         ModMenus.MENUS.register(bus);
         ModDisplaySources.register(bus);
+        ModDisplayTargets.register(bus);
         /*
          * Create: Deployer lets a panel type live on any board. It is optional, and the check is
          * what makes it optional: the class holding every reference to it is only named inside this

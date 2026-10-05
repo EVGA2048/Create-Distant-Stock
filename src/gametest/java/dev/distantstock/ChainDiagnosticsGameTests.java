@@ -38,6 +38,7 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import net.createmod.catnip.animation.LerpedFloat;
@@ -225,6 +226,82 @@ public final class ChainDiagnosticsGameTests {
                     h.succeed();
                 });
             });
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 1200)
+    public static void nonEmptyCacheIsNeverReLeasedToAnotherFault(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos chainPos = h.absolutePos(new BlockPos(5, 2, 5));
+        BlockPos diagnosticPos = h.absolutePos(new BlockPos(5, 2, 2));
+        BlockPos cacheAPos = h.absolutePos(new BlockPos(4, 2, 7));
+        BlockPos cacheBPos = h.absolutePos(new BlockPos(6, 2, 7));
+        BlockPos receiverAPos = h.absolutePos(new BlockPos(2, 2, 5));
+        BlockPos receiverBPos = h.absolutePos(new BlockPos(8, 2, 5));
+        String addressA = "LEASE-A";
+        String addressB = "LEASE-B";
+
+        var chainBlock = BuiltInRegistries.BLOCK.get(ResourceLocation.fromNamespaceAndPath("create", "chain_conveyor"));
+        var frogportBlock = BuiltInRegistries.BLOCK.get(ResourceLocation.fromNamespaceAndPath("create", "package_frogport"));
+        level.setBlock(chainPos, chainBlock.defaultBlockState(), 3);
+        level.setBlock(diagnosticPos, ModBlocks.DIAGNOSTIC_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(cacheAPos, ModBlocks.CACHE_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(cacheBPos, ModBlocks.CACHE_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(receiverAPos, frogportBlock.defaultBlockState(), 3);
+        level.setBlock(receiverBPos, frogportBlock.defaultBlockState(), 3);
+
+        ChainConveyorBlockEntity chain = (ChainConveyorBlockEntity) level.getBlockEntity(chainPos);
+        DiagnosticFrogportBlockEntity diagnostic = (DiagnosticFrogportBlockEntity) level.getBlockEntity(diagnosticPos);
+        CacheFrogportBlockEntity cacheA = (CacheFrogportBlockEntity) level.getBlockEntity(cacheAPos);
+        CacheFrogportBlockEntity cacheB = (CacheFrogportBlockEntity) level.getBlockEntity(cacheBPos);
+        FrogportBlockEntity receiverA = (FrogportBlockEntity) level.getBlockEntity(receiverAPos);
+        FrogportBlockEntity receiverB = (FrogportBlockEntity) level.getBlockEntity(receiverBPos);
+        h.assertTrue(chain != null && diagnostic != null && cacheA != null && cacheB != null
+                        && receiverA != null && receiverB != null, "lease-isolation fixture incomplete");
+
+        chain.setSpeed(128);
+        chain.preventSpeedUpdate = 2500;
+        attachLoopPort(level, chainPos, diagnosticPos, diagnostic, 0);
+        attachLoopPort(level, chainPos, receiverAPos, receiverA, 72);
+        attachLoopPort(level, chainPos, receiverBPos, receiverB, 144);
+        attachLoopPort(level, chainPos, cacheAPos, cacheA, 216);
+        attachLoopPort(level, chainPos, cacheBPos, cacheB, 288);
+        receiverA.addressFilter = addressA;
+        receiverB.addressFilter = addressB;
+        receiverA.acceptsPackages = receiverB.acceptsPackages = true;
+        receiverA.filterChanged();
+        receiverB.filterChanged();
+
+        // A cache with residual A cargo must not be considered spare for fault B, regardless of
+        // whether that cargo would later leave by replay, automation extraction or manual removal.
+        ItemStack oldA = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        PackageItem.addAddress(oldA, addressA);
+        cacheA.setReleaseDelaySeconds(0); // redstone mode: keep the old cargo parked without a pulse
+        cacheA.inventory.setStackInSlot(0, oldA);
+        h.assertTrue(cacheA.takeoverAddress().isBlank() && cacheA.cachedCount() == 1,
+                "fixture did not create a nonempty idle/replay cache");
+
+        ItemStack busy = new ItemStack(ModItems.PING_PACKAGE.get());
+        h.onEachTick(() -> {
+            chain.setSpeed(128);
+            receiverA.animatedPackage = busy;
+            receiverB.animatedPackage = busy;
+            receiverA.animationProgress.startWithValue(0).chase(1, .1, LerpedFloat.Chaser.LINEAR);
+            receiverB.animationProgress.startWithValue(0).chase(1, .1, LerpedFloat.Chaser.LINEAR);
+        });
+        ChainDiagnostics.register(diagnostic);
+        ChainDiagnostics.register(cacheA);
+        ChainDiagnostics.register(cacheB);
+        ChainDiagnostics.tick(level.getServer());
+
+        h.runAfterDelay(760, () -> {
+            h.assertTrue(cacheA.takeoverAddress().isBlank(),
+                    "nonempty cache A was re-leased while still holding old A cargo");
+            h.assertTrue(!cacheB.takeoverAddress().isBlank(),
+                    "empty cache B was not selected as the only safe lease candidate");
+            h.assertTrue(countAddress(cacheA, addressA) == cacheA.cachedCount(),
+                    "retired cache A mixed cargo from another fault");
+            h.succeed();
         });
     }
 
@@ -602,6 +679,82 @@ public final class ChainDiagnosticsGameTests {
         h.succeed();
     }
 
+    @GameTest(template = "empty", timeoutTicks = 140)
+    public static void diagnosticFrogportCapsNormalProbeConcurrencyAtFour(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos chainPos = h.absolutePos(new BlockPos(5, 2, 5));
+        BlockPos diagnosticPos = h.absolutePos(new BlockPos(5, 2, 3));
+        List<BlockPos> receiverPositions = List.of(
+                h.absolutePos(new BlockPos(1, 2, 5)),
+                h.absolutePos(new BlockPos(3, 2, 5)),
+                h.absolutePos(new BlockPos(7, 2, 5)),
+                h.absolutePos(new BlockPos(9, 2, 5)),
+                h.absolutePos(new BlockPos(5, 2, 7)));
+
+        var chainBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "chain_conveyor"));
+        var frogportBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "package_frogport"));
+        level.setBlock(chainPos, chainBlock.defaultBlockState(), 3);
+        level.setBlock(diagnosticPos, ModBlocks.DIAGNOSTIC_FROGPORT.get().defaultBlockState(), 3);
+        for (BlockPos pos : receiverPositions) level.setBlock(pos, frogportBlock.defaultBlockState(), 3);
+
+        ChainConveyorBlockEntity chain = (ChainConveyorBlockEntity) level.getBlockEntity(chainPos);
+        DiagnosticFrogportBlockEntity diagnostic =
+                (DiagnosticFrogportBlockEntity) level.getBlockEntity(diagnosticPos);
+        h.assertTrue(chain != null && diagnostic != null,
+                "parallel-probe fixture failed to create its chain/diagnostic Frogport");
+
+        chain.setSpeed(128);
+        chain.preventSpeedUpdate = 1000;
+        h.onEachTick(() -> chain.setSpeed(128));
+        attachLoopPort(level, chainPos, diagnosticPos, diagnostic, 0);
+
+        java.util.ArrayList<FrogportBlockEntity> receivers = new java.util.ArrayList<>();
+        for (int i = 0; i < receiverPositions.size(); i++) {
+            FrogportBlockEntity receiver = (FrogportBlockEntity) level.getBlockEntity(receiverPositions.get(i));
+            h.assertTrue(receiver != null, "parallel-probe receiver " + i + " was not created");
+            attachLoopPort(level, chainPos, receiverPositions.get(i), receiver, 50 + i * 55);
+            receiver.addressFilter = "PARALLEL-" + (char) ('A' + i);
+            receiver.acceptsPackages = true;
+            receiver.filterChanged();
+            receivers.add(receiver);
+        }
+
+        // Keep every receiver busy so none of the health pings can complete before the concurrency
+        // window fills. This makes the cap observable rather than timing-dependent on a short loop.
+        ItemStack busyMarker = new ItemStack(ModItems.PING_PACKAGE.get());
+        h.onEachTick(() -> {
+            for (FrogportBlockEntity receiver : receivers) {
+                receiver.animatedPackage = busyMarker;
+                receiver.animationProgress.startWithValue(0).chase(1, .1, LerpedFloat.Chaser.LINEAR);
+            }
+        });
+
+        ChainDiagnostics.register(diagnostic);
+        ChainDiagnostics.tick(level.getServer());
+
+        h.runAfterDelay(70, () -> {
+            int inFlight = diagnostic.diagnosticInFlightCount();
+            var pingAddresses = chain.getLoopingPackages().stream()
+                    .filter(pkg -> PingPackageData.isPing(pkg.item))
+                    .map(pkg -> PingPackageData.read(pkg.item))
+                    .filter(java.util.Objects::nonNull)
+                    .map(PingPackageData.Data::originalAddress)
+                    .collect(java.util.stream.Collectors.toSet());
+            long physicalPings = chain.getLoopingPackages().stream()
+                    .filter(pkg -> PingPackageData.isPing(pkg.item))
+                    .count();
+            h.assertTrue(inFlight == 4,
+                    "diagnostic concurrency did not settle at four in-flight probes: " + inFlight);
+            h.assertTrue(physicalPings == 4,
+                    "chain bus contains the wrong number of diagnostic ping parcels: " + physicalPings);
+            h.assertTrue(pingAddresses.size() == 4,
+                    "parallel health slots duplicated an address instead of widening coverage: " + pingAddresses);
+            h.succeed();
+        });
+    }
+
     @GameTest(template = "empty")
     public static void specialFrogportsExposeInspectablePackageMenus(GameTestHelper h) {
         var level = h.getLevel();
@@ -948,11 +1101,14 @@ public final class ChainDiagnosticsGameTests {
         long fast = ChainDiagnostics.estimatedProbeTimeoutTicks(diagnostic, receiverPos);
         chain.setSpeed(16);
         long slow = ChainDiagnostics.estimatedProbeTimeoutTicks(diagnostic, receiverPos);
+        chain.setSpeed(1);
+        long factoryScaleSlow = ChainDiagnostics.estimatedProbeTimeoutTicks(diagnostic, receiverPos);
 
         h.assertTrue(slow > fast,
                 "probe timeout did not expand at lower chain speed: fast=" + fast + " slow=" + slow);
-        h.assertTrue(fast >= 100 && slow <= 2400,
-                "dynamic probe timeout escaped its safety bounds: fast=" + fast + " slow=" + slow);
+        h.assertTrue(fast >= 100 && factoryScaleSlow > 2400,
+                "probe timeout still behaves like the old 120-second hard cap: fast=" + fast
+                        + " factoryScaleSlow=" + factoryScaleSlow);
         h.succeed();
     }
 
@@ -1006,6 +1162,60 @@ public final class ChainDiagnosticsGameTests {
         h.assertTrue(farTimeout > nearTimeout,
                 "farther receiver did not receive a longer probe deadline: near=" + nearTimeout
                         + " far=" + farTimeout);
+        h.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void probeTimeoutFollowsCreatesFewestHopRouteOnLargeRing(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos sourcePos = h.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos longTurnPos = h.absolutePos(new BlockPos(2, 2, 10));
+        BlockPos shortA = h.absolutePos(new BlockPos(5, 2, 2));
+        BlockPos shortB = h.absolutePos(new BlockPos(8, 2, 2));
+        BlockPos targetPos = h.absolutePos(new BlockPos(10, 2, 2));
+        BlockPos diagnosticPos = h.absolutePos(new BlockPos(2, 2, 0));
+        BlockPos receiverPos = h.absolutePos(new BlockPos(10, 2, 0));
+
+        var chainBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "chain_conveyor"));
+        var frogportBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "package_frogport"));
+        for (BlockPos pos : List.of(sourcePos, longTurnPos, shortA, shortB, targetPos)) {
+            level.setBlock(pos, chainBlock.defaultBlockState(), 3);
+        }
+        level.setBlock(diagnosticPos, ModBlocks.DIAGNOSTIC_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(receiverPos, frogportBlock.defaultBlockState(), 3);
+
+        ChainConveyorBlockEntity source = (ChainConveyorBlockEntity) level.getBlockEntity(sourcePos);
+        ChainConveyorBlockEntity longTurn = (ChainConveyorBlockEntity) level.getBlockEntity(longTurnPos);
+        ChainConveyorBlockEntity a = (ChainConveyorBlockEntity) level.getBlockEntity(shortA);
+        ChainConveyorBlockEntity b = (ChainConveyorBlockEntity) level.getBlockEntity(shortB);
+        ChainConveyorBlockEntity target = (ChainConveyorBlockEntity) level.getBlockEntity(targetPos);
+        DiagnosticFrogportBlockEntity diagnostic =
+                (DiagnosticFrogportBlockEntity) level.getBlockEntity(diagnosticPos);
+        FrogportBlockEntity receiver = (FrogportBlockEntity) level.getBlockEntity(receiverPos);
+        h.assertTrue(source != null && longTurn != null && a != null && b != null && target != null
+                        && diagnostic != null && receiver != null,
+                "fewest-hop timeout fixture did not create block entities");
+
+        connectBothWays(source, longTurn);
+        connectBothWays(longTurn, target);
+        connectBothWays(source, a);
+        connectBothWays(a, b);
+        connectBothWays(b, target);
+        attachLoopPort(level, sourcePos, diagnosticPos, diagnostic, 0);
+        attachLoopPort(level, targetPos, receiverPos, receiver, 0);
+        for (ChainConveyorBlockEntity chain : List.of(source, longTurn, a, b, target)) {
+            chain.setSpeed(36);
+        }
+
+        long timeout = ChainDiagnostics.estimatedProbeTimeoutTicks(diagnostic, receiverPos);
+        // The three-hop bottom path is physically much shorter, but Create advertises the two-hop
+        // source -> longTurn -> target route first. A time-Dijkstra estimator lands near 300 ticks;
+        // the Create-compatible estimate must budget the longer two-hop arc instead.
+        h.assertTrue(timeout > 400,
+                "probe timeout followed the physically shortest path instead of Create's fewest-hop route: "
+                        + timeout);
         h.succeed();
     }
 
@@ -1276,16 +1486,33 @@ public final class ChainDiagnosticsGameTests {
         ChainDiagnostics.unroutableCaptured(diagnostic, parcel);
 
         String sourcePrefix = EventRegistry.blockSource(h.getLevel(), pos) + "/a";
-        boolean event = EventRegistry.get(h.getLevel().getServer()).active().stream()
-                .anyMatch(row -> row.active()
+        EventRegistry.Record event = EventRegistry.get(h.getLevel().getServer()).active().stream()
+                .filter(row -> row.active()
                         && EventRegistry.Codes.CHAIN_NO_ROUTE.equals(row.code())
                         && "chain".equals(row.sourceType())
                         && row.sourceId().startsWith(sourcePrefix)
-                        && address.equals(row.detail()));
-        h.assertTrue(event, "unroutable parcel did not raise CHAIN_NO_ROUTE");
+                        && address.equals(row.detail()))
+                .findFirst().orElse(null);
+        h.assertTrue(event != null, "unroutable parcel did not raise CHAIN_NO_ROUTE");
+        h.assertTrue(event.createdAt() > 1_000_000_000_000L,
+                "chain diagnostic event used game ticks instead of Unix milliseconds: " + event.createdAt());
         h.assertTrue(ChainDiagnostics.lampState(h.getLevel(), address) == LampState.FATAL,
                 "Factory Gauge address fault did not become a fatal brass-lamp state");
+
+        ChainDiagnostics.diagnosticRemoved(diagnostic);
+        h.assertTrue(EventRegistry.get(h.getLevel().getServer()).active(
+                        EventRegistry.Codes.CHAIN_NO_ROUTE, "chain", event.sourceId()).isEmpty(),
+                "removing a diagnostic Frogport left its persistent no-route alarm active");
+        h.assertTrue(ChainDiagnostics.lampState(h.getLevel(), address) == null,
+                "removing a diagnostic Frogport left its address fault latched");
         h.succeed();
+    }
+
+    private static void connectBothWays(ChainConveyorBlockEntity a, ChainConveyorBlockEntity b) {
+        a.prepareStats();
+        b.prepareStats();
+        a.addConnectionTo(b.getBlockPos());
+        b.addConnectionTo(a.getBlockPos());
     }
 
     private static void attachLoopPort(net.minecraft.world.level.Level level, BlockPos chainPos,

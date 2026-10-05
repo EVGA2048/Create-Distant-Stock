@@ -229,9 +229,10 @@ public final class TowerChunkLoader {
                 continue;
             }
             TowerTier tier = be.tier();
-            if (tier == null) {
-                // Not a tower yet. Whatever it forced as a shorter tower is released by the same
-                // path a destroyed tower takes, so a mast taken apart never leaves chunks behind.
+            if (tier == null || !dev.distantstock.block.TowerStructure.baseComplete(level, be.getBlockPos())) {
+                // Not a complete tower yet. Whatever it forced before the mast/base was damaged is
+                // released by the same path a destroyed tower takes, so an incomplete 3x3 base can
+                // never keep chunks alive behind the operator's back.
                 forget(level, be.getBlockPos());
                 continue;
             }

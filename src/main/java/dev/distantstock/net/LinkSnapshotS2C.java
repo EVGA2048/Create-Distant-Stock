@@ -53,6 +53,17 @@ public record LinkSnapshotS2C(BlockPos source, LinkSnapshot.View view) implement
         buf.writeVarInt(view.transerverInbox());
         buf.writeVarInt(view.transerverCompleted());
         buf.writeVarInt(view.transerverDeadLetters());
+        buf.writeVarInt(view.diagnosticAddresses());
+        buf.writeVarInt(view.diagnosticHealthy());
+        buf.writeVarInt(view.diagnosticDegraded());
+        buf.writeVarInt(view.diagnosticFaults());
+        buf.writeVarInt(view.diagnosticUnknown());
+        buf.writeVarInt(view.diagnosticInFlight());
+        buf.writeVarInt(view.diagnosticCacheTakeovers());
+        buf.writeVarInt(view.diagnosticCacheAvailable());
+        buf.writeVarInt(view.protocolCompatible());
+        buf.writeVarInt(view.protocolIncompatible());
+        buf.writeVarInt(view.protocolUnknown());
         writeTower(buf, view.tower());
     }
 
@@ -158,6 +169,17 @@ public record LinkSnapshotS2C(BlockPos source, LinkSnapshot.View view) implement
                 buf.readUtf(),
                 buf.readUtf(),
                 buf.readUtf(),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readVarInt(),
+                buf.readVarInt(),
                 buf.readVarInt(),
                 buf.readVarInt(),
                 buf.readVarInt(),

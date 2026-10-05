@@ -112,6 +112,20 @@ public final class TowerGameTests {
         h.succeed();
     }
 
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void aTowerWithOneMissingSkirtCasingIsNotAssembled(GameTestHelper h) {
+        build(h, TowerTier.I.couplers(), true);
+        h.setBlock(X + 1, 0, Z, Blocks.AIR.defaultBlockState());
+        BlockPos core = base(h);
+        h.assertTrue(TowerStructure.mast(h.getLevel(), core).isPresent(),
+                "missing skirt casing incorrectly erased the mast/tier");
+        h.assertFalse(TowerStructure.baseComplete(h.getLevel(), core),
+                "base with one missing casing reported complete");
+        h.assertFalse(TowerStructure.assembled(h.getLevel(), core.above(TowerTier.I.couplers() + 1)),
+                "tower with an incomplete 3x3 base still assembled");
+        h.succeed();
+    }
+
     /**
      * Couplers and a cap standing on plain stone are a pile of parts.
      *
@@ -145,6 +159,13 @@ public final class TowerGameTests {
     /** Core at the bottom, {@code couplers} segments above it, and a resonator if asked for. */
     private static void build(GameTestHelper h, int couplers, boolean cap) {
         h.setBlock(X, 0, Z, ModBlocks.TOWER_CORE.get().defaultBlockState());
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx != 0 || dz != 0) {
+                    h.setBlock(X + dx, 0, Z + dz, ModBlocks.TOWER_CASING.get().defaultBlockState());
+                }
+            }
+        }
         for (int i = 1; i <= couplers; i++) {
             h.setBlock(X, i, Z, ModBlocks.TOWER_COUPLER.get().defaultBlockState());
         }
@@ -186,7 +207,7 @@ public final class TowerGameTests {
             h.assertTrue(!value.isBlank(), "the board's second line is empty");
             h.assertTrue(label.length() <= 4 && value.length() <= 4,
                     "the board was given \"" + label + "\" / \"" + value + "\", which does not fit");
-            h.assertTrue(java.util.List.of("TPS", "MSPT", "PING", "BACK", "PEER", "DEV").contains(label),
+            h.assertTrue(java.util.List.of("TPS", "MSPT", "PING", "BACK", "ERR", "PEER", "DEV").contains(label),
                     "the board is showing \"" + label + "\", which is not one of its readings");
             h.succeed();
         });

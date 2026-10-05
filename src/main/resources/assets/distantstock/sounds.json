@@ -25,5 +25,50 @@
         "stream": false
       }
     ]
+  },
+  "announcer_chime": {
+    "subtitle": "subtitle.distantstock.announcer_chime",
+    "sounds": [
+      {
+        "name": "distantstock:announcer_chime",
+        "stream": false
+      }
+    ]
+  },
+  "announcer_hmi": {
+    "subtitle": "subtitle.distantstock.announcer_chime",
+    "sounds": [
+      {
+        "name": "distantstock:announcer_hmi",
+        "stream": false
+      }
+    ]
+  },
+  "announcer_ipphone": {
+    "subtitle": "subtitle.distantstock.announcer_chime",
+    "sounds": [
+      {
+        "name": "distantstock:announcer_ipphone",
+        "stream": false
+      }
+    ]
+  },
+  "announcer_relay": {
+    "subtitle": "subtitle.distantstock.announcer_chime",
+    "sounds": [
+      {
+        "name": "distantstock:announcer_relay",
+        "stream": false
+      }
+    ]
+  },
+  "nixie_clock_westminster": {
+    "subtitle": "subtitle.distantstock.nixie_clock_westminster",
+    "sounds": [
+      {
+        "name": "distantstock:nixie_clock_westminster",
+        "stream": false
+      }
+    ]
   }
 }

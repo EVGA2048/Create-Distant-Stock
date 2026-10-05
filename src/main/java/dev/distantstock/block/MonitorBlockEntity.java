@@ -55,6 +55,8 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
     private java.util.UUID freq;
     private RemoteNetworkId networkId;
     private int deviceCount;
+    private int diagnosticFaults;
+    private int diagnosticInFlight;
 
     /** How long one reading stays up before the board turns to the next. */
     private static final int PAGE_TICKS = 100;
@@ -110,7 +112,9 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
                 new String[]{"TPS", short3(localTps)},
                 new String[]{"MSPT", short3(localMspt)},
                 new String[]{"BACK", Integer.toString(Math.min(backlog, 9999))},
-                new String[]{"DEV", Integer.toString(Math.min(deviceCount, 9999))});
+                new String[]{"DEV", Integer.toString(Math.min(deviceCount, 9999))},
+                new String[]{"ERR", Integer.toString(Math.min(diagnosticFaults, 9999))},
+                new String[]{"PING", Integer.toString(Math.min(diagnosticInFlight, 9999))});
     }
 
     /** A reading in at most four characters, which is one line of the board. */
@@ -210,6 +214,8 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
         fails = v.peerFails();
         inFlight = v.inFlight();
         deviceCount = freq == null ? 0 : CreateStock.deviceCount(freq);
+        diagnosticFaults = v.diagnosticFaults();
+        diagnosticInFlight = v.diagnosticInFlight();
         // The board turns to the next reading on its own beat, which is slower than this one.
         showPage(level.getGameTime());
         MonitorBlock.Status status = MonitorBlock.Status.fromTps(localTps);
@@ -246,6 +252,7 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
         GoggleText.line(tip, "goggle.distantstock.local_tps", fmt(localTps), fmt(localMspt));
         GoggleText.line(tip, "goggle.distantstock.pressure", backlog);
         GoggleText.line(tip, "goggle.distantstock.devices", deviceCount);
+        GoggleText.line(tip, "goggle.distantstock.monitor.diagnostics", diagnosticFaults, diagnosticInFlight);
         return true;
     }
 
@@ -296,6 +303,8 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
         tag.putInt("Fails", fails);
         tag.putInt("InFlight", inFlight);
         tag.putInt("DeviceCount", deviceCount);
+        tag.putInt("DiagnosticFaults", diagnosticFaults);
+        tag.putInt("DiagnosticInFlight", diagnosticInFlight);
         if (freq != null) {
             tag.putUUID("Freq", freq);
         }
@@ -314,6 +323,8 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
         fails = tag.getInt("Fails");
         inFlight = tag.getInt("InFlight");
         deviceCount = tag.getInt("DeviceCount");
+        diagnosticFaults = tag.getInt("DiagnosticFaults");
+        diagnosticInFlight = tag.getInt("DiagnosticInFlight");
         freq = tag.hasUUID("Freq") ? tag.getUUID("Freq") : null;
         networkId = tag.contains("RemoteNetwork")
                 ? RemoteNetworkId.read(tag.getCompound("RemoteNetwork")).orElse(null) : null;

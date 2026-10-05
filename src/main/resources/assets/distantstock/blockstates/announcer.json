@@ -1,0 +1,12 @@
+{
+  "variants": {
+    "facing=north,powered=false": {"model": "distantstock:block/announcer"},
+    "facing=north,powered=true":  {"model": "distantstock:block/announcer_powered"},
+    "facing=south,powered=false": {"model": "distantstock:block/announcer", "y": 180},
+    "facing=south,powered=true":  {"model": "distantstock:block/announcer_powered", "y": 180},
+    "facing=west,powered=false":  {"model": "distantstock:block/announcer", "y": 270},
+    "facing=west,powered=true":   {"model": "distantstock:block/announcer_powered", "y": 270},
+    "facing=east,powered=false":  {"model": "distantstock:block/announcer", "y": 90},
+    "facing=east,powered=true":   {"model": "distantstock:block/announcer_powered", "y": 90}
+  }
+}

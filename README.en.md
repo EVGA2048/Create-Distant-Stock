@@ -75,7 +75,7 @@ Distant Stock separates the cross-server destination from the Create parcel addr
 
 ![Interlink Tower components](docs/release/assets/tower.png)
 
-An Interlink Tower is built from an **Interlink Tower Base, consecutive Tower Couplers and an Ether Resonator on top**. Rotational power enters through the bottom of the base. Distant Casing forms the tower skirt and provides the visual/service shell around the core.
+An Interlink Tower is built from a **complete 3x3 base, consecutive Tower Couplers and an Ether Resonator on top**. The Interlink Tower Base occupies the centre and must be surrounded by all eight Distant Casings; rotational power enters through the bottom of the core. The casing ring forms the service skirt, observation windows and fluid ports. If any skirt casing is missing, the mast can still report its tier, but the tower will not run, carry devices or keep chunks loaded.
 
 Tower height determines its tier. Higher tiers carry more devices, reach farther and allow a larger chunk-loading square:
 

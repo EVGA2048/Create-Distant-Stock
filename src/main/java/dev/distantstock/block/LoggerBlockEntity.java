@@ -106,7 +106,6 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         this.networkKnown = true;
         this.promiseBusySeconds = 0;
         this.missingNetworkSeconds = 0;
-        this.missingNetworkSeconds = 0;
         sync();
         updateStatus();
     }
@@ -280,7 +279,10 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
 
     private List<EventRegistry.Record> scopedActive() {
         if (level == null || level.getServer() == null) return List.of();
-        return EventRegistry.get(level.getServer()).active().stream().filter(this::inScope).toList();
+        return EventRegistry.get(level.getServer()).active().stream()
+                .filter(this::inScope)
+                .filter(record -> record.severity().ordinal() >= minimumSeverity.ordinal())
+                .toList();
     }
 
     /** Highest-priority active warning/error that has not been printed/acknowledged yet. */
@@ -480,7 +482,7 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
                 || createFrequency == null || networkId == null) return;
         // An imported remote network has a Create frequency, but its Create logistics registry
         // lives on the other server. Looking up that frequency locally reports a spurious outage.
-        java.util.UUID localNode = dev.distantstock.link.TranserverBridge.nodeId();
+        java.util.UUID localNode = dev.distantstock.link.TranserverBridge.localNodeUuid();
         if (networkId != null && (localNode == null || !networkId.nodeId().equals(localNode))) {
             networkKnown = true;
             missingNetworkSeconds = 0;
@@ -493,15 +495,16 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         }
         NetworkHealth health = CreateStock.health(createFrequency, 4);
         missingNetworkSeconds = health.known() ? 0 : Math.min(60, missingNetworkSeconds + 1);
-        // A Create network may be registered after this block entity begins ticking. A short
-        // grace period avoids an error ticket on every ordinary world load or chunk transition.
-        boolean offline = !health.known() && missingNetworkSeconds >= 5;
-        networkKnown = !offline;
+        // A missing Create registry entry is only "unknown": all stock-link chunks may simply be
+        // unloaded. There is no honest way to distinguish that from a deleted network here, so do
+        // not manufacture an ERROR alarm from absence alone. After a short grace period the front
+        // panel shows OFFLINE/--, while real loaded-network faults still come from links/promise data.
+        networkKnown = health.known() || missingNetworkSeconds < 5;
         EventRegistry events = EventRegistry.get(level.getServer());
         String source = "network:" + createFrequency;
         long now = System.currentTimeMillis();
-        condition(events, EventRegistry.Codes.NETWORK_OFFLINE, EventRegistry.Severity.ERROR,
-                offline, source, "Create logistics network is not loaded", now);
+        // Clear the legacy false-positive alarm produced by older builds.
+        events.clear(EventRegistry.Codes.NETWORK_OFFLINE, "network", source, now);
         condition(events, EventRegistry.Codes.NETWORK_LINKS_OFFLINE, EventRegistry.Severity.WARN,
                 health.known() && health.offline() > 0, source,
                 health.offline() + " / " + health.totalLinks() + " logistics links offline", now);

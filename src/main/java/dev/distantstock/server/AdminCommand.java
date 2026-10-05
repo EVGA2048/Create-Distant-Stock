@@ -14,6 +14,7 @@ import dev.distantstock.link.InboundOrderInbox;
 import dev.distantstock.link.LinkSnapshot;
 import dev.distantstock.link.PackageCodec;
 import dev.distantstock.link.ParcelEscrow;
+import dev.distantstock.link.ParcelJournal;
 import dev.distantstock.link.ParcelQuarantine;
 import dev.distantstock.link.ParcelReturnInbox;
 import dev.distantstock.link.TranserverBridge;
@@ -73,6 +74,12 @@ public final class AdminCommand {
                     return Command.SINGLE_SUCCESS;
                 })
                 .then(Commands.literal("status").executes(AdminCommand::status))
+                .then(Commands.literal("doctor").executes(AdminCommand::doctor))
+                .then(Commands.literal("parcel")
+                        .then(Commands.literal("recent").executes(AdminCommand::parcelRecent))
+                        .then(Commands.argument("id", StringArgumentType.word())
+                                .suggests((ctx, builder) -> suggestParcelIds(ctx, builder))
+                                .executes(AdminCommand::parcelTrace)))
                 .then(Commands.literal("returns")
                         .executes(ctx -> returnsList(ctx, 1))
                         .then(Commands.literal("list")
@@ -192,6 +199,9 @@ public final class AdminCommand {
         ctx.getSource().sendSuccess(() -> Component.literal(String.join("\n", List.of(
                 "远仓指令（所有操作在终端界面里也能做，指令只是快捷方式）：",
                 "  /distantstock status                传输模式与队列",
+                "  /distantstock doctor                一键检查传输、包裹、塔、诊断与缓存健康",
+                "  /distantstock parcel <id>            查看一件包裹的完整生命周期",
+                "  /distantstock parcel recent          最近的包裹轨迹",
                 "  /distantstock help                  这一页",
                 "  /distantstock tower                 每座塔的状态 + 哪些设备没被带载、为什么",
                 "  /distantstock network create <名字>  用当前终端绑定的本地仓储网络创建远仓网络",
@@ -469,6 +479,135 @@ public final class AdminCommand {
         directory.delete(group.id());
         ctx.getSource().sendSuccess(() -> Component.literal("已删除系统「" + name + "」。"), true);
         return Command.SINGLE_SUCCESS;
+    }
+
+    private static int doctor(CommandContext<CommandSourceStack> ctx) {
+        MinecraftServer server = ctx.getSource().getServer();
+        LinkSnapshot.View view = LinkSnapshot.view();
+        ParcelEscrow escrow = ParcelEscrow.get(server);
+        ParcelReturnInbox returns = ParcelReturnInbox.get(server);
+        ParcelQuarantine quarantine = ParcelQuarantine.get(server);
+        InboundOrderInbox orders = InboundOrderInbox.get(server);
+        var chain = dev.distantstock.diagnostics.ChainDiagnostics.healthSnapshot();
+
+        boolean transportFault = dev.distantstock.config.StockConfig.useTranserver()
+                && (!view.transerverAttached() || !view.transerverUp());
+        boolean fault = transportFault || view.transerverDeadLetters() > 0 || quarantine.size() > 0
+                || chain.faults() > 0 || chain.fullCaches() > 0 || view.protocolIncompatible() > 0;
+        boolean degraded = !fault && (returns.size() > 0
+                || escrow.count(ParcelEscrow.State.REJECTED) > 0
+                || chain.degraded() > 0 || chain.unknown() > 0 || view.protocolUnknown() > 0);
+        String overall = fault ? "FAULT" : degraded ? "DEGRADED" : "HEALTHY";
+        ChatFormatting color = fault ? ChatFormatting.RED : degraded ? ChatFormatting.YELLOW : ChatFormatting.GREEN;
+        ctx.getSource().sendSuccess(() -> Component.literal("Distant Stock Doctor · " + overall).withStyle(color), false);
+
+        String transport = dev.distantstock.config.StockConfig.useTranserver()
+                ? (view.transerverAttached() && view.transerverUp() ? "OK" : "FAULT") : "DISABLED";
+        ctx.getSource().sendSuccess(() -> Component.literal("Transport  " + transport
+                + " · out " + view.transerverOutbox() + " / in " + view.transerverInbox()
+                + " / done " + view.transerverCompleted() + " / dead " + view.transerverDeadLetters()), false);
+
+        ctx.getSource().sendSuccess(() -> Component.literal("Parcels    escrow " + escrow.size()
+                + " · returns " + returns.size() + " · quarantine " + quarantine.size()
+                + " · journal " + ParcelJournal.get(server).size()), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("Orders     received "
+                + orders.count(InboundOrderInbox.State.RECEIVED) + " · processing "
+                + orders.count(InboundOrderInbox.State.PROCESSING) + " · applied "
+                + orders.count(InboundOrderInbox.State.APPLIED)), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("Chain      addresses " + chain.addresses()
+                + " · healthy " + chain.healthy() + " · degraded " + chain.degraded()
+                + " · fault " + chain.faults() + " · unknown " + chain.unknown()
+                + " · pings " + chain.inFlightProbes()), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("Cache      " + chain.caches()
+                + " total · " + chain.availableCaches() + " spare · " + chain.cacheTakeovers()
+                + " takeover · " + chain.fullCaches() + " full"), false);
+
+        List<dev.distantstock.block.TowerCoreBlockEntity> towers = dev.distantstock.block.LoadedTowers.all();
+        long running = towers.stream().filter(dev.distantstock.block.TowerCoreBlockEntity::isRunning).count();
+        ctx.getSource().sendSuccess(() -> Component.literal("Towers     " + running + "/" + towers.size()
+                + " running · frozen receivers " + chain.frozenPorts()), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("Protocol   " + view.protocolCompatible()
+                + " compatible · " + view.protocolIncompatible() + " incompatible · "
+                + view.protocolUnknown() + " unknown"), false);
+        String selfNode = dev.distantstock.link.TranserverBridge.localNodeId();
+        for (String node : dev.distantstock.link.TranserverBridge.knownNodes()) {
+            if (node.equals(selfNode)) continue;
+            var compatibility = dev.distantstock.link.ProtocolHelloService.compatibility(node);
+            if (compatibility == dev.distantstock.link.ProtocolHelloService.Compatibility.COMPATIBLE) continue;
+            var missing = dev.distantstock.link.ProtocolHelloService.missingRequired(node);
+            String detail = compatibility == dev.distantstock.link.ProtocolHelloService.Compatibility.UNKNOWN
+                    ? "对端未发送 capability hello（可能是旧版本）"
+                    : "缺少 " + String.join(", ", missing);
+            ctx.getSource().sendSuccess(() -> Component.literal("  · " + shortNode(node) + " · "
+                    + compatibility + " · " + detail), false);
+        }
+
+        var problemAddresses = dev.distantstock.diagnostics.ChainDiagnostics.addressHealth().stream()
+                .filter(row -> row.health() != dev.distantstock.diagnostics.ChainDiagnostics.Health.HEALTHY)
+                .limit(8).toList();
+        for (var row : problemAddresses) {
+            String latency = row.latencyTicks() < 0 ? "—"
+                    : String.format(Locale.ROOT, "%.1fs", row.latencyTicks() / 20.0);
+            ctx.getSource().sendSuccess(() -> Component.literal("  · " + row.health() + " " + row.address()
+                    + " · " + row.dimension() + " · latency " + latency), false);
+        }
+        if (problemAddresses.size() == 8) {
+            ctx.getSource().sendSuccess(() -> Component.literal("  · …仅显示前 8 条异常/未知地址"), false);
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int parcelRecent(CommandContext<CommandSourceStack> ctx) {
+        List<ParcelJournal.Trace> rows = ParcelJournal.get(ctx.getSource().getServer()).all();
+        if (rows.isEmpty()) {
+            ctx.getSource().sendSuccess(() -> Component.literal("Parcel Journal 还是空的。"), false);
+            return Command.SINGLE_SUCCESS;
+        }
+        ctx.getSource().sendSuccess(() -> Component.literal("最近包裹轨迹（最新在前）："), false);
+        for (ParcelJournal.Trace trace : rows.stream().limit(8).toList()) {
+            ParcelJournal.Step last = trace.latest();
+            String stage = last == null ? "—" : last.stage() + (last.count() > 1 ? " ×" + last.count() : "");
+            ctx.getSource().sendSuccess(() -> Component.literal("· " + shortId(trace.parcelId())
+                    + " · " + stage + (trace.address().isBlank() ? "" : " · " + trace.address())), false);
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static int parcelTrace(CommandContext<CommandSourceStack> ctx) {
+        String token = StringArgumentType.getString(ctx, "id");
+        Optional<ParcelJournal.Trace> found = ParcelJournal.get(ctx.getSource().getServer()).resolve(token);
+        if (found.isEmpty()) {
+            return failure(ctx, "找不到唯一包裹轨迹「" + token + "」；可以先用 /distantstock parcel recent");
+        }
+        ParcelJournal.Trace trace = found.get();
+        ctx.getSource().sendSuccess(() -> Component.literal("Parcel " + trace.parcelId()), false);
+        ctx.getSource().sendSuccess(() -> Component.literal("  address="
+                + (trace.address().isBlank() ? "—" : trace.address()) + " · target="
+                + (trace.destinationNode().isBlank() ? "—" : shortNode(trace.destinationNode()))
+                + " · group=" + shortId(trace.receivingDockGroupId())), false);
+        java.time.format.DateTimeFormatter clock = java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")
+                .withZone(java.time.ZoneId.systemDefault());
+        for (ParcelJournal.Step step : trace.steps()) {
+            String node = shortNode(step.node());
+            String count = step.count() > 1 ? " ×" + step.count() : "";
+            String detail = step.detail().isBlank() ? "" : " · " + step.detail();
+            ctx.getSource().sendSuccess(() -> Component.literal("  " + clock.format(java.time.Instant.ofEpochMilli(step.at()))
+                    + "  " + step.stage() + count + "  [" + node + "]" + detail), false);
+        }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private static CompletableFuture<Suggestions> suggestParcelIds(CommandContext<CommandSourceStack> ctx,
+                                                                    SuggestionsBuilder builder) {
+        List<String> ids = ParcelJournal.get(ctx.getSource().getServer()).all().stream()
+                .limit(MAX_SUGGESTIONS).map(row -> row.parcelId().toString()).toList();
+        return SharedSuggestionProvider.suggest(ids, builder);
+    }
+
+    private static String shortNode(String node) {
+        if (node == null || node.isBlank()) return "—";
+        String compact = node.replace("-", "");
+        return compact.length() <= 8 ? compact : compact.substring(0, 8);
     }
 
     private static int status(CommandContext<CommandSourceStack> ctx) {

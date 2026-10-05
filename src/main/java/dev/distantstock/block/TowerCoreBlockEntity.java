@@ -193,7 +193,8 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
      * itself.
      */
     public boolean isRunning() {
-        return tier != null && isSpeedRequirementFulfilled();
+        return tier != null && level != null && TowerStructure.baseComplete(level, worldPosition)
+                && isSpeedRequirementFulfilled();
     }
 
     /** Couplers counted on the last rescan, for the readout and for the cap notice. */
@@ -253,7 +254,10 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
         // Said before the carrying count, because a tower that is not turning carries nothing and
         // "0 / 0 台设备" on its own reads as "your docks were not counted" rather than "this tower
         // is not working". Reported from play exactly that way, twice.
-        if (getSpeed() == 0) {
+        boolean baseComplete = level != null && TowerStructure.baseComplete(level, worldPosition);
+        if (!baseComplete) {
+            GoggleText.line(tip, "goggle.distantstock.tower.base_incomplete");
+        } else if (getSpeed() == 0) {
             GoggleText.line(tip, "goggle.distantstock.tower.not_turning");
         } else if (!isRunning()) {
             GoggleText.line(tip, "goggle.distantstock.tower.too_slow", getSpeed());
@@ -293,7 +297,7 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
             // almost always that nothing is turning it: the base takes rotation on its underside
             // and nowhere else, so a shaft brought in from the side reaches nothing. Saying which
             // face it wants is cheaper than a player taking the skirt apart to find out.
-            if (getSpeed() == 0) {
+            if (baseComplete && getSpeed() == 0) {
                 GoggleText.line(tip, "goggle.distantstock.tower.no_shaft");
             }
         }

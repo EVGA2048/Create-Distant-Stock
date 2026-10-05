@@ -29,6 +29,14 @@ import java.util.*;
 public final class ChainDiagnostics {
     /** One normal address is sampled every four seconds per chain network. */
     private static final long SCAN_INTERVAL = 80;
+    /** Keep a large factory moving without flooding its chain bus with diagnostic parcels. */
+    private static final int MAX_NORMAL_PROBES = 4;
+    /** Once the Frogport mouth is free, stagger new health probes by half a second. */
+    private static final long NORMAL_PROBE_LAUNCH_INTERVAL = 10;
+    /** Large industrial rings can exceed the old 512-node safety cap. */
+    private static final int MAX_GRAPH_CONVEYORS = 4096;
+    /** One-second topology cache; live BE fields (speed/address/inventory) are still read every use. */
+    private static final long GRAPH_CACHE_TICKS = 20;
     private static final long FALLBACK_PROBE_TIMEOUT = 300;
     private static final long RETRY_INTERVAL = 60;
 
@@ -49,6 +57,9 @@ public final class ChainDiagnostics {
     private static final Set<FaultKey> FULL_CACHES = new HashSet<>();
     /** Live Factory Gauge address -> Create network associations, refreshed by the gauge's own tick. */
     private static final Map<AddressKey, Map<UUID, Long>> ADDRESS_NETWORKS = new HashMap<>();
+    private static final Map<ControllerKey, CachedGraph> GRAPH_CACHE = new HashMap<>();
+    private static final Map<ControllerKey, Set<String>> KNOWN_ADDRESSES = new HashMap<>();
+    private static final Map<AddressKey, LatencyStats> LATENCIES = new HashMap<>();
 
     public static String diagnosticAddress(BlockPos pos) {
         return DIAG_PREFIX + Long.toUnsignedString(pos.asLong(), 36);
@@ -75,19 +86,65 @@ public final class ChainDiagnostics {
     }
 
     public static void register(DiagnosticFrogportBlockEntity be) {
-        if (be != null) DIAGNOSTICS.add(be);
+        if (be != null) {
+            DIAGNOSTICS.add(be);
+            invalidateGraph(be.getLevel());
+        }
     }
 
     public static void unregister(DiagnosticFrogportBlockEntity be) {
         DIAGNOSTICS.remove(be);
+        if (be != null) invalidateGraph(be.getLevel());
+    }
+
+    /** Permanent removal of a diagnostic controller: release every route it may have intercepted. */
+    public static void diagnosticRemoved(DiagnosticFrogportBlockEntity diagnostic) {
+        if (diagnostic == null || !(diagnostic.getLevel() instanceof ServerLevel level)) return;
+        ControllerKey key = new ControllerKey(level.dimension(), diagnostic.getBlockPos());
+        long eventNow = System.currentTimeMillis();
+
+        PROBES.entrySet().removeIf(entry -> entry.getValue().controller().equals(key));
+        RUNTIME.remove(key);
+
+        for (Fault fault : new ArrayList<>(FAULTS.values())) {
+            if (!fault.key.controller().equals(key)) continue;
+            FAULTS.remove(fault.key);
+            thawTargets(level, fault);
+            BlockPos cachePos = fault.activeCachePos;
+            if (cachePos != null
+                    && level.getBlockEntity(cachePos) instanceof CacheFrogportBlockEntity cache
+                    && fault.key.address().equals(cache.takeoverAddress())) {
+                cache.setTakeoverAddress("");
+            }
+            FULL_CACHES.remove(fault.key);
+            String source = sourceId(level, diagnostic.getBlockPos(), fault.key.address());
+            EventRegistry registry = EventRegistry.get(level.getServer());
+            registry.clear(EventRegistry.Codes.CHAIN_PING_TIMEOUT, "chain", source, eventNow);
+            registry.clear(EventRegistry.Codes.CHAIN_CACHE_FULL, "chain", source + "/cache", eventNow);
+        }
+
+        for (String address : new ArrayList<>(diagnostic.unresolvedBadAddresses())) {
+            AddressKey addressKey = new AddressKey(level.dimension(), address);
+            Set<ControllerKey> owners = BAD_ADDRESSES.get(addressKey);
+            if (owners != null) {
+                owners.remove(key);
+                if (owners.isEmpty()) BAD_ADDRESSES.remove(addressKey);
+            }
+            EventRegistry.get(level.getServer()).clear(EventRegistry.Codes.CHAIN_NO_ROUTE, "chain",
+                    sourceId(level, diagnostic.getBlockPos(), address), eventNow);
+        }
     }
 
     public static void register(CacheFrogportBlockEntity be) {
-        if (be != null) CACHES.add(be);
+        if (be != null) {
+            CACHES.add(be);
+            invalidateGraph(be.getLevel());
+        }
     }
 
     public static void unregister(CacheFrogportBlockEntity be) {
         CACHES.remove(be);
+        if (be != null) invalidateGraph(be.getLevel());
     }
 
     /**
@@ -101,13 +158,10 @@ public final class ChainDiagnostics {
         BlockPos cachePos = cache.getBlockPos();
         long now = level.getGameTime();
         List<Fault> owned = FAULTS.values().stream()
-                .filter(fault -> !fault.cachePositions.isEmpty()
-                        && fault.key.controller().dimension().equals(level.dimension())
-                        && fault.cachePositions.contains(cachePos))
+                .filter(fault -> fault.key.controller().dimension().equals(level.dimension())
+                        && Objects.equals(fault.activeCachePos, cachePos))
                 .toList();
         for (Fault fault : owned) {
-            fault.cachePositions.remove(cachePos);
-            if (!Objects.equals(fault.activeCachePos, cachePos)) continue;
             fault.activeCachePos = null;
             if (!assignNextCacheOwner(level, fault, cachePos)) {
                 abandonCacheMitigation(level, fault, now);
@@ -123,18 +177,19 @@ public final class ChainDiagnostics {
                 && entry.getValue().address().equals(fault.key.address()));
 
         thawTargets(level, fault);
-        for (BlockPos cachePos : fault.cachePositions) {
-            if (level.getBlockEntity(cachePos) instanceof CacheFrogportBlockEntity cache) {
-                cache.setTakeoverAddress("");
-            }
+        BlockPos cachePos = fault.activeCachePos;
+        if (cachePos != null && level.getBlockEntity(cachePos) instanceof CacheFrogportBlockEntity cache
+                && fault.key.address().equals(cache.takeoverAddress())) {
+            cache.setTakeoverAddress("");
         }
 
         FULL_CACHES.remove(fault.key);
         EventRegistry registry = EventRegistry.get(level.getServer());
+        long eventNow = System.currentTimeMillis();
         registry.clear(EventRegistry.Codes.CHAIN_CACHE_FULL, "chain",
-                sourceId(level, fault.key.controller().pos(), fault.key.address()) + "/cache", now);
+                sourceId(level, fault.key.controller().pos(), fault.key.address()) + "/cache", eventNow);
         registry.clear(EventRegistry.Codes.CHAIN_PING_TIMEOUT, "chain",
-                sourceId(level, fault.key.controller().pos(), fault.key.address()), now);
+                sourceId(level, fault.key.controller().pos(), fault.key.address()), eventNow);
 
         RuntimeState runtime = RUNTIME.computeIfAbsent(fault.key.controller(), ignored -> new RuntimeState());
         runtime.nextScanTick = now;
@@ -145,23 +200,12 @@ public final class ChainDiagnostics {
     }
 
     /**
-     * One Create routing-table entry wins for a given address, so simply giving two cache Frogports
-     * the same public address does not load-balance them. Rotate ownership after every accepted
-     * parcel instead. With one fault and several spare caches this makes the frogs take turns; with
-     * several simultaneous faults, caches already reserved by another fault are never stolen.
+     * A fault keeps one exclusive cache lease while that cache has room. Ownership only moves when
+     * the active cache becomes full (see maintainFaults). This prevents one noisy address from
+     * walking through the entire spare-cache pool and starving simultaneous independent faults.
      */
     public static void cacheAcceptedPackage(CacheFrogportBlockEntity cache) {
-        if (cache == null || !(cache.getLevel() instanceof ServerLevel level)) return;
-        String address = cache.takeoverAddress();
-        if (address.isBlank()) return;
-
-        Fault fault = FAULTS.values().stream()
-                .filter(candidate -> candidate.key.controller().dimension().equals(level.dimension())
-                        && candidate.key.address().equals(address)
-                        && cache.getBlockPos().equals(candidate.activeCachePos))
-                .findFirst().orElse(null);
-        if (fault == null) return;
-        assignNextCacheOwner(level, fault, cache.getBlockPos());
+        // Intentionally no ownership rotation here.
     }
 
     private static boolean assignNextCacheOwner(ServerLevel level, Fault fault, BlockPos currentPos) {
@@ -171,11 +215,11 @@ public final class ChainDiagnostics {
 
         List<CacheFrogportBlockEntity> candidates = graph.caches().stream()
                 .filter(candidate -> !candidate.getBlockPos().equals(currentPos))
-                .filter(candidate -> candidate.takeoverAddress().isBlank())
+                .filter(CacheFrogportBlockEntity::availableForLease)
                 .filter(candidate -> !candidate.isBackedUp())
                 .filter(candidate -> FAULTS.values().stream().noneMatch(other -> other != fault
                         && other.key.controller().dimension().equals(level.dimension())
-                        && other.cachePositions.contains(candidate.getBlockPos())))
+                        && Objects.equals(other.activeCachePos, candidate.getBlockPos())))
                 .sorted(Comparator.comparingLong(candidate -> candidate.getBlockPos().asLong()))
                 .toList();
         if (candidates.isEmpty()) return false;
@@ -190,7 +234,6 @@ public final class ChainDiagnostics {
                 && fault.key.address().equals(current.takeoverAddress())) {
             current.setTakeoverAddress("");
         }
-        fault.cachePositions.add(next.getBlockPos());
         fault.activeCachePos = next.getBlockPos();
         next.setTakeoverAddress(fault.key.address());
         FULL_CACHES.remove(fault.key);
@@ -312,11 +355,13 @@ public final class ChainDiagnostics {
             if (graph.conveyors().isEmpty()) {
                 controller.setDiagnosticPlan("disconnected", "", 0, 0, 0, 0, 0, 0);
                 controller.setDiagnosticHealth(0, false);
+                controller.setDiagnosticInFlight(0);
                 continue;
             }
             if (!isLeader(controller, graph)) {
                 controller.setDiagnosticPlan("standby", "", 0, 0, 0, 0, 0, 0);
                 controller.setDiagnosticHealth(0, false);
+                controller.setDiagnosticInFlight(0);
                 continue;
             }
 
@@ -334,50 +379,101 @@ public final class ChainDiagnostics {
                             && fault.mitigated() && fault.activeCachePos != null);
             controller.setDiagnosticHealth(liveFaults, cacheMitigating);
 
-            // One diagnostic Frogport runs one probe at a time. This makes the cycle deterministic
-            // and prevents a recovery probe and a normal health probe from competing for its mouth.
-            Probe active = activeProbe(key);
-            if (active != null) {
-                Fault fault = FAULTS.get(new FaultKey(key, active.address()));
-                int targets = active.recovery() && fault != null
-                        ? Math.max(1, fault.targets.size())
-                        : receiverAddresses(graph).getOrDefault(active.address(), List.of()).size();
-                controller.setDiagnosticPlan(active.recovery() ? "recovery" : "waiting",
-                        active.address(), active.planIndex(), active.planTotal(), targets,
-                        0, active.sentTick(), active.deadlineTick());
-                continue;
-            }
-
             Map<String, List<FrogportBlockEntity>> addresses = receiverAddresses(graph);
+            KNOWN_ADDRESSES.put(key, Set.copyOf(addresses.keySet()));
             List<String> candidates = addresses.keySet().stream()
                     .filter(address -> !FAULTS.containsKey(new FaultKey(key, address)))
                     .sorted()
                     .toList();
 
-            if (candidates.isEmpty()) {
-                runtime.nextScanTick = level.getGameTime() + SCAN_INTERVAL;
-                controller.setDiagnosticPlan("idle", "", 0, 0, 0,
-                        runtime.nextScanTick, 0, 0);
+            // Recovery is intentionally single-flight and takes display/launch priority. Ordinary
+            // health probes already in the network are allowed to finish, but no new ones are added
+            // while a recovery probe is active.
+            Probe recovery = activeRecoveryProbe(key);
+            int inFlight = probeCount(key);
+            controller.setDiagnosticInFlight(inFlight);
+            if (recovery != null) {
+                Fault fault = FAULTS.get(new FaultKey(key, recovery.address()));
+                int targets = fault == null ? 1 : Math.max(1, fault.targets.size());
+                controller.setDiagnosticPlan("recovery", recovery.address(),
+                        recovery.planIndex(), recovery.planTotal(), targets,
+                        0, recovery.sentTick(), recovery.deadlineTick());
                 continue;
             }
 
-            runtime.cursor = Math.floorMod(runtime.cursor, candidates.size());
-            int planIndex = runtime.cursor + 1;
-            String address = candidates.get(runtime.cursor);
-            List<FrogportBlockEntity> addressTargets = addresses.get(address);
+            int normalCount = normalProbeCount(key);
+            Probe oldestNormal = oldestNormalProbe(key);
+            if (candidates.isEmpty()) {
+                if (oldestNormal != null) {
+                    controller.setDiagnosticPlan("waiting", oldestNormal.address(),
+                            oldestNormal.planIndex(), oldestNormal.planTotal(),
+                            addresses.getOrDefault(oldestNormal.address(), List.of()).size(),
+                            0, oldestNormal.sentTick(), oldestNormal.deadlineTick());
+                } else {
+                    runtime.nextScanTick = level.getGameTime() + SCAN_INTERVAL;
+                    controller.setDiagnosticPlan("idle", "", 0, 0, 0,
+                            runtime.nextScanTick, 0, 0);
+                }
+                continue;
+            }
 
+            // Four ordinary probes may be in flight together. Never send a second probe for the same
+            // business address; concurrent slots are for widening coverage, not duplicate traffic.
+            if (normalCount >= MAX_NORMAL_PROBES) {
+                if (oldestNormal != null) {
+                    controller.setDiagnosticPlan("waiting", oldestNormal.address(),
+                            oldestNormal.planIndex(), oldestNormal.planTotal(),
+                            addresses.getOrDefault(oldestNormal.address(), List.of()).size(),
+                            0, oldestNormal.sentTick(), oldestNormal.deadlineTick());
+                }
+                continue;
+            }
+
+            int selectedIndex = -1;
+            String address = null;
+            for (int offset = 0; offset < candidates.size(); offset++) {
+                int index = Math.floorMod(runtime.cursor + offset, candidates.size());
+                String candidate = candidates.get(index);
+                if (hasNormalProbe(key, candidate)) continue;
+                selectedIndex = index;
+                address = candidate;
+                break;
+            }
+
+            // Every configured address is already represented by an in-flight normal probe.
+            if (address == null) {
+                if (oldestNormal != null) {
+                    controller.setDiagnosticPlan("waiting", oldestNormal.address(),
+                            oldestNormal.planIndex(), oldestNormal.planTotal(),
+                            addresses.getOrDefault(oldestNormal.address(), List.of()).size(),
+                            0, oldestNormal.sentTick(), oldestNormal.deadlineTick());
+                }
+                continue;
+            }
+
+            int planIndex = selectedIndex + 1;
+            List<FrogportBlockEntity> addressTargets = addresses.get(address);
             if (level.getGameTime() < runtime.nextScanTick) {
                 controller.setDiagnosticPlan("scheduled", address, planIndex, candidates.size(),
                         addressTargets.size(), runtime.nextScanTick, 0, 0);
                 continue;
             }
 
-            runtime.cursor++;
-            FrogportBlockEntity target = addressTargets.get(0);
-            if (sendProbe(controller, key, address, target.getBlockPos(), address,
+            // Same-address Frogports are interchangeable to Create: the routing table may choose a
+            // different receiver than list index 0. Budget against the slowest receiver so a healthy
+            // far branch cannot time out merely because the probe happened to take that branch.
+            FrogportBlockEntity target = addressTargets.stream()
+                    .max(Comparator.comparingLong(candidate ->
+                            estimatedProbeTimeoutTicks(controller, graph, candidate.getBlockPos())))
+                    .orElse(addressTargets.get(0));
+            if (sendProbe(controller, graph, key, address, target.getBlockPos(), address,
                     false, level.getGameTime(), planIndex, candidates.size(), addressTargets.size())) {
-                runtime.nextScanTick = level.getGameTime() + SCAN_INTERVAL;
+                runtime.cursor = Math.floorMod(selectedIndex + 1, candidates.size());
+                runtime.nextScanTick = level.getGameTime() + NORMAL_PROBE_LAUNCH_INTERVAL;
+                controller.setDiagnosticInFlight(normalCount + 1);
             } else {
+                // The Frogport mouth itself still serialises physical injection. Retry soon without
+                // consuming this polling slot or advancing the cursor.
                 runtime.nextScanTick = level.getGameTime() + 10;
                 controller.setDiagnosticPlan("busy", address, planIndex, candidates.size(),
                         addressTargets.size(), runtime.nextScanTick, 0, 0);
@@ -425,7 +521,7 @@ public final class ChainDiagnostics {
                 if (active == null) {
                     registry.raise(EventRegistry.Severity.ERROR, EventRegistry.Codes.CHAIN_NO_ROUTE,
                             "chain", source, address, diagnostic.createFrequency(), null,
-                            level.getGameTime());
+                            System.currentTimeMillis());
                     active = registry.active(EventRegistry.Codes.CHAIN_NO_ROUTE, "chain", source).orElse(null);
                 }
 
@@ -467,15 +563,15 @@ public final class ChainDiagnostics {
             if (FULL_CACHES.contains(fault.key)) liveFullCaches.add(base + "/cache");
         }
 
-        long now = server.overworld().getGameTime();
+        long eventNow = System.currentTimeMillis();
         for (EventRegistry.Record record : new ArrayList<>(registry.active())) {
             if (!"chain".equals(record.sourceType())) continue;
             if (EventRegistry.Codes.CHAIN_PING_TIMEOUT.equals(record.code())
                     && !liveTimeouts.contains(record.sourceId())) {
-                registry.clear(record.code(), record.sourceType(), record.sourceId(), now);
+                registry.clear(record.code(), record.sourceType(), record.sourceId(), eventNow);
             } else if (EventRegistry.Codes.CHAIN_CACHE_FULL.equals(record.code())
                     && !liveFullCaches.contains(record.sourceId())) {
-                registry.clear(record.code(), record.sourceType(), record.sourceId(), now);
+                registry.clear(record.code(), record.sourceType(), record.sourceId(), eventNow);
             }
         }
     }
@@ -515,8 +611,14 @@ public final class ChainDiagnostics {
         if (FAULTS.containsKey(key)) return;
 
         CacheFrogportBlockEntity cache = graph.caches().stream()
-                .filter(candidate -> candidate.takeoverAddress().isBlank()
-                        || candidate.takeoverAddress().equals(probe.address()))
+                // A cache lease is exclusive by fault/address. Never reuse a frog that still
+                // contains parcels from an earlier incident, even if its public route is blank.
+                // Those parcels may leave by replay, bottom extraction or manual removal; reuse is
+                // allowed only after the inventory is observably empty.
+                .filter(CacheFrogportBlockEntity::availableForNewLease)
+                .filter(candidate -> FAULTS.values().stream().noneMatch(other ->
+                        other.key.controller().dimension().equals(level.dimension())
+                                && Objects.equals(other.activeCachePos, candidate.getBlockPos())))
                 .min(Comparator.comparingLong(be -> be.getBlockPos().asLong()))
                 .orElse(null);
 
@@ -544,7 +646,7 @@ public final class ChainDiagnostics {
 
         EventRegistry.get(server).raise(EventRegistry.Severity.ERROR,
                 EventRegistry.Codes.CHAIN_PING_TIMEOUT, "chain", sourceId(level, probe.controller().pos(), probe.address()),
-                probe.address(), controller.createFrequency(), null, now);
+                probe.address(), controller.createFrequency(), null, System.currentTimeMillis());
     }
 
     private static void maintainFaults(DiagnosticFrogportBlockEntity controller, Graph graph,
@@ -552,6 +654,7 @@ public final class ChainDiagnostics {
         List<Fault> faults = FAULTS.values().stream()
                 .filter(fault -> fault.key.controller().equals(controllerKey))
                 .toList();
+        boolean recoveryInFlight = activeRecoveryProbe(controllerKey) != null;
         for (Fault fault : faults) {
             if (!(controller.getLevel() instanceof ServerLevel level)) continue;
 
@@ -570,15 +673,16 @@ public final class ChainDiagnostics {
                         EventRegistry.get(level.getServer()).raise(EventRegistry.Severity.ERROR,
                                 EventRegistry.Codes.CHAIN_CACHE_FULL, "chain",
                                 sourceId(level, controller.getBlockPos(), fault.key.address()) + "/cache",
-                                fault.key.address(), controller.createFrequency(), null, now);
+                                fault.key.address(), controller.createFrequency(), null, System.currentTimeMillis());
                     }
                 } else if (FULL_CACHES.remove(fault.key)) {
                     EventRegistry.get(level.getServer()).clear(EventRegistry.Codes.CHAIN_CACHE_FULL, "chain",
-                            sourceId(level, controller.getBlockPos(), fault.key.address()) + "/cache", now);
+                            sourceId(level, controller.getBlockPos(), fault.key.address()) + "/cache",
+                            System.currentTimeMillis());
                 }
             }
 
-            if (hasRecoveryProbe(controllerKey, fault.key.address())) continue;
+            if (recoveryInFlight) continue;
             if (now < fault.nextRetryTick) continue;
 
             if (fault.mitigated()) {
@@ -605,9 +709,11 @@ public final class ChainDiagnostics {
                     continue;
                 }
                 int recoveryIndex = fault.passed.size() + 1;
-                if (!sendProbe(controller, controllerKey, fault.key.address(), target,
+                if (sendProbe(controller, graph, controllerKey, fault.key.address(), target,
                         recoveryAddress(target), true, now,
                         recoveryIndex, Math.max(1, fault.targets.size()), Math.max(1, fault.targets.size()))) {
+                    recoveryInFlight = true;
+                } else {
                     fault.nextRetryTick = now + 10;
                 }
             } else {
@@ -618,25 +724,28 @@ public final class ChainDiagnostics {
                     continue;
                 }
                 BlockPos target = targets.get(0).getBlockPos();
-                if (!sendProbe(controller, controllerKey, fault.key.address(), target,
+                if (sendProbe(controller, graph, controllerKey, fault.key.address(), target,
                         fault.key.address(), true, now,
                         1, Math.max(1, targets.size()), targets.size())) {
+                    recoveryInFlight = true;
+                } else {
                     fault.nextRetryTick = now + 10;
                 }
             }
         }
     }
 
-    private static boolean sendProbe(DiagnosticFrogportBlockEntity controller, ControllerKey key,
+    private static boolean sendProbe(DiagnosticFrogportBlockEntity controller, Graph graph, ControllerKey key,
                                      String originalAddress, BlockPos targetPos, String routingAddress,
                                      boolean recovery, long now,
                                      int planIndex, int planTotal, int targetCount) {
         UUID id = UUID.randomUUID();
-        long timeout = estimatedProbeTimeoutTicks(controller, targetPos);
+        long timeout = estimatedProbeTimeoutTicks(controller, graph, targetPos);
         ItemStack ping = PingPackageData.create(id, key.dimension().location().toString(), key.pos(),
                 targetPos, originalAddress, routingAddress, now, now + timeout);
         if (!controller.sendProbe(ping)) return false;
-        PROBES.put(id, new Probe(id, key, originalAddress, targetPos, now, now + timeout,
+        long expected = Math.max(1, Math.round(Math.max(1.0, timeout - 60.0) / 1.5));
+        PROBES.put(id, new Probe(id, key, originalAddress, targetPos, now, now + timeout, expected,
                 recovery, planIndex, planTotal));
         controller.setDiagnosticPlan(recovery ? "recovery" : "waiting", originalAddress,
                 planIndex, planTotal, targetCount, 0, now, now + timeout);
@@ -652,12 +761,24 @@ public final class ChainDiagnostics {
         if (controller == null || controller.getLevel() == null || targetPos == null) {
             return FALLBACK_PROBE_TIMEOUT;
         }
-        Graph graph = graph(controller);
+        return estimatedProbeTimeoutTicks(controller, graph(controller), targetPos);
+    }
+
+    private static long estimatedProbeTimeoutTicks(DiagnosticFrogportBlockEntity controller, Graph graph,
+                                                   BlockPos targetPos) {
+        if (controller == null || controller.getLevel() == null || graph == null || targetPos == null) {
+            return FALLBACK_PROBE_TIMEOUT;
+        }
         ChainConveyorBlockEntity source = owningConveyor(graph, controller.getBlockPos());
         ChainConveyorBlockEntity target = owningConveyor(graph, targetPos);
         if (source == null || target == null) return FALLBACK_PROBE_TIMEOUT;
 
-        double travelTicks = shortestTravelTicks(graph, source, target);
+        // Create does not route packages by physical travel time. Its routing table prefers the
+        // smallest RoutingTableEntry.distance(), i.e. the fewest conveyor-to-conveyor hops. On a
+        // large ring this can deliberately choose a physically much longer arc than a time-based
+        // Dijkstra would. Estimate the route with the same primary metric, otherwise healthy probes
+        // on factory-scale buses can be declared dead while they are still moving normally.
+        double travelTicks = createRouteTravelTicks(graph, source, target);
         if (!Double.isFinite(travelTicks)) return FALLBACK_PROBE_TIMEOUT;
 
         // Local sprocket arcs/port positions are not part of ConnectionStats. Budget eight blocks
@@ -667,54 +788,88 @@ public final class ChainDiagnostics {
         double endpointBpt;
         if (source == target) {
             endpointBpt = sourceBpt;
-        } else if (sourceBpt < 1.0e-4 || targetBpt < 1.0e-4) {
-            endpointBpt = Math.max(sourceBpt, targetBpt);
         } else {
+            // If either endpoint is stopped, the probe cannot complete normally. Do not hide that
+            // behind the speed of the other endpoint.
+            if (sourceBpt < 1.0e-4 || targetBpt < 1.0e-4) return FALLBACK_PROBE_TIMEOUT;
             endpointBpt = Math.min(sourceBpt, targetBpt);
         }
         if (endpointBpt < 1.0e-4) return FALLBACK_PROBE_TIMEOUT;
         double localTicks = 8.0 / endpointBpt;
-        long estimate = (long) Math.ceil((travelTicks + localTicks) * 1.5 + 60.0);
-        return Math.max(100, Math.min(2400, estimate));
+        double estimate = Math.ceil((travelTicks + localTicks) * 1.5 + 60.0);
+        if (!Double.isFinite(estimate) || estimate >= Long.MAX_VALUE) return Long.MAX_VALUE;
+        // There used to be a 2400-tick (120 s) ceiling here. That makes any legitimately slower
+        // factory-scale route a guaranteed false timeout, so only keep the five-second floor.
+        return Math.max(100, (long) estimate);
     }
 
-    private static double shortestTravelTicks(Graph graph, ChainConveyorBlockEntity source,
-                                              ChainConveyorBlockEntity target) {
+    /**
+     * Estimate the path Create itself will favour: minimum conveyor hop count first. Among equal-hop
+     * alternatives use the slowest travel-time candidate so the deadline remains conservative when
+     * Create's insertion order chooses either side of a ring.
+     */
+    private static double createRouteTravelTicks(Graph graph, ChainConveyorBlockEntity source,
+                                                 ChainConveyorBlockEntity target) {
         if (source == target) return 0;
-        record Node(BlockPos pos, double ticks) {}
+
         Map<BlockPos, ChainConveyorBlockEntity> byPos = new HashMap<>();
         for (ChainConveyorBlockEntity conveyor : graph.conveyors()) {
             byPos.put(conveyor.getBlockPos(), conveyor);
         }
+        BlockPos sourcePos = source.getBlockPos();
+        BlockPos targetPos = target.getBlockPos();
 
-        Map<BlockPos, Double> best = new HashMap<>();
-        PriorityQueue<Node> queue = new PriorityQueue<>(Comparator.comparingDouble(Node::ticks));
-        best.put(source.getBlockPos(), 0.0);
-        queue.add(new Node(source.getBlockPos(), 0.0));
-
+        // First mirror RoutingTableEntry.distance(): one point per conveyor-to-conveyor hop.
+        Map<BlockPos, Integer> hops = new HashMap<>();
+        ArrayDeque<BlockPos> queue = new ArrayDeque<>();
+        hops.put(targetPos, 0);
+        queue.add(targetPos);
         while (!queue.isEmpty()) {
-            Node node = queue.poll();
-            if (node.ticks() > best.getOrDefault(node.pos(), Double.POSITIVE_INFINITY)) continue;
-            if (node.pos().equals(target.getBlockPos())) return node.ticks();
-            ChainConveyorBlockEntity conveyor = byPos.get(node.pos());
+            BlockPos pos = queue.removeFirst();
+            ChainConveyorBlockEntity conveyor = byPos.get(pos);
             if (conveyor == null) continue;
-            double blocksPerTick = Math.abs(conveyor.getSpeed()) / 360.0;
-            if (blocksPerTick < 1.0e-4) continue;
-            conveyor.prepareStats();
+            int nextHop = hops.get(pos) + 1;
             for (BlockPos relative : conveyor.connections) {
-                BlockPos neighbour = conveyor.getBlockPos().offset(relative);
-                if (!byPos.containsKey(neighbour)) continue;
-                var stats = conveyor.connectionStats.get(relative);
-                double edge = stats == null
-                        ? Math.sqrt(relative.distSqr(BlockPos.ZERO))
-                        : stats.chainLength();
-                double candidate = node.ticks() + edge / blocksPerTick;
-                if (candidate >= best.getOrDefault(neighbour, Double.POSITIVE_INFINITY)) continue;
-                best.put(neighbour, candidate);
-                queue.add(new Node(neighbour, candidate));
+                BlockPos neighbour = pos.offset(relative);
+                if (!byPos.containsKey(neighbour) || hops.containsKey(neighbour)) continue;
+                hops.put(neighbour, nextHop);
+                queue.addLast(neighbour);
             }
         }
-        return Double.POSITIVE_INFINITY;
+
+        Integer sourceHops = hops.get(sourcePos);
+        if (sourceHops == null) return Double.POSITIVE_INFINITY;
+
+        // Then sum real chain travel time along minimum-hop routes. Taking the maximum of equal-hop
+        // choices is intentional: Create breaks those ties by routing-table insertion order, not by
+        // physical chain length, so the shorter-time branch is not guaranteed to be selected.
+        Map<BlockPos, Double> worstTicks = new HashMap<>();
+        worstTicks.put(targetPos, 0.0);
+        for (int hop = 1; hop <= sourceHops; hop++) {
+            for (Map.Entry<BlockPos, Integer> row : hops.entrySet()) {
+                if (row.getValue() != hop) continue;
+                ChainConveyorBlockEntity conveyor = byPos.get(row.getKey());
+                if (conveyor == null) continue;
+                double blocksPerTick = Math.abs(conveyor.getSpeed()) / 360.0;
+                if (blocksPerTick < 1.0e-4) continue;
+                conveyor.prepareStats();
+
+                double worst = Double.NEGATIVE_INFINITY;
+                for (BlockPos relative : conveyor.connections) {
+                    BlockPos neighbour = conveyor.getBlockPos().offset(relative);
+                    if (!Objects.equals(hops.get(neighbour), hop - 1)) continue;
+                    Double tail = worstTicks.get(neighbour);
+                    if (tail == null || !Double.isFinite(tail)) continue;
+                    var stats = conveyor.connectionStats.get(relative);
+                    double edge = stats == null
+                            ? Math.sqrt(relative.distSqr(BlockPos.ZERO))
+                            : stats.chainLength();
+                    worst = Math.max(worst, edge / blocksPerTick + tail);
+                }
+                if (Double.isFinite(worst)) worstTicks.put(row.getKey(), worst);
+            }
+        }
+        return worstTicks.getOrDefault(sourcePos, Double.POSITIVE_INFINITY);
     }
 
     private static ChainConveyorBlockEntity owningConveyor(Graph graph, BlockPos frogPos) {
@@ -745,6 +900,7 @@ public final class ChainDiagnostics {
             return;
         }
 
+        recordLatency(level, probe.address(), Math.max(0, now - probe.sentTick()), probe.expectedTicks(), now);
         Fault fault = FAULTS.get(new FaultKey(probe.controller(), probe.address()));
         if (probe.recovery() && fault != null) {
             if (fault.mitigated() && !frog.getBlockPos().equals(probe.targetPos())) {
@@ -808,7 +964,7 @@ public final class ChainDiagnostics {
         controller.recordDiagnosticResult("no_route", address);
         EventRegistry.get(level.getServer()).raise(EventRegistry.Severity.ERROR,
                 EventRegistry.Codes.CHAIN_NO_ROUTE, "chain", sourceId(level, controller.getBlockPos(), address),
-                address, controller.createFrequency(), null, level.getGameTime());
+                address, controller.createFrequency(), null, System.currentTimeMillis());
     }
 
     private static void clearBadAddress(ServerLevel level, ControllerKey controller, String address, long now) {
@@ -821,24 +977,25 @@ public final class ChainDiagnostics {
         DiagnosticFrogportBlockEntity loaded = controller(controller);
         if (loaded != null) loaded.clearBadAddress(address);
         EventRegistry.get(level.getServer()).clear(EventRegistry.Codes.CHAIN_NO_ROUTE, "chain",
-                sourceId(level, controller.pos(), address), now);
+                sourceId(level, controller.pos(), address), System.currentTimeMillis());
     }
 
     private static void restore(DiagnosticFrogportBlockEntity controller, Fault fault, long now) {
         if (!(controller.getLevel() instanceof ServerLevel level)) return;
         FAULTS.remove(fault.key);
         thawTargets(level, fault);
-        for (BlockPos cachePos : fault.cachePositions) {
-            if (level.getBlockEntity(cachePos) instanceof CacheFrogportBlockEntity cache) {
-                cache.setTakeoverAddress("");
-            }
+        BlockPos cachePos = fault.activeCachePos;
+        if (cachePos != null && level.getBlockEntity(cachePos) instanceof CacheFrogportBlockEntity cache
+                && fault.key.address().equals(cache.takeoverAddress())) {
+            cache.setTakeoverAddress("");
         }
         if (FULL_CACHES.remove(fault.key)) {
             EventRegistry.get(level.getServer()).clear(EventRegistry.Codes.CHAIN_CACHE_FULL, "chain",
-                    sourceId(level, controller.getBlockPos(), fault.key.address()) + "/cache", now);
+                    sourceId(level, controller.getBlockPos(), fault.key.address()) + "/cache",
+                    System.currentTimeMillis());
         }
         EventRegistry.get(level.getServer()).clear(EventRegistry.Codes.CHAIN_PING_TIMEOUT, "chain",
-                sourceId(level, controller.getBlockPos(), fault.key.address()), now);
+                sourceId(level, controller.getBlockPos(), fault.key.address()), System.currentTimeMillis());
         controller.recordDiagnosticResult("recovered", fault.key.address());
     }
 
@@ -883,10 +1040,10 @@ public final class ChainDiagnostics {
                         frog.target.register(frog, level, pos);
                     }
                 }
-                for (BlockPos cachePos : fault.cachePositions) {
-                    if (level.getBlockEntity(cachePos) instanceof CacheFrogportBlockEntity cache) {
-                        cache.setTakeoverAddress("");
-                    }
+                BlockPos cachePos = fault.activeCachePos;
+                if (cachePos != null && level.getBlockEntity(cachePos) instanceof CacheFrogportBlockEntity cache
+                        && fault.key.address().equals(cache.takeoverAddress())) {
+                    cache.setTakeoverAddress("");
                 }
             }
         }
@@ -896,6 +1053,9 @@ public final class ChainDiagnostics {
         BAD_ADDRESSES.clear();
         FULL_CACHES.clear();
         ADDRESS_NETWORKS.clear();
+        GRAPH_CACHE.clear();
+        KNOWN_ADDRESSES.clear();
+        LATENCIES.clear();
         RUNTIME.clear();
         DIAGNOSTICS.clear();
         CACHES.clear();
@@ -912,22 +1072,37 @@ public final class ChainDiagnostics {
         BAD_ADDRESSES.keySet().removeIf(k -> k.dimension().equals(level.dimension()));
         FULL_CACHES.removeIf(k -> k.controller().dimension().equals(level.dimension()));
         ADDRESS_NETWORKS.keySet().removeIf(k -> k.dimension().equals(level.dimension()));
+        GRAPH_CACHE.keySet().removeIf(k -> k.dimension().equals(level.dimension()));
+        KNOWN_ADDRESSES.keySet().removeIf(k -> k.dimension().equals(level.dimension()));
+        LATENCIES.keySet().removeIf(k -> k.dimension().equals(level.dimension()));
     }
 
-    private static boolean hasNormalProbe(ControllerKey key) {
-        return PROBES.values().stream().anyMatch(p -> p.controller().equals(key) && !p.recovery());
+    private static int probeCount(ControllerKey key) {
+        return (int) PROBES.values().stream().filter(p -> p.controller().equals(key)).count();
     }
 
-    private static Probe activeProbe(ControllerKey key) {
+    private static int normalProbeCount(ControllerKey key) {
+        return (int) PROBES.values().stream()
+                .filter(p -> p.controller().equals(key) && !p.recovery()).count();
+    }
+
+    private static boolean hasNormalProbe(ControllerKey key, String address) {
+        return PROBES.values().stream().anyMatch(p -> p.controller().equals(key)
+                && !p.recovery() && p.address().equals(address));
+    }
+
+    private static Probe oldestNormalProbe(ControllerKey key) {
         return PROBES.values().stream()
-                .filter(p -> p.controller().equals(key))
+                .filter(p -> p.controller().equals(key) && !p.recovery())
                 .min(Comparator.comparingLong(Probe::sentTick))
                 .orElse(null);
     }
 
-    private static boolean hasRecoveryProbe(ControllerKey key, String address) {
-        return PROBES.values().stream().anyMatch(p -> p.controller().equals(key)
-                && p.recovery() && p.address().equals(address));
+    private static Probe activeRecoveryProbe(ControllerKey key) {
+        return PROBES.values().stream()
+                .filter(p -> p.controller().equals(key) && p.recovery())
+                .min(Comparator.comparingLong(Probe::sentTick))
+                .orElse(null);
     }
 
     private static boolean isLeader(DiagnosticFrogportBlockEntity controller, Graph graph) {
@@ -957,8 +1132,21 @@ public final class ChainDiagnostics {
         return out;
     }
 
-    /** Traverse the actual connected Create chain graph starting at this Frogport's target. */
+    /** Cached traversal of the connected Create chain graph starting at this Frogport's target. */
     private static Graph graph(DiagnosticFrogportBlockEntity controller) {
+        if (controller == null || controller.getLevel() == null || controller.target == null) return Graph.EMPTY;
+        ControllerKey key = new ControllerKey(controller.getLevel().dimension(), controller.getBlockPos());
+        long now = controller.getLevel().getGameTime();
+        CachedGraph cached = GRAPH_CACHE.get(key);
+        if (cached != null && now >= cached.builtTick() && now - cached.builtTick() <= GRAPH_CACHE_TICKS) {
+            return cached.graph();
+        }
+        Graph built = buildGraph(controller);
+        GRAPH_CACHE.put(key, new CachedGraph(now, built));
+        return built;
+    }
+
+    private static Graph buildGraph(DiagnosticFrogportBlockEntity controller) {
         if (controller.getLevel() == null || controller.target == null) return Graph.EMPTY;
         if (!(controller.target.be(controller.getLevel(), controller.getBlockPos()) instanceof ChainConveyorBlockEntity start)) {
             return Graph.EMPTY;
@@ -969,7 +1157,7 @@ public final class ChainDiagnostics {
         conveyors.put(start.getBlockPos(), start);
         queue.add(start);
 
-        while (!queue.isEmpty() && conveyors.size() < 512) {
+        while (!queue.isEmpty() && conveyors.size() < MAX_GRAPH_CONVEYORS) {
             ChainConveyorBlockEntity current = queue.removeFirst();
             for (BlockPos connection : current.connections) {
                 BlockPos neighbourPos = current.getBlockPos().offset(connection);
@@ -1005,6 +1193,54 @@ public final class ChainDiagnostics {
         }
     }
 
+    public static void invalidateGraph(Level level) {
+        if (level == null) return;
+        GRAPH_CACHE.keySet().removeIf(key -> key.dimension().equals(level.dimension()));
+    }
+
+    private static void recordLatency(ServerLevel level, String address, long observed, long expected, long now) {
+        if (level == null || address == null || address.isBlank()) return;
+        LATENCIES.computeIfAbsent(new AddressKey(level.dimension(), address), ignored -> new LatencyStats())
+                .add(observed, expected, now);
+    }
+
+    public static List<AddressHealth> addressHealth() {
+        Set<AddressKey> keys = new LinkedHashSet<>();
+        for (Map.Entry<ControllerKey, Set<String>> row : KNOWN_ADDRESSES.entrySet()) {
+            for (String address : row.getValue()) keys.add(new AddressKey(row.getKey().dimension(), address));
+        }
+        keys.addAll(LATENCIES.keySet());
+        keys.addAll(BAD_ADDRESSES.keySet());
+        List<AddressHealth> out = new ArrayList<>();
+        for (AddressKey key : keys) {
+            boolean fault = BAD_ADDRESSES.containsKey(key) || FAULTS.keySet().stream().anyMatch(f ->
+                    f.controller().dimension().equals(key.dimension()) && f.address().equals(key.address()));
+            LatencyStats stats = LATENCIES.get(key);
+            Health health = fault ? Health.FAULT
+                    : stats == null || stats.samples == 0 ? Health.UNKNOWN
+                    : stats.degraded() ? Health.DEGRADED : Health.HEALTHY;
+            out.add(new AddressHealth(key.dimension().location().toString(), key.address(), health,
+                    stats == null ? -1 : stats.ewmaTicks,
+                    stats == null ? -1 : stats.ewmaExpectedTicks,
+                    stats == null ? 0 : stats.samples));
+        }
+        out.sort(Comparator.comparing(AddressHealth::dimension).thenComparing(AddressHealth::address));
+        return List.copyOf(out);
+    }
+
+    public static HealthSnapshot healthSnapshot() {
+        List<AddressHealth> addresses = addressHealth();
+        int healthy = (int) addresses.stream().filter(a -> a.health() == Health.HEALTHY).count();
+        int degraded = (int) addresses.stream().filter(a -> a.health() == Health.DEGRADED).count();
+        int faults = (int) addresses.stream().filter(a -> a.health() == Health.FAULT).count();
+        int unknown = (int) addresses.stream().filter(a -> a.health() == Health.UNKNOWN).count();
+        int availableCaches = (int) CACHES.stream().filter(CacheFrogportBlockEntity::availableForLease).count();
+        int takeovers = (int) CACHES.stream().filter(c -> !c.takeoverAddress().isBlank()).count();
+        return new HealthSnapshot(DIAGNOSTICS.size(), CACHES.size(), availableCaches, PROBES.size(),
+                addresses.size(), healthy, degraded, faults, unknown,
+                takeovers, FULL_CACHES.size(), FROZEN.size());
+    }
+
     private static String sourceId(ServerLevel level, BlockPos controller, String address) {
         return EventRegistry.blockSource(level, controller) + "/a" + Integer.toUnsignedString(address.hashCode(), 36);
     }
@@ -1022,7 +1258,7 @@ public final class ChainDiagnostics {
     }
 
     private record Probe(UUID id, ControllerKey controller, String address, BlockPos targetPos,
-                         long sentTick, long deadlineTick, boolean recovery,
+                         long sentTick, long deadlineTick, long expectedTicks, boolean recovery,
                          int planIndex, int planTotal) {
     }
 
@@ -1035,7 +1271,6 @@ public final class ChainDiagnostics {
         final FaultKey key;
         final Set<BlockPos> targets;
         final Set<BlockPos> passed = new LinkedHashSet<>();
-        final Set<BlockPos> cachePositions = new LinkedHashSet<>();
         BlockPos activeCachePos;
         long nextRetryTick;
 
@@ -1043,13 +1278,48 @@ public final class ChainDiagnostics {
             this.key = key;
             this.targets = targets;
             this.activeCachePos = cachePos;
-            if (cachePos != null) this.cachePositions.add(cachePos);
             this.nextRetryTick = nextRetryTick;
         }
 
         boolean mitigated() {
             return activeCachePos != null;
         }
+    }
+
+    private record CachedGraph(long builtTick, Graph graph) {
+    }
+
+    private static final class LatencyStats {
+        double ewmaTicks;
+        double ewmaExpectedTicks;
+        long lastTicks;
+        long lastSuccessTick;
+        int samples;
+
+        void add(long observed, long expected, long now) {
+            double alpha = samples == 0 ? 1.0 : 0.25;
+            ewmaTicks = samples == 0 ? observed : ewmaTicks * (1.0 - alpha) + observed * alpha;
+            ewmaExpectedTicks = samples == 0 ? expected : ewmaExpectedTicks * (1.0 - alpha) + expected * alpha;
+            lastTicks = observed;
+            lastSuccessTick = now;
+            samples++;
+        }
+
+        boolean degraded() {
+            return samples >= 3 && ewmaExpectedTicks > 0
+                    && ewmaTicks > Math.max(ewmaExpectedTicks * 1.75, ewmaExpectedTicks + 40.0);
+        }
+    }
+
+    public enum Health { HEALTHY, DEGRADED, FAULT, UNKNOWN }
+
+    public record AddressHealth(String dimension, String address, Health health,
+                                double latencyTicks, double expectedTicks, int samples) {
+    }
+
+    public record HealthSnapshot(int controllers, int caches, int availableCaches, int inFlightProbes,
+                                 int addresses, int healthy, int degraded, int faults, int unknown,
+                                 int cacheTakeovers, int fullCaches, int frozenPorts) {
     }
 
     private record Graph(List<ChainConveyorBlockEntity> conveyors, List<FrogportBlockEntity> frogports,

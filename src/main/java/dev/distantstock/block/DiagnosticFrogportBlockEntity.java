@@ -69,6 +69,7 @@ public final class DiagnosticFrogportBlockEntity extends FrogportBlockEntity imp
     private int planTotal;
     private int targetCount;
     private int faultCount;
+    private int inFlightCount;
     private boolean cacheActive;
     private long nextActionTick;
     private long probeSentTick;
@@ -93,6 +94,18 @@ public final class DiagnosticFrogportBlockEntity extends FrogportBlockEntity imp
     public void onLoad() {
         super.onLoad();
         ChainDiagnostics.register(this);
+    }
+
+    @Override
+    public void destroy() {
+        // Permanent removal must fail open. A diagnostic Frogport may currently own frozen real
+        // Frogports and a cache takeover; leaving that runtime state behind would keep production
+        // routes hijacked after the diagnostic device itself is gone.
+        if (level != null && !level.isClientSide) {
+            ChainDiagnostics.diagnosticRemoved(this);
+        }
+        ChainDiagnostics.unregister(this);
+        super.destroy();
     }
 
     @Override
@@ -249,6 +262,17 @@ public final class DiagnosticFrogportBlockEntity extends FrogportBlockEntity imp
         syncDiagnosticState();
     }
 
+    public int diagnosticInFlightCount() {
+        return inFlightCount;
+    }
+
+    public void setDiagnosticInFlight(int count) {
+        int next = Math.max(0, count);
+        if (inFlightCount == next) return;
+        inFlightCount = next;
+        syncDiagnosticState();
+    }
+
     public void recordDiagnosticResult(String result, String address) {
         result = result == null ? "none" : result;
         address = address == null ? "" : address;
@@ -303,6 +327,10 @@ public final class DiagnosticFrogportBlockEntity extends FrogportBlockEntity imp
                     .withStyle(ChatFormatting.DARK_GRAY));
         }
 
+        if (inFlightCount > 0) {
+            tooltip.add(Component.translatable("goggle.distantstock.diagnostic.in_flight", inFlightCount)
+                    .withStyle(ChatFormatting.AQUA));
+        }
         tooltip.add(Component.translatable("goggle.distantstock.diagnostic.faults", faultCount)
                 .withStyle(faultCount > 0 ? ChatFormatting.RED : ChatFormatting.DARK_GREEN));
         tooltip.add(Component.translatable("goggle.distantstock.diagnostic.cache",
@@ -338,6 +366,7 @@ public final class DiagnosticFrogportBlockEntity extends FrogportBlockEntity imp
         tag.putInt("DiagnosticPlanTotal", planTotal);
         tag.putInt("DiagnosticTargetCount", targetCount);
         tag.putInt("DiagnosticFaultCount", faultCount);
+        tag.putInt("DiagnosticInFlightCount", inFlightCount);
         tag.putBoolean("DiagnosticCacheActive", cacheActive);
         tag.putLong("DiagnosticNextAction", nextActionTick);
         tag.putLong("DiagnosticProbeSent", probeSentTick);
@@ -369,6 +398,7 @@ public final class DiagnosticFrogportBlockEntity extends FrogportBlockEntity imp
         planTotal = Math.max(0, tag.getInt("DiagnosticPlanTotal"));
         targetCount = Math.max(0, tag.getInt("DiagnosticTargetCount"));
         faultCount = Math.max(0, tag.getInt("DiagnosticFaultCount"));
+        inFlightCount = Math.max(0, tag.getInt("DiagnosticInFlightCount"));
         cacheActive = tag.getBoolean("DiagnosticCacheActive");
         nextActionTick = Math.max(0, tag.getLong("DiagnosticNextAction"));
         probeSentTick = Math.max(0, tag.getLong("DiagnosticProbeSent"));

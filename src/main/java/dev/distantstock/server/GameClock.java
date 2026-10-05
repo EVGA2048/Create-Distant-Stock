@@ -10,6 +10,8 @@ import dev.distantstock.link.LinkSnapshot;
 import dev.distantstock.link.OrderService;
 import dev.distantstock.link.PackagePump;
 import dev.distantstock.link.PackageStripService;
+import dev.distantstock.link.PackageTraceService;
+import dev.distantstock.link.ProtocolHelloService;
 import dev.distantstock.link.ParcelEscrowPump;
 import dev.distantstock.link.TranserverBridge;
 import dev.distantstock.link.TranserverPackageService;
@@ -56,6 +58,8 @@ public final class GameClock {
             TranserverPackageService.register();
             TranserverOrderService.register();
             PackageStripService.register();
+            PackageTraceService.register();
+            ProtocolHelloService.register();
             NetworkAnnouncementService.register();
             TranserverStockService.register();
             DistantNetworkJoinService.register();
@@ -79,6 +83,7 @@ public final class GameClock {
         if (transerverActive) {
             DistantNetworkJoinService.stop();
             ReceiverProbeService.stop();
+            ProtocolHelloService.stop();
             TranserverBridge.stop();
         }
         if (legacyActive) {
@@ -145,6 +150,8 @@ public final class GameClock {
                 TranserverOrderService.tick(e.getServer());
             }
             if (ticks % 20 == 0) {
+                PackageTraceService.acknowledgeCompleted();
+                ProtocolHelloService.publish();
                 NetworkAnnouncementService.publish();
                 DistantNetworkJoinService.tick(e.getServer());
                 DistantNetworkDeleteService.tick();

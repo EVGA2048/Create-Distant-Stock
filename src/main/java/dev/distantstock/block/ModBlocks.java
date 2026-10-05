@@ -43,6 +43,28 @@ public final class ModBlocks {
                     .lightLevel(state -> state.getValue(WallSounderBlock.LIT) ? 15 : 0)));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, ConditionLinkerBlock> CONDITION_LINKER =
             BLOCKS.register("condition_linker", () -> new ConditionLinkerBlock(panel()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, AnnouncerBlock> ANNOUNCER =
+            BLOCKS.register("announcer", () -> new AnnouncerBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_YELLOW)
+                    .strength(2.4f, 5.0f)
+                    .sound(SoundType.METAL)));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, NetworkBroadcasterBlock> NETWORK_BROADCASTER =
+            BLOCKS.register("network_broadcaster", () -> new NetworkBroadcasterBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_PURPLE)
+                    .strength(2.8f, 6.0f)
+                    .sound(SoundType.METAL)));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, NixieClockBlock> NIXIE_CLOCK =
+            BLOCKS.register("nixie_clock", () -> new NixieClockBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(2.0f, 4.0f)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, FlapClockBlock> FLAP_CLOCK =
+            BLOCKS.register("flap_clock", () -> new FlapClockBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(2.0f, 4.0f)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, RemotePackagerBlock> REMOTE_PACKAGER =
             BLOCKS.register("remote_packager", () -> new RemotePackagerBlock(
                     BlockBehaviour.Properties.ofFullCopy(net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(

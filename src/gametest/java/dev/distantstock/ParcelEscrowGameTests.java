@@ -7,6 +7,7 @@ import dev.distantstock.item.ModItems;
 import dev.distantstock.link.ParcelEscrow;
 import dev.distantstock.link.ParcelEscrowPump;
 import dev.distantstock.link.ParcelLedger;
+import dev.distantstock.link.ParcelJournal;
 import dev.distantstock.link.TranserverBridge;
 import dev.distantstock.routing.DockGroup;
 import dev.distantstock.routing.DockGroupDirectory;
@@ -78,6 +79,9 @@ public final class ParcelEscrowGameTests {
                     "投递成功后 escrow 记录没有清掉，包裹会被再投一次");
             h.assertTrue(ParcelLedger.get(server).contains(parcelId),
                     "ledger 没有标记已投递的包裹，重放会被当成一个新包裹");
+            var trace = ParcelJournal.get(server).find(parcelId).orElse(null);
+            h.assertTrue(trace != null && trace.steps().stream().anyMatch(step -> step.stage().startsWith("APPLIED")),
+                    "本地投递成功却没有写入 parcel journal");
             h.succeed();
         });
     }
@@ -320,6 +324,9 @@ public final class ParcelEscrowGameTests {
             h.assertTrue(record.state() == ParcelEscrow.State.HELD,
                     "没有目标港的记录状态不是 HELD，而是 " + record.state());
             h.assertTrue(!ParcelLedger.get(server).contains(parcelId), "没有投递成功却写了 ledger");
+            var trace = ParcelJournal.get(server).find(parcelId).orElse(null);
+            h.assertTrue(trace != null && trace.steps().stream().anyMatch(step -> "WAITING_DOCK".equals(step.stage())),
+                    "没有目标港时 parcel journal 没记录 WAITING_DOCK");
 
             // 再跑一拍还是 HELD：RETRY 不是失败，也不会被当成退件处理掉。
             ParcelEscrowPump.tick(server);

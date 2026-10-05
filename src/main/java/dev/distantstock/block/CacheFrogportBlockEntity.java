@@ -30,6 +30,8 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
     public static final int CACHE_SLOTS = 54;
 
     private String takeoverAddress = "";
+    /** Address whose parcels are still physically held here, even after active takeover ended. */
+    private String cargoOwnerAddress = "";
     private long nextReleaseTick;
     private int releaseDelaySeconds = 5;
     private boolean lastRedstonePowered;
@@ -67,12 +69,34 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
         return takeoverAddress;
     }
 
+    /** Durable custody owner of the parcels still buffered in this cache. */
+    public String cargoOwnerAddress() {
+        return cargoOwnerAddress;
+    }
+
+    /** A cache may be leased only when it owns no old cargo and advertises no current takeover. */
+    public boolean availableForLease() {
+        return takeoverAddress.isBlank() && cargoOwnerAddress.isBlank() && cachedCount() == 0;
+    }
+
     public int cachedCount() {
         int count = 0;
         for (int slot = 0; slot < inventory.getSlots(); slot++) {
             if (!inventory.getStackInSlot(slot).isEmpty()) count++;
         }
         return count;
+    }
+
+    /**
+     * Whether this cache can accept a new fault lease.
+     *
+     * <p>How the previous cargo disappeared is deliberately irrelevant. It may have replayed onto
+     * the chain, been extracted from the bottom by automation, or been removed by an operator. The
+     * only safe reuse boundary is observable state: no active public takeover address and no parcel
+     * left in the buffer. A single residual parcel keeps the cache reserved from unrelated faults.
+     */
+    public boolean availableForNewLease() {
+        return takeoverAddress.isBlank() && cachedCount() == 0;
     }
 
     public int releaseDelaySeconds() {
@@ -108,6 +132,13 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
             target.deregister(this, level, worldPosition);
         }
         takeoverAddress = next;
+        if (!next.isBlank()) {
+            // Starting a lease also establishes cargo custody, even before the first package arrives.
+            // The custody label deliberately survives when takeoverAddress later becomes blank.
+            cargoOwnerAddress = next;
+        } else {
+            reconcileCargoCustody();
+        }
         if (level != null && !level.isClientSide && target != null) {
             target.register(this, level, worldPosition);
         }
@@ -146,6 +177,10 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
             return;
         }
 
+        String incomingAddress = PackageItem.getAddress(stack);
+        if (cargoOwnerAddress.isBlank()) {
+            cargoOwnerAddress = incomingAddress == null ? "" : incomingAddress;
+        }
         ItemStack remainder = ItemHandlerHelper.insertItemStacked(inventory, stack.copy(), false);
         if (!remainder.isEmpty()) {
             // This should only be reachable if another insertion filled the final slot between
@@ -197,6 +232,7 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
     public void tick() {
         super.tick();
         if (level == null || level.isClientSide) return;
+        reconcileCargoCustody();
 
         boolean powered = level.hasNeighborSignal(worldPosition);
         if (releaseDelaySeconds == 0) {
@@ -271,7 +307,7 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
             phase = "takeover";
             phaseColor = ChatFormatting.YELLOW;
         } else if (cachedCount() > 0) {
-            phase = "replay";
+            phase = "draining";
             phaseColor = ChatFormatting.AQUA;
         } else {
             phase = "idle";
@@ -282,6 +318,9 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
 
         if (!takeoverAddress.isBlank()) {
             GoggleText.line(tooltip, "goggle.distantstock.cache.address", takeoverAddress);
+        }
+        if (!cargoOwnerAddress.isBlank()) {
+            GoggleText.line(tooltip, "goggle.distantstock.cache.custody", cargoOwnerAddress);
         }
         GoggleText.value(tooltip, "goggle.distantstock.cache.inventory",
                 cachedCount() >= inventory.getSlots() ? ChatFormatting.RED : ChatFormatting.GRAY,
@@ -311,6 +350,7 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
     protected void write(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.write(tag, registries, clientPacket);
         tag.putString("TakeoverAddress", takeoverAddress);
+        tag.putString("CargoOwnerAddress", cargoOwnerAddress);
         tag.putLong("NextRelease", nextReleaseTick);
         tag.putInt("ReleaseDelaySeconds", releaseDelaySeconds);
         tag.putBoolean("LastRedstonePowered", lastRedstonePowered);
@@ -326,6 +366,13 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
         super.read(tag, registries, clientPacket);
         migrateLegacyInventorySize();
         takeoverAddress = tag.getString("TakeoverAddress");
+        cargoOwnerAddress = tag.getString("CargoOwnerAddress");
+        if (cargoOwnerAddress.isBlank() && !takeoverAddress.isBlank()) {
+            cargoOwnerAddress = takeoverAddress;
+        }
+        if (cargoOwnerAddress.isBlank() && cachedCount() > 0) {
+            cargoOwnerAddress = inferCargoOwnerAddress();
+        }
         nextReleaseTick = tag.getLong("NextRelease");
         releaseDelaySeconds = tag.contains("ReleaseDelaySeconds")
                 ? normalizeReleaseDelaySeconds(tag.getInt("ReleaseDelaySeconds"))
@@ -375,6 +422,29 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
         }
         inventory = expanded;
         itemHandler = new PackagePortAutomationInventoryWrapper(inventory, this);
+    }
+
+    /** Release custody only after the physical buffer is empty and the active lease is gone. */
+    private void reconcileCargoCustody() {
+        if (takeoverAddress.isBlank() && cachedCount() == 0 && !cargoOwnerAddress.isBlank()) {
+            cargoOwnerAddress = "";
+            setChanged();
+            sendData();
+        }
+    }
+
+    /** Migration for pre-custody saves: recover a single unambiguous address from buffered parcels. */
+    private String inferCargoOwnerAddress() {
+        String owner = "";
+        for (int slot = 0; slot < inventory.getSlots(); slot++) {
+            ItemStack stack = inventory.getStackInSlot(slot);
+            if (stack.isEmpty() || !PackageItem.isPackage(stack)) continue;
+            String address = PackageItem.getAddress(stack);
+            if (address == null || address.isBlank()) continue;
+            if (owner.isBlank()) owner = address;
+            else if (!owner.equals(address)) return "<mixed-legacy>";
+        }
+        return owner;
     }
 
     private static int normalizeReleaseDelaySeconds(int seconds) {

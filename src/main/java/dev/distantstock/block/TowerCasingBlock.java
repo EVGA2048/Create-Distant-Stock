@@ -433,7 +433,11 @@ public final class TowerCasingBlock extends Block
             int graphDistance = lit
                     ? distance.getOrDefault(pos, 0)
                     : distanceFromOrigin.getOrDefault(pos, 0);
-            long due = now + 1L + graphDistance;
+            // Layer zero belongs to the source-facing casing itself. Queue it for the current
+            // server-post pass instead of adding an artificial extra tick; this makes the visible
+            // wave deterministic even when scheduled block ticks are processed late in a busy tick.
+            // Each following graph layer still advances exactly one tick later.
+            long due = now + graphDistance;
             WINDOW_WAVES.computeIfAbsent(level.dimension(), ignored -> new TreeMap<>())
                     .computeIfAbsent(due, ignored -> new ArrayList<>())
                     .add(new WindowChange(pos.immutable(), lit, generation));

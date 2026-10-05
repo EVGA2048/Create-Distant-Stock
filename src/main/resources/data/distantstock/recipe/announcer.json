@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [" B ", "BNB", " E "],
+  "key": {
+    "B": {"item": "create:brass_sheet"},
+    "N": {"item": "minecraft:note_block"},
+    "E": {"item": "create:electron_tube"}
+  },
+  "result": {"id": "distantstock:announcer", "count": 1}
+}

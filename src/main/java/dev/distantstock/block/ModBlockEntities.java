@@ -53,6 +53,18 @@ public final class ModBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ConditionLinkerBlockEntity>> CONDITION_LINKER =
             BES.register("condition_linker", () -> BlockEntityType.Builder.of(ConditionLinkerBlockEntity::new,
                     ModBlocks.CONDITION_LINKER.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<AnnouncerBlockEntity>> ANNOUNCER =
+            BES.register("announcer", () -> BlockEntityType.Builder.of(AnnouncerBlockEntity::new,
+                    ModBlocks.ANNOUNCER.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<NetworkBroadcasterBlockEntity>> NETWORK_BROADCASTER =
+            BES.register("network_broadcaster", () -> BlockEntityType.Builder.of(NetworkBroadcasterBlockEntity::new,
+                    ModBlocks.NETWORK_BROADCASTER.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<NixieClockBlockEntity>> NIXIE_CLOCK =
+            BES.register("nixie_clock", () -> BlockEntityType.Builder.of(NixieClockBlockEntity::new,
+                    ModBlocks.NIXIE_CLOCK.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<FlapClockBlockEntity>> FLAP_CLOCK =
+            BES.register("flap_clock", () -> BlockEntityType.Builder.of(FlapClockBlockEntity::new,
+                    ModBlocks.FLAP_CLOCK.get()).build(null));
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RemotePackagerBlockEntity>> REMOTE_PACKAGER =
             BES.register("remote_packager", () -> BlockEntityType.Builder.of(RemotePackagerBlockEntity::new,
                     ModBlocks.REMOTE_PACKAGER.get()).build(null));

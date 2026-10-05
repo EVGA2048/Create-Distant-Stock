@@ -106,7 +106,9 @@ public final class ClientSetup {
             SignalPanelRenderer.registerModels();
             RemoteGaugeRenderer.registerModels();
             ResonatorRenderer.registerModels();
+            TowerCoreRenderer.registerModels();
             WallSounderRenderer.registerModels();
+            ClockIndicatorRenderer.registerModels();
             SpecialFrogportModels.init();
             // Create normally lets Flywheel's GlassPipeVisual replace the vanilla block-entity
             // renderer entirely. In this pack that visual stops submitting fluid instances, so the
@@ -167,6 +169,8 @@ public final class ClientSetup {
             e.registerBlockEntityRenderer(ModBlockEntities.MONITOR.get(),
                     MonitorFlapRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.LOGGER.get(), LoggerRenderer::new);
+            e.registerBlockEntityRenderer(ModBlockEntities.NIXIE_CLOCK.get(), NixieClockRenderer::new);
+            e.registerBlockEntityRenderer(ModBlockEntities.FLAP_CLOCK.get(), FlapClockRenderer::new);
             // 底座里的以太。四个观察窗是模型的一部分，液面是这里画的 —— 机壳通上红石变成窗户
             // 之后才看得见，所以它平时不占任何画面。
             e.registerBlockEntityRenderer(ModBlockEntities.TOWER_CORE.get(), TowerCoreRenderer::new);

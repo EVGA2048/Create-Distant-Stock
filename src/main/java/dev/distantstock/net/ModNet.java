@@ -10,10 +10,10 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 public final class ModNet {
     @SubscribeEvent
     public static void register(RegisterPayloadHandlersEvent e) {
-        // CloakStateS2C changed wire format after v0.3.12 (phase varint -> boolean state).
-        // Keep incompatible test clients/servers from silently connecting and decoding each
-        // other's payloads as if they matched.
-        PayloadRegistrar r = e.registrar("11");
+        // v13: local announcer editor packets were added alongside the 9.4.3 control-plane work.
+        // Keep mixed client/server builds from silently accepting payload sets they do not share.
+        // v12 introduced LinkSnapshotS2C protocol-compatibility counters.
+        PayloadRegistrar r = e.registrar("19");
         r.playToServer(SetAddressC2S.TYPE, SetAddressC2S.STREAM_CODEC, SetAddressC2S::handle);
         r.playToServer(PlaceOrderC2S.TYPE, PlaceOrderC2S.STREAM_CODEC, PlaceOrderC2S::handle);
         r.playToServer(JoinNetworkC2S.TYPE, JoinNetworkC2S.STREAM_CODEC, JoinNetworkC2S::handle);
@@ -41,6 +41,7 @@ public final class ModNet {
         r.playToServer(LoggerActionC2S.TYPE, LoggerActionC2S.STREAM_CODEC, LoggerActionC2S::handle);
         r.playToServer(SetCacheFrogportReleaseC2S.TYPE, SetCacheFrogportReleaseC2S.STREAM_CODEC,
                 SetCacheFrogportReleaseC2S::handle);
+        r.playToServer(SaveAnnouncerC2S.TYPE, SaveAnnouncerC2S.STREAM_CODEC, SaveAnnouncerC2S::handle);
         r.playToClient(RemoteGroupsS2C.TYPE, RemoteGroupsS2C.STREAM_CODEC, RemoteGroupsS2C::handle);
         r.playToClient(OpenMonitorS2C.TYPE, OpenMonitorS2C.STREAM_CODEC, OpenMonitorS2C::handle);
         r.playToClient(LinkSnapshotS2C.TYPE, LinkSnapshotS2C.STREAM_CODEC, LinkSnapshotS2C::handle);
@@ -54,6 +55,7 @@ public final class ModNet {
         r.playToClient(CreateNetworkLockS2C.TYPE, CreateNetworkLockS2C.STREAM_CODEC,
                 CreateNetworkLockS2C::handle);
         r.playToClient(OpenLoggerS2C.TYPE, OpenLoggerS2C.STREAM_CODEC, OpenLoggerS2C::handle);
+        r.playToClient(OpenAnnouncerS2C.TYPE, OpenAnnouncerS2C.STREAM_CODEC, OpenAnnouncerS2C::handle);
         r.playToClient(CloakStateS2C.TYPE, CloakStateS2C.STREAM_CODEC, CloakStateS2C::handle);
     }
 

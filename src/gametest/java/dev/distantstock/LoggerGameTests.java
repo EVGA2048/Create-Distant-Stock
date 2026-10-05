@@ -4,6 +4,9 @@ import dev.distantstock.block.LoggerBlock;
 import dev.distantstock.block.LoggerBlockEntity;
 import dev.distantstock.block.ModBlocks;
 import dev.distantstock.event.EventRegistry;
+import dev.distantstock.link.TranserverBridge;
+import dev.distantstock.routing.RemoteNetworkId;
+import dev.distantstock.routing.WorldIdentity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -38,6 +41,65 @@ public final class LoggerGameTests {
                 "ERROR escalation did not enter the audible alarm queue");
         registry.clear("NETWORK", "test", source, 4);
         h.succeed();
+    }
+
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void severityThresholdAlsoControlsAlarmQueues(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.LOGGER.get().defaultBlockState(), 3);
+        LoggerBlockEntity logger = (LoggerBlockEntity) level.getBlockEntity(pos);
+        UUID network = UUID.randomUUID();
+        logger.setCreateFrequency(network);
+        logger.setMinimumSeverity(EventRegistry.Severity.ERROR);
+
+        EventRegistry registry = EventRegistry.get(level.getServer());
+        String source = "threshold-" + UUID.randomUUID();
+        EventRegistry.Record warn = registry.raise(EventRegistry.Severity.WARN,
+                "THRESHOLD_WARN", "test", source, "warning below threshold", network, null,
+                System.currentTimeMillis());
+
+        h.assertFalse(logger.rows().stream().anyMatch(row -> row.id().equals(warn.id())),
+                "ERROR-only logger still displayed a WARN");
+        h.assertTrue(logger.nextUnacknowledgedAlarm() == null,
+                "hidden WARN still entered the buzzer queue");
+        h.assertTrue(logger.nextPrintableAlarm() == null,
+                "hidden WARN still entered the print queue");
+        h.assertTrue(logger.status() == LoggerBlock.Status.NORMAL,
+                "hidden WARN still changed the front status lamp");
+
+        registry.clear("THRESHOLD_WARN", "test", source, System.currentTimeMillis());
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 180)
+    public static void unloadedCreateNetworkIsUnknownNotErrorAlarm(GameTestHelper h) {
+        var level = h.getLevel();
+        UUID localNode = TranserverBridge.localNodeUuid();
+        if (localNode == null) {
+            h.succeed();
+            return;
+        }
+
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.LOGGER.get().defaultBlockState(), 3);
+        LoggerBlockEntity logger = (LoggerBlockEntity) level.getBlockEntity(pos);
+        UUID missingFrequency = UUID.randomUUID();
+        RemoteNetworkId network = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, localNode,
+                WorldIdentity.get(level), level.dimension().location().toString(), missingFrequency);
+        logger.setBinding(network, null);
+
+        h.runAfterDelay(130, () -> {
+            h.assertTrue(logger.status() == LoggerBlock.Status.OFFLINE,
+                    "unloaded network did not settle to the neutral OFFLINE/unknown display");
+            h.assertTrue(EventRegistry.get(level.getServer()).active(
+                            EventRegistry.Codes.NETWORK_OFFLINE, "network", "network:" + missingFrequency).isEmpty(),
+                    "unloaded/unknown Create network still raised a false ERROR alarm");
+            h.assertTrue(logger.nextUnacknowledgedAlarm() == null,
+                    "unknown network entered the audible alarm queue");
+            h.succeed();
+        });
     }
 
     @GameTest(template = "empty", timeoutTicks = 40)

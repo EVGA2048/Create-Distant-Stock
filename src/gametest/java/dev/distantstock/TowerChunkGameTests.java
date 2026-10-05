@@ -95,13 +95,14 @@ public final class TowerChunkGameTests {
             h.assertTrue(dev.distantstock.routing.TowerChunkLoader.forces(level, core, chunk),
                     "the loader does not believe it holds the tower's chunk");
 
-            // Taking the mast down is not the same as taking the block away: the tower is gone, so
-            // its chunk is released.
-            h.setBlock(X, 0, Z, Blocks.AIR.defaultBlockState());
+            // Breaking one skirt casing is enough to make the 3x3 base incomplete, so this is no
+            // longer a working tower and must release its chunk-loader ticket even though the core
+            // and mast are still standing.
+            h.setBlock(X + 1, 0, Z, Blocks.AIR.defaultBlockState());
             h.runAfterDelay(80, () -> {
                 int left = ownersForcing(level, chunk, core);
                 h.assertTrue(!dev.distantstock.routing.TowerChunkLoader.forces(level, core, chunk),
-                        "the loader still believes it holds a chunk of a tower that is gone");
+                        "the loader still believes an incomplete 3x3 tower base holds its chunk");
                 // Fewer owners than while the tower stood, and the ledger denying it holds anything:
                 // the count cannot say "back to the old number" because the arena this case runs in
                 // is forced by the framework through the same set, and that ticket arrives whenever
@@ -172,6 +173,13 @@ public final class TowerChunkGameTests {
     /** Core at the bottom, {@code couplers} segments, and a resonator on top: the shortest tower. */
     private static void build(GameTestHelper h, int couplers) {
         h.setBlock(X, 0, Z, ModBlocks.TOWER_CORE.get().defaultBlockState());
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx != 0 || dz != 0) {
+                    h.setBlock(X + dx, 0, Z + dz, ModBlocks.TOWER_CASING.get().defaultBlockState());
+                }
+            }
+        }
         for (int i = 1; i <= couplers; i++) {
             h.setBlock(X, i, Z, ModBlocks.TOWER_COUPLER.get().defaultBlockState());
         }

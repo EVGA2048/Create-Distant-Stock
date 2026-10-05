@@ -13,8 +13,9 @@ import java.util.Optional;
  * stack that never meets a core is a pile of parts, not a tower. Written down once so the renderer,
  * the base's own block entity and the goggle readout cannot drift apart on what "built" means.
  *
- * <p>Not in the scan yet: the base's 3x3 skirt and the shaft underneath it. Neither changes whether
- * a tower exists, only how well it works, and both are the assembly stage's business.
+ * <p>The authored base is part of the structure: the centre core must be surrounded by all eight
+ * Distant Casing blocks in the 3x3 ring. The shaft underneath is operational rather than structural:
+ * a complete tower can stand without power, but it cannot run until rotation reaches the core.
  */
 public final class TowerStructure {
     /** Couplers needed before a mast is a tower at all. The tier table starts here. */
@@ -22,6 +23,25 @@ public final class TowerStructure {
 
     /** A complete mast: how many couplers, and the base it stands on. */
     public record Mast(int couplers, TowerTier tier) {
+    }
+
+    /**
+     * Whether the core is surrounded by the complete 3x3 Distant Casing ring shown in Ponder.
+     * The centre is the core itself; all eight neighbours at the same Y must be tower casing.
+     */
+    public static boolean baseComplete(Level level, BlockPos core) {
+        if (level == null || core == null || !level.getBlockState(core).is(ModBlocks.TOWER_CORE.get())) {
+            return false;
+        }
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) continue;
+                if (!level.getBlockState(core.offset(dx, 0, dz)).is(ModBlocks.TOWER_CASING.get())) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /**
@@ -102,7 +122,9 @@ public final class TowerStructure {
 
     /** Whether the mast under this cap is complete and tall enough to be a tower. */
     public static boolean assembled(Level level, BlockPos cap) {
-        return coreUnder(level, cap).flatMap(core -> mast(level, core)).isPresent();
+        return coreUnder(level, cap)
+                .filter(core -> baseComplete(level, core))
+                .flatMap(core -> mast(level, core)).isPresent();
     }
 
     /**

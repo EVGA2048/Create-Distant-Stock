@@ -11,18 +11,19 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * FluidLogistics cancels Create's package renderer and draws its own brown shell for every
- * FluidPackageItem. Run first for our optional subclass: draw the pale-blue shell, then delegate
- * only the dynamic fluid contents back to FluidLogistics.
+ * FluidLogistics 1.3.x installs FluidAwarePackageRenderer for package entities. Intercept only our
+ * optional subclass there: draw the Distant Stock pale-blue shell, then delegate the dynamic fluid
+ * contents back to FluidLogistics' current renderer.
  */
-// Mixin HEAD callbacks are emitted in reverse application order here: a lower priority places this
-// callback before FluidLogistics' default-priority callback in the transformed render method.
-@Mixin(value = PackageRenderer.class, priority = 900)
+@Pseudo
+@Mixin(targets = "com.yision.fluidlogistics.content.logistics.fluidPackage.client.FluidAwarePackageRenderer",
+        priority = 900, remap = false)
 public abstract class RemoteFluidPackageRendererMixin {
     private static final ResourceLocation REMOTE_FLUID =
             ResourceLocation.fromNamespaceAndPath("distantstock", "remote_fluid_package");
