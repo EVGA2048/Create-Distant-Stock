@@ -13,6 +13,12 @@ public final class ModBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DockBlockEntity>> DOCK =
             BES.register("dock", () -> BlockEntityType.Builder.of(ModBlockEntities::dockEntity,
                     ModBlocks.DOCK.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DiagnosticFrogportBlockEntity>> DIAGNOSTIC_FROGPORT =
+            BES.register("diagnostic_frogport", () -> BlockEntityType.Builder.of(
+                    DiagnosticFrogportBlockEntity::new, ModBlocks.DIAGNOSTIC_FROGPORT.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CacheFrogportBlockEntity>> CACHE_FROGPORT =
+            BES.register("cache_frogport", () -> BlockEntityType.Builder.of(
+                    CacheFrogportBlockEntity::new, ModBlocks.CACHE_FROGPORT.get()).build(null));
 
     private static DockBlockEntity dockEntity(net.minecraft.core.BlockPos pos,
                                               net.minecraft.world.level.block.state.BlockState state) {
@@ -35,6 +41,33 @@ public final class ModBlockEntities {
                     ModBlocks.REMOTE_GAUGE.get()).build(null));
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MonitorBlockEntity>> MONITOR =
             BES.register("monitor", () -> BlockEntityType.Builder.of(MonitorBlockEntity::new, ModBlocks.MONITOR.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<LoggerBlockEntity>> LOGGER =
+            BES.register("logger", () -> BlockEntityType.Builder.of(LoggerBlockEntity::new,
+                    ModBlocks.LOGGER.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<StackLightBlockEntity>> STACK_LIGHT =
+            BES.register("stack_light", () -> BlockEntityType.Builder.of(StackLightBlockEntity::new,
+                    ModBlocks.STACK_LIGHT.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<WallSounderBlockEntity>> WALL_SOUNDER =
+            BES.register("wall_sounder", () -> BlockEntityType.Builder.of(WallSounderBlockEntity::new,
+                    ModBlocks.RED_WALL_SOUNDER.get(), ModBlocks.ORANGE_WALL_SOUNDER.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ConditionLinkerBlockEntity>> CONDITION_LINKER =
+            BES.register("condition_linker", () -> BlockEntityType.Builder.of(ConditionLinkerBlockEntity::new,
+                    ModBlocks.CONDITION_LINKER.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<AnnouncerBlockEntity>> ANNOUNCER =
+            BES.register("announcer", () -> BlockEntityType.Builder.of(AnnouncerBlockEntity::new,
+                    ModBlocks.ANNOUNCER.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<NetworkBroadcasterBlockEntity>> NETWORK_BROADCASTER =
+            BES.register("network_broadcaster", () -> BlockEntityType.Builder.of(NetworkBroadcasterBlockEntity::new,
+                    ModBlocks.NETWORK_BROADCASTER.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<NetworkSpeakerBlockEntity>> NETWORK_SPEAKER =
+            BES.register("network_speaker", () -> BlockEntityType.Builder.of(NetworkSpeakerBlockEntity::new,
+                    ModBlocks.NETWORK_SPEAKER.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<NixieClockBlockEntity>> NIXIE_CLOCK =
+            BES.register("nixie_clock", () -> BlockEntityType.Builder.of(NixieClockBlockEntity::new,
+                    ModBlocks.NIXIE_CLOCK.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<FlapClockBlockEntity>> FLAP_CLOCK =
+            BES.register("flap_clock", () -> BlockEntityType.Builder.of(FlapClockBlockEntity::new,
+                    ModBlocks.FLAP_CLOCK.get()).build(null));
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RemotePackagerBlockEntity>> REMOTE_PACKAGER =
             BES.register("remote_packager", () -> BlockEntityType.Builder.of(RemotePackagerBlockEntity::new,
                     ModBlocks.REMOTE_PACKAGER.get()).build(null));

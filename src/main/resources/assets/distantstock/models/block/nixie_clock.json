@@ -1,0 +1,741 @@
+{
+  "loader": "neoforge:composite",
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "create:block/nixie_tube"
+  },
+  "children": {
+    "frame": {
+      "render_type": "minecraft:solid",
+      "textures": {
+        "frame": "create:block/industrial_iron_block",
+        "tube": "create:block/nixie_tube"
+      },
+      "elements": [
+        {
+          "name": "half_height_full_width_backplate",
+          "from": [
+            0,
+            4,
+            13
+          ],
+          "to": [
+            16,
+            12,
+            16
+          ],
+          "faces": {
+            "north": {
+              "uv": [
+                0,
+                4,
+                16,
+                12
+              ],
+              "texture": "#frame"
+            },
+            "south": {
+              "uv": [
+                0,
+                4,
+                16,
+                12
+              ],
+              "texture": "#frame",
+              "cullface": "south"
+            },
+            "west": {
+              "uv": [
+                13,
+                4,
+                16,
+                12
+              ],
+              "texture": "#frame"
+            },
+            "east": {
+              "uv": [
+                0,
+                4,
+                3,
+                12
+              ],
+              "texture": "#frame"
+            },
+            "up": {
+              "uv": [
+                0,
+                13,
+                16,
+                16
+              ],
+              "texture": "#frame"
+            },
+            "down": {
+              "uv": [
+                0,
+                0,
+                16,
+                3
+              ],
+              "texture": "#frame"
+            }
+          }
+        },
+        {
+          "name": "connector_h1",
+          "from": [
+            13.25,
+            6.0,
+            10.8
+          ],
+          "to": [
+            15.45,
+            7.1,
+            13.0
+          ],
+          "faces": {
+            "north": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "south": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "west": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "east": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "up": {
+              "uv": [
+                6,
+                6,
+                12,
+                12
+              ],
+              "texture": "#tube"
+            },
+            "down": {
+              "uv": [
+                6,
+                6,
+                12,
+                12
+              ],
+              "texture": "#tube"
+            }
+          }
+        },
+        {
+          "name": "connector_h2",
+          "from": [
+            10.75,
+            6.0,
+            10.8
+          ],
+          "to": [
+            12.95,
+            7.1,
+            13.0
+          ],
+          "faces": {
+            "north": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "south": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "west": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "east": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "up": {
+              "uv": [
+                6,
+                6,
+                12,
+                12
+              ],
+              "texture": "#tube"
+            },
+            "down": {
+              "uv": [
+                6,
+                6,
+                12,
+                12
+              ],
+              "texture": "#tube"
+            }
+          }
+        },
+        {
+          "name": "connector_colon",
+          "from": [
+            8.25,
+            6.0,
+            10.8
+          ],
+          "to": [
+            10.45,
+            7.1,
+            13.0
+          ],
+          "faces": {
+            "north": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "south": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "west": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "east": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "up": {
+              "uv": [
+                6,
+                6,
+                12,
+                12
+              ],
+              "texture": "#tube"
+            },
+            "down": {
+              "uv": [
+                6,
+                6,
+                12,
+                12
+              ],
+              "texture": "#tube"
+            }
+          }
+        },
+        {
+          "name": "connector_m1",
+          "from": [
+            5.75,
+            6.0,
+            10.8
+          ],
+          "to": [
+            7.95,
+            7.1,
+            13.0
+          ],
+          "faces": {
+            "north": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "south": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "west": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "east": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "up": {
+              "uv": [
+                6,
+                6,
+                12,
+                12
+              ],
+              "texture": "#tube"
+            },
+            "down": {
+              "uv": [
+                6,
+                6,
+                12,
+                12
+              ],
+              "texture": "#tube"
+            }
+          }
+        },
+        {
+          "name": "connector_m2",
+          "from": [
+            3.25,
+            6.0,
+            10.8
+          ],
+          "to": [
+            5.45,
+            7.1,
+            13.0
+          ],
+          "faces": {
+            "north": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "south": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "west": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "east": {
+              "uv": [
+                0,
+                10,
+                6,
+                13
+              ],
+              "texture": "#tube"
+            },
+            "up": {
+              "uv": [
+                6,
+                6,
+                12,
+                12
+              ],
+              "texture": "#tube"
+            },
+            "down": {
+              "uv": [
+                6,
+                6,
+                12,
+                12
+              ],
+              "texture": "#tube"
+            }
+          }
+        }
+      ]
+    },
+    "tubes": {
+      "render_type": "minecraft:translucent",
+      "textures": {
+        "tube": "create:block/nixie_tube"
+      },
+      "elements": [
+        {
+          "name": "tube_h1",
+          "from": [
+            13.25,
+            7.1,
+            10.8
+          ],
+          "to": [
+            15.45,
+            10.4,
+            13.0
+          ],
+          "faces": {
+            "north": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "south": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "west": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "east": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "up": {
+              "uv": [
+                6,
+                0,
+                12,
+                6
+              ],
+              "texture": "#tube"
+            }
+          }
+        },
+        {
+          "name": "tube_h2",
+          "from": [
+            10.75,
+            7.1,
+            10.8
+          ],
+          "to": [
+            12.95,
+            10.4,
+            13.0
+          ],
+          "faces": {
+            "north": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "south": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "west": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "east": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "up": {
+              "uv": [
+                6,
+                0,
+                12,
+                6
+              ],
+              "texture": "#tube"
+            }
+          }
+        },
+        {
+          "name": "tube_colon",
+          "from": [
+            8.25,
+            7.1,
+            10.8
+          ],
+          "to": [
+            10.45,
+            10.4,
+            13.0
+          ],
+          "faces": {
+            "north": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "south": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "west": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "east": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "up": {
+              "uv": [
+                6,
+                0,
+                12,
+                6
+              ],
+              "texture": "#tube"
+            }
+          }
+        },
+        {
+          "name": "tube_m1",
+          "from": [
+            5.75,
+            7.1,
+            10.8
+          ],
+          "to": [
+            7.95,
+            10.4,
+            13.0
+          ],
+          "faces": {
+            "north": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "south": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "west": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "east": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "up": {
+              "uv": [
+                6,
+                0,
+                12,
+                6
+              ],
+              "texture": "#tube"
+            }
+          }
+        },
+        {
+          "name": "tube_m2",
+          "from": [
+            3.25,
+            7.1,
+            10.8
+          ],
+          "to": [
+            5.45,
+            10.4,
+            13.0
+          ],
+          "faces": {
+            "north": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "south": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "west": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "east": {
+              "uv": [
+                0,
+                1,
+                6,
+                10
+              ],
+              "texture": "#tube"
+            },
+            "up": {
+              "uv": [
+                6,
+                0,
+                12,
+                6
+              ],
+              "texture": "#tube"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

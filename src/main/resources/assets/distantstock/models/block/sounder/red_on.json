@@ -1,0 +1,471 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:translucent",
+  "textures": {
+    "particle": "distantstock:block/sounder/andesite",
+    "mount_front": "distantstock:block/sounder/mount_front",
+    "andesite": "distantstock:block/sounder/andesite",
+    "housing_side": "distantstock:block/sounder/housing_side",
+    "housing_top": "distantstock:block/sounder/housing_top",
+    "speaker_well": "distantstock:block/sounder/speaker_well",
+    "rail_front": "distantstock:block/sounder/rail_front",
+    "rail_top": "distantstock:block/sounder/rail_top",
+    "filament_on": "distantstock:block/sounder/filament_on",
+    "red_on_front": "distantstock:block/sounder/red_on_front",
+    "red_on_side": "distantstock:block/sounder/red_on_side",
+    "red_on_top": "distantstock:block/sounder/red_on_top",
+    "red_on_bottom": "distantstock:block/sounder/red_on_bottom"
+  },
+  "credit": "Distant Stock concept; Create andesite and stock-link lamp texels, recolored glass",
+  "elements": [
+    {
+      "name": "wall_mount",
+      "from": [
+        4,
+        2,
+        14
+      ],
+      "to": [
+        12,
+        14,
+        16
+      ],
+      "faces": {
+        "north": {
+          "texture": "#mount_front",
+          "uv": [
+            0,
+            0,
+            8.0,
+            12.0
+          ]
+        },
+        "south": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            8.0,
+            12.0
+          ]
+        },
+        "west": {
+          "texture": "#housing_side",
+          "uv": [
+            2,
+            0,
+            4,
+            12
+          ]
+        },
+        "east": {
+          "texture": "#housing_side",
+          "uv": [
+            4,
+            0,
+            2,
+            12
+          ]
+        },
+        "up": {
+          "texture": "#housing_top",
+          "uv": [
+            0,
+            2,
+            8,
+            4
+          ]
+        },
+        "down": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            8.0,
+            2.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "speaker_housing",
+      "from": [
+        4,
+        9,
+        12
+      ],
+      "to": [
+        12,
+        14,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#speaker_well",
+          "uv": [
+            0,
+            0,
+            8.0,
+            5.0
+          ]
+        },
+        "south": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            8.0,
+            5.0
+          ]
+        },
+        "west": {
+          "texture": "#housing_side",
+          "uv": [
+            0,
+            0,
+            2,
+            5
+          ]
+        },
+        "east": {
+          "texture": "#housing_side",
+          "uv": [
+            2,
+            0,
+            0,
+            5
+          ]
+        },
+        "up": {
+          "texture": "#housing_top",
+          "uv": [
+            0,
+            0,
+            8,
+            2
+          ]
+        },
+        "down": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            8.0,
+            2.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "grille_rail_9",
+      "from": [
+        5,
+        9,
+        11
+      ],
+      "to": [
+        11,
+        10,
+        12
+      ],
+      "faces": {
+        "north": {
+          "texture": "#rail_front",
+          "uv": [
+            0,
+            0,
+            6.0,
+            1.0
+          ]
+        },
+        "south": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            6.0,
+            1.0
+          ]
+        },
+        "west": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            1.0,
+            1.0
+          ]
+        },
+        "east": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            1.0,
+            1.0
+          ]
+        },
+        "up": {
+          "texture": "#rail_top",
+          "uv": [
+            0,
+            0,
+            6.0,
+            1.0
+          ]
+        },
+        "down": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            6.0,
+            1.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "grille_rail_11",
+      "from": [
+        5,
+        11,
+        11
+      ],
+      "to": [
+        11,
+        12,
+        12
+      ],
+      "faces": {
+        "north": {
+          "texture": "#rail_front",
+          "uv": [
+            0,
+            0,
+            6.0,
+            1.0
+          ]
+        },
+        "south": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            6.0,
+            1.0
+          ]
+        },
+        "west": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            1.0,
+            1.0
+          ]
+        },
+        "east": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            1.0,
+            1.0
+          ]
+        },
+        "up": {
+          "texture": "#rail_top",
+          "uv": [
+            0,
+            0,
+            6.0,
+            1.0
+          ]
+        },
+        "down": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            6.0,
+            1.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "grille_rail_13",
+      "from": [
+        5,
+        13,
+        11
+      ],
+      "to": [
+        11,
+        14,
+        12
+      ],
+      "faces": {
+        "north": {
+          "texture": "#rail_front",
+          "uv": [
+            0,
+            0,
+            6.0,
+            1.0
+          ]
+        },
+        "south": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            6.0,
+            1.0
+          ]
+        },
+        "west": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            1.0,
+            1.0
+          ]
+        },
+        "east": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            1.0,
+            1.0
+          ]
+        },
+        "up": {
+          "texture": "#rail_top",
+          "uv": [
+            0,
+            0,
+            6.0,
+            1.0
+          ]
+        },
+        "down": {
+          "texture": "#andesite",
+          "uv": [
+            0,
+            0,
+            6.0,
+            1.0
+          ]
+        }
+      }
+    },
+    {
+      "name": "filament",
+      "from": [
+        6.5,
+        3.5,
+        12.5
+      ],
+      "to": [
+        9.5,
+        7.5,
+        12.5
+      ],
+      "faces": {
+        "north": {
+          "texture": "#filament_on",
+          "uv": [
+            0,
+            0,
+            3.0,
+            4.0
+          ]
+        },
+        "south": {
+          "texture": "#filament_on",
+          "uv": [
+            3,
+            0,
+            0,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "name": "glass_bulb",
+      "from": [
+        5,
+        3,
+        11
+      ],
+      "to": [
+        11,
+        8,
+        14
+      ],
+      "faces": {
+        "north": {
+          "texture": "#red_on_front",
+          "uv": [
+            0,
+            0,
+            6.0,
+            5.0
+          ]
+        },
+        "south": {
+          "texture": "#red_on_front",
+          "uv": [
+            6,
+            0,
+            0,
+            5
+          ]
+        },
+        "west": {
+          "texture": "#red_on_side",
+          "uv": [
+            3,
+            0,
+            0,
+            5
+          ]
+        },
+        "east": {
+          "texture": "#red_on_side",
+          "uv": [
+            0,
+            0,
+            3.0,
+            5.0
+          ]
+        },
+        "up": {
+          "texture": "#red_on_top",
+          "uv": [
+            0,
+            0,
+            6.0,
+            3.0
+          ],
+          "rotation": 180
+        },
+        "down": {
+          "texture": "#red_on_bottom",
+          "uv": [
+            0,
+            0,
+            6.0,
+            3.0
+          ],
+          "rotation": 180
+        }
+      }
+    }
+  ]
+}

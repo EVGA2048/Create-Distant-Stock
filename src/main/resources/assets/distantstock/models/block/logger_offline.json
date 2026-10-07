@@ -1,0 +1,1268 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:translucent",
+  "textures": {
+    "particle": "distantstock:block/logger/back",
+    "face": "distantstock:block/logger/face",
+    "back": "distantstock:block/logger/back",
+    "side": "distantstock:block/logger/side",
+    "top": "distantstock:block/logger/top",
+    "tube_socket_front": "distantstock:block/logger/tube_socket_front",
+    "tube_socket_side": "distantstock:block/logger/tube_socket_side",
+    "tube_socket_top": "distantstock:block/logger/tube_socket_top",
+    "brass": "distantstock:block/logger/brass",
+    "factory_panel": "distantstock:block/logger/factory_panel",
+    "printer": "distantstock:block/logger/printer",
+    "iron": "distantstock:block/logger/iron",
+    "buzzer": "distantstock:block/logger/buzzer",
+    "dark": "distantstock:block/logger/dark",
+    "glass_front": "distantstock:block/logger/glass_front",
+    "glass_side": "distantstock:block/logger/glass_side",
+    "glass_top": "distantstock:block/logger/glass_top",
+    "red_off": "distantstock:block/logger/red_off",
+    "amber_off": "distantstock:block/logger/amber_off",
+    "green_off": "distantstock:block/logger/green_off"
+  },
+  "elements": [
+    {
+      "name": "wall_panel",
+      "from": [
+        0,
+        0,
+        13
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
+      "faces": {
+        "north": {
+          "texture": "#face",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "south": {
+          "texture": "#back",
+          "uv": [
+            0,
+            0,
+            16,
+            16
+          ]
+        },
+        "west": {
+          "texture": "#side",
+          "uv": [
+            3,
+            0,
+            0,
+            16
+          ]
+        },
+        "east": {
+          "texture": "#side",
+          "uv": [
+            0,
+            0,
+            3,
+            16
+          ]
+        },
+        "up": {
+          "texture": "#top",
+          "uv": [
+            0,
+            0,
+            16,
+            3
+          ]
+        },
+        "down": {
+          "texture": "#top",
+          "uv": [
+            0,
+            3,
+            16,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "name": "tube_0_socket",
+      "from": [
+        10,
+        7,
+        9
+      ],
+      "to": [
+        15,
+        9,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#tube_socket_front",
+          "uv": [
+            0,
+            0,
+            5,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#tube_socket_front",
+          "uv": [
+            0,
+            0,
+            5,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#tube_socket_side",
+          "uv": [
+            0,
+            0,
+            4,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#tube_socket_side",
+          "uv": [
+            0,
+            0,
+            4,
+            2
+          ]
+        },
+        "up": {
+          "texture": "#tube_socket_top",
+          "uv": [
+            0,
+            0,
+            5,
+            4
+          ]
+        },
+        "down": {
+          "texture": "#tube_socket_top",
+          "uv": [
+            0,
+            0,
+            5,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "name": "tube_1_socket",
+      "from": [
+        4,
+        7,
+        9
+      ],
+      "to": [
+        9,
+        9,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#tube_socket_front",
+          "uv": [
+            0,
+            0,
+            5,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#tube_socket_front",
+          "uv": [
+            0,
+            0,
+            5,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#tube_socket_side",
+          "uv": [
+            0,
+            0,
+            4,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#tube_socket_side",
+          "uv": [
+            0,
+            0,
+            4,
+            2
+          ]
+        },
+        "up": {
+          "texture": "#tube_socket_top",
+          "uv": [
+            0,
+            0,
+            5,
+            4
+          ]
+        },
+        "down": {
+          "texture": "#tube_socket_top",
+          "uv": [
+            0,
+            0,
+            5,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "name": "red_socket",
+      "from": [
+        1,
+        12,
+        10
+      ],
+      "to": [
+        3,
+        13,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "south": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "west": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "east": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "up": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            2,
+            3
+          ]
+        },
+        "down": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            2,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        1.5,
+        13.25,
+        10.5
+      ],
+      "to": [
+        2.5,
+        14.25,
+        11.5
+      ],
+      "rotation": {
+        "angle": 45,
+        "axis": "y",
+        "origin": [
+          2,
+          13.75,
+          11
+        ]
+      },
+      "faces": {
+        "up": {
+          "uv": [
+            14,
+            8,
+            15,
+            9
+          ],
+          "texture": "#factory_panel"
+        }
+      },
+      "name": "red_bulb_internal_0"
+    },
+    {
+      "from": [
+        2,
+        12,
+        10
+      ],
+      "to": [
+        2,
+        14,
+        12
+      ],
+      "rotation": {
+        "angle": 45,
+        "axis": "y",
+        "origin": [
+          2,
+          12.5,
+          11
+        ]
+      },
+      "faces": {
+        "east": {
+          "uv": [
+            6,
+            8,
+            8,
+            10
+          ],
+          "texture": "#factory_panel"
+        },
+        "west": {
+          "uv": [
+            13,
+            8,
+            15,
+            10
+          ],
+          "texture": "#factory_panel"
+        }
+      },
+      "name": "red_bulb_internal_1"
+    },
+    {
+      "from": [
+        2,
+        12,
+        10
+      ],
+      "to": [
+        2,
+        14,
+        12
+      ],
+      "rotation": {
+        "angle": -45,
+        "axis": "y",
+        "origin": [
+          2,
+          12.5,
+          11
+        ]
+      },
+      "faces": {
+        "east": {
+          "uv": [
+            6,
+            8,
+            8,
+            10
+          ],
+          "texture": "#factory_panel"
+        },
+        "west": {
+          "uv": [
+            13,
+            8,
+            15,
+            10
+          ],
+          "texture": "#factory_panel"
+        }
+      },
+      "name": "red_bulb_internal_2"
+    },
+    {
+      "name": "amber_socket",
+      "from": [
+        1,
+        8,
+        10
+      ],
+      "to": [
+        3,
+        9,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "south": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "west": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "east": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "up": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            2,
+            3
+          ]
+        },
+        "down": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            2,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        1.5,
+        9.25,
+        10.5
+      ],
+      "to": [
+        2.5,
+        10.25,
+        11.5
+      ],
+      "rotation": {
+        "angle": 45,
+        "axis": "y",
+        "origin": [
+          2,
+          9.75,
+          11
+        ]
+      },
+      "faces": {
+        "up": {
+          "uv": [
+            14,
+            8,
+            15,
+            9
+          ],
+          "texture": "#factory_panel"
+        }
+      },
+      "name": "amber_bulb_internal_0"
+    },
+    {
+      "from": [
+        2,
+        8,
+        10
+      ],
+      "to": [
+        2,
+        10,
+        12
+      ],
+      "rotation": {
+        "angle": 45,
+        "axis": "y",
+        "origin": [
+          2,
+          8.5,
+          11
+        ]
+      },
+      "faces": {
+        "east": {
+          "uv": [
+            6,
+            8,
+            8,
+            10
+          ],
+          "texture": "#factory_panel"
+        },
+        "west": {
+          "uv": [
+            13,
+            8,
+            15,
+            10
+          ],
+          "texture": "#factory_panel"
+        }
+      },
+      "name": "amber_bulb_internal_1"
+    },
+    {
+      "from": [
+        2,
+        8,
+        10
+      ],
+      "to": [
+        2,
+        10,
+        12
+      ],
+      "rotation": {
+        "angle": -45,
+        "axis": "y",
+        "origin": [
+          2,
+          8.5,
+          11
+        ]
+      },
+      "faces": {
+        "east": {
+          "uv": [
+            6,
+            8,
+            8,
+            10
+          ],
+          "texture": "#factory_panel"
+        },
+        "west": {
+          "uv": [
+            13,
+            8,
+            15,
+            10
+          ],
+          "texture": "#factory_panel"
+        }
+      },
+      "name": "amber_bulb_internal_2"
+    },
+    {
+      "name": "green_socket",
+      "from": [
+        1,
+        4,
+        10
+      ],
+      "to": [
+        3,
+        5,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "south": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            2,
+            1
+          ]
+        },
+        "west": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "east": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "up": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            2,
+            3
+          ]
+        },
+        "down": {
+          "texture": "#brass",
+          "uv": [
+            0,
+            0,
+            2,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "from": [
+        1.5,
+        5.25,
+        10.5
+      ],
+      "to": [
+        2.5,
+        6.25,
+        11.5
+      ],
+      "rotation": {
+        "angle": 45,
+        "axis": "y",
+        "origin": [
+          2,
+          5.75,
+          11
+        ]
+      },
+      "faces": {
+        "up": {
+          "uv": [
+            14,
+            8,
+            15,
+            9
+          ],
+          "texture": "#factory_panel"
+        }
+      },
+      "name": "green_bulb_internal_0"
+    },
+    {
+      "from": [
+        2,
+        4,
+        10
+      ],
+      "to": [
+        2,
+        6,
+        12
+      ],
+      "rotation": {
+        "angle": 45,
+        "axis": "y",
+        "origin": [
+          2,
+          4.5,
+          11
+        ]
+      },
+      "faces": {
+        "east": {
+          "uv": [
+            6,
+            8,
+            8,
+            10
+          ],
+          "texture": "#factory_panel"
+        },
+        "west": {
+          "uv": [
+            13,
+            8,
+            15,
+            10
+          ],
+          "texture": "#factory_panel"
+        }
+      },
+      "name": "green_bulb_internal_1"
+    },
+    {
+      "from": [
+        2,
+        4,
+        10
+      ],
+      "to": [
+        2,
+        6,
+        12
+      ],
+      "rotation": {
+        "angle": -45,
+        "axis": "y",
+        "origin": [
+          2,
+          4.5,
+          11
+        ]
+      },
+      "faces": {
+        "east": {
+          "uv": [
+            6,
+            8,
+            8,
+            10
+          ],
+          "texture": "#factory_panel"
+        },
+        "west": {
+          "uv": [
+            13,
+            8,
+            15,
+            10
+          ],
+          "texture": "#factory_panel"
+        }
+      },
+      "name": "green_bulb_internal_2"
+    },
+    {
+      "name": "printer_housing",
+      "from": [
+        5,
+        3,
+        10
+      ],
+      "to": [
+        15,
+        6,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#printer",
+          "uv": [
+            0,
+            0,
+            10,
+            3
+          ]
+        },
+        "south": {
+          "texture": "#iron",
+          "uv": [
+            0,
+            0,
+            10,
+            3
+          ]
+        },
+        "west": {
+          "texture": "#iron",
+          "uv": [
+            0,
+            0,
+            3,
+            3
+          ]
+        },
+        "east": {
+          "texture": "#iron",
+          "uv": [
+            0,
+            0,
+            3,
+            3
+          ]
+        },
+        "up": {
+          "texture": "#iron",
+          "uv": [
+            0,
+            0,
+            10,
+            3
+          ]
+        },
+        "down": {
+          "texture": "#iron",
+          "uv": [
+            0,
+            0,
+            10,
+            3
+          ]
+        }
+      }
+    },
+    {
+      "name": "buzzer_grille",
+      "from": [
+        1,
+        0,
+        12
+      ],
+      "to": [
+        4,
+        4,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#buzzer",
+          "uv": [
+            0,
+            0,
+            3,
+            4
+          ]
+        },
+        "south": {
+          "texture": "#dark",
+          "uv": [
+            0,
+            0,
+            3,
+            4
+          ]
+        },
+        "west": {
+          "texture": "#dark",
+          "uv": [
+            0,
+            0,
+            1,
+            4
+          ]
+        },
+        "east": {
+          "texture": "#dark",
+          "uv": [
+            0,
+            0,
+            1,
+            4
+          ]
+        },
+        "up": {
+          "texture": "#dark",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        },
+        "down": {
+          "texture": "#dark",
+          "uv": [
+            0,
+            0,
+            3,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "name": "tube_0_glass",
+      "from": [
+        10,
+        9,
+        9
+      ],
+      "to": [
+        15,
+        16,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#glass_front",
+          "uv": [
+            0,
+            0,
+            5,
+            7
+          ]
+        },
+        "south": {
+          "texture": "#glass_front",
+          "uv": [
+            0,
+            0,
+            5,
+            7
+          ]
+        },
+        "west": {
+          "texture": "#glass_side",
+          "uv": [
+            0,
+            0,
+            4,
+            7
+          ]
+        },
+        "east": {
+          "texture": "#glass_side",
+          "uv": [
+            0,
+            0,
+            4,
+            7
+          ]
+        },
+        "up": {
+          "texture": "#glass_top",
+          "uv": [
+            0,
+            0,
+            5,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "name": "tube_1_glass",
+      "from": [
+        4,
+        9,
+        9
+      ],
+      "to": [
+        9,
+        16,
+        13
+      ],
+      "faces": {
+        "north": {
+          "texture": "#glass_front",
+          "uv": [
+            0,
+            0,
+            5,
+            7
+          ]
+        },
+        "south": {
+          "texture": "#glass_front",
+          "uv": [
+            0,
+            0,
+            5,
+            7
+          ]
+        },
+        "west": {
+          "texture": "#glass_side",
+          "uv": [
+            0,
+            0,
+            4,
+            7
+          ]
+        },
+        "east": {
+          "texture": "#glass_side",
+          "uv": [
+            0,
+            0,
+            4,
+            7
+          ]
+        },
+        "up": {
+          "texture": "#glass_top",
+          "uv": [
+            0,
+            0,
+            5,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "name": "red_bulb",
+      "from": [
+        1,
+        13,
+        10
+      ],
+      "to": [
+        3,
+        15,
+        12
+      ],
+      "faces": {
+        "north": {
+          "texture": "#red_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#red_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ],
+          "rotation": 270
+        },
+        "west": {
+          "texture": "#red_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#red_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ],
+          "rotation": 90
+        },
+        "up": {
+          "texture": "#red_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ],
+          "rotation": 180
+        },
+        "down": {
+          "texture": "#red_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "amber_bulb",
+      "from": [
+        1,
+        9,
+        10
+      ],
+      "to": [
+        3,
+        11,
+        12
+      ],
+      "faces": {
+        "north": {
+          "texture": "#amber_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#amber_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ],
+          "rotation": 270
+        },
+        "west": {
+          "texture": "#amber_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#amber_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ],
+          "rotation": 90
+        },
+        "up": {
+          "texture": "#amber_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ],
+          "rotation": 180
+        },
+        "down": {
+          "texture": "#amber_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "green_bulb",
+      "from": [
+        1,
+        5,
+        10
+      ],
+      "to": [
+        3,
+        7,
+        12
+      ],
+      "faces": {
+        "north": {
+          "texture": "#green_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#green_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ],
+          "rotation": 270
+        },
+        "west": {
+          "texture": "#green_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#green_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ],
+          "rotation": 90
+        },
+        "up": {
+          "texture": "#green_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ],
+          "rotation": 180
+        },
+        "down": {
+          "texture": "#green_off",
+          "uv": [
+            0,
+            0,
+            2,
+            2
+          ]
+        }
+      }
+    }
+  ],
+  "credit": "Distant Stock / logger console V3 / corrected panel UVs and native Create factory-gauge translucent bulbs"
+}

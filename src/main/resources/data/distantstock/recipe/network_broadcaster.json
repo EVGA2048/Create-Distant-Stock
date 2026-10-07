@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [" R ", "RPR", " A "],
+  "key": {
+    "R": {"item": "create:polished_rose_quartz"},
+    "P": {"item": "create:precision_mechanism"},
+    "A": {"item": "distantstock:announcer"}
+  },
+  "result": {"id": "distantstock:network_broadcaster", "count": 1}
+}

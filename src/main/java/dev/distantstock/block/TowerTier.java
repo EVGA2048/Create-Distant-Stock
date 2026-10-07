@@ -21,13 +21,13 @@ import java.util.Optional;
  */
 public enum TowerTier {
     //            couplers  devices  radius  chunkSide  stress
-    I(5, 8, 32, 1, 256),
-    II(7, 16, 40, 3, 512),
-    III(9, 32, 48, 3, 1024),
-    IV(11, 48, 64, 5, 2048),
-    V(13, 64, 80, 5, 4096),
-    VI(15, 96, 112, 7, 8192),
-    VII(17, 128, 144, 7, 16384);
+    I(5, 8, 32, 1, 8),
+    II(7, 16, 40, 3, 16),
+    III(9, 32, 48, 3, 32),
+    IV(11, 48, 64, 5, 64),
+    V(13, 64, 80, 5, 128),
+    VI(15, 96, 112, 7, 256),
+    VII(17, 128, 144, 7, 512);
 
     private final int couplers;
     private final int devices;

@@ -7,6 +7,7 @@ import dev.distantstock.item.ModItems;
 import dev.distantstock.link.ParcelEscrow;
 import dev.distantstock.link.ParcelEscrowPump;
 import dev.distantstock.link.ParcelLedger;
+import dev.distantstock.link.ParcelJournal;
 import dev.distantstock.link.TranserverBridge;
 import dev.distantstock.routing.DockGroup;
 import dev.distantstock.routing.DockGroupDirectory;
@@ -78,6 +79,9 @@ public final class ParcelEscrowGameTests {
                     "投递成功后 escrow 记录没有清掉，包裹会被再投一次");
             h.assertTrue(ParcelLedger.get(server).contains(parcelId),
                     "ledger 没有标记已投递的包裹，重放会被当成一个新包裹");
+            var trace = ParcelJournal.get(server).find(parcelId).orElse(null);
+            h.assertTrue(trace != null && trace.steps().stream().anyMatch(step -> step.stage().startsWith("APPLIED")),
+                    "本地投递成功却没有写入 parcel journal");
             h.succeed();
         });
     }
@@ -320,6 +324,9 @@ public final class ParcelEscrowGameTests {
             h.assertTrue(record.state() == ParcelEscrow.State.HELD,
                     "没有目标港的记录状态不是 HELD，而是 " + record.state());
             h.assertTrue(!ParcelLedger.get(server).contains(parcelId), "没有投递成功却写了 ledger");
+            var trace = ParcelJournal.get(server).find(parcelId).orElse(null);
+            h.assertTrue(trace != null && trace.steps().stream().anyMatch(step -> "WAITING_DOCK".equals(step.stage())),
+                    "没有目标港时 parcel journal 没记录 WAITING_DOCK");
 
             // 再跑一拍还是 HELD：RETRY 不是失败，也不会被当成退件处理掉。
             ParcelEscrowPump.tick(server);
@@ -376,27 +383,19 @@ public final class ParcelEscrowGameTests {
         });
     }
 
-    /**
-     * isLocal 的边界。空白目的地是「比节点 id 更早的记录」，只能由本机认领；哨兵必须是一个
-     * uuid 的规范写法，否则写进记录再读出来就匹配不上；别人的节点 id 不能被当成本机，那会把
-     * 包裹投进错误的存档。
-     */
+    /** isLocal 的边界：旧空白记录属于本机，正式节点 UUID 属于本机，别人的 UUID 绝不能属于本机。 */
     @GameTest(template = "empty", timeoutTicks = 40)
     public static void isLocalAcceptsBlanksAndTheLocalNode(GameTestHelper h) {
         h.assertTrue(TranserverBridge.isLocal(null), "null 目的地必须算本机");
         h.assertTrue(TranserverBridge.isLocal(""), "空目的地必须算本机");
         h.assertTrue(TranserverBridge.isLocal("   "), "纯空白目的地必须算本机");
-        h.assertTrue(TranserverBridge.isLocal(TranserverBridge.localNodeId()), "本机节点 id 必须算本机");
-        try {
-            UUID sentinel = UUID.fromString(TranserverBridge.LOCAL_NODE_ID);
-            h.assertTrue(TranserverBridge.LOCAL_NODE_ID.equals(sentinel.toString()),
-                    "哨兵的字符串形式和 UUID.toString() 不一致，落盘的记录将永远匹配不上本机");
-        } catch (IllegalArgumentException invalid) {
-            h.fail("本机哨兵不是合法 uuid：" + invalid.getMessage());
-        }
-        // 挂上 Transerver 时 localNodeId() 是真实节点，没挂上时是哨兵；两种情况都要有一个「别人」。
-        String foreign = TranserverBridge.LOCAL_NODE_ID.equals(TranserverBridge.localNodeId())
-                ? UUID.randomUUID().toString() : TranserverBridge.LOCAL_NODE_ID;
+        UUID local = TranserverBridge.localNodeUuid();
+        h.assertTrue(local != null, "Transerver 的持久节点身份没有在服务器启动时暴露");
+        h.assertTrue(TranserverBridge.isLocal(local.toString()), "本机节点 id 必须算本机");
+        String foreign;
+        do {
+            foreign = UUID.randomUUID().toString();
+        } while (foreign.equals(local.toString()));
         h.assertFalse(TranserverBridge.isLocal(foreign), "别的节点被当成了本机：" + foreign);
         h.succeed();
     }

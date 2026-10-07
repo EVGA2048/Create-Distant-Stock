@@ -158,6 +158,19 @@ public final class LinkSnapshot {
 
     /** The same view with the readout of the monitor that is asking. */
     public static View view(TowerReadout tower) {
+        var diagnostic = dev.distantstock.diagnostics.ChainDiagnostics.healthSnapshot();
+        int protocolCompatible = 0;
+        int protocolIncompatible = 0;
+        int protocolUnknown = 0;
+        String localNode = TranserverBridge.localNodeId();
+        for (String node : TranserverBridge.knownNodes()) {
+            if (node.equals(localNode)) continue;
+            switch (ProtocolHelloService.compatibility(node)) {
+                case COMPATIBLE -> protocolCompatible++;
+                case INCOMPATIBLE -> protocolIncompatible++;
+                case UNKNOWN -> protocolUnknown++;
+            }
+        }
         return new View(
                 selfId(),
                 peerId == null ? "" : peerId,
@@ -183,6 +196,17 @@ public final class LinkSnapshot {
                 transerverInbox,
                 transerverCompleted,
                 transerverDeadLetters,
+                diagnostic.addresses(),
+                diagnostic.healthy(),
+                diagnostic.degraded(),
+                diagnostic.faults(),
+                diagnostic.unknown(),
+                diagnostic.inFlightProbes(),
+                diagnostic.cacheTakeovers(),
+                diagnostic.availableCaches(),
+                protocolCompatible,
+                protocolIncompatible,
+                protocolUnknown,
                 tower == null ? TowerReadout.NONE : tower
         );
     }
@@ -218,6 +242,17 @@ public final class LinkSnapshot {
             int transerverInbox,
             int transerverCompleted,
             int transerverDeadLetters,
+            int diagnosticAddresses,
+            int diagnosticHealthy,
+            int diagnosticDegraded,
+            int diagnosticFaults,
+            int diagnosticUnknown,
+            int diagnosticInFlight,
+            int diagnosticCacheTakeovers,
+            int diagnosticCacheAvailable,
+            int protocolCompatible,
+            int protocolIncompatible,
+            int protocolUnknown,
             TowerReadout tower
     ) {
         public boolean linkUp() {

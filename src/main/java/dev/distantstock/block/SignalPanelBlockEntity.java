@@ -15,6 +15,7 @@ import dev.distantstock.item.SignalLampPanelItem;
 import dev.distantstock.item.ModItems;
 import dev.distantstock.stock.CreateStock;
 import dev.distantstock.stock.NetworkHealth;
+import dev.distantstock.event.EventRegistry;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -48,6 +49,43 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
     public SignalPanelBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.SIGNAL_PANEL.get(), pos, state);
         setLazyTickRate(2);
+    }
+
+    /**
+     * Highest active event for one Create network. INFO is history/telemetry and does not light an
+     * alarm. At the highest severity, an unacknowledged event flashes; when every event at that
+     * severity is acknowledged the same colour remains steady until the condition clears.
+     */
+    private LampState eventLevel(UUID freq) {
+        if (freq == null || level == null || level.isClientSide || level.getServer() == null) {
+            return lampAlarms.entrySet().stream()
+                    .filter(entry -> freq != null && freq.equals(lampNetworks.get(entry.getKey())))
+                    .map(Map.Entry::getValue).findFirst().orElse(null);
+        }
+        List<EventRegistry.Record> events = EventRegistry.get(level.getServer()).activeForFrequency(freq);
+        return eventLevel(events);
+    }
+
+    /** Pure alarm-to-lamp mapping, shared with regression tests and later logger/signal consumers. */
+    public static LampState eventLevel(List<EventRegistry.Record> events) {
+        EventRegistry.Severity highest = null;
+        for (EventRegistry.Record event : events) {
+            if (event.severity() == EventRegistry.Severity.INFO) continue;
+            if (highest == null || event.severity().ordinal() > highest.ordinal()) {
+                highest = event.severity();
+            }
+        }
+        if (highest == null) return null;
+        boolean unacknowledged = false;
+        for (EventRegistry.Record event : events) {
+            if (event.severity() == highest && !event.acknowledged()) {
+                unacknowledged = true;
+                break;
+            }
+        }
+        return highest == EventRegistry.Severity.ERROR
+                ? (unacknowledged ? LampState.FATAL : LampState.FATAL_ACK)
+                : (unacknowledged ? LampState.WARN_URGENT : LampState.WARN);
     }
 
     @Override
@@ -107,6 +145,9 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
             new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
     private final Map<FactoryPanelBlock.PanelSlot, NetworkHealth> lampHealth =
             new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
+    /** Alarm-registry contribution for each bound Create network, sampled server-side and synced. */
+    private final Map<FactoryPanelBlock.PanelSlot, LampState> lampAlarms =
+            new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
     private final Map<FactoryPanelBlock.PanelSlot, SimpleContainer> monitors =
             new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
     private final Map<FactoryPanelBlock.PanelSlot, List<LampState>> monitorStates =
@@ -136,9 +177,16 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
         if (freq == null) {
             lampNetworks.remove(slot);
             lampHealth.remove(slot);
+            lampAlarms.remove(slot);
         } else {
             lampNetworks.put(slot, freq);
             lampHealth.put(slot, CreateStock.health(freq, REPORTED_MISSING_LINKS));
+            LampState alarm = eventLevel(freq);
+            if (alarm == null) {
+                lampAlarms.remove(slot);
+            } else {
+                lampAlarms.put(slot, alarm);
+            }
         }
         sync();
     }
@@ -162,6 +210,17 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
             NetworkHealth next = CreateStock.health(entry.getValue(), REPORTED_MISSING_LINKS);
             NetworkHealth previous = lampHealth.put(entry.getKey(), next);
             if (!next.equals(previous)) {
+                changed = true;
+            }
+            LampState nextAlarm = eventLevel(entry.getValue());
+            LampState previousAlarm = lampAlarms.get(entry.getKey());
+            if (nextAlarm == null) {
+                if (previousAlarm != null) {
+                    lampAlarms.remove(entry.getKey());
+                    changed = true;
+                }
+            } else if (nextAlarm != previousAlarm) {
+                lampAlarms.put(entry.getKey(), nextAlarm);
                 changed = true;
             }
             if (sampleMonitor(entry.getKey(), entry.getValue())) {
@@ -335,13 +394,14 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
             // Bound to a frequency, so the network itself is the sensor: no gauges, no wiring.
             NetworkHealth net = lampHealth.get(slot);
             LampState overall = networkLevel(net == null ? NetworkHealth.UNKNOWN : net);
+            LampState alarm = lampAlarms.get(slot);
             if (overall == LampState.FATAL) {
                 // Without a reachable network every per-item reading is just "no stock", which
                 // would masquerade as a shortage. The missing network is the real problem.
-                return overall;
+                return LampState.worst(overall, alarm);
             }
             LampState watched = worstMonitored(slot);
-            return watched != null ? watched : overall;
+            return LampState.worst(alarm, watched != null ? watched : overall);
         }
         LampState worst = null;
         for (FactoryPanelConnection connection : behaviour.targetedBy.values()) {
@@ -402,6 +462,14 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
         return orders.binding(slot);
     }
 
+    public java.util.UUID distantNetworkScope(FactoryPanelBlock.PanelSlot slot) {
+        return orders.scope(slot);
+    }
+
+    public void setDistantNetworkScope(FactoryPanelBlock.PanelSlot slot, java.util.UUID scope) {
+        orders.setScope(slot, scope);
+    }
+
     public boolean bind(FactoryPanelBlock.PanelSlot slot, dev.distantstock.routing.RemoteNetworkId network,
                         java.util.UUID receivingGroup, String address) {
         orders.bind(slot, network, receivingGroup, address);
@@ -424,6 +492,14 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
         return orders.outstanding(slot);
     }
 
+    /** Receives the complete distant-gauge state when a dedicated gauge board becomes mixed. */
+    public void importRemoteOrderState(CompoundTag snapshot, HolderLookup.Provider registries) {
+        if (snapshot == null) return;
+        orders.read(snapshot, registries, false);
+        setChanged();
+        sendData();
+    }
+
     /** The ordering beat, run from the block's ticker alongside the lamp sampling. */
     public void tickOrders() {
         orders.tickOrders();
@@ -439,7 +515,10 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
     @Override
     public boolean removePanel(FactoryPanelBlock.PanelSlot slot) {
         boolean removed = super.removePanel(slot);
-        if (removed) remoteGauges.remove(slot);
+        if (removed) {
+            remoteGauges.remove(slot);
+            orders.forget(slot);
+        }
         return removed;
     }
 
@@ -550,7 +629,7 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
             case IDLE, ALL_GOOD -> ChatFormatting.GREEN;
             case ACT -> ChatFormatting.AQUA;
             case WARN -> ChatFormatting.GOLD;
-            case WARN_URGENT, FATAL -> ChatFormatting.RED;
+            case WARN_URGENT, FATAL, FATAL_ACK -> ChatFormatting.RED;
         };
     }
 
@@ -630,6 +709,11 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
             health.put(entry.getKey().name(), row);
         }
         tag.put("LampHealth", health);
+        CompoundTag alarms = new CompoundTag();
+        for (var entry : lampAlarms.entrySet()) {
+            alarms.putInt(entry.getKey().name(), entry.getValue().ordinal());
+        }
+        tag.put("LampAlarms", alarms);
         CompoundTag watches = new CompoundTag();
         for (var entry : monitors.entrySet()) {
             CompoundTag row = new CompoundTag();
@@ -691,6 +775,15 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
             lampHealth.put(slot, new NetworkHealth(row.getBoolean("Known"), row.getInt("Loaded"),
                     row.getInt("Total"), row.getBoolean("Idle"), row.getBoolean("Locked"), List.copyOf(missing)));
         }
+        lampAlarms.clear();
+        CompoundTag alarms = tag.getCompound("LampAlarms");
+        for (var slot : FactoryPanelBlock.PanelSlot.values()) {
+            if (!alarms.contains(slot.name())) continue;
+            int ordinal = alarms.getInt(slot.name());
+            if (ordinal >= 0 && ordinal < LampState.values().length) {
+                lampAlarms.put(slot, LampState.values()[ordinal]);
+            }
+        }
         monitors.clear();
         monitorStates.clear();
         CompoundTag watches = tag.getCompound("LampWatches");
@@ -726,6 +819,24 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
 
         private boolean isLampInputBlocked() {
             return !owner.panelDataReady() || isLampSlot();
+        }
+
+        /** A mixed board still has real distant gauges, not factory gauges wearing our texture. */
+        private boolean isRemoteGaugeSlot() {
+            return owner.isRemoteGauge(slot);
+        }
+
+        @Override
+        public void displayScreen(Player player) {
+            if (!isRemoteGaugeSlot()) {
+                super.displayScreen(player);
+                return;
+            }
+            if (dev.distantstock.client.TerminalPanelGesture.bindInsteadOfScreen(
+                    player, blockEntity, slot)) {
+                return;
+            }
+            dev.distantstock.client.RemoteGaugeScreen.open(this);
         }
 
         /**
@@ -818,16 +929,18 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
 
         @Override
         public void tick() {
-            if (!isLampInputBlocked()) {
-                super.tick();
-            }
+            if (isLampInputBlocked()) return;
+            if (isRemoteGaugeSlot()
+                    && !RemoteGaugeBlockEntity.localNetworkConfigured(network)) return;
+            super.tick();
         }
 
         @Override
         public void lazyTick() {
-            if (!isLampInputBlocked()) {
-                super.lazyTick();
-            }
+            if (isLampInputBlocked()) return;
+            if (isRemoteGaugeSlot()
+                    && !RemoteGaugeBlockEntity.localNetworkConfigured(network)) return;
+            super.lazyTick();
         }
     }
 }

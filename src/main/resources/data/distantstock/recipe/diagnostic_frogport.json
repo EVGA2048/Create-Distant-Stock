@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    " E ",
+    "BFB",
+    " R "
+  ],
+  "key": {
+    "E": { "item": "create:electron_tube" },
+    "B": { "item": "create:brass_ingot" },
+    "F": { "item": "create:package_frogport" },
+    "R": { "item": "minecraft:redstone_torch" }
+  },
+  "result": {
+    "id": "distantstock:diagnostic_frogport",
+    "count": 1
+  }
+}

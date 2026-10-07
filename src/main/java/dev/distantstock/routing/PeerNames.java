@@ -75,7 +75,8 @@ public final class PeerNames extends SavedData {
         if (node == null) {
             return "";
         }
-        if (node.toString().equals(dev.distantstock.link.TranserverBridge.localNodeId())) {
+        java.util.UUID local = dev.distantstock.link.TranserverBridge.localNodeUuid();
+        if (node.equals(local)) {
             return "本服";
         }
         if (server != null) {

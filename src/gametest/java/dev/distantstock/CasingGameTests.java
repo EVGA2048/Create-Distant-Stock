@@ -6,6 +6,7 @@ import dev.distantstock.config.StockConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.gametest.GameTestHolder;
@@ -27,6 +28,22 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @GameTestHolder("distantstock")
 @PrefixGameTestTemplate(false)
 public final class CasingGameTests {
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void undersideFluidPortExposesOnlyTheOpenedFace(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos corePos = h.absolutePos(new BlockPos(3, 2, 3));
+        BlockPos casingPos = corePos.north();
+        level.setBlock(corePos, ModBlocks.TOWER_CORE.get().defaultBlockState(), 3);
+        level.setBlock(casingPos, ModBlocks.TOWER_CASING.get().defaultBlockState()
+                .setValue(TowerCasingBlock.PORT, TowerCasingBlock.Port.DOWN), 3);
+        var core = (dev.distantstock.block.TowerCoreBlockEntity) level.getBlockEntity(corePos);
+        h.assertTrue(core != null, "tower core missing");
+        h.assertTrue(TowerCasingBlock.portTank(level, casingPos, level.getBlockState(casingPos),
+                net.minecraft.core.Direction.DOWN) == core.tank(), "underside port failed to expose tower tank");
+        h.assertTrue(TowerCasingBlock.portTank(level, casingPos, level.getBlockState(casingPos),
+                net.minecraft.core.Direction.UP) == null, "closed top unexpectedly exposed tower tank");
+        h.succeed();
+    }
     private static final int Y = 2;
     private static final int Z = 2;
     /** The redstone block. Casings start one further along and run to the wall of the arena. */
@@ -45,6 +62,43 @@ public final class CasingGameTests {
             lit(h, 5, "a casing four along");
             lit(h, LAST_X, "the far end of the run");
             h.succeed();
+        });
+    }
+
+    /** The efficient component planner must still reveal the window as a visible travelling wave. */
+    @GameTest(template = "empty", timeoutTicks = 80)
+    public static void signalWindowRipplesOutwardInsteadOfOpeningAllAtOnce(GameTestHelper h) {
+        layRun(h);
+        h.setBlock(SOURCE_X, Y, Z, Blocks.REDSTONE_BLOCK.defaultBlockState());
+        h.runAfterDelay(3, () -> {
+            lit(h, FIRST_X, "the first ripple step");
+            dark(h, LAST_X, "the far end before the ripple arrived");
+            h.runAfterDelay(8, () -> {
+                lit(h, LAST_X, "the far end after the ripple arrived");
+                h.succeed();
+            });
+        });
+    }
+
+    /** Batch state updates must still invalidate Minecraft's block-light engine. */
+    @GameTest(template = "empty", timeoutTicks = 200)
+    public static void windowLightAppearsAndDisappearsWithPower(GameTestHelper h) {
+        layRun(h);
+        BlockPos litPos = h.absolutePos(new BlockPos(FIRST_X, Y, Z));
+        int baseline = h.getLevel().getBrightness(LightLayer.BLOCK, litPos);
+        h.setBlock(SOURCE_X, Y, Z, Blocks.REDSTONE_BLOCK.defaultBlockState());
+        settle(h, () -> {
+            int poweredLight = h.getLevel().getBrightness(LightLayer.BLOCK, litPos);
+            h.assertTrue(poweredLight > baseline,
+                    "powered casing changed state but did not emit block light");
+            h.setBlock(SOURCE_X, Y, Z, Blocks.AIR.defaultBlockState());
+            settle(h, () -> {
+                int after = h.getLevel().getBrightness(LightLayer.BLOCK, litPos);
+                h.assertTrue(after <= baseline,
+                        "unpowered casing left stale block light behind: baseline=" + baseline
+                                + ", powered=" + poweredLight + ", after=" + after);
+                h.succeed();
+            });
         });
     }
 
@@ -147,8 +201,8 @@ public final class CasingGameTests {
     }
 
     /**
-     * The window settles over block ticks, one casing further along per tick as each state change
-     * wakes its neighbours, so the wait is the run length plus room to spare.
+     * The component is settled as a batch now; keep a generous wait so this helper also covers
+     * Minecraft's asynchronous light propagation before assertions inspect block light.
      */
     private static void settle(GameTestHelper h, Runnable then) {
         h.runAfterDelay(40, then);

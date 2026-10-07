@@ -41,15 +41,23 @@ public final class GaugePlacementEvents {
             return;
         }
         if (factory && state.is(createGauge)) return;
+        var slot = FactoryPanelBlock.getTargetedSlot(pos, state, event.getHitVec().getLocation());
+        if (remote && FactoryPanelBlockItem.isTuned(stack)
+                && level.getBlockEntity(pos) instanceof FactoryPanelBlockEntity board
+                && board.panels.get(slot).isActive()
+                && isRemoteGauge(board, slot)) {
+            retuneExistingRemoteGauge(event, board, slot, stack);
+            return;
+        }
         if (remote && !isOurBoard(state) && net.neoforged.fml.ModList.get().isLoaded("deployer")) {
             installOnSomeoneElsesBoard(event, level, pos, state, stack);
             return;
         }
         if (!level.mayInteract(event.getEntity(), pos)
                 || !event.getEntity().mayUseItemAt(pos, event.getHitVec().getDirection(), stack)) return;
-        var slot = FactoryPanelBlock.getTargetedSlot(pos, state, event.getHitVec().getLocation());
+        boolean tuned = FactoryPanelBlockItem.isTuned(stack);
         if (!(level.getBlockEntity(pos) instanceof FactoryPanelBlockEntity old)
-                || old.panels.get(slot).isActive() || !FactoryPanelBlockItem.isTuned(stack)) {
+                || old.panels.get(slot).isActive() || (!remote && !tuned)) {
             event.setCancellationResult(InteractionResult.FAIL);
             event.setCanceled(true);
             return;
@@ -58,17 +66,79 @@ public final class GaugePlacementEvents {
             SignalPanelBlockEntity panel = state.is(ModBlocks.SIGNAL_PANEL.get())
                     ? (SignalPanelBlockEntity) old
                     : SignalLampPanelItem.convertFactoryPanel(level, pos, state);
-            if (panel == null || !panel.addPanel(slot,
-                    LogisticallyLinkedBlockItem.networkFromStack(FactoryPanelBlockItem.fixCtrlCopiedStack(stack)))) {
+            java.util.UUID localNetwork = tuned
+                    ? LogisticallyLinkedBlockItem.networkFromStack(FactoryPanelBlockItem.fixCtrlCopiedStack(stack))
+                    : dev.distantstock.block.RemoteGaugeBlockEntity.UNCONFIGURED_LOCAL_NETWORK;
+            if (panel == null || !panel.addPanel(slot, localNetwork)) {
                 event.setCancellationResult(InteractionResult.FAIL);
                 event.setCanceled(true);
                 return;
             }
             panel.setRemoteGauge(slot, remote);
+            if (remote && !tuned) {
+                // FactoryPanelBehaviour cannot serialize null. The marker is never treated as an
+                // actual Create logistics network by Distant Stock's ordering path.
+                panel.panels.get(slot).setNetwork(
+                        dev.distantstock.block.RemoteGaugeBlockEntity.UNCONFIGURED_LOCAL_NETWORK);
+            }
             if (!event.getEntity().isCreative()) stack.shrink(1);
         }
         event.setCancellationResult(InteractionResult.sidedSuccess(level.isClientSide));
         event.setCanceled(true);
+    }
+
+    /**
+     * Retunes only an existing distant gauge panel's local Create inventory network.
+     *
+     * <p>This is the second half of "place first, configure later". RightClickBlock fires before the
+     * block's own {@code useItemOn}; without this branch the generic panel-placement guard sees the
+     * occupied slot and cancels the click as "cannot place another panel", so the player's tuning
+     * gesture never reaches the gauge.
+     */
+    private static void retuneExistingRemoteGauge(PlayerInteractEvent.RightClickBlock event,
+                                                  FactoryPanelBlockEntity board,
+                                                  FactoryPanelBlock.PanelSlot slot,
+                                                  ItemStack stack) {
+        var level = event.getLevel();
+        var player = event.getEntity();
+        java.util.UUID network = LogisticallyLinkedBlockItem.networkFromStack(
+                FactoryPanelBlockItem.fixCtrlCopiedStack(stack));
+        if (network == null) {
+            event.setCancellationResult(InteractionResult.FAIL);
+            event.setCanceled(true);
+            return;
+        }
+        if (!level.mayInteract(player, board.getBlockPos())
+                || !player.mayUseItemAt(board.getBlockPos(), event.getHitVec().getDirection(), stack)) {
+            return;
+        }
+        if (!level.isClientSide) {
+            if (!com.simibubi.create.Create.LOGISTICS.mayInteract(network, player)) {
+                player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                        "message.distantstock.network.interact_denied"), true);
+                event.setCancellationResult(InteractionResult.FAIL);
+                event.setCanceled(true);
+                return;
+            }
+            board.panels.get(slot).setNetwork(network);
+            board.setChanged();
+            board.notifyUpdate();
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "message.distantstock.remote_gauge.local_network_bound"), true);
+        }
+        event.setCancellationResult(InteractionResult.sidedSuccess(level.isClientSide));
+        event.setCanceled(true);
+    }
+
+    private static boolean isRemoteGauge(FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot) {
+        if (board instanceof dev.distantstock.block.RemoteGaugeBlockEntity) {
+            return dev.distantstock.block.RemoteGaugeBlockEntity.isOurPanel(board.panels.get(slot));
+        }
+        if (board instanceof dev.distantstock.block.SignalPanelBlockEntity signal) {
+            return signal.isRemoteGauge(slot);
+        }
+        return net.neoforged.fml.ModList.get().isLoaded("deployer")
+                && dev.distantstock.panel.DeployerPanels.holdsRemoteGauge(board, slot);
     }
 
     /**
@@ -121,16 +191,17 @@ public final class GaugePlacementEvents {
         }
         var slot = FactoryPanelBlock.getTargetedSlot(pos, state, event.getHitVec().getLocation());
         if (!(level.getBlockEntity(pos) instanceof FactoryPanelBlockEntity board)
-                || board.panels.get(slot).isActive() || !FactoryPanelBlockItem.isTuned(stack)) {
+                || board.panels.get(slot).isActive()) {
             event.setCancellationResult(InteractionResult.FAIL);
             event.setCanceled(true);
             return;
         }
         if (!level.isClientSide) {
-            var network = LogisticallyLinkedBlockItem.networkFromStack(
-                    FactoryPanelBlockItem.fixCtrlCopiedStack(stack));
-            if (network == null
-                    || !dev.distantstock.panel.DeployerPanels.install(board, slot, network)) {
+            var network = FactoryPanelBlockItem.isTuned(stack)
+                    ? LogisticallyLinkedBlockItem.networkFromStack(
+                    FactoryPanelBlockItem.fixCtrlCopiedStack(stack))
+                    : dev.distantstock.block.RemoteGaugeBlockEntity.UNCONFIGURED_LOCAL_NETWORK;
+            if (!dev.distantstock.panel.DeployerPanels.install(board, slot, network)) {
                 event.setCancellationResult(InteractionResult.FAIL);
                 event.setCanceled(true);
                 return;

@@ -11,6 +11,7 @@ import dev.distantstock.menu.ModMenus;
 import com.simibubi.create.AllPartialModels;
 import com.simibubi.create.content.logistics.packager.PackagerRenderer;
 import com.simibubi.create.content.logistics.packager.PackagerVisual;
+import com.simibubi.create.content.logistics.packagePort.frogport.FrogportRenderer;
 import dev.engine_room.flywheel.lib.visualization.SimpleBlockEntityVisualizer;
 import dev.engine_room.flywheel.lib.model.baked.PartialModel;
 import net.minecraft.client.Minecraft;
@@ -21,6 +22,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
@@ -31,9 +33,20 @@ public final class ClientSetup {
     @EventBusSubscriber(modid = DistantStock.MODID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static final class Screens {
         @SubscribeEvent
+        public static void goggles(FMLClientSetupEvent e) {
+            // Goggles are a presentation feature. Register this only on the physical client so the
+            // helmet cannot become a server-side behavioural predicate for unrelated Create addons.
+            e.enqueueWork(() -> com.simibubi.create.content.equipment.goggles.GogglesItem
+                    .addIsWearingPredicate(player -> player.getItemBySlot(EquipmentSlot.HEAD)
+                            .is(ModItems.ETHER_CASING_HELMET.get())));
+        }
+
+        @SubscribeEvent
         public static void screens(RegisterMenuScreensEvent e) {
             e.register(ModMenus.REQUESTER.get(), RequesterScreen::new);
             e.register(ModMenus.LAMP_MONITOR.get(), LampMonitorScreen::new);
+            e.register(ModMenus.CACHE_FROGPORT.get(), CacheFrogportScreen::new);
+            e.register(ModMenus.DOCK.get(), DockScreen::new);
             e.register(ModMenus.REMOTE_REQUESTER.get(), RemoteRedstoneRequesterScreen::new);
         }
 
@@ -93,11 +106,29 @@ public final class ClientSetup {
             SignalPanelRenderer.registerModels();
             RemoteGaugeRenderer.registerModels();
             ResonatorRenderer.registerModels();
+            TowerCoreRenderer.registerModels();
+            WallSounderRenderer.registerModels();
+            ClockIndicatorRenderer.registerModels();
+            SpecialFrogportModels.init();
+            // Create normally lets Flywheel's GlassPipeVisual replace the vanilla block-entity
+            // renderer entirely. In this pack that visual stops submitting fluid instances, so the
+            // pipe still transports fluid but appears empty. Disable the Flywheel visualizer only
+            // for glass fluid pipes and let Create's own TransparentStraightPipeRenderer render
+            // them instead. Keeping both active causes the two fluid surfaces to z-fight/flicker.
+            @SuppressWarnings("unchecked")
+            net.minecraft.world.level.block.entity.BlockEntityType<com.simibubi.create.content.fluids.pipes.StraightPipeBlockEntity>
+                    glassPipeType = (net.minecraft.world.level.block.entity.BlockEntityType<com.simibubi.create.content.fluids.pipes.StraightPipeBlockEntity>)
+                    (net.minecraft.world.level.block.entity.BlockEntityType<?>) net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE
+                            .get(ResourceLocation.fromNamespaceAndPath("create", "glass_fluid_pipe"));
+            dev.engine_room.flywheel.api.visualization.VisualizerRegistry.setVisualizer(glassPipeType, null);
             SimpleBlockEntityVisualizer.builder(ModBlockEntities.REMOTE_PACKAGER.get())
                     .factory((context, be, partialTick) -> new PackagerVisual<>(context, be, partialTick))
                     // The renderer still draws the packaged box outside the Flywheel check.
                     .neverSkipVanillaRender()
                     .apply();
+            // Diagnostic/cache Frogports intentionally use Create's vanilla FrogportRenderer
+            // rather than FrogportVisual. Their authored orange/green partial models are selected
+            // by FrogportVisualTintMixin without multiplying colours over the cyan source texture.
         }
 
 
@@ -123,16 +154,23 @@ public final class ClientSetup {
         public static void renderers(EntityRenderersEvent.RegisterRenderers e) {
             e.registerBlockEntityRenderer(ModBlockEntities.REMOTE_GAUGE.get(),
                     RemoteGaugeRenderer::new);
+            e.registerBlockEntityRenderer(ModBlockEntities.GAUGE.get(), GaugeFlapRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.REMOTE_PACKAGER.get(), PackagerRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.DOCK.get(), DockParcelRenderer::new);
+            e.registerBlockEntityRenderer(ModBlockEntities.DIAGNOSTIC_FROGPORT.get(), FrogportRenderer::new);
+            e.registerBlockEntityRenderer(ModBlockEntities.CACHE_FROGPORT.get(), FrogportRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.SIGNAL_PANEL.get(), SignalPanelRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.ETHER_RESONATOR.get(), ResonatorRenderer::new);
+            e.registerBlockEntityRenderer(ModBlockEntities.WALL_SOUNDER.get(), WallSounderRenderer::new);
             // The monitor's face is a flap display, and this is Create's renderer for one: the
             // glyphs, the flip animation and the light they are drawn in all come from it. Nothing
             // of ours is involved, which is the point — a board that looks like a display board
             // because it is one.
             e.registerBlockEntityRenderer(ModBlockEntities.MONITOR.get(),
                     MonitorFlapRenderer::new);
+            e.registerBlockEntityRenderer(ModBlockEntities.LOGGER.get(), LoggerRenderer::new);
+            e.registerBlockEntityRenderer(ModBlockEntities.NIXIE_CLOCK.get(), NixieClockRenderer::new);
+            e.registerBlockEntityRenderer(ModBlockEntities.FLAP_CLOCK.get(), FlapClockRenderer::new);
             // 底座里的以太。四个观察窗是模型的一部分，液面是这里画的 —— 机壳通上红石变成窗户
             // 之后才看得见，所以它平时不占任何画面。
             e.registerBlockEntityRenderer(ModBlockEntities.TOWER_CORE.get(), TowerCoreRenderer::new);
@@ -150,6 +188,16 @@ public final class ClientSetup {
             AllPartialModels.PACKAGE_RIGGING.put(remoteId,
                     PartialModel.of(ResourceLocation.fromNamespaceAndPath(DistantStock.MODID,
                             "item/remote_package_rigging_12x12")));
+            ResourceLocation pingId = BuiltInRegistries.ITEM.getKey(ModItems.PING_PACKAGE.get());
+            AllPartialModels.PACKAGES.put(pingId,
+                    PartialModel.of(ResourceLocation.fromNamespaceAndPath(DistantStock.MODID,
+                            "item/ping_package_12x12")));
+            AllPartialModels.PACKAGE_RIGGING.put(pingId,
+                    PartialModel.of(ResourceLocation.fromNamespaceAndPath(DistantStock.MODID,
+                            "item/ping_package_rigging_12x12")));
+            if (net.neoforged.fml.ModList.get().isLoaded("fluidlogistics")) {
+                dev.distantstock.compat.fluidlogistics.FluidLogisticsClientCompat.registerModels();
+            }
         }
     }
 

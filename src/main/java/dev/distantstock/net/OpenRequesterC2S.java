@@ -41,7 +41,7 @@ public record OpenRequesterC2S() implements CustomPacketPayload {
             player.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> new RequesterMenu(id, inv, hand),
                     Component.translatable("gui.distantstock.title")
-            ), buf -> MenuSync.writeItem(buf, hand, RequesterData.freq(stack)));
+            ), buf -> MenuSync.writeItem(buf, hand, stack));
         });
     }
 }

@@ -8,6 +8,8 @@ import numpy as np
 REPO=Path('/Users/xx2005/Documents/git_repository/DistantStock')
 OUT=Path(__file__).resolve().parent
 sys.path.insert(0,str(REPO/'scripts/concepts'))
+sys.path.insert(0,str(REPO/'scripts'))
+from casing_ct import continue_frame
 from render_scene import render,box
 BG='#e8eeed'
 prior=OUT.parent/'tower_base_v2/textures'
@@ -35,6 +37,7 @@ def tile(mask,on=False,fluid=False):
                           (0,3,6,(0,13,3,16)),(1,3,7,(13,13,16,16))]:
         if mask&(1<<a) and mask&(1<<b) and not mask&(1<<diag):
             im.paste(source.crop(rect),rect[:2])
+    im = continue_frame(im,mask,source)
     if fluid: im.paste(port.crop((2,2,14,14)),(2,2))
     return im
 materials={}

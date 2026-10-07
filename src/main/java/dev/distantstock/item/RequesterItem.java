@@ -47,10 +47,17 @@ public final class RequesterItem extends Item {
             return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
         }
         if (!level.isClientSide && player instanceof ServerPlayer sp) {
+            var network = RequesterData.network(stack).orElse(null);
+            UUID freq = RequesterData.freq(stack);
+            if (!dev.distantstock.stock.CreateNetworkAccess.mayInteract(network, freq, player)) {
+                player.displayClientMessage(Component.translatable(
+                        "message.distantstock.network.interact_denied"), true);
+                return InteractionResultHolder.fail(stack);
+            }
             sp.openMenu(new SimpleMenuProvider(
                     (id, inv, p) -> new RequesterMenu(id, inv, hand),
                     Component.translatable("gui.distantstock.title")
-            ), buf -> MenuSync.writeItem(buf, hand, RequesterData.freq(stack)));
+            ), buf -> MenuSync.writeItem(buf, hand, stack));
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
     }

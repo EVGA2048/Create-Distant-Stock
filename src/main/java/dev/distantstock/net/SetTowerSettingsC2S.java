@@ -72,6 +72,14 @@ public record SetTowerSettingsC2S(BlockPos monitor, long tower, int radius, bool
                     msg.monitor.getZ() + 0.5) > REACH) {
                 return;
             }
+            // The same tower page can be opened from a monitor (extra services) or from the
+            // tower itself. Do not accept an arbitrary coordinate merely because it happens to be
+            // covered by a tower; crafted packets must name a real control source.
+            var sourceBlock = level.getBlockState(msg.monitor).getBlock();
+            if (sourceBlock != dev.distantstock.block.ModBlocks.MONITOR.get()
+                    && sourceBlock != dev.distantstock.block.ModBlocks.TOWER_CORE.get()) {
+                return;
+            }
             // A negative radius is the file's own "nobody chose", so anything below it is folded
             // into the same answer rather than stored as a second spelling of it.
             int radius = Math.max(-1, msg.radius);

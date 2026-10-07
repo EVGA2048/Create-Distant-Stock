@@ -1,0 +1,4 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": { "layer0": "distantstock:item/ether_casing_leggings" }
+}

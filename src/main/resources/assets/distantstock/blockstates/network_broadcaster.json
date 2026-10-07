@@ -1,0 +1,6 @@
+{
+  "variants": {
+    "powered=false": {"model": "distantstock:block/network_broadcaster"},
+    "powered=true":  {"model": "distantstock:block/network_broadcaster_powered"}
+  }
+}

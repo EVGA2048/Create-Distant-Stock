@@ -3,8 +3,11 @@ package dev.distantstock;
 import dev.distantstock.block.ModBlockEntities;
 import dev.distantstock.block.ModBlocks;
 import dev.distantstock.config.StockConfig;
+import dev.distantstock.display.ModDisplaySources;
+import dev.distantstock.display.ModDisplayTargets;
 import dev.distantstock.fluid.ModFluids;
 import dev.distantstock.item.ModItems;
+import dev.distantstock.item.ModArmorMaterials;
 import dev.distantstock.menu.ModMenus;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -21,9 +24,13 @@ public final class DistantStock {
         ModFluids.FLUIDS.register(bus);
         ModBlocks.BLOCKS.register(bus);
         ModBlockEntities.BES.register(bus);
+        ModArmorMaterials.MATERIALS.register(bus);
         ModItems.ITEMS.register(bus);
+        ModSounds.SOUNDS.register(bus);
         ModItems.TABS.register(bus);
         ModMenus.MENUS.register(bus);
+        ModDisplaySources.register(bus);
+        ModDisplayTargets.register(bus);
         /*
          * Create: Deployer lets a panel type live on any board. It is optional, and the check is
          * what makes it optional: the class holding every reference to it is only named inside this
@@ -33,5 +40,11 @@ public final class DistantStock {
         if (net.neoforged.fml.ModList.get().isLoaded("deployer")) {
             dev.distantstock.panel.DeployerPanels.register(bus);
         }
+        // FluidLogistics is a true optional compat surface. This class references its API and is
+        // therefore never resolved on packs that do not have the mod installed.
+        if (net.neoforged.fml.ModList.get().isLoaded("fluidlogistics")) {
+            dev.distantstock.compat.fluidlogistics.FluidLogisticsCompat.register(bus);
+        }
     }
+
 }

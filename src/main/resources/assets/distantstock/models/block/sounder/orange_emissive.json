@@ -1,0 +1,118 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:translucent",
+  "textures": {
+    "particle": "distantstock:block/sounder/orange_on_front",
+    "filament_on": "distantstock:block/sounder/filament_on",
+    "orange_on_front": "distantstock:block/sounder/orange_on_front",
+    "orange_on_side": "distantstock:block/sounder/orange_on_side",
+    "orange_on_top": "distantstock:block/sounder/orange_on_top",
+    "orange_on_bottom": "distantstock:block/sounder/orange_on_bottom"
+  },
+  "elements": [
+    {
+      "name": "emissive_filament",
+      "from": [
+        6.5,
+        3.5,
+        12.47
+      ],
+      "to": [
+        9.5,
+        7.5,
+        12.47
+      ],
+      "faces": {
+        "north": {
+          "texture": "#filament_on",
+          "uv": [
+            0,
+            0,
+            3,
+            4
+          ]
+        },
+        "south": {
+          "texture": "#filament_on",
+          "uv": [
+            3,
+            0,
+            0,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "name": "emissive_lens",
+      "from": [
+        4.98,
+        2.98,
+        10.98
+      ],
+      "to": [
+        11.02,
+        8.02,
+        14.02
+      ],
+      "faces": {
+        "north": {
+          "texture": "#orange_on_front",
+          "uv": [
+            0,
+            0,
+            6,
+            5
+          ]
+        },
+        "south": {
+          "texture": "#orange_on_front",
+          "uv": [
+            6,
+            0,
+            0,
+            5
+          ]
+        },
+        "west": {
+          "texture": "#orange_on_side",
+          "uv": [
+            3,
+            0,
+            0,
+            5
+          ]
+        },
+        "east": {
+          "texture": "#orange_on_side",
+          "uv": [
+            0,
+            0,
+            3,
+            5
+          ]
+        },
+        "up": {
+          "texture": "#orange_on_top",
+          "uv": [
+            0,
+            0,
+            6,
+            3
+          ],
+          "rotation": 180
+        },
+        "down": {
+          "texture": "#orange_on_bottom",
+          "uv": [
+            0,
+            0,
+            6,
+            3
+          ],
+          "rotation": 180
+        }
+      }
+    }
+  ]
+}

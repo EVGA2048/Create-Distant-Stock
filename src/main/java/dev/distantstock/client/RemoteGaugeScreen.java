@@ -9,9 +9,13 @@ import dev.distantstock.net.BindGaugePanelC2S;
 import net.createmod.catnip.gui.ScreenOpener;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.PacketDistributor;
+
+import java.util.List;
 
 /**
  * Create 的工厂仪表界面，**把窗口接长一段**，远仓那两行住在里面。
@@ -70,6 +74,13 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen implements Group
     private final FactoryPanelBehaviour behaviour;
     private com.simibubi.create.content.logistics.AddressEditBox destination;
     private com.simibubi.create.content.logistics.AddressEditBox address;
+    private EditBox networkCode;
+    private Button joinNetworkButton;
+    private Button sourceButton;
+    private dev.distantstock.net.DistantDeviceStateS2C networkState =
+            new dev.distantstock.net.DistantDeviceStateS2C(
+                    net.minecraft.core.BlockPos.ZERO, -1, null, "", null, List.of());
+    private boolean sourcePickerOpen;
     /** 接收港组的清单：点一行就把名字填进框里，和终端那个下拉是同一份数据。 */
     private final GroupPicker picker = new GroupPicker();
 
@@ -115,10 +126,97 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen implements Group
         address.setHint(Component.translatable("gui.distantstock.remote_gauge.address.hint"));
         addRenderableWidget(address);
 
-        // 清单是服务器推的，推的那一次可以和界面创建抢跑 —— 要一次比赌它送到便宜。
-        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-                new dev.distantstock.net.SetDockGroupC2S("",
-                        dev.distantstock.net.SetDockGroupC2S.REFRESH));
+        int networkY = bandTop() + HINT_TOP - 2;
+        networkCode = new EditBox(font, left, networkY, 82, 12,
+                Component.translatable("gui.distantstock.device.join_code"));
+        networkCode.setBordered(false);
+        networkCode.setMaxLength(9);
+        networkCode.setTextColor(HINT_COLOR);
+        networkCode.setHint(Component.literal("1F2A-5B7G"));
+        networkCode.setResponder(ignore -> updateNetworkWidgets());
+        addRenderableWidget(networkCode);
+        joinNetworkButton = addRenderableWidget(Button.builder(
+                        Component.translatable("gui.distantstock.distant_network.join"),
+                        b -> joinNetwork())
+                .bounds(left + 87, networkY - 2, 42, 14).build());
+        sourceButton = addRenderableWidget(Button.builder(Component.empty(), b -> {
+                    sourcePickerOpen = !sourcePickerOpen;
+                })
+                .bounds(left, networkY - 2, wide, 14).build());
+        updateNetworkWidgets();
+
+        // 组清单跟设备状态一起按**设备自己的正式远仓 scope**发送。
+        // 不能拿一个空终端去 REFRESH：空终端会被解释成 Legacy scope，把正式网络的组全过滤掉。
+        requestNetworkState();
+    }
+
+    public void applyDistantNetworkState(dev.distantstock.net.DistantDeviceStateS2C state) {
+        if (state == null || !state.pos().equals(behaviour.blockEntity.getBlockPos())
+                || state.slot() != behaviour.slot.ordinal()) return;
+        networkState = state;
+        sourcePickerOpen = false;
+        updateNetworkWidgets();
+    }
+
+    private void requestNetworkState() {
+        PacketDistributor.sendToServer(new dev.distantstock.net.DistantDeviceActionC2S(
+                behaviour.blockEntity.getBlockPos(), behaviour.slot.ordinal(),
+                dev.distantstock.net.DistantDeviceActionC2S.REFRESH, "", null));
+    }
+
+    private void joinNetwork() {
+        String code = networkCode == null ? "" : networkCode.getValue().trim();
+        try {
+            code = dev.distantstock.routing.DistantNetworkDirectory.normalizeCode(code);
+        } catch (IllegalArgumentException ignored) {
+            return;
+        }
+        PacketDistributor.sendToServer(new dev.distantstock.net.DistantDeviceActionC2S(
+                behaviour.blockEntity.getBlockPos(), behaviour.slot.ordinal(),
+                dev.distantstock.net.DistantDeviceActionC2S.JOIN, code, null));
+    }
+
+    private void updateNetworkWidgets() {
+        if (networkCode == null || joinNetworkButton == null || sourceButton == null) return;
+        boolean joined = networkState != null && networkState.joined();
+        networkCode.visible = !joined;
+        joinNetworkButton.visible = !joined;
+        if (!joined) {
+            try {
+                dev.distantstock.routing.DistantNetworkDirectory.normalizeCode(networkCode.getValue());
+                joinNetworkButton.active = true;
+            } catch (IllegalArgumentException ignored) {
+                joinNetworkButton.active = false;
+            }
+        }
+        sourceButton.visible = joined;
+        if (joined) {
+            String source = selectedSourceLabel();
+            String label = networkState.networkName().isBlank()
+                    ? Component.translatable("gui.distantstock.device.select_source").getString()
+                    : networkState.networkName() + " · " + (source.isBlank()
+                    ? Component.translatable("gui.distantstock.device.select_source").getString() : source);
+            sourceButton.setMessage(Component.literal(font.plainSubstrByWidth(label, sourceButton.getWidth() - 10)));
+            sourceButton.active = !networkState.members().isEmpty();
+        }
+    }
+
+    private String selectedSourceLabel() {
+        if (networkState == null || networkState.selected() == null) return "";
+        return networkState.members().stream()
+                .filter(member -> networkState.selected().equals(member.network()))
+                .map(this::memberLabel)
+                .findFirst().orElse(networkState.selected().shortLabel());
+    }
+
+    private String memberLabel(dev.distantstock.net.DistantDeviceStateS2C.Member member) {
+        String warehouse = member.warehouseName() == null || member.warehouseName().isBlank()
+                ? Component.translatable("gui.distantstock.warehouse.unnamed").getString()
+                : member.warehouseName();
+        String where = member.local()
+                ? Component.translatable("gui.distantstock.local").getString()
+                : member.server();
+        return where == null || where.isBlank() ? warehouse : warehouse + " · " + where;
     }
 
     /** 本服的清单到了。 */
@@ -229,20 +327,7 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen implements Group
         if (address != null) {
             AddressStrip.renderUnder(graphics, address);
         }
-        // 这一行只说一件事：这块仪表指着哪台仓库。右边补一句"关掉即保存"—— 没有确认按钮了，
-        // 不说的话玩家不知道该什么时候离开这个界面。仓库名太长时**先让着右边那句**，宁可截仓库名。
-        Component note = Component.translatable("gui.distantstock.save_on_close");
-        int noteW = font.width(note);
-        graphics.drawString(font, note, guiLeft + windowWidth - INSET_R - noteW, top + HINT_TOP,
-                HINT_COLOR_NOTE, false);
-        Component line = sourceLine(behaviour);
-        // 没仓库时那句话说白了是"你现在填的东西存不下来"，用警告色 —— 玩家上一次就是没注意到它。
-        int lineColor = knownBinding(behaviour) == null ? HINT_COLOR_WARN : HINT_COLOR;
-        if (line != null) {
-            int room = Math.max(0, windowWidth - INSET_L - INSET_R - noteW - 8);
-            graphics.drawString(font, font.plainSubstrByWidth(line.getString(), room),
-                    guiLeft + INSET_L, top + HINT_TOP, lineColor, false);
-        }
+        // 最后一行由实际控件占用：未加入时是 Join Code，加入后是成员仓库选择器。
     }
 
     /**
@@ -260,6 +345,19 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen implements Group
      */
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (sourcePickerOpen && networkState != null) {
+            int hit = sourcePickerIndex(mouseX, mouseY);
+            if (hit >= 0) {
+                var member = networkState.members().get(hit);
+                PacketDistributor.sendToServer(new dev.distantstock.net.DistantDeviceActionC2S(
+                        behaviour.blockEntity.getBlockPos(), behaviour.slot.ordinal(),
+                        dev.distantstock.net.DistantDeviceActionC2S.SELECT, "", member.network()));
+                sourcePickerOpen = false;
+                return true;
+            }
+            if (insideSourcePicker(mouseX, mouseY)) return true;
+            sourcePickerOpen = false;
+        }
         // 清单先来：它画在框上面，点它的时候该落到行里，而不是落到底下那个输入框上。
         if (picker.isOpen()) {
             String picked = picker.hit(mouseX, mouseY, pickerX(), pickerY(), pickerW());
@@ -302,6 +400,42 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen implements Group
             picker.render(graphics, font, pickerX(), pickerY(), pickerW(), mouseX, mouseY,
                     destination == null ? "" : destination.getValue());
         }
+        renderSourcePicker(graphics, mouseX, mouseY);
+    }
+
+    private int sourcePickerRows() {
+        return networkState == null ? 0 : Math.min(6, networkState.members().size());
+    }
+
+    private int sourcePickerX() { return guiLeft + INSET_L; }
+    private int sourcePickerW() { return windowWidth - INSET_L - INSET_R; }
+    private int sourcePickerY() { return bandTop() + HINT_TOP - 4 - sourcePickerRows() * 12; }
+
+    private boolean insideSourcePicker(double x, double y) {
+        return sourcePickerOpen && x >= sourcePickerX() && x < sourcePickerX() + sourcePickerW()
+                && y >= sourcePickerY() && y < sourcePickerY() + sourcePickerRows() * 12;
+    }
+
+    private int sourcePickerIndex(double x, double y) {
+        if (!insideSourcePicker(x, y)) return -1;
+        int index = (int) ((y - sourcePickerY()) / 12);
+        return index >= 0 && networkState != null && index < networkState.members().size() ? index : -1;
+    }
+
+    private void renderSourcePicker(GuiGraphics graphics, int mouseX, int mouseY) {
+        if (!sourcePickerOpen || networkState == null || networkState.members().isEmpty()) return;
+        int x = sourcePickerX(), y = sourcePickerY(), w = sourcePickerW();
+        int rows = sourcePickerRows();
+        graphics.fill(x - 2, y - 2, x + w + 2, y + rows * 12 + 2, 0xEE20282B);
+        for (int i = 0; i < rows; i++) {
+            var member = networkState.members().get(i);
+            int ry = y + i * 12;
+            boolean hover = mouseX >= x && mouseX < x + w && mouseY >= ry && mouseY < ry + 12;
+            if (hover) graphics.fill(x, ry, x + w, ry + 12, 0x665A7A82);
+            String text = memberLabel(member) + (member.packable() ? "" : " · !");
+            graphics.drawString(font, font.plainSubstrByWidth(text, w - 6), x + 3, ry + 2,
+                    member.packable() ? HINT_COLOR : HINT_COLOR_WARN, false);
+        }
     }
 
     /**
@@ -312,6 +446,10 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen implements Group
      */
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (networkCode != null && networkCode.isFocused()
+                && networkCode.keyPressed(keyCode, scanCode, modifiers)) {
+            return true;
+        }
         if (getFocused() instanceof com.simibubi.create.content.logistics.AddressEditBox box
                 && box.keyPressed(keyCode, scanCode, modifiers)) {
             return true;
@@ -321,6 +459,10 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen implements Group
 
     @Override
     public boolean charTyped(char codePoint, int modifiers) {
+        if (networkCode != null && networkCode.isFocused()
+                && networkCode.charTyped(codePoint, modifiers)) {
+            return true;
+        }
         if (getFocused() instanceof com.simibubi.create.content.logistics.AddressEditBox box
                 && box.charTyped(codePoint, modifiers)) {
             return true;
@@ -348,9 +490,8 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen implements Group
     /**
      * 这块仪表指着哪台仓库，或者一句"它没有指着谁"；**读不出来的时候返回 null，什么都不画**。
      *
-     * <p>"读不出来"是 Deployer 那条路：别的模组的板子上那格仪表我们只能拿到它的地址
-     * （{@code DeployerPanels.addressOf}），拿不到它绑的网络。这时候沉默比编一句话强 —— 说"未绑定"
-     * 会让一台绑好的仪表看起来是坏的。
+     * <p>Deployer 板上的远仓仪表也使用同一份 {@code RemoteBinding}，所以这里必须把它读出来；
+     * 否则设备实际绑定正常，重开界面却会像没配置过一样。
      */
     private static Component sourceLine(FactoryPanelBehaviour behaviour) {
         RemoteBinding binding = knownBinding(behaviour);
@@ -375,6 +516,10 @@ public final class RemoteGaugeScreen extends FactoryPanelScreen implements Group
         }
         if (behaviour.blockEntity instanceof dev.distantstock.block.SignalPanelBlockEntity signal) {
             return signal.binding(behaviour.slot);
+        }
+        if (behaviour.blockEntity instanceof FactoryPanelBlockEntity board
+                && net.neoforged.fml.ModList.get().isLoaded("deployer")) {
+            return dev.distantstock.panel.DeployerPanels.bindingOf(board, behaviour.slot);
         }
         return null;
     }

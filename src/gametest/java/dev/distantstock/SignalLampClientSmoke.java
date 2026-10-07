@@ -3,9 +3,11 @@ package dev.distantstock;
 import com.mojang.logging.LogUtils;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelConnectionHandler;
 import dev.distantstock.block.ModBlocks;
+import dev.distantstock.item.ModItems;
 import dev.distantstock.client.RemoteGaugeRenderer;
 import dev.distantstock.client.ResonatorRenderer;
 import dev.distantstock.client.SignalPanelRenderer;
+import dev.distantstock.client.WallSounderRenderer;
 import dev.engine_room.flywheel.lib.model.baked.PartialModel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.model.BakedModel;
@@ -36,6 +38,108 @@ public final class SignalLampClientSmoke {
                     .noneMatch(m -> m.getName().contains("distantstock$lampOutput"))) {
                 throw new AssertionError("Client lamp connection mixin was not applied");
             }
+            if (Arrays.stream(com.simibubi.create.content.logistics.packagePort.frogport.FrogportRenderer.class.getDeclaredMethods())
+                    .noneMatch(m -> m.getName().contains("distantstock$replacePart"))) {
+                throw new AssertionError("Special Frogport authored-model renderer mixin was not applied");
+            }
+            LogUtils.getLogger().info(
+                    "DISTANTSTOCK_SPECIAL_FROGPORT_RENDERER_OK: authored partial-model swap applied");
+
+            var chainMethods = Arrays.stream(
+                    com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorInteractionHandler.class
+                            .getDeclaredMethods()).map(java.lang.reflect.Method::getName).toList();
+            if (chainMethods.stream().noneMatch(n -> n.contains("distantstock$specialFrogportActivatesChainSelection"))
+                    || chainMethods.stream().noneMatch(n -> n.contains("distantstock$specialFrogportCreatesTarget"))) {
+                throw new AssertionError("Special Frogport chain-selection mixin was not applied");
+            }
+            if (Arrays.stream(com.simibubi.create.content.logistics.packagePort.PackagePortTargetSelectionHandler.class
+                            .getDeclaredMethods())
+                    .noneMatch(m -> m.getName().contains("distantstock$keepSpecialFrogportTargeting"))) {
+                throw new AssertionError("Special Frogport target-preview mixin was not applied");
+            }
+            var untunedDiagnostic = new net.minecraft.world.item.ItemStack(ModItems.DIAGNOSTIC_FROGPORT.get());
+            var untunedId = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(
+                    dev.distantstock.client.SpecialFrogportSelection.normalizeForCreateCheck(untunedDiagnostic).getItem());
+            if (!ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "diagnostic_frogport").equals(untunedId)) {
+                throw new AssertionError("Untuned diagnostic Frogport incorrectly entered chain targeting: " + untunedId);
+            }
+
+            dev.distantstock.item.RequesterData.setFreq(untunedDiagnostic, java.util.UUID.randomUUID());
+            for (var stack : java.util.List.of(
+                    untunedDiagnostic,
+                    new net.minecraft.world.item.ItemStack(ModItems.CACHE_FROGPORT.get()))) {
+                var normalized = dev.distantstock.client.SpecialFrogportSelection.normalizeForCreateCheck(stack);
+                var id = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(normalized.getItem());
+                if (!ResourceLocation.fromNamespaceAndPath("create", "package_frogport").equals(id)) {
+                    throw new AssertionError("Configured special Frogport did not normalize for Create chain selection: " + id);
+                }
+            }
+            LogUtils.getLogger().info(
+                    "DISTANTSTOCK_SPECIAL_FROGPORT_SELECTION_OK: tuned diagnostic/cache Frogports participate in Create chain targeting");
+
+            // Dynamic sounder glow must use the inverse Catnip Y convention. North/south hide a
+            // sign error (0/180 are their own opposites), so explicitly pin the east/west cases.
+            float eps = 0.0001f;
+            if (Math.abs(WallSounderRenderer.rotationRadians(Direction.NORTH)) > eps
+                    || Math.abs(WallSounderRenderer.rotationRadians(Direction.SOUTH) - (float) Math.PI) > eps
+                    || Math.abs(WallSounderRenderer.rotationRadians(Direction.EAST) + (float) (Math.PI / 2)) > eps
+                    || Math.abs(WallSounderRenderer.rotationRadians(Direction.WEST) - (float) (Math.PI / 2)) > eps) {
+                throw new AssertionError("Wall sounder emissive rotation does not match baked blockstate facing");
+            }
+            LogUtils.getLogger().info(
+                    "DISTANTSTOCK_WALL_SOUNDER_ROTATION_OK: east/west emissive glow matches baked model orientation");
+
+            // The remote requester follows Create's original visual contract: redstone toggles the
+            // POWERED blockstate and that state must bake to a genuinely different side texture.
+            var requesterStates = ModBlocks.REMOTE_REDSTONE_REQUESTER.get().getStateDefinition().getPossibleStates();
+            var unpoweredState = requesterStates.stream()
+                    .filter(s -> s.getValue(com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlock.AXIS)
+                            == Direction.Axis.Z)
+                    .filter(s -> !s.getValue(com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlock.POWERED))
+                    .findFirst().orElseThrow();
+            var poweredState = requesterStates.stream()
+                    .filter(s -> s.getValue(com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlock.AXIS)
+                            == Direction.Axis.Z)
+                    .filter(s -> s.getValue(com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlock.POWERED))
+                    .findFirst().orElseThrow();
+            var unpoweredModel = mc.getBlockRenderer().getBlockModel(unpoweredState);
+            var poweredModel = mc.getBlockRenderer().getBlockModel(poweredState);
+            verify(unpoweredModel, mc);
+            verify(poweredModel, mc);
+            var unpoweredSprites = spriteNames(unpoweredModel, unpoweredState);
+            var poweredSprites = spriteNames(poweredModel, poweredState);
+            var expectedOff = ResourceLocation.fromNamespaceAndPath(DistantStock.MODID,
+                    "block/remote_redstone_requester_unpowered");
+            var expectedOn = ResourceLocation.fromNamespaceAndPath(DistantStock.MODID,
+                    "block/remote_redstone_requester_powered");
+            if (!unpoweredSprites.contains(expectedOff) || !poweredSprites.contains(expectedOn)
+                    || unpoweredSprites.equals(poweredSprites)) {
+                throw new AssertionError("Remote requester powered/unpowered baked models are not visually distinct: off="
+                        + unpoweredSprites + " on=" + poweredSprites);
+            }
+            if (!com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlockEntity.class
+                    .isAssignableFrom(dev.distantstock.block.RemoteRedstoneRequesterBlockEntity.class)) {
+                throw new AssertionError("Create requester effect packet cannot recognise the remote requester BE");
+            }
+            LogUtils.getLogger().info(
+                    "DISTANTSTOCK_REMOTE_REQUESTER_EFFECT_OK: powered model is distinct and Create effect packet accepts remote requester BE");
+
+            if (net.neoforged.fml.ModList.get().isLoaded("fluidlogistics")) {
+                Class<?> fluidRenderer = Class.forName(
+                        "com.yision.fluidlogistics.content.logistics.fluidPackage.client.FluidAwarePackageRenderer");
+                if (Arrays.stream(fluidRenderer.getDeclaredMethods())
+                        .noneMatch(m -> m.getName().contains("distantstock$renderRemoteFluidPackage"))) {
+                    throw new AssertionError("Remote fluid package entity renderer mixin was not applied to FluidLogistics 1.3.x renderer");
+                }
+                var remoteFluidId = ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "remote_fluid_package");
+                var remoteFluidModel = com.simibubi.create.AllPartialModels.PACKAGES.get(remoteFluidId);
+                if (remoteFluidModel == null) {
+                    throw new AssertionError("Remote fluid package has no Create package partial model");
+                }
+                verify(remoteFluidModel.get(), mc);
+                LogUtils.getLogger().info(
+                        "DISTANTSTOCK_REMOTE_FLUID_ENTITY_RENDERER_OK: 1.3.x renderer mixin applied and blue 12x12 shell partial baked");
+            }
             // The casing's connected texture attaches by swapping its baked model, and a swap that
             // silently did not happen leaves a perfectly ordinary-looking block with no connection
             // logic at all. Nothing else in the game reports that, so it is asserted here.
@@ -45,6 +149,25 @@ public final class SignalLampClientSmoke {
                     throw new AssertionError("Distant casing is not using a connected-texture model: " + state);
                 }
             }
+            for (boolean powered : new boolean[]{false, true}) {
+                var topPort = ModBlocks.TOWER_CASING.get().defaultBlockState()
+                        .setValue(dev.distantstock.block.TowerCasingBlock.POWERED, powered)
+                        .setValue(dev.distantstock.block.TowerCasingBlock.PORT,
+                                dev.distantstock.block.TowerCasingBlock.Port.UP);
+                try {
+                    verify(mc.getBlockRenderer().getBlockModel(topPort), mc);
+                } catch (AssertionError failure) {
+                    throw new AssertionError("Tower casing UP fluid-port model is missing/broken: " + topPort,
+                            failure);
+                }
+            }
+            LogUtils.getLogger().info(
+                    "DISTANTSTOCK_TOWER_TOP_FLUID_PORT_OK: UP casing port baked for inactive/active states");
+            var towerShaftField = dev.distantstock.client.TowerCoreRenderer.class.getDeclaredField("SHAFT");
+            towerShaftField.setAccessible(true);
+            verify(((PartialModel) towerShaftField.get(null)).get(), mc);
+            LogUtils.getLogger().info(
+                    "DISTANTSTOCK_TOWER_SHAFT_RENDERER_OK: dedicated kinetic tower shaft partial baked alongside ether level");
             int states = 0;
             for (var block : java.util.List.of(ModBlocks.CYAN_INDICATOR_LAMP.get(), ModBlocks.ORANGE_INDICATOR_LAMP.get(),
                     ModBlocks.RED_INDICATOR_LAMP.get(), ModBlocks.GREEN_INDICATOR_LAMP.get(),
@@ -54,6 +177,18 @@ public final class SignalLampClientSmoke {
                     states++;
                 }
             }
+            for (var block : java.util.List.of(ModBlocks.STACK_LIGHT.get(), ModBlocks.CONDITION_LINKER.get())) {
+                for (var state : block.getStateDefinition().getPossibleStates()) {
+                    try {
+                        verify(mc.getBlockRenderer().getBlockModel(state), mc);
+                    } catch (AssertionError failure) {
+                        throw new AssertionError("Condition model: " + state, failure);
+                    }
+                    states++;
+                }
+            }
+            LogUtils.getLogger().info("DISTANTSTOCK_CONDITION_MODELS_OK: stack-light/linker states baked");
+
             var partials = dev.distantstock.block.SignalLampModels.all();
             for (var entry : partials.entrySet()) {
                 try { verify(((PartialModel) entry.getValue()).get(), mc); }
@@ -120,7 +255,8 @@ public final class SignalLampClientSmoke {
             // opens with blank captions, and the only place that shows up is in front of a player.
             var language = net.minecraft.locale.Language.getInstance();
             for (var entry : java.util.Map.of(
-                    "export", 5, "import", 3, "tune", 3, "status", 5, "tower", 8, "replenish", 6)
+                    "export", 4, "import", 3, "tune", 3, "status", 3,
+                    "tower", 6, "replenish", 4, "diagnostics", 5, "logger", 4)
                     .entrySet()) {
                 String scene = entry.getKey();
                 var id = ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "ponder/" + scene + ".nbt");
@@ -145,7 +281,14 @@ public final class SignalLampClientSmoke {
                 scenes++;
             }
             LogUtils.getLogger().info("DISTANTSTOCK_PONDER_OK: {} scenes have a structure and their text", scenes);
+            var dockGui = ResourceLocation.fromNamespaceAndPath(
+                    DistantStock.MODID, "textures/gui/remote_dock.png");
+            mc.getResourceManager().getResource(dockGui).orElseThrow(
+                    () -> new AssertionError("Distant Dock GUI texture is missing: " + dockGui));
+            LogUtils.getLogger().info("DISTANTSTOCK_DOCK_GUI_OK: remote dock panel texture is present");
             checkDockGroupPage(mc);
+            checkDistantNetworkPage(mc);
+            checkLoggerPage(mc);
             checkMonitorPages(mc);
             if (checkTerminalClick()) {
                 LogUtils.getLogger().info("DISTANTSTOCK_TERMINAL_CLICK_OK: 点一下就有反应");
@@ -157,6 +300,17 @@ public final class SignalLampClientSmoke {
         } finally {
             mc.stop();
         }
+    }
+
+    private static java.util.Set<ResourceLocation> spriteNames(BakedModel model,
+                                                                net.minecraft.world.level.block.state.BlockState state) {
+        java.util.Set<ResourceLocation> out = new java.util.LinkedHashSet<>();
+        RandomSource random = RandomSource.create(0xD157A17L);
+        for (Direction side : Direction.values()) {
+            for (var quad : model.getQuads(state, side, random)) out.add(quad.getSprite().contents().name());
+        }
+        for (var quad : model.getQuads(state, null, random)) out.add(quad.getSprite().contents().name());
+        return out;
     }
 
     /**
@@ -172,7 +326,7 @@ public final class SignalLampClientSmoke {
     private static void checkDockGroupPage(Minecraft mc) {
         var graphics = new net.minecraft.client.gui.GuiGraphics(mc, mc.renderBuffers().bufferSource());
         var mine = new dev.distantstock.net.DockGroupsS2C.Entry(java.util.UUID.randomUUID(),
-                "测试网络", true, true, 2, "某人", java.util.List.of("甲", "乙"), true);
+                "测试地址", true, true, 2, "某人", java.util.List.of("甲", "乙"), true, false);
         var page = new dev.distantstock.client.DockGroupScreen(null, mine);
         page.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
         page.render(graphics, 0, 0, 0f);
@@ -185,10 +339,62 @@ public final class SignalLampClientSmoke {
         LogUtils.getLogger().info("DISTANTSTOCK_GROUP_PAGE_OK: 港组页面开得出、画得出来");
     }
 
+    /** New Distant Stock network page: unjoined, joined member and authoritative owner all render. */
+    private static void checkDistantNetworkPage(Minecraft mc) {
+        var graphics = new net.minecraft.client.gui.GuiGraphics(mc, mc.renderBuffers().bufferSource());
+        var page = new dev.distantstock.client.DistantNetworkScreen(null, false);
+        page.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+
+        page.apply(new dev.distantstock.net.DistantNetworkStateS2C(
+                true, null, "", false, "", "", false));
+        page.render(graphics, 0, 0, 0f);
+
+        var networkId = java.util.UUID.randomUUID();
+        page.apply(new dev.distantstock.net.DistantNetworkStateS2C(
+                true, networkId, "Nexus", false, "", "未命名仓库", true));
+        page.render(graphics, 0, 0, 0f);
+
+        page.apply(new dev.distantstock.net.DistantNetworkStateS2C(
+                true, networkId, "Nexus", true, "1F2A-5B7G", "中控仓", true));
+        page.render(graphics, 0, 0, 0f);
+        LogUtils.getLogger().info(
+                "DISTANTSTOCK_DISTANT_NETWORK_PAGE_OK: 未加入、成员、创建者三种状态均可绘制");
+    }
+
+    /** Logger screen renders active, acknowledged and cleared rows without a world/menu. */
+    private static void checkLoggerPage(Minecraft mc) {
+        var graphics = new net.minecraft.client.gui.GuiGraphics(mc, mc.renderBuffers().bufferSource());
+        var source = new net.minecraft.core.BlockPos(4, 70, 9);
+        long now = System.currentTimeMillis();
+        var rows = java.util.List.of(
+                new dev.distantstock.net.OpenLoggerS2C.Row(java.util.UUID.randomUUID(), now - 5000, now,
+                        dev.distantstock.event.EventRegistry.Severity.ERROR, "PARCEL_QUARANTINED",
+                        "parcel", "deadbeef", "ownership conflict", true, false, false, 2),
+                new dev.distantstock.net.OpenLoggerS2C.Row(java.util.UUID.randomUUID(), now - 9000, now - 3000,
+                        dev.distantstock.event.EventRegistry.Severity.WARN, "DOCK_NO_ADDRESS",
+                        "dock", "minecraft:overworld@1,2,3", "no receiving address", true, true, false, 1),
+                new dev.distantstock.net.OpenLoggerS2C.Row(java.util.UUID.randomUUID(), now - 12000, now - 6000,
+                        dev.distantstock.event.EventRegistry.Severity.INFO, "TEST_CLEARED",
+                        "test", "smoke", "cleared event", false, false, false, 1));
+        var snapshot = new dev.distantstock.net.OpenLoggerS2C(source,
+                dev.distantstock.event.EventRegistry.Severity.INFO,
+                dev.distantstock.block.LoggerBlockEntity.AlarmSoundMode.DING_DONG,
+                java.util.UUID.randomUUID(), 16, rows);
+        var page = new dev.distantstock.client.LoggerScreen(snapshot);
+        page.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+        page.render(graphics, 0, 0, 0f);
+        page.update(new dev.distantstock.net.OpenLoggerS2C(source,
+                dev.distantstock.event.EventRegistry.Severity.WARN,
+                dev.distantstock.block.LoggerBlockEntity.AlarmSoundMode.BUZZER,
+                null, 0, rows));
+        page.render(graphics, 0, 0, 0f);
+        LogUtils.getLogger().info("DISTANTSTOCK_LOGGER_PAGE_OK: 活动、已确认、已恢复事件均可绘制");
+    }
+
     /**
-     * 监视器两页都画得出来，而且**切页之后整块要重新居中**。
+     * 监视器链路 / 塔 / 诊断三页都画得出来，而且切页不能破坏布局。
      *
-     * <p>塔页比链路页高 66 像素、用的是另一张底图（见 {@code gen_monitor_tower_bg.py}）：切页时
+     * <p>塔页比链路页更高，背景由 Create 原生的 stock-keeper GUI 分片重复拼接：切页时
      * 屏幕顶点的位置得跟着变，否则高的那一页会顶到屏幕外面 —— 玩家截的图里"底部那行区块选区被切掉"
      * 就是这么来的。这里画一遍链路页、点一下页签、再画一遍塔页；两张底图少一张、或者切页后没重算
      * 位置，这里都会抛出来。
@@ -202,19 +408,22 @@ public final class SignalLampClientSmoke {
                         40, 16, true, 120, 4000, 512, false, 1, true, true, 3, 5)));
         var view = new dev.distantstock.link.LinkSnapshot.View("A", "B", 20, 5, 1, 2, 0,
                 true, 19.5, 6, true, 12, 0, 1, 1,
-                true, true, "node", "A服", "", 0, 0, 0, 0, tower);
+                true, true, "node", "A服", "", 0, 0, 0, 0,
+                12, 10, 1, 1, 0, 4, 1, 2, 1, 0, 0, tower);
 
         var monitor = new dev.distantstock.client.MonitorScreen(
                 new net.minecraft.core.BlockPos(0, 0, 0), view);
         monitor.init(mc, mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
         monitor.render(graphics, 0, 0, 0f);
 
-        // 点一下「塔」那个页签：位置和 MonitorScreen.drawPageToggle 里写的一致。
-        int left = (mc.getWindow().getGuiScaledWidth() - 272) / 2;
-        int top = (mc.getWindow().getGuiScaledHeight() - 190) / 2;
-        monitor.mouseClicked(left + 55 + 20, top + 27 + 6, 0);
+        // 页签命中区直接跟 MonitorScreen 的 220x112 Bee Port 布局一致。
+        int left = (mc.getWindow().getGuiScaledWidth() - 220) / 2;
+        int top = (mc.getWindow().getGuiScaledHeight() - (112 + 24)) / 2 + 24;
+        monitor.mouseClicked(left - 22 + 9, top + 8 + 9, 0);   // 塔
         monitor.render(graphics, 0, 0, 0f);
-        LogUtils.getLogger().info("DISTANTSTOCK_MONITOR_PAGES_OK: 监视器链路页与塔页都画得出来");
+        monitor.mouseClicked(left - 22 + 9, top + 26 + 9, 0);  // 诊
+        monitor.render(graphics, 0, 0, 0f);
+        LogUtils.getLogger().info("DISTANTSTOCK_MONITOR_PAGES_OK: 监视器链路/塔/诊断三页均可绘制");
     }
 
     /**

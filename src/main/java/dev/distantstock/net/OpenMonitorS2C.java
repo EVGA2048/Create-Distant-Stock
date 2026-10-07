@@ -11,7 +11,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /** One-shot response to a player's explicit monitor interaction. */
-public record OpenMonitorS2C(BlockPos source, LinkSnapshot.View view) implements CustomPacketPayload {
+public record OpenMonitorS2C(BlockPos source, LinkSnapshot.View view, boolean towerOnly)
+        implements CustomPacketPayload {
     public static final Type<OpenMonitorS2C> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "open_monitor"));
 
@@ -21,10 +22,11 @@ public record OpenMonitorS2C(BlockPos source, LinkSnapshot.View view) implements
     private static void write(RegistryFriendlyByteBuf buf, OpenMonitorS2C message) {
         buf.writeBlockPos(message.source);
         LinkSnapshotS2C.writeView(buf, message.view);
+        buf.writeBoolean(message.towerOnly);
     }
 
     private static OpenMonitorS2C read(RegistryFriendlyByteBuf buf) {
-        return new OpenMonitorS2C(buf.readBlockPos(), LinkSnapshotS2C.readView(buf));
+        return new OpenMonitorS2C(buf.readBlockPos(), LinkSnapshotS2C.readView(buf), buf.readBoolean());
     }
 
     @Override

@@ -1,0 +1,469 @@
+{
+  "parent": "minecraft:block/block",
+  "loader": "neoforge:composite",
+  "textures": {
+    "particle": "sounder_study:andesite"
+  },
+  "credit": "Distant Stock concept; Create andesite and stock-link lamp texels, recolored glass",
+  "children": {
+    "body": {
+      "render_type": "minecraft:cutout",
+      "elements": [
+        {
+          "name": "wall_mount",
+          "from": [
+            4,
+            2,
+            14
+          ],
+          "to": [
+            12,
+            14,
+            16
+          ],
+          "faces": {
+            "north": {
+              "texture": "sounder_study:mount_front",
+              "uv": [
+                0,
+                0,
+                8.0,
+                12.0
+              ]
+            },
+            "south": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                8.0,
+                12.0
+              ]
+            },
+            "west": {
+              "texture": "sounder_study:housing_side",
+              "uv": [
+                2,
+                0,
+                4,
+                12
+              ]
+            },
+            "east": {
+              "texture": "sounder_study:housing_side",
+              "uv": [
+                4,
+                0,
+                2,
+                12
+              ]
+            },
+            "up": {
+              "texture": "sounder_study:housing_top",
+              "uv": [
+                0,
+                2,
+                8,
+                4
+              ]
+            },
+            "down": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                8.0,
+                2.0
+              ]
+            }
+          }
+        },
+        {
+          "name": "speaker_housing",
+          "from": [
+            4,
+            9,
+            12
+          ],
+          "to": [
+            12,
+            14,
+            14
+          ],
+          "faces": {
+            "north": {
+              "texture": "sounder_study:speaker_well",
+              "uv": [
+                0,
+                0,
+                8.0,
+                5.0
+              ]
+            },
+            "south": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                8.0,
+                5.0
+              ]
+            },
+            "west": {
+              "texture": "sounder_study:housing_side",
+              "uv": [
+                0,
+                0,
+                2,
+                5
+              ]
+            },
+            "east": {
+              "texture": "sounder_study:housing_side",
+              "uv": [
+                2,
+                0,
+                0,
+                5
+              ]
+            },
+            "up": {
+              "texture": "sounder_study:housing_top",
+              "uv": [
+                0,
+                0,
+                8,
+                2
+              ]
+            },
+            "down": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                8.0,
+                2.0
+              ]
+            }
+          }
+        },
+        {
+          "name": "grille_rail_9",
+          "from": [
+            5,
+            9,
+            11
+          ],
+          "to": [
+            11,
+            10,
+            12
+          ],
+          "faces": {
+            "north": {
+              "texture": "sounder_study:rail_front",
+              "uv": [
+                0,
+                0,
+                6.0,
+                1.0
+              ]
+            },
+            "south": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                6.0,
+                1.0
+              ]
+            },
+            "west": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                1.0,
+                1.0
+              ]
+            },
+            "east": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                1.0,
+                1.0
+              ]
+            },
+            "up": {
+              "texture": "sounder_study:rail_top",
+              "uv": [
+                0,
+                0,
+                6.0,
+                1.0
+              ]
+            },
+            "down": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                6.0,
+                1.0
+              ]
+            }
+          }
+        },
+        {
+          "name": "grille_rail_11",
+          "from": [
+            5,
+            11,
+            11
+          ],
+          "to": [
+            11,
+            12,
+            12
+          ],
+          "faces": {
+            "north": {
+              "texture": "sounder_study:rail_front",
+              "uv": [
+                0,
+                0,
+                6.0,
+                1.0
+              ]
+            },
+            "south": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                6.0,
+                1.0
+              ]
+            },
+            "west": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                1.0,
+                1.0
+              ]
+            },
+            "east": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                1.0,
+                1.0
+              ]
+            },
+            "up": {
+              "texture": "sounder_study:rail_top",
+              "uv": [
+                0,
+                0,
+                6.0,
+                1.0
+              ]
+            },
+            "down": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                6.0,
+                1.0
+              ]
+            }
+          }
+        },
+        {
+          "name": "grille_rail_13",
+          "from": [
+            5,
+            13,
+            11
+          ],
+          "to": [
+            11,
+            14,
+            12
+          ],
+          "faces": {
+            "north": {
+              "texture": "sounder_study:rail_front",
+              "uv": [
+                0,
+                0,
+                6.0,
+                1.0
+              ]
+            },
+            "south": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                6.0,
+                1.0
+              ]
+            },
+            "west": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                1.0,
+                1.0
+              ]
+            },
+            "east": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                1.0,
+                1.0
+              ]
+            },
+            "up": {
+              "texture": "sounder_study:rail_top",
+              "uv": [
+                0,
+                0,
+                6.0,
+                1.0
+              ]
+            },
+            "down": {
+              "texture": "sounder_study:andesite",
+              "uv": [
+                0,
+                0,
+                6.0,
+                1.0
+              ]
+            }
+          }
+        },
+        {
+          "name": "filament",
+          "from": [
+            6.5,
+            3.5,
+            13
+          ],
+          "to": [
+            9.5,
+            7.5,
+            13
+          ],
+          "faces": {
+            "north": {
+              "texture": "sounder_study:filament_off",
+              "uv": [
+                0,
+                0,
+                3.0,
+                4.0
+              ]
+            },
+            "south": {
+              "texture": "sounder_study:filament_off",
+              "uv": [
+                3,
+                0,
+                0,
+                4
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "glass": {
+      "render_type": "minecraft:translucent",
+      "elements": [
+        {
+          "name": "glass_bulb",
+          "from": [
+            4.5,
+            3,
+            12
+          ],
+          "to": [
+            11.5,
+            8,
+            14
+          ],
+          "faces": {
+            "north": {
+              "texture": "sounder_study:orange_off_front",
+              "uv": [
+                0,
+                0,
+                7.0,
+                5.0
+              ]
+            },
+            "south": {
+              "texture": "sounder_study:orange_off_front",
+              "uv": [
+                7,
+                0,
+                0,
+                5
+              ]
+            },
+            "west": {
+              "texture": "sounder_study:orange_off_side",
+              "uv": [
+                2,
+                0,
+                0,
+                5
+              ]
+            },
+            "east": {
+              "texture": "sounder_study:orange_off_side",
+              "uv": [
+                0,
+                0,
+                2.0,
+                5.0
+              ]
+            },
+            "up": {
+              "texture": "sounder_study:orange_off_top",
+              "uv": [
+                0,
+                0,
+                7.0,
+                2.0
+              ],
+              "rotation": 180
+            },
+            "down": {
+              "texture": "sounder_study:orange_off_bottom",
+              "uv": [
+                0,
+                0,
+                7.0,
+                2.0
+              ],
+              "rotation": 180
+            }
+          }
+        }
+      ]
+    }
+  }
+}

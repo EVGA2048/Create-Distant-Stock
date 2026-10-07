@@ -71,4 +71,5 @@ public final class TowerCouplerBlock extends Block {
     public static boolean connected(Level level, BlockPos pos, Direction direction) {
         return level.getBlockState(pos.relative(direction)).getBlock() instanceof TowerCouplerBlock;
     }
+
 }

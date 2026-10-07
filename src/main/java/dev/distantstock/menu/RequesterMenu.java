@@ -28,6 +28,14 @@ public final class RequesterMenu extends AbstractContainerMenu {
     public List<NetworkDirectory.Entry> networks = new ArrayList<>();
     public UUID selectedFreq;
     public boolean demo;
+    /** Server-authored configuration snapshot carried by the menu-opening payload. Client only. */
+    boolean hasOpenedState;
+    RemoteNetworkId openedNetworkId;
+    UUID openedDistantNetworkId;
+    String openedAddress = "";
+    String openedHomeAddress = "";
+    UUID openedReceivingGroup;
+    String openedReceivingGroupName = "";
 
     public RequesterMenu(int id, Inventory inv, InteractionHand hand) {
         super(ModMenus.REQUESTER.get(), id);
@@ -38,6 +46,69 @@ public final class RequesterMenu extends AbstractContainerMenu {
             // The screen cannot draw a list it has never been given, and the field it replaces used
             // to be free text precisely because there was nothing to list.
             sendGroupList(inv.player, device(inv.player));
+        }
+    }
+
+    /** Persist only the terminal's Distant Stock network context; no Create warehouse is implied. */
+    public void persistDistantNetworkContext(Player player, UUID scope) {
+        if (player == null || isGauge()) return;
+        ItemStack stack = device(player);
+        if (stack.isEmpty()) return;
+        RequesterData.setDistantNetwork(stack, scope);
+        player.getInventory().setChanged();
+    }
+
+    public void clearDistantNetworkContext(Player player) {
+        if (player == null || isGauge()) return;
+        ItemStack stack = device(player);
+        if (stack.isEmpty()) return;
+        RequesterData.setDistantNetwork(stack, null);
+        RequesterData.clearWarehouseBinding(stack);
+        RequesterData.setReceivingGroup(stack, null, null);
+        selectedFreq = null;
+        player.getInventory().setChanged();
+    }
+
+    /** Replace an obsolete local RemoteNetworkId stored on the device with the live directory id. */
+    public void persistLocalNetworkIdentity(Player player, RemoteNetworkId member, UUID scope) {
+        if (player == null || member == null) return;
+        UUID stored = scope == null
+                ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID : scope;
+        GaugeBlockEntity gauge = gauge(player);
+        if (gauge != null) {
+            gauge.setNetwork(member, stored);
+            return;
+        }
+        ItemStack stack = device(player);
+        if (!stack.isEmpty()) {
+            RequesterData.setNetwork(stack, member, stored);
+            player.getInventory().setChanged();
+        }
+    }
+
+    /**
+     * Persist a changed Distant Stock membership onto the currently selected warehouse binding.
+     * Live announcements are still preferred when present; this copy is what survives a quiet peer.
+     */
+    public void persistDistantNetworkScope(Player player, RemoteNetworkId member, UUID scope) {
+        if (player == null || member == null || !member.equals(networkId(player))) {
+            return;
+        }
+        UUID stored = scope == null
+                ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID : scope;
+        GaugeBlockEntity gauge = gauge(player);
+        if (gauge != null) {
+            if (!stored.equals(gauge.distantNetworkId())) {
+                gauge.setNetwork(member, stored);
+            }
+            return;
+        }
+        ItemStack stack = device(player);
+        if (!stack.isEmpty()) {
+            if (!RequesterData.distantNetwork(stack).filter(stored::equals).isPresent()) {
+                RequesterData.setNetwork(stack, member, stored);
+                player.getInventory().setChanged();
+            }
         }
     }
 
@@ -61,6 +132,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
             menu.selectedFreq = buf.readUUID();
         }
         MenuSync.readCatalog(menu, buf);
+        MenuSync.readState(menu, buf);
         return menu;
     }
 
@@ -87,6 +159,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
     }
 
     public String address(Player player) {
+        if (hasOpenedState && player != null && player.level().isClientSide) {
+            return openedAddress;
+        }
         GaugeBlockEntity be = gauge(player);
         if (be != null) {
             return be.address();
@@ -102,6 +177,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
      * happen to call the door the same thing.
      */
     public String homeAddress(Player player) {
+        if (hasOpenedState && player != null && player.level().isClientSide) {
+            return openedHomeAddress;
+        }
         GaugeBlockEntity be = gauge(player);
         if (be != null) {
             return be.homeAddress();
@@ -118,15 +196,75 @@ public final class RequesterMenu extends AbstractContainerMenu {
         ItemStack stack = device(player);
         if (!stack.isEmpty()) {
             RequesterData.setHomeAddress(stack, homeAddress);
+            player.getInventory().setChanged();
         }
     }
 
     public RemoteNetworkId networkId(Player player) {
+        if (hasOpenedState && player != null && player.level().isClientSide) {
+            return openedNetworkId;
+        }
         GaugeBlockEntity be = gauge(player);
         if (be != null) {
             return be.networkId();
         }
         return RequesterData.network(device(player)).orElse(null);
+    }
+
+    /** The Distant Stock network that contains the selected Create logistics network. */
+    public UUID distantNetworkId(Player player) {
+        if (hasOpenedState && player != null && player.level().isClientSide) {
+            if (selectedFreq != null) {
+                for (NetworkDirectory.Entry entry : networks) {
+                    if (selectedFreq.equals(entry.freq())) {
+                        return entry.distantNetworkId() == null
+                                ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID
+                                : entry.distantNetworkId();
+                    }
+                }
+            }
+            return openedDistantNetworkId == null
+                    ? dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID
+                    : openedDistantNetworkId;
+        }
+        GaugeBlockEntity gauge = gauge(player);
+        if (gauge != null && gauge.hasDistantNetworkId()
+                && dev.distantstock.routing.DistantNetworkDirectory.isFormalId(gauge.distantNetworkId())) {
+            return gauge.distantNetworkId();
+        }
+        if (!isGauge()) {
+            UUID carriedScope = RequesterData.distantNetwork(device(player))
+                    .filter(dev.distantstock.routing.DistantNetworkDirectory::isFormalId)
+                    .orElse(null);
+            if (carriedScope != null) {
+                return carriedScope;
+            }
+        }
+        RemoteNetworkId resolved = MenuSync.resolve(networkId(player), freq(player));
+        if (resolved == null || player == null || player.level().getServer() == null) {
+            return dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
+        }
+
+        UUID localNode = dev.distantstock.link.TranserverBridge.localNodeUuid();
+        if (localNode != null && localNode.equals(resolved.nodeId())) {
+            // Local SavedData is the only authority for membership. A device's stored scope is
+            // merely a cache and must never let two old terminals disagree about one warehouse.
+            // Canonicalise by frequency when a live local row exists, but do not require the
+            // background scanner to have run yet.
+            RemoteNetworkId canonical = NetworkDirectory.findByFreq(resolved.createFrequency())
+                    .filter(NetworkDirectory.Entry::local)
+                    .map(NetworkDirectory.Entry::networkId)
+                    .orElse(resolved);
+            return dev.distantstock.routing.DistantNetworkDirectory.get(player.level().getServer())
+                    .formalNetworkOf(canonical)
+                    .orElse(dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID);
+        }
+        NetworkDirectory.Entry live = NetworkDirectory.find(resolved).orElse(null);
+        if (live != null && dev.distantstock.routing.DistantNetworkDirectory
+                .isFormalId(live.distantNetworkId())) {
+            return live.distantNetworkId();
+        }
+        return dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
     }
 
     public void writeAddress(Player player, String address) {
@@ -138,16 +276,16 @@ public final class RequesterMenu extends AbstractContainerMenu {
         ItemStack stack = device(player);
         if (!stack.isEmpty()) {
             RequesterData.setAddress(stack, address);
+            player.getInventory().setChanged();
         }
     }
 
     /**
-     * Points the requester at a group, making or renaming one if that is what the name asks for.
+     * Points the requester at an existing receiving address.
      *
-     * <p>Three outcomes from one field, because the screen has one field: an existing name selects,
-     * an unused name creates, and a rename renames whatever the requester is already carrying. The
-     * rename case is why the flag is here rather than being inferred — without it, renaming a group
-     * to a name nobody has used would create a second group and leave the original behind.
+     * <p>Receiving addresses are created implicitly by configuring Distant Docks, scoped by one
+     * Distant Stock network. The requester is only a selector: typing an unknown address must never
+     * create a second routing object behind the user's back.
      */
     public void writeDockGroup(Player player, String name, int action) {
         ItemStack stack = device(player);
@@ -203,10 +341,10 @@ public final class RequesterMenu extends AbstractContainerMenu {
                     sendGroupList(player, stack);
                     return;
                 }
-                dev.distantstock.routing.DockGroup existing = directory.findByName(trimmed).orElse(null);
-                if (existing != null && !existing.id().equals(carried.get())) {
-                    // The name is taken by a different group. Refusing keeps two groups from
-                    // sharing a name, which would make every readout ambiguous.
+                if (!dev.distantstock.routing.ReceivingAddressResolver.mayClaimLocalName(
+                        player.level().getServer(), carried.get(), trimmed)) {
+                    // A receiving-address name is network-wide now. Another server having the name
+                    // is just as much a collision as another local group having it.
                     return;
                 }
                 dev.distantstock.routing.DockGroup renamed =
@@ -217,12 +355,32 @@ public final class RequesterMenu extends AbstractContainerMenu {
             }
         }
         java.util.UUID who = player == null ? null : player.getUUID();
+        UUID addressScope = distantNetworkId(player);
+        if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(addressScope)) {
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "message.distantstock.network.required"), true);
+            sendGroupList(player, stack);
+            return;
+        }
         if (action == dev.distantstock.net.SetDockGroupC2S.TOGGLE_OPEN) {
-            // Only the owner may open or close their own system. Anyone else flipping it would be
-            // handing themselves a key to somebody else's warehouse.
-            dev.distantstock.routing.DockGroup target = directory.findByName(trimmed).orElse(null);
+            // Legacy management flag. It no longer controls delivery, but old saves/screens may
+            // still use it for collaborator membership until that UI is fully retired.
+            dev.distantstock.routing.DockGroup target =
+                    directory.findByName(addressScope, trimmed).orElse(null);
             if (target != null && target.ownedBy(who)) {
                 directory.setOpen(target.id(), !target.open());
+            }
+            sendGroupList(player, stack);
+            return;
+        }
+        if (action == dev.distantstock.net.SetDockGroupC2S.TOGGLE_VISIBILITY) {
+            dev.distantstock.routing.DockGroup target =
+                    directory.findByName(addressScope, trimmed).orElse(null);
+            if (target != null && target.ownedBy(who)) {
+                directory.setVisibility(target.id(),
+                        target.visibility() == dev.distantstock.routing.DockGroup.Visibility.PUBLIC
+                                ? dev.distantstock.routing.DockGroup.Visibility.UNLISTED
+                                : dev.distantstock.routing.DockGroup.Visibility.PUBLIC);
             }
             sendGroupList(player, stack);
             return;
@@ -232,7 +390,8 @@ public final class RequesterMenu extends AbstractContainerMenu {
             // screen and is a courtesy, not a lock: a modified client can send this straight away,
             // and the thing it can do is delete a group it already owns. What must not happen is
             // somebody else's group disappearing, and that is what this check is for.
-            dev.distantstock.routing.DockGroup target = directory.findByName(trimmed).orElse(null);
+            dev.distantstock.routing.DockGroup target =
+                    directory.findByName(addressScope, trimmed).orElse(null);
             if (target != null && target.ownedBy(who) && directory.delete(target.id())) {
                 // The docks that were in it go back to the group every dock starts in. A dock left
                 // pointing at a system nobody can address any more would sit there looking busy
@@ -248,48 +407,31 @@ public final class RequesterMenu extends AbstractContainerMenu {
             sendGroupList(player, stack);
             return;
         }
-        dev.distantstock.routing.DockGroup existing = directory.findByName(trimmed).orElse(null);
-        if (existing == null) {
-            // Not a name from here. It may be one from another server, learned from that server's
-            // announcement — the whole point of the announcement carrying groups is that this name
-            // could not otherwise be typed on this side. What holds it and what answers to it are
-            // both on the far end; the one thing this side does have is the member list that came
-            // with it.
-            var remote = dev.distantstock.routing.RemoteGroups.get(player.level().getServer())
-                    .findByName(trimmed).orElse(null);
-            if (remote != null) {
-                // 名单也照查，和本服的组一样。远端组没有"这个人能不能用"的第二处判据：订单上没有
-                // 玩家，对面判不了（见 OrderDestination）。客户端已经画成灰的、点不动了，这一句是给
-                // 改过的客户端准备的 —— 少了它，一个选不动的目的地照样会被写进手里这台终端。
-                if (!remote.admits(who)) {
-                    player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
-                            "gui.distantstock.group.not_admitted", remote.name()), true);
-                    sendGroupList(player, stack);
-                    return;
-                }
-                // 名字带上服务器：这个框决定货从哪台服务器出来，而"远仓B · 仓库"和"仓库"在框里
-                // 长得一样是不行的。存进去的是显示形式，查找照样认（RemoteGroups.findByName
-                // 两个都匹配），所以重新打开终端时框里还是完整的那个目的地。
-                setCarriedGroup(player, stack, remote.group(), remote.display());
-                sendGroupList(player, stack);
-                return;
-            }
-        }
-        if (existing != null && !existing.admits(who)) {
-            // Selecting a closed group would only fail later, at the dock. Refusing here is the one
-            // moment the player can still be told why.
+        var resolved = dev.distantstock.routing.ReceivingAddressResolver.resolve(
+                player.level().getServer(), addressScope, trimmed);
+        if (resolved.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.CONFLICT) {
+            // Dedicated wording is intentionally left to the language PR. The important part here
+            // is that a conflicting name never silently picks the local or remote copy.
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "gui.distantstock.group.unknown_name", trimmed), true);
+            sendGroupList(player, stack);
             return;
         }
-        // A group made here belongs to whoever made it, and starts closed. See
-        // DockGroupDirectory.createFor for why the default is the quiet one.
-        dev.distantstock.routing.DockGroup group = existing != null
-                ? existing : directory.createFor(trimmed, who);
-        // findByName above and createFor here both run on the server thread, so nothing can slip
-        // between them. The duplicate check inside createFor is what keeps that an argument rather
-        // than a hope.
-        setCarriedGroup(player, stack, group);
-        // Push the list again: a system just made does not exist on the client until it is told,
-        // and the one now carried has to stop being drawn as somebody else's.
+        if (resolved.kind() == dev.distantstock.routing.ReceivingAddressResolver.Kind.REMOTE) {
+            var remote = resolved.remote();
+            // Keep only the globally unique receiving-address name on the terminal. Older builds
+            // wrote "server·name"; the resolver still accepts that spelling when it reads one.
+            setCarriedGroup(player, stack, remote.group(), remote.name());
+            sendGroupList(player, stack);
+            return;
+        }
+        if (resolved.kind() != dev.distantstock.routing.ReceivingAddressResolver.Kind.LOCAL) {
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "gui.distantstock.group.unknown_name", trimmed), true);
+            sendGroupList(player, stack);
+            return;
+        }
+        setCarriedGroup(player, stack, resolved.local());
         sendGroupList(player, stack);
     }
 
@@ -301,6 +443,9 @@ public final class RequesterMenu extends AbstractContainerMenu {
      * under cannot disagree about where the goods come out.
      */
     public java.util.Optional<UUID> carriedGroup(Player player) {
+        if (hasOpenedState && player != null && player.level().isClientSide) {
+            return java.util.Optional.ofNullable(openedReceivingGroup);
+        }
         GaugeBlockEntity be = gauge(player);
         if (be != null) {
             return java.util.Optional.of(be.receivingGroup());
@@ -329,23 +474,76 @@ public final class RequesterMenu extends AbstractContainerMenu {
             return;
         }
         RequesterData.setReceivingGroup(stack, id, name);
+        if (player != null) {
+            player.getInventory().setChanged();
+        }
+    }
+
+    /** Name included in the server-authored open snapshot, before the async group list arrives. */
+    public String openedReceivingGroupName() {
+        return hasOpenedState ? openedReceivingGroupName : "";
+    }
+
+    public boolean hasOpenedState() {
+        return hasOpenedState;
+    }
+
+    public java.util.Optional<UUID> openedReceivingGroup() {
+        return hasOpenedState ? java.util.Optional.ofNullable(openedReceivingGroup)
+                : java.util.Optional.empty();
+    }
+
+    public String openedAddress() {
+        return hasOpenedState ? openedAddress : "";
+    }
+
+    public String openedHomeAddress() {
+        return hasOpenedState ? openedHomeAddress : "";
+    }
+
+    public RemoteNetworkId openedNetworkId() {
+        return hasOpenedState ? openedNetworkId : null;
+    }
+
+    public java.util.Optional<UUID> openedDistantNetworkId() {
+        return hasOpenedState ? java.util.Optional.ofNullable(openedDistantNetworkId)
+                : java.util.Optional.empty();
     }
 
     /** Pushes the current list to whoever has this screen open. */
     public static void sendGroupList(Player player, ItemStack stack) {
-        if (!(player instanceof net.minecraft.server.level.ServerPlayer serverPlayer)
+        if (!(player instanceof net.minecraft.server.level.ServerPlayer)
                 || player.level().getServer() == null) {
             // There is nothing to push to a player who is not on a server — a game test's mock
             // player is the case that matters, and the write it is testing happens either way.
             return;
         }
-        dev.distantstock.routing.DockGroupDirectory directory =
-                dev.distantstock.routing.DockGroupDirectory.get(player.level().getServer());
         java.util.UUID carried = player.containerMenu instanceof RequesterMenu menu
                 ? menu.carriedGroup(player).orElse(null)
                 : dev.distantstock.item.RequesterData.receivingGroup(stack).orElse(null);
+        java.util.UUID scope = player.containerMenu instanceof RequesterMenu menu
+                ? menu.distantNetworkId(player)
+                : scopeOf(player, stack);
+        sendGroupList(player, scope, carried);
+    }
+
+    /**
+     * Pushes receiving addresses for an already-known Distant Stock scope.
+     *
+     * <p>Placed devices do not carry a requester ItemStack. Passing {@code ItemStack.EMPTY} through
+     * the terminal helper used to silently turn their request into Legacy scope, so every formal
+     * receiving address was filtered out and the picker opened empty. A device already stores the
+     * authoritative scope; use it directly instead of inventing a terminal to ask through.
+     */
+    public static void sendGroupList(Player player, java.util.UUID scope, java.util.UUID carried) {
+        if (!(player instanceof net.minecraft.server.level.ServerPlayer serverPlayer)
+                || player.level().getServer() == null) {
+            return;
+        }
+        dev.distantstock.routing.DockGroupDirectory directory =
+                dev.distantstock.routing.DockGroupDirectory.get(player.level().getServer());
         net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(serverPlayer,
-                dev.distantstock.net.DockGroupsS2C.of(directory, player.getUUID(), carried,
+                dev.distantstock.net.DockGroupsS2C.of(directory, player.getUUID(), carried, scope,
                         group -> dev.distantstock.block.LoadedDocks.allInGroup(group).size(),
                         owner -> dev.distantstock.routing.PlayerNames.display(
                                 player.level().getServer(), owner)));
@@ -355,7 +553,27 @@ public final class RequesterMenu extends AbstractContainerMenu {
         net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(serverPlayer,
                 dev.distantstock.net.RemoteGroupsS2C.of(
                         dev.distantstock.routing.RemoteGroups.get(player.level().getServer()),
-                        player.level().getServer(), player.getUUID()));
+                        player.level().getServer(), player.getUUID(), scope));
+    }
+
+    private static UUID scopeOf(Player player, ItemStack stack) {
+        if (player == null || player.level().getServer() == null || stack == null || stack.isEmpty()) {
+            return dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
+        }
+        UUID terminalScope = RequesterData.distantNetwork(stack)
+                .filter(dev.distantstock.routing.DistantNetworkDirectory::isFormalId)
+                .orElse(null);
+        if (terminalScope != null) {
+            return terminalScope;
+        }
+        RemoteNetworkId network = RequesterData.network(stack).orElse(null);
+        if (network == null) {
+            return dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID;
+        }
+        return NetworkDirectory.find(network).map(NetworkDirectory.Entry::distantNetworkId)
+                .or(() -> RequesterData.distantNetwork(stack))
+                .orElseGet(() -> dev.distantstock.routing.DistantNetworkDirectory
+                        .get(player.level().getServer()).scopeOf(network));
     }
 
     public ItemStack device(Player player) {

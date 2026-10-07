@@ -57,10 +57,8 @@ public final class StockConfig {
                 .define("giveManual", true);
         CASING_REDSTONE_RANGE = b.comment(
                         "How far a redstone signal spreads through connected distant casings, in blocks,",
-                        "before the window stops opening. Bounds a search per casing, so a large build",
-                        "does not hitch when a lever is flipped.",
-                        "64 by default: a wall of casings around a real base is longer than 32 blocks,",
-                        "and having the far end of it stay opaque reads as the window being broken.")
+                        "before the window stops opening. The component is planned in one linear pass",
+                        "and the visible change ripples outward afterwards. Default: 64 blocks.")
                 .defineInRange("casing.redstoneRange", 64, 1, 192);
         TOWER_CHARGE_PARCELS = b.comment(
                         "Charge the tower ether for every parcel that leaves a dock it carries.",

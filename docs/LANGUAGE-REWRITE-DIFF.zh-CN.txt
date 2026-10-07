@@ -1,0 +1,1180 @@
+机械动力：远仓 中文本地化参考稿
+========================================================================
+
+说明：完整 403 条保留原 key；下面仅列出与当前 zh_cn.json 不同的建议译文。
+
+[001] item.distantstock.lamp.placement
+原文：右键：居中红石灯；潜行右键墙面：四分格；右键仪表空格：添加灯
+建议：右键放置居中信号灯；潜行右键墙面放置四分格信号灯；右键空白仪表格安装信号灯
+
+[002] item.distantstock.requester.unbind_hint
+原文：潜行并对空气右键：解除网络绑定（保留地址）
+建议：潜行并对空气右键以解除网络绑定
+
+[003] item.distantstock.requester.unbound
+原文：已解除网络绑定，可以重新选择网络
+建议：网络绑定已解除
+
+[004] gui.distantstock.route.group
+原文：接收港组
+建议：收货港组
+
+[005] gui.distantstock.route.remote
+原文：远端地址
+建议：远程地址
+
+[006] gui.distantstock.route.pending
+原文：待接入港组目录
+建议：可用港组
+
+[007] item.distantstock.manual
+原文：远仓说明书
+建议：远仓手册
+
+[008] goggle.distantstock.remote_gauge.inflight
+原文：  在途：%s
+建议：  在途订单：%s
+
+[009] goggle.distantstock.remote_gauge.stock
+原文：  本地库存：%s
+建议：  当前库存：%s
+
+[010] goggle.distantstock.remote_gauge.target
+原文：  目标：%s
+建议：  目标库存：%s
+
+[011] gui.distantstock.remote_gauge.no_panel
+原文：这个角上没有仪表可以绑定
+建议：该位置没有可绑定的远仓仪表
+
+[012] gui.distantstock.remote_gauge.unbound
+原文：已经松开这块仪表的绑定
+建议：远仓仪表已解绑
+
+[013] gui.distantstock.remote_gauge.bound
+原文：这块仪表已指向 %s
+建议：远仓仪表已绑定至 %s
+
+[014] item.distantstock.brass_signal_lamp.usage
+原文：潜行空手右键：打开监控列表；手持仓储链接器右键：绑定物流网络
+建议：潜行空手右键查看监控；手持仓储链接器右键绑定物流网络
+
+[015] itemGroup.distantstock
+原文：远仓
+建议：机械动力：远仓
+
+[016] gui.distantstock.title
+原文：远仓
+建议：远仓终端
+
+[017] gui.distantstock.subtitle
+原文：跨服仓管
+建议：跨服仓储网络
+
+[018] gui.distantstock.request
+原文：下单
+建议：提交订单
+
+[019] gui.distantstock.cart
+原文：购物车
+建议：订单
+
+[020] gui.distantstock.untuned
+原文：还没加入远仓网络。
+建议：尚未绑定远仓网络
+
+[021] gui.distantstock.networks
+原文：开放的远仓网络
+建议：可用远仓网络
+
+[022] gui.distantstock.networks.empty
+原文：暂无开放网络。请先在仓库服放置并启用未锁定的 Stock Link。
+建议：暂无可用的远仓网络。请确认远端仓储网络已上线并允许访问。
+
+[023] gui.distantstock.networks.links
+原文：%s 个节点
+建议：%s 个连接点
+
+[024] gui.distantstock.empty
+原文：还没有对面库存缓存。
+建议：暂无远程库存数据
+
+[025] gui.distantstock.demo
+原文：演示列表（debug.demoStock）。正式用关掉。
+建议：演示库存已启用（debug.demoStock）
+
+[026] gui.distantstock.queued
+原文：已入队
+建议：订单已提交
+
+[027] gui.distantstock.need_item
+原文：购物车是空的。
+建议：订单中没有物品
+
+[028] gui.distantstock.order_fail
+原文：下单失败（缺货或队列满）。
+建议：下单失败：库存不足或订单队列已满
+
+[029] gui.distantstock.no_peer
+原文：这张网不在本服，也没配对端。
+建议：无法连接到该远仓网络
+
+[030] gui.distantstock.dock_bound
+原文：远仓港已绑定 Create 物流网络
+建议：远仓港已绑定物流网络
+
+[031] gui.distantstock.dock_unbound
+原文：已解除远仓港绑定。
+建议：远仓港已解绑
+
+[032] gui.distantstock.dock_bind_failed
+原文：无法绑定：目标不是可用的 Create 物流网络。
+建议：绑定失败：目标位置没有可用的 Create 物流网络
+
+[033] gui.distantstock.dock_unbind_hint
+原文：潜行右键以解绑远仓港。
+建议：潜行右键解除远仓港绑定
+
+[034] gui.distantstock.freq
+原文：频率 %s
+建议：网络频率：%s
+
+[035] gui.distantstock.status.online
+原文：链路在线
+建议：连接正常
+
+[036] gui.distantstock.status.offline
+原文：链路离线
+建议：连接中断
+
+[037] gui.distantstock.local
+原文：本端
+建议：本机
+
+[038] gui.distantstock.peer
+原文：对端
+建议：远端
+
+[039] gui.distantstock.link_down
+原文：LINK DOWN
+建议：连接中断
+
+[040] gui.distantstock.pressure
+原文：链路
+建议：传输状态
+
+[041] gui.distantstock.pressure_line
+原文：积压 %s · RTT %s · 在途 %s
+建议：积压 %s · 延迟 %s · 在途 %s
+
+[042] gui.distantstock.online
+原文：在线 %s/%s
+建议：在线 %s / %s
+
+[043] gui.distantstock.orders
+原文：订单积压 %s
+建议：待处理订单 %s
+
+[044] gui.distantstock.packages
+原文：包裹积压 %s
+建议：待处理包裹 %s
+
+[045] gui.distantstock.in_flight
+原文：在途 %s
+建议：传输中 %s
+
+[046] gui.distantstock.in_flight.label
+原文：在途
+建议：传输中
+
+[047] gui.distantstock.manual
+原文：远仓说明书
+建议：远仓手册
+
+[048] gui.distantstock.manual.hint
+原文：点窗口左右翻页
+建议：点击页面两侧翻页
+
+[049] gui.distantstock.manual.h1
+原文：加入远仓网络
+建议：连接远仓网络
+
+[050] gui.distantstock.manual.p1
+原文：仓库服先放置并启用未锁定的 Stock Link，远仓会把它发布给所有已连接服务器。任意服务器的玩家打开未调谐的终端，从开放网络列表中选择加入，不需要亲自前往仓库服。用已加入网络的终端右键发报机即可抄入。
+建议：先在仓库服务器启用一套可访问的 Create 仓储网络。打开尚未调谐的远仓终端，从网络列表中选择目标仓库即可完成绑定，无需前往远端服务器。
+
+[051] gui.distantstock.manual.h2
+原文：港怎么接
+建议：远仓港与物流
+
+[052] gui.distantstock.manual.p2
+原文：仓库可用淡蓝色远仓打包机。它沿用 Create 打包逻辑并产出远仓包裹；出货港舱口朝操作者，侧面或背面留给皮带/漏斗喂包裹。收货港只认地址（空=全收），再用漏斗拉走。舱里出现纸箱=槽里有货。
+建议：远仓打包机负责将订单封装为远仓包裹，远仓港负责跨服收发。发送端从侧面或背面送入包裹；接收端再通过漏斗、溜槽或传送带将包裹送入本地物流。底面为回退出口，请务必留出空间。
+
+[053] gui.distantstock.manual.h3
+原文：管理员设置
+建议：服务器配置
+
+[054] gui.distantstock.manual.p3
+原文：玩家方块不填 IP。OP 输入 /distantstock，或潜行右键监视器。选 Host（仓库）或 Client（外服），填本端 ID、监听、对端、密码。保存写到本服 config/distantstock-common.toml，立刻重听 18772。各服密码必须相同。
+建议：远仓不会把服务器地址写入方块或包裹。管理员可通过 /distantstock 或监视器配置本机节点、远端节点与连接凭据。各服务器应使用唯一节点 ID，并保持认证令牌一致。
+
+[055] gui.distantstock.manual.h4
+原文：星型多服
+建议：多服务器连接
+
+[056] gui.distantstock.manual.p4
+原文：一座仓库 + 多台生存服。外服下单带 from=自己的 id；仓库打包后只把包裹寄回那一台。外服只向仓库拉目录。外服之间不互相当仓库。
+建议：一台仓库服务器可以同时服务多台生存服务器。订单会记录来源服务器，仓库完成打包后只会将对应包裹送回正确的目标节点。
+
+[057] gui.distantstock.manual.h5
+原文：护目镜
+建议：工程师护目镜
+
+[058] gui.distantstock.manual.p5
+原文：护目镜只报活数据：港看出货/收货、短频或地址、UP/DOWN、槽或积压。请求台看短频、地址、目录条数。监视器看 TPS 和积压。教程只在这本说明书里。giveManual 可关，关了进档不送书。
+建议：佩戴工程师护目镜可以直接查看远仓设备状态，包括工作模式、绑定网络、包裹积压、故障原因与互通塔带载情况。
+
+[059] item.distantstock.requester.desc
+原文：打开后从已连接服务器公开的远仓网络中加入。
+建议：浏览远程库存并提交跨服订单。
+
+[060] item.distantstock.manual.desc
+原文：远仓手册。网络、港、皮带和管理员设置。按住 W 可看思索。
+建议：机械动力：远仓使用手册。按住 W 查看思索场景。
+
+[061] block.distantstock.dock.desc
+原文：完整方块机壳，侧面接物流，底面是回退面需接溜槽；机身灯：熄灭＝未接入，绿＝待机，青闪＝发送，橙闪＝回退堵塞，红＝故障。
+建议：跨服包裹的收发端口。绿色表示待机，青色表示传输中，橙色表示回退堵塞，红色表示故障。底面为回退出口。
+
+[062] block.distantstock.tower_casing.desc
+原文：装饰机壳，六面自带连接纹理；红石信号会让相连机壳的中心变成透明观察窗（传播上限可配置）。
+建议：互通塔结构机壳。受到红石信号时，相连机壳会开启观察窗。
+
+[063] block.distantstock.tower_core.desc
+原文：互通塔的 3x3 底座中心，底面接受旋转动力。堆上连续的耦合器再盖一台以太谐振器，塔就立起来了。
+建议：互通塔的动力核心。由底面输入旋转动力，并向上连接互通塔耦合器与以太谐振器。
+
+[064] block.distantstock.tower_coupler.desc
+原文：塔身段。堆得越高等级越高，能带载的远仓设备和区块加载范围也越大。
+建议：互通塔的塔身组件。塔越高，可带载的设备数量与范围越大。
+
+[065] block.distantstock.ether_resonator.desc
+原文：塔顶。转臂旋转即为塔在工作；塔完全建成后才会启动。
+建议：互通塔顶部组件。互通塔正常运行时，谐振器会持续旋转。
+
+[066] block.distantstock.gauge.desc
+原文：落地仓管台。用已加入网络的终端右键写入。
+建议：固定式远仓终端，用于浏览库存并提交订单。
+
+[067] block.distantstock.monitor.desc
+原文：贴墙看本端/对端 TPS 和链路压力。OP 潜行打开链路设置。
+建议：用于查看链路、服务器状态与互通塔运行情况。
+
+[068] block.distantstock.remote_packager.desc
+原文：淡蓝色的 Create 打包机变体。自动产出远仓包裹，保留地址与包裹内容。
+建议：Create 打包机的远仓变体，用于生成可跨服运输的远仓包裹。
+
+[069] goggle.distantstock.lamp.state.none
+原文：  状态：无输入
+建议：  状态：无信号
+
+[070] goggle.distantstock.lamp.state.idle
+原文：  状态：待机（绿慢闪）· 达标且无在途订单
+建议：  状态：待机（绿色慢闪）
+
+[071] goggle.distantstock.lamp.state.all_good
+原文：  状态：正常（绿常亮）· 达标，仍在处理订单
+建议：  状态：正常（绿色常亮）
+
+[072] goggle.distantstock.lamp.state.act
+原文：  状态：行动中（青常亮）
+建议：  状态：工作中（青色常亮）
+
+[073] goggle.distantstock.lamp.state.warn
+原文：  状态：警告（橙常亮）· 缺货，网络正在补
+建议：  状态：缺货（橙色常亮）
+
+[074] goggle.distantstock.lamp.state.warn_urgent
+原文：  状态：警告（橙快闪）· 缺货且网络不应答
+建议：  状态：缺货且网络无响应（橙色快闪）
+
+[075] goggle.distantstock.lamp.state.fatal
+原文：  状态：故障（红快闪）· 需要人工处理
+建议：  状态：故障（红色快闪）
+
+[076] goggle.distantstock.lamp.net.unknown
+原文：  网络：该频率在本服没有已加载的网络
+建议：  网络：未找到已加载的对应网络
+
+[077] goggle.distantstock.lamp.net.links
+原文：  网络：链接 %s/%s 在线
+建议：  网络：%s / %s 个连接点在线
+
+[078] goggle.distantstock.lamp.net.locked
+原文：  网络：已被锁定
+建议：  网络：访问受限
+
+[079] goggle.distantstock.lamp.net.more
+原文：  另有 %s 个链接未加载
+建议：  另有 %s 个连接点未加载
+
+[080] gui.distantstock.lamp.bound
+原文：信号灯已绑定网络 %s
+建议：信号灯已绑定至网络 %s
+
+[081] gui.distantstock.lamp.unbound
+原文：已解除信号灯的网络绑定
+建议：信号灯已解绑
+
+[082] gui.distantstock.lamp.mode.tip
+原文：按住以切换模式：正常＝达标亮，反相＝未达标亮
+建议：按住切换模式：正常模式在条件满足时亮起，反相模式则相反
+
+[083] item.distantstock.remote_package.desc
+原文：淡蓝色封装的远仓包裹，兼容 Create 物流并保留地址与内容数据。
+建议：可通过远仓系统跨服运输的 Create 包裹。保留原有地址与包裹内容。
+
+[084] gui.distantstock.tuned
+原文：已写入远仓网络。
+建议：远仓网络已写入
+
+[085] gui.distantstock.admin
+原文：远仓链路
+建议：远仓连接设置
+
+[086] gui.distantstock.admin.host
+原文：Host 仓库
+建议：仓库节点
+
+[087] gui.distantstock.admin.client
+原文：Client 外服
+建议：远端节点
+
+[088] gui.distantstock.admin.self
+原文：本端 ID
+建议：本机节点 ID
+
+[089] gui.distantstock.admin.bind
+原文：本服监听
+建议：监听地址
+
+[090] gui.distantstock.admin.warehouse
+原文：仓库地址
+建议：仓库节点地址
+
+[091] gui.distantstock.admin.peers
+原文：外服列表
+建议：远端节点列表
+
+[092] gui.distantstock.admin.token
+原文：密码
+建议：认证令牌
+
+[093] gui.distantstock.admin.save
+原文：保存到本服
+建议：保存配置
+
+[094] gui.distantstock.admin.saved
+原文：远仓配置已写入本服。
+建议：远仓配置已保存
+
+[095] gui.distantstock.admin.hint.host
+原文：外服：id@主机:端口，逗号分隔
+建议：远端节点：id@主机:端口，多个节点用逗号分隔
+
+[096] gui.distantstock.admin.hint.client
+原文：仓库：host@主机:端口
+建议：仓库节点：id@主机:端口
+
+[097] goggle.distantstock.mode.export
+原文：模式：出货
+建议：模式：发送
+
+[098] goggle.distantstock.mode.import
+原文：模式：收货
+建议：模式：接收
+
+[099] goggle.distantstock.link.up
+原文：链路：已连接
+建议：连接：正常
+
+[100] goggle.distantstock.link.down
+原文：链路：已断开
+建议：连接：中断
+
+[101] goggle.distantstock.backlog
+原文：积压：订单 %s · 在途 %s
+建议：积压：订单 %s · 包裹 %s
+
+[102] goggle.distantstock.slots.full
+原文：已满，对端将重试
+建议：缓存已满，稍后将自动重试
+
+[103] goggle.distantstock.untuned
+原文：未调谐
+建议：未绑定网络
+
+[104] goggle.distantstock.catalog
+原文：目录：%s 种
+建议：可用物品：%s 种
+
+[105] goggle.distantstock.local_tps
+原文：本端：TPS %s · MSPT %s
+建议：本机：TPS %s · MSPT %s
+
+[106] goggle.distantstock.peer_tps
+原文：对端：TPS %s
+建议：远端：TPS %s
+
+[107] goggle.distantstock.peer_down
+原文：对端：未连接
+建议：远端：未连接
+
+[108] goggle.distantstock.pressure
+原文：压力：积压 %s · RTT %s
+建议：传输：积压 %s · 延迟 %s
+
+[109] goggle.distantstock.status.inactive
+原文：指示灯：熄灭（未接入远仓网络）
+建议：状态灯：熄灭（未接入远仓）
+
+[110] goggle.distantstock.status.standby
+原文：指示灯：绿色常亮（待机）
+建议：状态灯：绿色常亮（待机）
+
+[111] goggle.distantstock.status.sending
+原文：指示灯：青色闪烁（发送中）
+建议：状态灯：青色闪烁（传输中）
+
+[112] goggle.distantstock.status.fault
+原文：指示灯：红色常亮（故障）
+建议：状态灯：红色常亮（故障）
+
+[113] goggle.distantstock.status.blocked
+原文：指示灯：橙色闪烁（回退面堵塞）
+建议：状态灯：橙色闪烁（回退出口堵塞）
+
+[114] goggle.distantstock.fallback.slots
+原文：回退面：%s/%s
+建议：回退缓存：%s / %s
+
+[115] goggle.distantstock.fallback.last
+原文：最近回退：%s
+建议：最近一次回退：%s
+
+[116] goggle.distantstock.fallback.stripped
+原文：已剔除不兼容物品
+建议：已退回不兼容物品
+
+[117] goggle.distantstock.fallback.strip_unmatched
+原文：整包退出：目标缺失项不在包裹内容里
+建议：整包退回：无法定位不兼容内容
+
+[118] goggle.distantstock.fallback.parcel
+原文：整包退出：目标无法接收
+建议：整包退回：目标无法接收
+
+[119] goggle.distantstock.fault.payload_unreadable
+原文：故障：托管记录无法解码，已移交隔离库
+建议：故障：包裹数据无法读取，已转入隔离库
+
+[120] goggle.distantstock.fault.strip_unmatched
+原文：故障：无法定位不兼容物品，整包已退出
+建议：故障：无法定位不兼容内容，包裹已退回
+
+[121] goggle.distantstock.fault.strip_limit
+原文：故障：剔除重发已达上限，整包已退出
+建议：故障：重试次数已达上限，包裹已退回
+
+[122] goggle.distantstock.default_route
+原文：默认目的：%s · %s
+建议：默认目标：%s · %s
+
+[123] goggle.distantstock.default_route.none
+原文：默认目的：未设置（普通包裹将留在港内）
+建议：默认目标：未设置
+
+[124] message.distantstock.default_route.none
+原文： ｜默认目的：未设置
+建议： ｜默认目标：未设置
+
+[125] message.distantstock.default_route.set
+原文：已设置默认目的：%s · %s
+建议：默认目标已设置：%s · %s
+
+[126] message.distantstock.default_route.cleared
+原文：已清除默认目的
+建议：默认目标已清除
+
+[127] goggle.distantstock.send.no_route
+原文：无目的：该包裹没有路由，本港也没有默认目的，包裹留在港内
+建议：无法发送：包裹未指定目标，且本港没有默认目标
+
+[128] goggle.distantstock.send.dropped
+原文：发送中止：已放回发送缓存
+建议：发送已取消，包裹已返回发送缓存
+
+[129] goggle.distantstock.target.none
+原文：目标：未设置（普通包裹会留在港内）
+建议：目标：未设置
+
+[130] goggle.distantstock.outbound
+原文：待发：%s/%s
+建议：发送缓存：%s / %s
+
+[131] value.distantstock.mode.export
+原文：出货
+建议：发送
+
+[132] value.distantstock.mode.import
+原文：收货
+建议：接收
+
+[133] goggle.distantstock.lamp.short.act
+原文：在途
+建议：工作中
+
+[134] goggle.distantstock.lamp.short.warn_urgent
+原文：缺货·网络无响应
+建议：缺货 · 无响应
+
+[135] gui.distantstock.dock.accepted
+原文：包裹已放入远仓港
+建议：包裹已进入远仓港
+
+[136] gui.distantstock.dock.busy
+原文：远仓港里已经有一个包裹了
+建议：远仓港当前没有空余缓存
+
+[137] item.distantstock.ether_bottle.usage
+原文：右键工作盆/储液池：倒出 250mB；右键其他地方：饮用
+建议：右键工作盆或储液池倒出 250 mB；在其他位置右键饮用
+
+[138] item.distantstock.molten_amethyst_bottle.usage
+原文：右键工作盆/储液池：倒出 250mB；右键其他地方：饮用
+建议：右键工作盆或储液池倒出 250 mB；在其他位置右键饮用
+
+[139] gui.distantstock.dock.unhandled
+原文：远仓港看不懂手里的东西：%s
+建议：无法将该物品放入远仓港：%s
+
+[140] gui.distantstock.dock_bind_no_node
+原文：无法抄写：本服未配置 Transerver 节点。跨服绑定需要它来标识网络在哪一台服务器上，请先用 /distantstock 配置连接。
+建议：无法绑定：本机尚未配置 Transerver 节点。请先使用 /distantstock 完成服务器连接设置。
+
+[141] distantstock.ponder.distant_export.header
+原文：仓库出货
+建议：跨服发货
+
+[142] distantstock.ponder.distant_export.text_1
+原文：每一枚包裹都从仓储开始。把远仓打包机贴着箱子放好，让它的正面朝向产线：订单到来时，它会将货物封成一枚远仓包裹，并自行交给下一环。
+建议：远仓打包机负责将仓储订单封装为远仓包裹。将它接入本地仓储物流，并让输出朝向后续运输线路。
+
+[143] distantstock.ponder.distant_export.text_2
+原文：这就是远仓港，货物离开本服的唯一一道门。它一次只容纳一枚包裹，因此它上游的一切都是队列，而不是缓存。
+建议：远仓港是包裹离开本机的出口。每座港一次处理一个包裹，上游物流应负责排队。
+
+[144] distantstock.ponder.distant_export.text_3
+原文：再由传送带把两端连起来。让整条带保持水平，末端指向远仓港——包裹抵达时会被自动接收，不必有人守在旁边投递。
+建议：用传送带、漏斗或其他物流设备将远仓包裹送入远仓港。包裹进入后会自动开始传输。
+
+[145] distantstock.ponder.distant_export.text_4
+原文：包裹就位后，升降台会升起，将它送过以太表面。两边的仓储网络自始至终彼此独立，真正跨越的只有这枚封好的包裹。
+建议：发送开始后，升降台会托起包裹并完成跨服传输。两端仓储网络仍然彼此独立，跨服移动的只有包裹。
+
+[146] distantstock.ponder.distant_export.text_5
+原文：底面是回退面，在这个角度看不到。请为它留出空位，否则被退回的包裹将无处可去。
+建议：远仓港底面是回退出口。请在下方预留容器或物流线路，用于接收退回的包裹。
+
+[147] distantstock.ponder.distant_import.header
+原文：外服收货
+建议：跨服收货
+
+[148] distantstock.ponder.distant_import.text_1
+原文：在负责接收的服务器上，远仓港需要的是一个收货地址，而不是目的地。手持远仓终端潜行右键，即可写入。
+建议：接收端远仓港需要加入一个收货港组。远程包裹会根据目标港组送达其中可用的港口。
+
+[149] distantstock.ponder.distant_import.text_2
+原文：漏斗会从下方收走远仓港放出的货物，再由传送带送往仓储。同样这两个方块也服务于另一个方向——这正是回退面值得留空的原因。
+建议：收到的包裹可从侧面送入本地物流。底面仅用于退回无法处理的货物，请不要作为正常出货口使用。
+
+[150] distantstock.ponder.distant_import.text_3
+原文：最末端是一只普通的箱子。这里不知道货物在对面服务器价值几何，对面也不知道它们在此处的去向；真正完成旅程的，只有那枚包裹。
+建议：远仓只负责将包裹送到正确的服务器和港组。包裹抵达后，仍由 Create 本地物流完成分拣与拆包。
+
+[151] distantstock.ponder.distant_tune.header
+原文：调谐与下单
+建议：绑定与下单
+
+[152] distantstock.ponder.distant_tune.text_1
+原文：远仓请求台是远仓终端的家具形态，携带同一套网络与同一个地址。因此在这里写下的订单，打包产线读得懂。
+建议：远仓请求台与便携式远仓终端共用同一套远程库存与订单系统，可用于浏览仓库并提交请求。
+
+[153] distantstock.ponder.distant_tune.text_2
+原文：手持已调谐的远仓终端潜行右键远仓港，它加入你当前选中的系统；直接右键则发往该系统。操作结果会显示在快捷栏上方。
+建议：使用已调谐的远仓终端可以为港口和设备写入网络、港组与地址。不同交互方式会执行绑定、解绑或设置目标等操作。
+
+[154] distantstock.ponder.distant_tune.text_3
+原文：请求台是给人站着填写订单的地方，不是产线上的机器。请单独给它一个位置，免得日后的传送带还要绕开它布线。
+建议：请求台是供玩家使用的终端设备，不参与物理物流运输。可以将它放在控制室或仓库操作区。
+
+[155] distantstock.ponder.distant_status.header
+原文：读取链路状态
+建议：查看运行状态
+
+[156] distantstock.ponder.distant_status.text_1
+原文：顶部的玻璃罩就是链路指示灯。对面不可达时它是暗的，两端互相找到时才会亮起——隔着房间看一眼，就能知道这条线通不通。
+建议：远仓设备的状态灯可以快速显示当前工作状态。连接中断时熄灭，正常连接后重新亮起。
+
+[157] distantstock.ponder.distant_status.text_2
+原文：墙面监控器记录得更久：哪些链路在线、两端各承载多少，以及掉线链路所在的坐标。
+建议：远仓监视器可以集中查看连接状态、服务器性能、积压与互通塔运行情况。
+
+[158] distantstock.ponder.distant_status.text_3
+原文：故障需要人工清除。放弃重试的远仓港会停在红灯，直到有人右键它为止，因此一次失败不会被误当成空闲而悄悄遗忘。
+建议：严重故障不会被自动忽略。出现红色故障状态时，请检查护目镜或监视器中的具体原因。
+
+[159] distantstock.ponder.distant_status.text_4
+原文：指示灯按它想要多少注意力排列：熄灭表示未接入网络，绿色表示待命，青色表示包裹正在上升，橙色表示回退面被堵、货物无法卸下，红色表示故障。
+建议：状态灯含义：熄灭表示未接入，绿色表示待机，青色表示传输中，橙色表示回退堵塞，红色表示故障。
+
+[160] distantstock.ponder.distant_status.text_5
+原文：对面服务器拒收的一切都会从底部离开并停在那里。请给它一个容器或一条传送带接住；下方若是空的，远仓港会扣住货物并闪橙色，直到你腾出位置。
+建议：无法接收或被退回的货物会从底面回退出口离开。下方空间不足时，远仓港会保留货物并显示橙色状态。
+
+[161] goggle.distantstock.tower.unbuilt
+原文：尚未成塔：耦合器 %s / %s
+建议：结构未完成：耦合器 %s / %s
+
+[162] goggle.distantstock.tower.tier
+原文：等级：%s 级（耦合器 %s 个）
+建议：等级：%s（%s 个耦合器）
+
+[163] goggle.distantstock.tower.capped
+原文：已封顶（等级不再提升）
+建议：已达到最高等级
+
+[164] goggle.distantstock.tower.radius
+原文：带载 %s 格内的设备
+建议：设备覆盖半径：%s 格
+
+[165] goggle.distantstock.tower.devices
+原文：最多 %s 台设备
+建议：最大带载设备：%s
+
+[166] goggle.distantstock.tower.stalled
+原文：已停转：没有转速，或应力过载
+建议：互通塔未运行：动力不足或应力过载
+
+[167] goggle.distantstock.tower.carrying
+原文：正在带载 %s / %s 台设备
+建议：带载设备：%s / %s
+
+[168] goggle.distantstock.tower.carrying.idle
+原文：未带载：转起来后可带 %s 台设备
+建议：当前未带载 · 最大 %s 台设备
+
+[169] goggle.distantstock.tower.chunks
+原文：常驻加载 %sx%s 区块
+建议：区块加载范围：%s × %s
+
+[170] goggle.distantstock.tower.ether.off
+原文：  不计费（tower.chargeParcels 为关）
+建议：  以太消耗已关闭
+
+[171] goggle.distantstock.send.no_ether
+原文：已滞留：塔的以太不足
+建议：无法发送：互通塔以太不足
+
+[172] gui.distantstock.uncharged
+原文：没有塔带载这台请求台 —— 可以看，不能下单
+建议：未处于运行中的互通塔覆盖范围内，当前无法下单
+
+[173] distantstock.ponder.distant_tower.text_1
+原文：一座塔的动力从脚下送上来：在底座正下方接一根竖直的传动轴。底面是底座唯一接受旋转的接面，从侧面接过来的轴它认不到。转速不必快，中速（30 转/分）即可——真正吃紧的是应力。
+建议：互通塔由底部输入旋转动力。请在互通塔底座正下方连接竖直传动轴；底座不接受侧面动力输入。
+
+[174] distantstock.ponder.distant_tower.text_2
+原文：在轴的正上方放一块互通塔底座——整座塔只有它会转，等级与带载也都记在它身上。四周再用远仓机壳围出 3×3 的裙板收口：成塔判定只认底座、耦合器与谐振器，裙板不参与其中，但它是塔基的门面。
+建议：将互通塔底座放在塔基中央，并使用远仓机壳围出 3×3 基座。机壳用于结构与外观，不影响塔的等级计算。
+
+[175] distantstock.ponder.distant_tower.text_3
+原文：往上堆互通塔耦合器，桅杆要从底座一路连续长上去：中间断一格，或者夹进别的方块，塔就不成立。五段是 I 级的门槛。
+建议：在底座上连续堆叠互通塔耦合器。至少需要 5 个耦合器才能形成 I 级互通塔，中间不能断开。
+
+[176] distantstock.ponder.distant_tower.text_4
+原文：顶上盖一台以太谐振器，塔就立起来了。塔顶的光柱就是它的状态灯：还没成塔、或塔没在转时是暗灰，工作时是青色，有包裹经过时会变成更深的蓝色并自己发亮——从塔底抬头就能看清。
+建议：最上方放置以太谐振器即可完成互通塔。正常运行时塔顶会发出青色光柱，传输包裹时颜色会发生变化。
+
+[177] distantstock.ponder.distant_tower.text_5
+原文：塔越高，等级越高：耦合器堆到 5 段是 I 级，此后每多两段升一级，17 段封顶 VII 级。
+建议：互通塔共有七个等级。5 个耦合器为 I 级，此后每增加 2 个提升一级，17 个耦合器达到 VII 级。
+
+[178] distantstock.ponder.distant_tower.text_6
+原文：等级决定三件事：能带载多少台远仓设备（I 级 8 台，VII 级 128 台）、能照顾到多远的设备（32 格到 144 格）、能常驻加载多大的区块范围（1×1 到 7×7）。
+建议：等级越高，互通塔可带载的设备越多、覆盖距离越远，并可维持更大的区块加载范围。
+
+[179] distantstock.ponder.distant_tower.text_7
+原文：塔从下方那根轴吃旋转动力，等级越高吃得越多：I 级 256，此后逐级约翻倍，VII 级 16384。转速掉到中速以下，或者网络应力过载，塔顶的光柱都会暗下去。
+建议：高等级互通塔需要更多应力。转速不足或动力网络应力过载时，互通塔会停止运行。
+
+[180] distantstock.ponder.distant_tower.text_8
+原文：把拉杆按下去：被红石点亮的机壳，中间会变成透明的观察窗，并顺着相连的机壳一路传开。这只是外观，塔照常工作。
+建议：红石信号可使相连的远仓机壳开启观察窗。这只是外观变化，不会影响互通塔运行。
+
+[181] goggle.distantstock.tower.inactive
+原文：未激活：不在任何正在运行的互通塔范围内
+建议：未激活：不在运行中的互通塔覆盖范围内
+
+[182] gui.distantstock.tab.link
+原文：链路
+建议：连接
+
+[183] gui.distantstock.tab.tower
+原文：塔
+建议：互通塔
+
+[184] gui.distantstock.tower.none
+原文：未接入塔
+建议：未连接互通塔
+
+[185] gui.distantstock.tower.summary
+原文：%s 座塔 · 带载 %s/%s
+建议：%s 座互通塔 · 带载 %s / %s
+
+[186] gui.distantstock.tower.reach
+原文：范围 %s 格 · 载 %s 台
+建议：范围 %s 格 · 最大 %s 台设备
+
+[187] gui.distantstock.tower.selection.none
+原文：区块选区 未选 · 系统上限 %s×%s
+建议：未设置区块加载范围 · 上限 %s × %s
+
+[188] gui.distantstock.tower.selection
+原文：区块选区 %s×%s · 系统上限 %s×%s
+建议：区块加载 %s × %s · 上限 %s × %s
+
+[189] gui.distantstock.tower.stress
+原文：消耗 %s · %s 转
+建议：应力 %s · 转速 %s RPM
+
+[190] gui.distantstock.tower.more
+原文：还有 %s 座
+建议：另有 %s 座互通塔
+
+[191] gui.distantstock.tower.speed
+原文：%s 转
+建议：%s RPM
+
+[192] gui.distantstock.tower.radius
+原文：半径 %s
+建议：覆盖半径 %s
+
+[193] gui.distantstock.tower.loading
+原文：加载
+建议：区块加载
+
+[194] gui.distantstock.tower.carrying
+原文：带载
+建议：设备带载
+
+[195] gui.distantstock.tower.traffic
+原文：10 分钟  发 %s / 收 %s
+建议：最近 10 分钟 · 发 %s / 收 %s
+
+[196] gui.distantstock.group.default
+原文：默认收货港组
+建议：未分组
+
+[197] gui.distantstock.route.group.hint
+原文：选你自己的组＝货回本服；选「服务器 · 组名」＝货留那台服务器
+建议：选择本机港组可将货物送回本机；选择“服务器 · 港组”可发送至远端服务器
+
+[198] gui.distantstock.group.closed
+原文：你不在这个网络的名单里（开放的可自己加入，锁着的找所有者）
+建议：你没有使用该港组的权限
+
+[199] gui.distantstock.group.unknown_name
+原文：没有这个港组：%s
+建议：未找到港组：%s
+
+[200] gui.distantstock.manual.p6
+原文：塔是远仓设备工作的前提。有塔在转的维度里，没被任何塔罩住的远仓设备会停，护目镜上会红字写明。建法：用远仓机壳在中央的互通塔底座周围围出 3×3 裙板，底座正下方接一根竖直传动轴——底面是它唯一接受旋转的接面。往上堆至少五段耦合器，顶上盖一台以太谐振器。高度就是等级：五段是 I 级，十七段是 VII 级，每升一级都能带载更多设备、够到更远、常驻加载更大的区块范围。塔从下方那根轴吃应力，等级越高吃得越多。塔顶的光柱就是它的状态：没在转是暗灰，在转是青色，有包裹经过时变成更深的蓝色并自己发亮。
+建议：远仓设备需要处于运行中的互通塔覆盖范围内才能执行跨服操作。互通塔由底座、连续的耦合器和顶部以太谐振器组成，并从底座下方输入旋转动力。耦合器数量决定等级；等级越高，设备容量、覆盖范围和区块加载范围越大。
+
+[201] gui.distantstock.manual.h7
+原文：港组与锁定
+建议：港组与权限
+
+[202] gui.distantstock.manual.p7
+原文：一个港组就是一套系统：它决定包裹从哪些港出来。在终端上点开「收货港组」那一栏，会列出你可以用的系统；打一个没人用过的名字就会新建一个。潜行右键一个港，它属于当前选中的系统；直接右键，它就发往那个系统。你自己建的系统归你，而且默认关闭——只有你能往里加港、也只有你能往里发货。列表里你自己那个系统右边有个锁，点它开放给别人，再点一次收回。塔上的远仓监视器会列出所属系统里的每一座塔，并且允许你逐座单独调整。
+建议：港组用于决定跨服包裹应从哪些远仓港接收。你可以新建港组、将港口加入其中，并设置谁可以使用。发送时选择目标港组，系统会在其中寻找可用的接收港。
+
+[203] gui.distantstock.group.rename
+原文：改名
+建议：重命名
+
+[204] goggle.distantstock.group
+原文：接收港组：%s（本组 %s 个港）
+建议：收货港组：%s · %s 个港
+
+[205] gui.distantstock.manual.h8
+原文：跨服下单
+建议：自动跨服请求
+
+[206] gui.distantstock.manual.p8
+原文：远仓仪表是会自动下单的工厂仪表：每个格子绑一个远端仓库，面板读数低于数值面板上的目标，它就补差额，一次一单、最多一组，库存到目标或超过两分钟才算这一单结束。手持已调谐的终端右键格子绑定，潜行右键解绑；四个格子可以是四个仓库。远仓红石请求器是红石请求器的跨服版：上升沿发一单，九个格子一次发出去。没绑定的红石请求器就是普通红石请求器。两者都要有塔带载，没塔带载时照常显示、不下单。
+建议：远仓仪表会根据库存目标自动补货；远仓红石请求器则在收到红石上升沿时提交预设订单。使用已调谐的远仓终端可为它们绑定远程仓库与收货港组。两种设备都需要互通塔带载。
+
+[207] distantstock.ponder.distant_replenish.header
+原文：跨服下单
+建议：自动跨服请求
+
+[208] distantstock.ponder.distant_replenish.text_1
+原文：远仓仪表是会自动下单的工厂仪表。给它装上面板，设好过滤物品和你想保有的数量，这一个格子就会替你盯着这个数。
+建议：远仓仪表可以自动维持目标库存。设置过滤物品与目标数量后，它会持续检查当前库存。
+
+[209] distantstock.ponder.distant_replenish.text_2
+原文：手持已调谐的远仓终端右键这个格子，它就会绑到那台终端的货源网络和收货港组上；潜行右键解绑。四个格子各绑各的，一块板子可以同时对着四处要货。
+建议：使用已调谐的远仓终端右键仪表格即可绑定远程货源和收货港组；潜行右键可解除绑定。每个格子都可以独立配置。
+
+[210] distantstock.ponder.distant_replenish.text_3
+原文：数量少于目标时，它会补上差额。同一时刻只有一单在途：下一单要等库存到货、或者这一单被判超时；单次最多一组，免得一次把远端仓库整仓拉走。
+建议：库存低于目标时，远仓仪表会请求缺少的数量。为避免重复下单，每个格子同一时间只保留一笔在途订单。
+
+[211] distantstock.ponder.distant_replenish.text_4
+原文：远仓红石请求器是同一件事的脉冲版。在它自己的界面里填好九个物品和到货地址，用同样的手势绑定，一个上升沿发出一单。
+建议：远仓红石请求器用于按红石信号提交固定订单。配置物品与地址后，每次上升沿触发一次请求。
+
+[212] distantstock.ponder.distant_replenish.text_5
+原文：两者都下到收货港组里，和请求台下的单一样，所以货物会从本侧的远仓港出来。没绑定的请求器就是普通红石请求器，没绑定的仪表就是普通仪表。
+建议：远仓仪表和远仓红石请求器提交的订单都会送往所选收货港组，再由本地物流继续处理。
+
+[213] distantstock.ponder.distant_replenish.text_6
+原文：没有塔带载时它们什么都不发——先把塔立起来。
+建议：两种设备都需要运行中的互通塔带载。
+
+[214] message.distantstock.casing.port.open
+原文：这一面已开成以太接口
+建议：已开启以太接口
+
+[215] message.distantstock.casing.port.closed
+原文：已经把这个接口关上
+建议：已关闭以太接口
+
+[216] goggle.distantstock.tower.no_shaft
+原文：  底座下方没有传动轴（只接受底面输入）
+建议：  底座下方未连接传动轴
+
+[217] gui.distantstock.manual.h9
+原文：两个系统怎么互传
+建议：远仓港互传
+
+[218] gui.distantstock.manual.p9
+原文：两座塔、两个港组之间互传，只需要三步。一、两边都要有正在转的塔：塔带载是远仓设备工作的前提，转不动的塔什么都不带，设备会停（护目镜上有红字）。二、给每个港指定归属：手持已调谐的终端潜行右键一个港，它加入你当前选中的那个系统。三、给发送港指定目的地：普通右键（不潜行）它，它就发往你当前选中的系统，同时自己切成发送模式。包裹从侧面或背面喂进发送港（传送带、漏斗都行），到达时落在对方系统的某个港里，从侧面抽走即可；底面是回退面，留给被拒收和堵塞的货，记得在下面放容器。港组只管「从哪些港出来」，和塔的等级无关：同一个系统里的港可以分散在多座塔的范围内。
+建议：两套港组之间互传时，先确保两端都有运行中的互通塔。随后将接收港加入对应港组，并为发送港选择目标港组。普通包裹可从侧面或背面送入发送港，抵达后从接收港侧面进入本地物流；底面始终作为回退出口使用。
+
+[219] gui.distantstock.dock_bind_no_network
+原文：这里没有可抓取的物流网络
+建议：未找到可绑定的物流网络
+
+[220] gui.distantstock.remote_gauge.no_destination
+原文：请填一个目的地
+建议：请选择收货港组
+
+[221] gui.distantstock.remote_gauge.needs_terminal
+原文：这一格还没有仓库——先用已调谐的终端点它一下
+建议：尚未绑定远程仓库，请使用已调谐的远仓终端右键绑定
+
+[222] gui.distantstock.group.default_fixed
+原文：默认系统不能改名或删除
+建议：未分组状态不能重命名或删除
+
+[223] goggle.distantstock.tower.not_turning
+原文：  未接通应力——塔不转，不带载任何设备
+建议：  未获得旋转动力，互通塔无法运行
+
+[224] goggle.distantstock.tower.too_slow
+原文：  转速不足（%s rpm），达不到工作要求
+建议：  转速不足：%s RPM
+
+[225] gui.distantstock.pair.forgotten
+原文：已隐藏这个远端港组；对面改动它之后会重新出现。
+建议：已隐藏该远端港组；远端信息变化后可能再次出现
+
+[226] gui.distantstock.pair.remote_no_rename
+原文：远端港组的名字由对面服务器的主人决定，这里改不了。
+建议：远端港组只能由其所在服务器修改名称
+
+[227] gui.distantstock.remote_gauge.destination
+原文：目的地
+建议：收货港组
+
+[228] gui.distantstock.remote_gauge.destination.hint
+原文：点一下选组；不改就保持原样
+建议：点击选择收货港组
+
+[229] gui.distantstock.remote_gauge.address
+原文：地址
+建议：包裹地址
+
+[230] gui.distantstock.remote_gauge.address.hint
+原文：包裹上写的地址
+建议：设置包裹抵达后的本地地址
+
+[231] gui.distantstock.remote_gauge.source
+原文：仓库：%s
+建议：货源：%s
+
+[232] gui.distantstock.save_on_close
+原文：关掉界面即保存
+建议：关闭界面时自动保存
+
+[233] goggle.distantstock.send.no_group
+原文：无目的地：没有设置收货港组，包裹留在港内
+建议：无法发送：尚未选择收货港组
+
+[234] goggle.distantstock.peer_silent
+原文：对端：暂无比值（链路在线）
+建议：远端：暂无状态数据
+
+[235] gui.distantstock.networks.more
+原文：显示 %s / %s · 滚轮翻页
+建议：%s / %s · 使用滚轮翻页
+
+[236] message.distantstock.casing.port.no_tower
+原文：这块机壳不属于任何塔：这个口通向空处
+建议：该机壳未连接到互通塔，无法启用以太接口
+
+[237] message.distantstock.dock.target
+原文：已设置收货港组：%s（服务器：%s）
+建议：目标港组已设置：%s（%s）
+
+[238] message.distantstock.dock.target.no_group
+原文：终端没有设收货港组：本港现在指向「%s」（谁都收），跨服包裹会被留在港内 —— 先在终端的「接收港组」里选一个组再点。
+建议：终端尚未选择收货港组，远仓港不会发送跨服包裹。请先在终端中选择一个港组。
+
+[239] message.distantstock.dock.joined
+原文：本港已加入收货港组：%s
+建议：远仓港已加入港组：%s
+
+[240] item.distantstock.remote_package.crossing
+原文：跨服寄往 %s
+建议：目标服务器：%s
+
+[241] create.gui.stock_keeper.package_address.hint
+原文：包裹在对面被认领用的地址；对面的港/蛙港要收这个地址
+建议：包裹抵达后使用的本地地址
+
+[242] gui.distantstock.member.nobody
+原文：（服务器建的，没有组主）
+建议：无所有者
+
+[243] gui.distantstock.member.hint_name
+原文：输入玩家名
+建议：输入玩家名称
+
+[244] gui.distantstock.member.not_owner
+原文：只有组主能改成员名单
+建议：只有港组所有者可以修改成员
+
+[245] gui.distantstock.member.full
+原文：成员名单满了（上限 %s 人）
+建议：成员数量已达上限（%s）
+
+[246] gui.distantstock.member.unknown
+原文：这个服务器不认识玩家「%s」：名字要跟他进服时的完全一样
+建议：未找到玩家“%s”，请确认名称是否正确
+
+[247] gui.distantstock.member.is_owner
+原文：%s 是这个组的主人，本来就能用
+建议：%s 是该港组的所有者
+
+[248] gui.distantstock.member.already
+原文：%s 已经在名单里（名字已刷新）
+建议：%s 已拥有该港组的使用权限
+
+[249] gui.distantstock.member.added
+原文：已把 %s 加入港组「%s」：他能用这个组，改不了它
+建议：已将 %s 加入港组“%s”
+
+[250] gui.distantstock.member.not_member
+原文：「%s」不在这个组的名单里
+建议：%s 不是港组“%s”的成员
+
+[251] gui.distantstock.member.removed
+原文：已把 %s 移出港组「%s」
+建议：已将 %s 移出港组“%s”
+
+[252] gui.distantstock.group.locked_hint
+原文：锁只管「谁能自己加入」：能用的永远是组主和名单里的人
+建议：锁定后，只有所有者和成员可以使用该港组
+
+[253] gui.distantstock.route.home
+原文：本端地址
+建议：本地地址
+
+[254] gui.distantstock.route.home.hint
+原文：留空＝过海后不改地址
+建议：留空则保留包裹原地址
+
+[255] item.distantstock.remote_package.home_address
+原文：对面服务器上用：%s
+建议：本地地址：%s
+
+[256] gui.distantstock.group.unknown
+原文：这个收货港组不存在了：重新选一个再下单
+建议：所选收货港组已不存在，请重新选择
+
+[257] gui.distantstock.queued_at
+原文：已下单：货从 %s 出来
+建议：订单已提交 · 收货港组：%s
+
+[258] gui.distantstock.where.local
+原文：本服 · %s
+建议：本机 · %s
+
+[259] gui.distantstock.where.remote
+原文：%s（对岸）
+建议：%s · 远端
+
+[260] message.distantstock.parcel.for_other
+原文：这是给 %s 的包裹，只有他能取走
+建议：该包裹属于 %s
+
+[261] message.distantstock.parcel.arrived
+原文：你的包裹到了：%s
+建议：收到远仓包裹：%s
+
+[262] gui.distantstock.net.button
+原文：网络…
+建议：网络设置
+
+[263] gui.distantstock.net.add
+原文：加入
+建议：添加成员
+
+[264] gui.distantstock.net.lock
+原文：锁上
+建议：关闭公开加入
+
+[265] gui.distantstock.net.unlock
+原文：开放加入
+建议：允许公开加入
+
+[266] gui.distantstock.net.open
+原文：开放加入
+建议：公开
+
+[267] gui.distantstock.net.locked
+原文：已锁定
+建议：仅成员
+
+[268] gui.distantstock.net.empty
+原文：（这个网络里只有所有者）
+建议：暂无其他成员
+
+[269] gui.distantstock.net.more
+原文：…还有 %s 人
+建议：另有 %s 人
+
+[270] gui.distantstock.net.leave
+原文：离开网络
+建议：退出网络
+
+[271] gui.distantstock.net.is_member
+原文：你是这个网络的成员：能用它下单，改不了它
+建议：你是该网络的成员，可以使用它下单
+
+[272] gui.distantstock.net.not_member_open
+原文：这个网络开放加入：点「加入网络」就能用
+建议：该网络允许公开加入
+
+[273] gui.distantstock.net.not_member_locked
+原文：这个网络锁着：要所有者把你加进名单
+建议：该网络仅限成员使用
+
+[274] gui.distantstock.member.joined
+原文：已加入网络「%s」：你能用它下单，改不了它
+建议：已加入网络“%s”
+
+[275] gui.distantstock.member.left
+原文：已离开网络「%s」
+建议：已退出网络“%s”
+
+[276] gui.distantstock.member.join.owner
+原文：「%s」是你自己建的
+建议：“%s”由你创建
+
+[277] gui.distantstock.member.join.already
+原文：你已经在「%s」的名单里
+建议：你已经加入“%s”
+
+[278] gui.distantstock.member.join.closed
+原文：「%s」锁着：要所有者把你加进名单
+建议：“%s”仅限成员加入，请联系所有者
+
+[279] gui.distantstock.member.leave.owner
+原文：你是「%s」的所有者，只能把它删掉
+建议：你是“%s”的所有者，无法直接退出
+
+[280] gui.distantstock.member.leave.not_member
+原文：你不在「%s」的名单里
+建议：你尚未加入“%s”
+
+[281] goggle.distantstock.remote_requester.unbound
+原文：未绑定：现在是一台普通红石请求器
+建议：未绑定远程仓库，当前按普通红石请求器工作
+
+[282] goggle.distantstock.remote_requester.bind_hint
+原文：手持已调谐的终端右键它，绑定到另一台服务器的仓库
+建议：使用已调谐的远仓终端右键进行绑定
+
+[283] gui.distantstock.group.not_admitted
+原文：「%s」没有把你放进名单，选不了 —— 让对面的组主加你。
+建议：你没有使用“%s”的权限
+
+[284] gui.distantstock.group.no_dock
+原文：无港
+建议：暂无可用港口
+
+[285] gui.distantstock.group.none
+原文：没选接收港组：先在列表里新建一个或加入一个 —— 没选组的话货没人接
+建议：尚未选择收货港组
+
+[286] gui.distantstock.route.group.required
+原文：点这里选一个组（必须新建或加入）
+建议：点击选择收货港组
+
+[287] gui.distantstock.group.more
+原文：还有 %s 个 —— 去终端的港组列表里看
+建议：另有 %s 个港组
+
+[288] gui.distantstock.networks.nopacker
+原文：对面无打包机
+建议：远端没有可用的打包设备
+
+[289] gui.distantstock.remote_requester.group
+原文：接收港组
+建议：收货港组
+
+[290] gui.distantstock.remote_requester.group.hint
+原文：点一下选接收港组；留空＝对面随便挑
+建议：点击选择收货港组
+
+[291] gui.distantstock.remote_requester.saved
+原文：已保存：接收港组和本端地址
+建议：设置已保存
+
+[292] gui.distantstock.remote_requester.saved_address_only
+原文：本端地址已存下；接收港组没变（上面那条说的是原因）
+建议：本地地址已保存，收货港组保持不变
+
+[293] gui.distantstock.remote_requester.binding
+原文：这台请求器还没绑定：先在终端里调谐，再右键它 —— 没绑定的话它按普通红石请求器工作
+建议：尚未绑定远程仓库。请先使用已调谐的远仓终端右键绑定。
+
+[294] gui.distantstock.remote_requester.source
+原文：仓库：%s
+建议：货源：%s

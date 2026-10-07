@@ -14,12 +14,62 @@ public final class ModBlocks {
 
     public static final DeferredHolder<net.minecraft.world.level.block.Block, DockBlock> DOCK =
             BLOCKS.register("dock", () -> new DockBlock(machine()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, DiagnosticFrogportBlock> DIAGNOSTIC_FROGPORT =
+            BLOCKS.register("diagnostic_frogport", () -> new DiagnosticFrogportBlock(
+                    BlockBehaviour.Properties.ofFullCopy(net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
+                            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", "package_frogport")))
+                            .noOcclusion()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, CacheFrogportBlock> CACHE_FROGPORT =
+            BLOCKS.register("cache_frogport", () -> new CacheFrogportBlock(
+                    BlockBehaviour.Properties.ofFullCopy(net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(
+                            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", "package_frogport")))
+                            .noOcclusion()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, GaugeBlock> GAUGE =
             BLOCKS.register("gauge", () -> new GaugeBlock(machine().noOcclusion()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, RemoteGaugeBlock> REMOTE_GAUGE =
             BLOCKS.register("remote_gauge", () -> new RemoteGaugeBlock(panel()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, MonitorBlock> MONITOR =
             BLOCKS.register("monitor", () -> new MonitorBlock(panel()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, LoggerBlock> LOGGER =
+            BLOCKS.register("logger", () -> new LoggerBlock(panel()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, StackLightBlock> STACK_LIGHT =
+            BLOCKS.register("stack_light", () -> new StackLightBlock(panel()
+                    .lightLevel(state -> StackLightBlock.anyLit(state) ? 12 : 0)));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, WallSounderBlock> RED_WALL_SOUNDER =
+            BLOCKS.register("red_wall_sounder", () -> new WallSounderBlock(panel()
+                    .lightLevel(state -> state.getValue(WallSounderBlock.LIT) ? 15 : 0)));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, WallSounderBlock> ORANGE_WALL_SOUNDER =
+            BLOCKS.register("orange_wall_sounder", () -> new WallSounderBlock(panel()
+                    .lightLevel(state -> state.getValue(WallSounderBlock.LIT) ? 15 : 0)));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, ConditionLinkerBlock> CONDITION_LINKER =
+            BLOCKS.register("condition_linker", () -> new ConditionLinkerBlock(panel()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, AnnouncerBlock> ANNOUNCER =
+            BLOCKS.register("announcer", () -> new AnnouncerBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_YELLOW)
+                    .strength(2.4f, 5.0f)
+                    .sound(SoundType.METAL)));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, NetworkBroadcasterBlock> NETWORK_BROADCASTER =
+            BLOCKS.register("network_broadcaster", () -> new NetworkBroadcasterBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.COLOR_PURPLE)
+                    .strength(2.8f, 6.0f)
+                    .sound(SoundType.METAL)));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, NetworkSpeakerBlock> NETWORK_SPEAKER =
+            BLOCKS.register("network_speaker", () -> new NetworkSpeakerBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(2.6f, 5.5f)
+                    .sound(SoundType.METAL)));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, NixieClockBlock> NIXIE_CLOCK =
+            BLOCKS.register("nixie_clock", () -> new NixieClockBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(2.0f, 4.0f)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()));
+    public static final DeferredHolder<net.minecraft.world.level.block.Block, FlapClockBlock> FLAP_CLOCK =
+            BLOCKS.register("flap_clock", () -> new FlapClockBlock(BlockBehaviour.Properties.of()
+                    .mapColor(MapColor.METAL)
+                    .strength(2.0f, 4.0f)
+                    .sound(SoundType.METAL)
+                    .noOcclusion()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, RemotePackagerBlock> REMOTE_PACKAGER =
             BLOCKS.register("remote_packager", () -> new RemotePackagerBlock(
                     BlockBehaviour.Properties.ofFullCopy(net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(

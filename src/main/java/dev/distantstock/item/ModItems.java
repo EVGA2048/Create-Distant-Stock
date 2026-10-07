@@ -10,6 +10,7 @@ import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ArmorItem;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -21,16 +22,41 @@ public final class ModItems {
             () -> new RequesterItem(new Item.Properties().stacksTo(1)));
     public static final DeferredHolder<Item, DockItem> DOCK = ITEMS.register("dock",
             () -> new DockItem(ModBlocks.DOCK.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, DiagnosticFrogportItem> DIAGNOSTIC_FROGPORT =
+            ITEMS.register("diagnostic_frogport", () -> new DiagnosticFrogportItem(
+                    ModBlocks.DIAGNOSTIC_FROGPORT.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, com.simibubi.create.content.logistics.packagePort.PackagePortItem> CACHE_FROGPORT =
+            ITEMS.register("cache_frogport", () -> new com.simibubi.create.content.logistics.packagePort.PackagePortItem(
+                    ModBlocks.CACHE_FROGPORT.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> GAUGE = ITEMS.register("gauge",
             () -> new BlockItem(ModBlocks.GAUGE.get(), new Item.Properties()));
-    public static final DeferredHolder<Item, com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockItem> REMOTE_GAUGE = ITEMS.register("remote_gauge",
-            () -> new com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockItem(ModBlocks.REMOTE_GAUGE.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, RemoteGaugeItem> REMOTE_GAUGE = ITEMS.register("remote_gauge",
+            () -> new RemoteGaugeItem(ModBlocks.REMOTE_GAUGE.get(), new Item.Properties()));
     public static final DeferredHolder<Item, com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlockItem> REMOTE_REDSTONE_REQUESTER =
             ITEMS.register("remote_redstone_requester",
                     () -> new com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlockItem(
                             ModBlocks.REMOTE_REDSTONE_REQUESTER.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> MONITOR = ITEMS.register("monitor",
             () -> new BlockItem(ModBlocks.MONITOR.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, LoggerItem> LOGGER = ITEMS.register("logger",
+            () -> new LoggerItem(ModBlocks.LOGGER.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, BlockItem> STACK_LIGHT = ITEMS.register("stack_light",
+            () -> new BlockItem(ModBlocks.STACK_LIGHT.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, BlockItem> RED_WALL_SOUNDER = block("red_wall_sounder",
+            ModBlocks.RED_WALL_SOUNDER);
+    public static final DeferredHolder<Item, BlockItem> ORANGE_WALL_SOUNDER = block("orange_wall_sounder",
+            ModBlocks.ORANGE_WALL_SOUNDER);
+    public static final DeferredHolder<Item, ConditionLinkerItem> CONDITION_LINKER = ITEMS.register("condition_linker",
+            () -> new ConditionLinkerItem(ModBlocks.CONDITION_LINKER.get(), new Item.Properties().stacksTo(1)));
+    public static final DeferredHolder<Item, BlockItem> ANNOUNCER = block("announcer", ModBlocks.ANNOUNCER);
+    public static final DeferredHolder<Item, com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem> NETWORK_BROADCASTER =
+            ITEMS.register("network_broadcaster", () -> new com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem(
+                    ModBlocks.NETWORK_BROADCASTER.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem> NETWORK_SPEAKER =
+            ITEMS.register("network_speaker", () -> new com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem(
+                    ModBlocks.NETWORK_SPEAKER.get(), new Item.Properties()));
+    public static final DeferredHolder<Item, BlockItem> NIXIE_CLOCK = block("nixie_clock", ModBlocks.NIXIE_CLOCK);
+    public static final DeferredHolder<Item, BlockItem> FLAP_CLOCK = block("flap_clock", ModBlocks.FLAP_CLOCK);
     public static final DeferredHolder<Item, BlockItem> REMOTE_PACKAGER = ITEMS.register("remote_packager",
             () -> new BlockItem(ModBlocks.REMOTE_PACKAGER.get(), new Item.Properties()));
     public static final DeferredHolder<Item, SignalLampPanelItem> CYAN_INDICATOR_LAMP = lamp("cyan_indicator_lamp", SignalLampPanelItem.Color.CYAN);
@@ -43,11 +69,27 @@ public final class ModItems {
                     SignalLampPanelItem.Material.BRASS,
                     SignalLampPanelItem.Color.WHITE));
     public static final DeferredHolder<Item, BlockItem> TOWER_CASING = block("tower_casing", ModBlocks.TOWER_CASING);
+    private static final int ETHER_ARMOR_DURABILITY = 42;
+    public static final DeferredHolder<Item, EtherCasingArmorItem> ETHER_CASING_HELMET = ITEMS.register(
+            "ether_casing_helmet", () -> etherArmor(ArmorItem.Type.HELMET));
+    public static final DeferredHolder<Item, EtherCasingArmorItem> ETHER_CASING_CHESTPLATE = ITEMS.register(
+            "ether_casing_chestplate", () -> etherArmor(ArmorItem.Type.CHESTPLATE));
+    public static final DeferredHolder<Item, EtherCasingArmorItem> ETHER_CASING_LEGGINGS = ITEMS.register(
+            "ether_casing_leggings", () -> etherArmor(ArmorItem.Type.LEGGINGS));
+    public static final DeferredHolder<Item, EtherCasingArmorItem> ETHER_CASING_BOOTS = ITEMS.register(
+            "ether_casing_boots", () -> etherArmor(ArmorItem.Type.BOOTS));
     public static final DeferredHolder<Item, BlockItem> TOWER_CORE = block("tower_core", ModBlocks.TOWER_CORE);
     public static final DeferredHolder<Item, BlockItem> TOWER_COUPLER = block("tower_coupler", ModBlocks.TOWER_COUPLER);
     public static final DeferredHolder<Item, BlockItem> ETHER_RESONATOR = block("ether_resonator", ModBlocks.ETHER_RESONATOR);
     public static final DeferredHolder<Item, RemotePackageItem> REMOTE_PACKAGE = ITEMS.register("remote_package",
             () -> new RemotePackageItem(new Item.Properties()));
+    /** System-generated diagnostic parcel; also exposed in creative for route diagnostics/testing. */
+    public static final DeferredHolder<Item, PingPackageItem> PING_PACKAGE = ITEMS.register("ping_package",
+            () -> new PingPackageItem(new Item.Properties()));
+    public static final DeferredHolder<Item, EventReceiptItem> EVENT_RECEIPT = ITEMS.register("event_receipt",
+            () -> new EventReceiptItem(new Item.Properties().stacksTo(16)));
+    public static final DeferredHolder<Item, Item> LOGGER_PAPER_ROLL = ITEMS.register("logger_paper_roll",
+            () -> new Item(new Item.Properties().stacksTo(16)));
     public static final DeferredHolder<Item, Item> MANUAL = ITEMS.register("manual",
             () -> new ManualItem(new Item.Properties().stacksTo(1)));
 
@@ -58,6 +100,10 @@ public final class ModItems {
     public static final DeferredHolder<Item, Item> ETHER_QUARTZ = ITEMS.register("ether_quartz",
             () -> new Item(new Item.Properties()));
     public static final DeferredHolder<Item, Item> POLISHED_ETHER_QUARTZ = ITEMS.register("polished_ether_quartz",
+            () -> new Item(new Item.Properties()));
+    public static final DeferredHolder<Item, Item> INCOMPLETE_ETHER_MECHANISM = ITEMS.register("incomplete_ether_mechanism",
+            () -> new Item(new Item.Properties()));
+    public static final DeferredHolder<Item, Item> ETHER_MECHANISM = ITEMS.register("ether_mechanism",
             () -> new Item(new Item.Properties()));
     public static final DeferredHolder<Item, BucketItem> ETHER_BUCKET = ITEMS.register("ether_bucket",
             () -> new BucketItem(dev.distantstock.fluid.ModFluids.ETHER.get(),
@@ -79,14 +125,26 @@ public final class ModItems {
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB = TABS.register("main", () -> CreativeModeTab.builder()
             .title(Component.translatable("itemGroup.distantstock"))
-            .icon(() -> new ItemStack(REQUESTER.get()))
+            .icon(() -> new ItemStack(DOCK.get()))
             .displayItems((params, out) -> {
                 out.accept(REQUESTER.get());
                 out.accept(DOCK.get());
+                out.accept(DIAGNOSTIC_FROGPORT.get());
+                out.accept(CACHE_FROGPORT.get());
                 out.accept(GAUGE.get());
                 out.accept(REMOTE_GAUGE.get());
                 out.accept(REMOTE_REDSTONE_REQUESTER.get());
                 out.accept(MONITOR.get());
+                out.accept(LOGGER.get());
+                out.accept(STACK_LIGHT.get());
+                out.accept(RED_WALL_SOUNDER.get());
+                out.accept(ORANGE_WALL_SOUNDER.get());
+                out.accept(CONDITION_LINKER.get());
+                out.accept(ANNOUNCER.get());
+                out.accept(NETWORK_BROADCASTER.get());
+                out.accept(NETWORK_SPEAKER.get());
+                out.accept(NIXIE_CLOCK.get());
+                out.accept(FLAP_CLOCK.get());
                 out.accept(REMOTE_PACKAGER.get());
                 out.accept(CYAN_INDICATOR_LAMP.get());
                 out.accept(ORANGE_INDICATOR_LAMP.get());
@@ -95,13 +153,25 @@ public final class ModItems {
                 out.accept(WHITE_INDICATOR_LAMP.get());
                 out.accept(BRASS_SIGNAL_LAMP.get());
                 out.accept(TOWER_CASING.get());
+                out.accept(ETHER_CASING_HELMET.get());
+                out.accept(ETHER_CASING_CHESTPLATE.get());
+                out.accept(ETHER_CASING_LEGGINGS.get());
+                out.accept(ETHER_CASING_BOOTS.get());
                 out.accept(TOWER_CORE.get());
                 out.accept(TOWER_COUPLER.get());
                 out.accept(ETHER_RESONATOR.get());
                 out.accept(REMOTE_PACKAGE.get());
+                out.accept(PING_PACKAGE.get());
+                if (net.neoforged.fml.ModList.get().isLoaded("fluidlogistics")) {
+                    out.accept(dev.distantstock.compat.fluidlogistics.FluidLogisticsCompat.remoteFluidPackage());
+                }
+                out.accept(EVENT_RECEIPT.get());
+                out.accept(LOGGER_PAPER_ROLL.get());
                 out.accept(ENDER_DUST.get());
                 out.accept(ETHER_QUARTZ.get());
                 out.accept(POLISHED_ETHER_QUARTZ.get());
+                out.accept(INCOMPLETE_ETHER_MECHANISM.get());
+                out.accept(ETHER_MECHANISM.get());
                 out.accept(ETHER_BUCKET.get());
                 out.accept(MOLTEN_AMETHYST_BUCKET.get());
                 out.accept(ETHER_BOTTLE.get());
@@ -113,6 +183,12 @@ public final class ModItems {
     private static DeferredHolder<Item, BlockItem> block(String name,
                                                           DeferredHolder<net.minecraft.world.level.block.Block, ? extends net.minecraft.world.level.block.Block> block) {
         return ITEMS.register(name, () -> new BlockItem(block.get(), new Item.Properties()));
+    }
+
+    private static EtherCasingArmorItem etherArmor(ArmorItem.Type type) {
+        return new EtherCasingArmorItem(type, new Item.Properties()
+                .fireResistant()
+                .durability(type.getDurability(ETHER_ARMOR_DURABILITY)));
     }
 
     private static DeferredHolder<Item, SignalLampPanelItem> lamp(String name, SignalLampPanelItem.Color color) {

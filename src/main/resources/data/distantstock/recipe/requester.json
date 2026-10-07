@@ -1,15 +1,22 @@
 {
-  "type": "minecraft:crafting_shaped",
+  "type": "minecraft:crafting_shapeless",
   "category": "equipment",
-  "key": {
-    "W": { "item": "minecraft:stripped_warped_stem" },
-    "C": { "item": "minecraft:copper_ingot" },
-    "R": { "item": "minecraft:redstone" }
-  },
-  "pattern": [
-    " W ",
-    "WCW",
-    " R "
+  "ingredients": [
+    {
+      "item": "create:stock_ticker"
+    },
+    {
+      "item": "create:transmitter"
+    },
+    {
+      "item": "distantstock:ether_mechanism"
+    },
+    {
+      "item": "create:brass_sheet"
+    }
   ],
-  "result": { "count": 1, "id": "distantstock:requester" }
+  "result": {
+    "count": 1,
+    "id": "distantstock:requester"
+  }
 }

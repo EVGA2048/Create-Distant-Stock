@@ -1,0 +1,29 @@
+{
+  "variants": {
+    "facing=up": {
+      "model": "distantstock:block/network_speaker"
+    },
+    "facing=down": {
+      "model": "distantstock:block/network_speaker",
+      "x": 180
+    },
+    "facing=north": {
+      "model": "distantstock:block/network_speaker",
+      "x": 270
+    },
+    "facing=south": {
+      "model": "distantstock:block/network_speaker",
+      "x": 90
+    },
+    "facing=east": {
+      "model": "distantstock:block/network_speaker",
+      "x": 90,
+      "y": 90
+    },
+    "facing=west": {
+      "model": "distantstock:block/network_speaker",
+      "x": 90,
+      "y": 270
+    }
+  }
+}

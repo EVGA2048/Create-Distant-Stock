@@ -33,7 +33,13 @@ import java.util.UUID;
  * of who may use a group, and none of this crosses with a parcel — the only thing the far end ever
  * learns about a group is the id that travels in an order and on the parcels of one.
  */
-public record DockGroup(UUID id, String name, UUID owner, boolean open, Map<UUID, String> members) {
+public record DockGroup(UUID id, String name, UUID owner, boolean open, Map<UUID, String> members,
+                        UUID distantNetworkId, Visibility visibility) {
+    public enum Visibility {
+        PUBLIC,
+        UNLISTED
+    }
+
     public static final int MAX_NAME_LENGTH = 48;
     /** How many players one group may name. Caps the packet as much as it caps the list. */
     public static final int MAX_MEMBERS = 32;
@@ -41,6 +47,9 @@ public record DockGroup(UUID id, String name, UUID owner, boolean open, Map<UUID
     public DockGroup {
         Objects.requireNonNull(id, "id");
         name = normalizeName(name);
+        distantNetworkId = distantNetworkId == null
+                ? DistantNetworkDirectory.LEGACY_NETWORK_ID : distantNetworkId;
+        visibility = visibility == null ? Visibility.PUBLIC : visibility;
         if (members == null || members.isEmpty()) {
             members = Map.of();
         } else {
@@ -55,7 +64,14 @@ public record DockGroup(UUID id, String name, UUID owner, boolean open, Map<UUID
 
     /** A group with nobody named in it: what every group was before members existed. */
     public DockGroup(UUID id, String name, UUID owner, boolean open) {
-        this(id, name, owner, open, Map.of());
+        this(id, name, owner, open, Map.of(),
+                DistantNetworkDirectory.LEGACY_NETWORK_ID, Visibility.PUBLIC);
+    }
+
+    /** Backward-compatible constructor for old save/tests before address scope and visibility. */
+    public DockGroup(UUID id, String name, UUID owner, boolean open, Map<UUID, String> members) {
+        this(id, name, owner, open, members,
+                DistantNetworkDirectory.LEGACY_NETWORK_ID, Visibility.PUBLIC);
     }
 
     /**
@@ -125,7 +141,7 @@ public record DockGroup(UUID id, String name, UUID owner, boolean open, Map<UUID
         }
         Map<UUID, String> next = new LinkedHashMap<>(members);
         next.put(player, playerName == null || playerName.isBlank() ? "?" : playerName.trim());
-        return new DockGroup(id, name, owner, open, next);
+        return new DockGroup(id, name, owner, open, next, distantNetworkId, visibility);
     }
 
     public DockGroup withoutMember(UUID player) {
@@ -134,15 +150,23 @@ public record DockGroup(UUID id, String name, UUID owner, boolean open, Map<UUID
         }
         Map<UUID, String> next = new LinkedHashMap<>(members);
         next.remove(player);
-        return new DockGroup(id, name, owner, open, next);
+        return new DockGroup(id, name, owner, open, next, distantNetworkId, visibility);
     }
 
     public DockGroup rename(String newName) {
-        return new DockGroup(id, newName, owner, open, members);
+        return new DockGroup(id, newName, owner, open, members, distantNetworkId, visibility);
     }
 
     public DockGroup withOpen(boolean nextOpen) {
-        return new DockGroup(id, name, owner, nextOpen, members);
+        return new DockGroup(id, name, owner, nextOpen, members, distantNetworkId, visibility);
+    }
+
+    public DockGroup withVisibility(Visibility nextVisibility) {
+        return new DockGroup(id, name, owner, open, members, distantNetworkId, nextVisibility);
+    }
+
+    public DockGroup inDistantNetwork(UUID networkId) {
+        return new DockGroup(id, name, owner, open, members, networkId, visibility);
     }
 
     private static String normalizeName(String value) {

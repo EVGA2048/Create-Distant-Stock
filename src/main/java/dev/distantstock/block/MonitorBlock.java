@@ -34,8 +34,28 @@ import org.jetbrains.annotations.Nullable;
  * this block's face animates on the client, so the ticker has to run on both sides. {@code IBE}
  * gives exactly that, and Create's smart ticker is what calls the block entity's own {@code tick}.
  */
-public final class MonitorBlock extends WallPanelBlock implements IWrenchable,
+public final class MonitorBlock extends WallPanelBlock implements com.simibubi.create.content.kinetics.base.IRotate,
         com.simibubi.create.foundation.block.IBE<MonitorBlockEntity> {
+
+    // Create's flap renderer uses the kinetic rotation transform even for a stationary panel.
+    // Advertise the axis it expects, but never connect this display to a shaft network.
+    @Override
+    public net.minecraft.core.Direction.Axis getRotationAxis(BlockState state) {
+        return net.minecraft.core.Direction.Axis.Y;
+    }
+
+    @Override
+    public boolean hasShaftTowards(net.minecraft.world.level.LevelReader level, BlockPos pos,
+                                   BlockState state, net.minecraft.core.Direction side) {
+        return false;
+    }
+
+    @Override
+    public com.simibubi.create.content.kinetics.base.IRotate.SpeedLevel getMinimumRequiredSpeedLevel() {
+        // A wall display must flip its glyphs without a motor even though the inherited renderer
+        // expects IRotate for its (zero-speed) transform.
+        return com.simibubi.create.content.kinetics.base.IRotate.SpeedLevel.NONE;
+    }
 
     /** Rotation would silently move the cabin or the panel slots, so a wrench click only reports state. */
     @Override
@@ -177,7 +197,7 @@ public final class MonitorBlock extends WallPanelBlock implements IWrenchable,
                 // readout is built for the monitor that asked.
                 PacketDistributor.sendToPlayer(sp,
                         new OpenMonitorS2C(pos, LinkSnapshot.view(
-                                dev.distantstock.routing.TowerReadout.survey(level, pos))));
+                                dev.distantstock.routing.TowerReadout.survey(level, pos)), false));
             }
         }
     }

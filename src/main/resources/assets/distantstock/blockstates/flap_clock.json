@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": {"model": "distantstock:block/flap_clock"},
+    "facing=south": {"model": "distantstock:block/flap_clock", "y": 180},
+    "facing=west":  {"model": "distantstock:block/flap_clock", "y": 270},
+    "facing=east":  {"model": "distantstock:block/flap_clock", "y": 90}
+  }
+}

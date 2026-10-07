@@ -58,7 +58,8 @@ public final class TranserverPackageService {
      *
      * <p>理由用中文写，因为读这一行的人是在诊断"我的货为什么没到"，而不是在读协议。
      */
-    private static void complain(PackageDispatchCodec.Dispatch dispatch, String sourceNode, String why) {
+    private static void complain(MinecraftServer server, PackageDispatchCodec.Dispatch dispatch,
+                                 String sourceNode, String stage, String why) {
         long now = System.currentTimeMillis();
         Long last = WAITING.get(dispatch.parcelId());
         if (last != null && now - last < COMPLAIN_INTERVAL_MS) {
@@ -71,6 +72,7 @@ public final class TranserverPackageService {
         WAITING.put(dispatch.parcelId(), now);
         LOG.warn("[DistantStock/Parcel] 包裹收不下，会一直重投 parcel={} source={} group={} 原因={}",
                 dispatch.parcelId(), sourceNode, dispatch.receivingDockGroupId(), why);
+        PackageTraceService.report(server, sourceNode, dispatch.parcelId(), stage, why);
     }
 
     public static void register() {
@@ -123,6 +125,8 @@ public final class TranserverPackageService {
         if (ledger.contains(dispatch.parcelId())) {
             LOG.info("[DistantStock/Parcel] duplicate already applied parcel={} source={} group={}",
                     dispatch.parcelId(), sourceNode, dispatch.receivingDockGroupId());
+            PackageTraceService.report(server, sourceNode, dispatch.parcelId(),
+                    "APPLIED_DUPLICATE", "destination ledger already contains parcel");
             return DeliveryResult.APPLIED;
         }
         // Tell the source exactly what this server lacks. Only the source owns those mods, so it is the only
@@ -131,6 +135,8 @@ public final class TranserverPackageService {
         if (!missing.isEmpty()) {
             LOG.warn("[DistantStock/Parcel] rejected incompatible parcel={} source={} group={} missing={}",
                     dispatch.parcelId(), sourceNode, dispatch.receivingDockGroupId(), missing);
+            PackageTraceService.report(server, sourceNode, dispatch.parcelId(),
+                    "REJECTED_INCOMPATIBLE", String.join(",", missing));
             requestStrip(sourceNode, dispatch.parcelId(), missing);
             return DeliveryResult.REJECTED;
         }
@@ -138,6 +144,8 @@ public final class TranserverPackageService {
         if (parcel.isEmpty() || !PackageItem.isPackage(parcel)) {
             LOG.warn("[DistantStock/Parcel] rejected unreadable parcel={} source={} group={}",
                     dispatch.parcelId(), sourceNode, dispatch.receivingDockGroupId());
+            PackageTraceService.report(server, sourceNode, dispatch.parcelId(),
+                    "REJECTED_UNREADABLE", "destination could not decode package");
             return DeliveryResult.REJECTED;
         }
         // 过海。包裹从对面来，身上穿的还是对面那台服务器的门牌 —— 在这边认不出任何一台港，
@@ -158,23 +166,27 @@ public final class TranserverPackageService {
         if (!groupExists(server, dispatch.receivingDockGroupId())) {
             long since = UNKNOWN_GROUP_SINCE.computeIfAbsent(dispatch.parcelId(), key -> now);
             if (now - since < unknownGroupGraceTicks) {
-                complain(dispatch, sourceNode, "这一侧还没有这个收货港组，等一下它可能就建好了");
+                complain(server, dispatch, sourceNode, "WAITING_GROUP",
+                        "这一侧还没有这个收货港组，等一下它可能就建好了");
                 return DeliveryResult.RETRY;
             }
             UNKNOWN_GROUP_SINCE.remove(dispatch.parcelId());
             LOG.warn("[DistantStock/Parcel] 退回：这一侧没有这个收货港组 parcel={} source={} group={}",
                     dispatch.parcelId(), sourceNode, dispatch.receivingDockGroupId());
+            PackageTraceService.report(server, sourceNode, dispatch.parcelId(),
+                    "REJECTED_GROUP_MISSING", dispatch.receivingDockGroupId().toString());
             return DeliveryResult.REJECTED;
         }
         UNKNOWN_GROUP_SINCE.remove(dispatch.parcelId());
 
         DockBlockEntity dock = LoadedDocks.importFor(parcel, dispatch.receivingDockGroupId());
         if (dock == null || dock.isFull()) {
-            complain(dispatch, sourceNode, dock == null ? "没有一台能收它的港" : "港满了");
+            complain(server, dispatch, sourceNode, "WAITING_DOCK",
+                    dock == null ? "没有一台能收它的港" : "港满了");
             return DeliveryResult.RETRY;
         }
         if (!dock.insert(parcel)) {
-            complain(dispatch, sourceNode, "港拒收");
+            complain(server, dispatch, sourceNode, "WAITING_DOCK", "港拒收");
             return DeliveryResult.RETRY;
         }
         WAITING.remove(dispatch.parcelId());
@@ -192,6 +204,9 @@ public final class TranserverPackageService {
                                 + ", " + dock.getBlockPos().getZ()), false);
             }
         }
+        String appliedDetail = (dock.getLevel() == null ? "unknown" : dock.getLevel().dimension().location())
+                + "@" + dock.getBlockPos().toShortString();
+        PackageTraceService.report(server, sourceNode, dispatch.parcelId(), "APPLIED", appliedDetail);
         LOG.info("[DistantStock/Parcel] applied parcel={} source={} group={} dock={} dimension={}",
                 dispatch.parcelId(), sourceNode, dispatch.receivingDockGroupId(), dock.getBlockPos(),
                 dock.getLevel() == null ? "unknown" : dock.getLevel().dimension().location());

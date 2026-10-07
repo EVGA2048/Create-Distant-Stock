@@ -4,6 +4,8 @@ import com.mojang.serialization.MapCodec;
 import dev.distantstock.config.StockConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
@@ -12,10 +14,16 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.Queue;
 import java.util.Set;
+import java.util.TreeMap;
 
 /**
  * The distant casing: the tower's 3x3 skirt and the decorative panel everywhere else.
@@ -32,7 +40,8 @@ import java.util.Set;
  */
 public final class TowerCasingBlock extends Block
         implements com.simibubi.create.foundation.block.IBE<TowerCasingBlockEntity>,
-        com.simibubi.create.api.equipment.goggles.IProxyHoveringInformation {
+        com.simibubi.create.api.equipment.goggles.IProxyHoveringInformation,
+        com.simibubi.create.content.equipment.wrench.IWrenchable {
     public static final MapCodec<TowerCasingBlock> CODEC = simpleCodec(TowerCasingBlock::new);
     public static final BooleanProperty POWERED = BooleanProperty.create("powered");
     /**
@@ -50,13 +59,15 @@ public final class TowerCasingBlock extends Block
     public static final net.minecraft.world.level.block.state.properties.EnumProperty<Port> PORT =
             net.minecraft.world.level.block.state.properties.EnumProperty.create("port", Port.class);
 
-    /** Which face carries the port. Up and down are left out: one is the coupler, one the ground. */
+    /** Which face carries the port. The casing is not the core's driveshaft: its underside is usable. */
     public enum Port implements net.minecraft.util.StringRepresentable {
         NONE(null),
         NORTH(Direction.NORTH),
         EAST(Direction.EAST),
         SOUTH(Direction.SOUTH),
-        WEST(Direction.WEST);
+        WEST(Direction.WEST),
+        UP(Direction.UP),
+        DOWN(Direction.DOWN);
 
         private final Direction face;
 
@@ -85,14 +96,20 @@ public final class TowerCasingBlock extends Block
     }
 
     private static final Direction[] DIRECTIONS = Direction.values();
+    /** Hard stop for an accidentally gigantic connected decorative shell. */
+    private static final int COMPONENT_LIMIT = 65536;
     /**
-     * Ceiling on how many casings one search may look at.
-     *
-     * A radius on its own does not bound the work: a wall is mostly surface, so the number of
-     * casings within N steps grows with N squared. This is the number that actually keeps a large
-     * build from hitching when someone flips a lever, and hitting it simply reports unpowered.
+     * Planned visual changes, bucketed by game tick. A redstone change does one O(N) component
+     * scan, then these cheap buckets reveal the windows one graph step per tick. Old entries are
+     * invalidated by the generation stored on each casing BE, so changing the source mid-ripple
+     * never requires removing thousands of queued entries.
      */
-    private static final int SEARCH_LIMIT = 4096;
+    private static final Map<ResourceKey<Level>, NavigableMap<Long, List<WindowChange>>> WINDOW_WAVES =
+            new HashMap<>();
+    private static long nextWindowWaveGeneration;
+
+    private record WindowChange(BlockPos pos, boolean powered, long generation) {
+    }
 
     public TowerCasingBlock(Properties props) {
         super(props);
@@ -145,6 +162,13 @@ public final class TowerCasingBlock extends Block
         return ModBlockEntities.TOWER_CASING.get();
     }
 
+    @Override
+    protected net.minecraft.world.InteractionResult useWithoutItem(
+            BlockState state, Level level, BlockPos pos,
+            net.minecraft.world.entity.player.Player player, net.minecraft.world.phys.BlockHitResult hit) {
+        return TowerControl.open(level, pos, player);
+    }
+
     /**
      * The wrench opens and closes a fluid port.
      *
@@ -160,22 +184,40 @@ public final class TowerCasingBlock extends Block
         if (!DockBlock.isWrench(stack) || player.isShiftKeyDown()) {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);
         }
+        setPort(level, pos, state, player, hit.getDirection());
+        return net.minecraft.world.ItemInteractionResult.sidedSuccess(level.isClientSide);
+    }
+
+    // Create's wrench calls IWrenchable.onWrenched before vanilla useItemOn. Without this hook,
+    // its default wrench action consumes the interaction and the port never changes state.
+    @Override
+    public net.minecraft.world.InteractionResult onWrenched(BlockState state,
+            net.minecraft.world.item.context.UseOnContext context) {
+        setPort(context.getLevel(), context.getClickedPos(), state,
+                context.getPlayer(), context.getClickedFace());
+        return net.minecraft.world.InteractionResult.sidedSuccess(context.getLevel().isClientSide);
+    }
+
+    private static void setPort(Level level, BlockPos pos, BlockState state,
+                                net.minecraft.world.entity.player.Player player, Direction face) {
         if (!level.isClientSide) {
             // The clicked face, not the block: a pipe arrives at one side of one casing. Clicking
             // the face that is already open closes it; clicking another moves the port there, which
             // is one gesture instead of "close it first, then open it where you meant".
-            Port wanted = hit.getDirection().getAxis().isHorizontal()
-                    && state.getValue(PORT) != Port.of(hit.getDirection())
-                    ? Port.of(hit.getDirection()) : Port.NONE;
+            Port wanted = state.getValue(PORT) != Port.of(face) ? Port.of(face) : Port.NONE;
             boolean open = wanted != Port.NONE;
             level.setBlock(pos, state.setValue(PORT, wanted), 3);
+            // Block capabilities are cached by pipes. A closed casing answers null, so opening or
+            // moving the port must invalidate that cached answer immediately or a pipe that looked
+            // one tick too early can believe this casing has no tank forever.
+            level.invalidateCapabilities(pos);
             level.playSound(null, pos, open ? net.minecraft.sounds.SoundEvents.IRON_TRAPDOOR_OPEN
                     : net.minecraft.sounds.SoundEvents.IRON_TRAPDOOR_CLOSE,
                     net.minecraft.sounds.SoundSource.BLOCKS, 0.6f, 1.2f);
-            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+            if (player != null) player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
                     open ? "message.distantstock.casing.port.open"
                             : "message.distantstock.casing.port.closed"), true);
-            if (open && coreFor(level, pos) == null) {
+            if (player != null && open && coreFor(level, pos) == null) {
                 // The other silent trap: a port only reaches the core of the tower this casing is
                 // part of, and a casing standing on its own opens a socket onto nothing. The click
                 // works and the block looks right, so the player finds out when the pipes will not
@@ -184,7 +226,6 @@ public final class TowerCasingBlock extends Block
                         "message.distantstock.casing.port.no_tower"), false);
             }
         }
-        return net.minecraft.world.ItemInteractionResult.sidedSuccess(level.isClientSide);
     }
 
     /**
@@ -236,9 +277,9 @@ public final class TowerCasingBlock extends Block
             return null;
         }
         TowerCoreBlockEntity core = coreFor(level, pos);
-        // The core's own underside is where the shaft enters, and a port on that face would be a
-        // pipe arriving at a driveshaft. Every other side of a port is fair game.
-        return core == null || side == Direction.DOWN ? null : core.tank();
+        // Only the core's underside carries a driveshaft. The skirt's underside is an independent
+        // fluid face, so an open DOWN casing port can connect a pipe below the skirt.
+        return core == null ? null : core.tank();
     }
 
     @Override
@@ -270,49 +311,136 @@ public final class TowerCasingBlock extends Block
 
     @Override
     protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
-        boolean lit = drivenWithinRange(level, pos);
-        if (lit == state.getValue(POWERED)) {
-            return;
+        settleConnectedComponent(level, pos);
+    }
+
+    /** Apply only the due layer of each already-planned ripple. Called once from the server clock. */
+    public static void tickWindowRipples(MinecraftServer server) {
+        if (server == null || WINDOW_WAVES.isEmpty()) return;
+        var dimensions = new ArrayList<>(WINDOW_WAVES.keySet());
+        for (ResourceKey<Level> dimension : dimensions) {
+            ServerLevel level = server.getLevel(dimension);
+            NavigableMap<Long, List<WindowChange>> waves = WINDOW_WAVES.get(dimension);
+            if (level == null || waves == null) continue;
+            long now = level.getGameTime();
+            while (!waves.isEmpty() && waves.firstKey() <= now) {
+                List<WindowChange> due = waves.pollFirstEntry().getValue();
+                for (WindowChange change : due) {
+                    BlockState current = level.getBlockState(change.pos());
+                    if (!(current.getBlock() instanceof TowerCasingBlock)
+                            || !(level.getBlockEntity(change.pos()) instanceof TowerCasingBlockEntity casing)
+                            || casing.windowWaveGeneration() != change.generation()
+                            || current.getValue(POWERED) == change.powered()) {
+                        continue;
+                    }
+                    level.setBlock(change.pos(), current.setValue(POWERED, change.powered()), Block.UPDATE_CLIENTS);
+                    level.getChunkSource().getLightEngine().checkBlock(change.pos());
+                }
+            }
+            if (waves.isEmpty()) WINDOW_WAVES.remove(dimension);
         }
-        // setBlock, not just a state swap: the neighbours have to be told, or the change stops here
-        // and the window never spreads past the casings the lever itself touches.
-        level.setBlock(pos, state.setValue(POWERED, lit), Block.UPDATE_ALL);
+    }
+
+    public static void clearWindowRipples() {
+        WINDOW_WAVES.clear();
+        nextWindowWaveGeneration = 0;
+    }
+
+    public static void forgetWindowRipples(Level level) {
+        if (level != null) WINDOW_WAVES.remove(level.dimension());
     }
 
     /**
-     * Whether any casing connected to this one is being driven directly by redstone, within range.
+     * Recompute one whole connected casing component in one pass, then animate the answer as a
+     * ripple instead of changing every block in the same tick.
      *
-     * <p>Note what is searched for: a casing with an actual signal, not a casing that is merely
-     * {@link #POWERED}. The window is a light, and this is the bulb — a lit casing does not light
-     * its neighbours any more than a lit lamp does, so the effect cannot walk away from the source
-     * one casing at a time and outrun the range check.
+     * <p>The old implementation asked this question independently for every casing. Turning a large
+     * wall on often looked cheap because each search found a powered source and returned early;
+     * turning it off was pathological because every casing had to prove that no source existed by
+     * walking the same wall again. On a control-room shell that is effectively O(N^2).
+     *
+     * <p>We still discover the component once and run one multi-source breadth-first search, so the
+     * expensive part remains O(N). The distance result doubles as animation timing: activation
+     * walks outward from the actual powered casings; deactivation walks outward from the casing
+     * whose neighbour changed. That restores the old ritual-like wave without restoring the old
+     * O(N²) "every casing searches the whole wall" cost.
      */
-    private static boolean drivenWithinRange(Level level, BlockPos origin) {
-        int range = StockConfig.casingRedstoneRange();
-        Set<BlockPos> seen = new HashSet<>();
-        List<BlockPos> frontier = new ArrayList<>();
-        seen.add(origin);
-        frontier.add(origin);
+    private static void settleConnectedComponent(ServerLevel level, BlockPos origin) {
+        if (!(level.getBlockState(origin).getBlock() instanceof TowerCasingBlock)) {
+            return;
+        }
+        long now = level.getGameTime();
+        if (level.getBlockEntity(origin) instanceof TowerCasingBlockEntity originCasing
+                && originCasing.lastWindowPlanTick() == now) {
+            return;
+        }
 
-        for (int step = 0; step <= range && !frontier.isEmpty(); step++) {
-            List<BlockPos> next = new ArrayList<>();
-            for (BlockPos pos : frontier) {
-                if (level.hasNeighborSignal(pos)) {
-                    return true;
-                }
-                for (Direction direction : DIRECTIONS) {
-                    BlockPos neighbour = pos.relative(direction);
-                    if (seen.size() >= SEARCH_LIMIT) {
-                        return false;
-                    }
-                    if (seen.add(neighbour)
-                            && level.getBlockState(neighbour).getBlock() instanceof TowerCasingBlock) {
-                        next.add(neighbour);
+        Set<BlockPos> component = new HashSet<>();
+        Queue<BlockPos> discover = new ArrayDeque<>();
+        Map<BlockPos, Integer> distanceFromOrigin = new HashMap<>();
+        component.add(origin);
+        discover.add(origin);
+        distanceFromOrigin.put(origin, 0);
+
+        while (!discover.isEmpty() && component.size() < COMPONENT_LIMIT) {
+            BlockPos pos = discover.remove();
+            int nextOriginDistance = distanceFromOrigin.get(pos) + 1;
+            for (Direction direction : DIRECTIONS) {
+                BlockPos neighbour = pos.relative(direction);
+                if (component.add(neighbour)) {
+                    if (level.getBlockState(neighbour).getBlock() instanceof TowerCasingBlock) {
+                        discover.add(neighbour);
+                        distanceFromOrigin.put(neighbour, nextOriginDistance);
+                    } else {
+                        component.remove(neighbour);
                     }
                 }
             }
-            frontier = next;
         }
-        return false;
+
+        int range = StockConfig.casingRedstoneRange();
+        Map<BlockPos, Integer> distance = new HashMap<>();
+        Queue<BlockPos> flood = new ArrayDeque<>();
+        for (BlockPos pos : component) {
+            if (level.hasNeighborSignal(pos)) {
+                distance.put(pos, 0);
+                flood.add(pos);
+            }
+        }
+
+        while (!flood.isEmpty()) {
+            BlockPos pos = flood.remove();
+            int nextDistance = distance.get(pos) + 1;
+            if (nextDistance > range) continue;
+            for (Direction direction : DIRECTIONS) {
+                BlockPos neighbour = pos.relative(direction);
+                if (!component.contains(neighbour) || distance.containsKey(neighbour)) continue;
+                distance.put(neighbour, nextDistance);
+                flood.add(neighbour);
+            }
+        }
+
+        long generation = ++nextWindowWaveGeneration;
+        for (BlockPos pos : component) {
+            if (level.getBlockEntity(pos) instanceof TowerCasingBlockEntity casing) {
+                // Marks the whole component, not only changed blocks. This invalidates a previous
+                // half-finished ripple even where the new desired state already matches today.
+                casing.markWindowPlan(now, generation);
+            }
+            BlockState current = level.getBlockState(pos);
+            boolean lit = distance.containsKey(pos);
+            if (current.getValue(POWERED) == lit) continue;
+            int graphDistance = lit
+                    ? distance.getOrDefault(pos, 0)
+                    : distanceFromOrigin.getOrDefault(pos, 0);
+            // Layer zero belongs to the source-facing casing itself. Queue it for the current
+            // server-post pass instead of adding an artificial extra tick; this makes the visible
+            // wave deterministic even when scheduled block ticks are processed late in a busy tick.
+            // Each following graph layer still advances exactly one tick later.
+            long due = now + graphDistance;
+            WINDOW_WAVES.computeIfAbsent(level.dimension(), ignored -> new TreeMap<>())
+                    .computeIfAbsent(due, ignored -> new ArrayList<>())
+                    .add(new WindowChange(pos.immutable(), lit, generation));
+        }
     }
 }

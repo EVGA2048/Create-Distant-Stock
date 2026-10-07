@@ -1,0 +1,16 @@
+{
+  "native": {
+    "size": [
+      16,
+      16
+    ],
+    "visible_pixels": 60
+  },
+  "detail": {
+    "size": [
+      32,
+      32
+    ],
+    "visible_pixels": 238
+  }
+}

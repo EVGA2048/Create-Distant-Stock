@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/generated",
+  "render_type": "minecraft:translucent",
+  "textures": {
+    "layer0": "distantstock:item/ether_calibration_prism"
+  }
+}

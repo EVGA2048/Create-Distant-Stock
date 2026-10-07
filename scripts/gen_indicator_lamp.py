@@ -47,6 +47,13 @@ def _glow(colour):
     return (round(r * 255), round(g * 255), round(b * 255))
 
 
+def _hot_core(colour):
+    """Tiny white-hot centre while preserving the lamp's hue around it."""
+    # Only a few centre texels use this value; keeping the coloured rim intact avoids the old
+    # "red turns pink" problem while still giving the eye an unmistakable specular/emissive core.
+    return tuple(round(channel * 0.42 + 255 * 0.58) for channel in colour)
+
+
 def save_texture(name, image):
     TEXTURES.mkdir(parents=True, exist_ok=True)
     image.save(TEXTURES / f"{name}.png")
@@ -80,6 +87,10 @@ def make_textures():
             for y, row in enumerate(pattern):
                 for x, shade in enumerate(row):
                     pixels[x, y] = (*palette[shade], alpha)
+            if powered:
+                core = _hot_core(palette[2])
+                for x, y in ((2, 1), (1, 2), (2, 2), (3, 2), (2, 3)):
+                    pixels[x, y] = (*core, 255)
             save_texture(f"indicator_lamp_{name}_{'on' if powered else 'off'}", image)
 
 
@@ -128,12 +139,28 @@ def make_models():
             "textures": textures,
             "elements": [base, lamp],
         })
+        lit_base = box("thin_andesite_mount", [5, 0, 5], [11, 1, 11], "base")
+        lit_lamp = box("emissive_five_pixel_bulb", [5.5, 1, 5.5], [10.5, 5, 10.5], "lamp")
+        lit_lamp["shade"] = False
+        for face in lit_lamp["faces"].values():
+            face["uv"] = [0, 0, 5, 5]
+            # NeoForge's ExtraFaceData. 15/15 gives the lit bulb the same visual priority as the
+            # full-bright brass signal lamp renderer even in daylight or a brightly lit factory.
+            face["neoforge_data"] = {
+                "block_light": 15,
+                "sky_light": 15,
+                "ambient_occlusion": False,
+            }
         write_model(f"{name}_lit", {
-            "parent": f"distantstock:block/{name}",
-            # Only the powered state uses cutout: this preserves the cloudy
-            # glass of the unpowered lamp while keeping the lit core crisp.
+            "parent": "minecraft:block/block",
+            "ambientocclusion": False,
             "render_type": "minecraft:cutout",
-            "textures": {"lamp": f"distantstock:block/indicator_lamp_{color}_on"},
+            "textures": {
+                "base": "create:block/industrial_iron_block",
+                "lamp": f"distantstock:block/indicator_lamp_{color}_on",
+                "particle": "create:block/industrial_iron_block",
+            },
+            "elements": [lit_base, lit_lamp],
         })
         item = ASSETS / f"models/item/{name}.json"
         item.parent.mkdir(parents=True, exist_ok=True)

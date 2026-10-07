@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "minecraft:block/note_block",
+    "north": "distantstock:block/announcer_side_composite",
+    "south": "distantstock:block/announcer_side_composite",
+    "east": "distantstock:block/announcer_side_composite",
+    "west": "distantstock:block/announcer_side_composite",
+    "up": "minecraft:block/note_block",
+    "down": "create:block/brass_block"
+  }
+}

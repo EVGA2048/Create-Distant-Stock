@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "distantstock:block/frogport/diagnostic_block"
+    }
+  }
+}

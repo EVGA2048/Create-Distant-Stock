@@ -24,6 +24,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 
 /**
  * A factory gauge board whose panels can order from another server.
@@ -43,6 +44,14 @@ import java.util.UUID;
  * off as lost.
  */
 public final class RemoteGaugeBlockEntity extends FactoryPanelBlockEntity implements IHaveGoggleInformation {
+    /** Create requires every panel network field to be a serializable UUID, even before setup. */
+    public static final UUID UNCONFIGURED_LOCAL_NETWORK = UUID.nameUUIDFromBytes(
+            "distantstock:unconfigured_local_inventory".getBytes(StandardCharsets.UTF_8));
+
+    public static boolean localNetworkConfigured(UUID network) {
+        return network != null && !UNCONFIGURED_LOCAL_NETWORK.equals(network);
+    }
+
     private final RemoteOrderBook orders = new RemoteOrderBook(this);
 
     public RemoteGaugeBlockEntity(BlockPos pos, BlockState state) {
@@ -88,6 +97,21 @@ public final class RemoteGaugeBlockEntity extends FactoryPanelBlockEntity implem
             super(be, slot);
         }
 
+        @Override
+        public void tick() {
+            // An untuned remote gauge is a valid placed/configurable device, but not yet a valid
+            // local stock monitor. Keep Create's network field serializable, but never query the
+            // internal unconfigured marker as if it were a real logistics network.
+            if (!localNetworkConfigured(network)) return;
+            super.tick();
+        }
+
+        @Override
+        public void lazyTick() {
+            if (!localNetworkConfigured(network)) return;
+            super.lazyTick();
+        }
+
         /**
          * 开界面 —— 除非手上拿着终端，那这一下是**绑定**（见 {@code TerminalPanelGesture}）。
          *
@@ -110,6 +134,14 @@ public final class RemoteGaugeBlockEntity extends FactoryPanelBlockEntity implem
         return orders.binding(slot);
     }
 
+    public java.util.UUID distantNetworkScope(FactoryPanelBlock.PanelSlot slot) {
+        return orders.scope(slot);
+    }
+
+    public void setDistantNetworkScope(FactoryPanelBlock.PanelSlot slot, java.util.UUID scope) {
+        orders.setScope(slot, scope);
+    }
+
     /** Points one panel at a warehouse, replacing whatever it was pointed at. */
     public void bind(FactoryPanelBlock.PanelSlot slot, RemoteNetworkId network, UUID receivingGroup,
                      String address) {
@@ -128,9 +160,37 @@ public final class RemoteGaugeBlockEntity extends FactoryPanelBlockEntity implem
         orders.unbind(slot);
     }
 
+    @Override
+    public boolean removePanel(FactoryPanelBlock.PanelSlot slot) {
+        boolean removed = super.removePanel(slot);
+        if (removed) {
+            // A physically removed panel is a new device if this slot is filled again. Keeping the
+            // old warehouse/scope here makes the replacement silently inherit somebody else's
+            // configuration.
+            orders.forget(slot);
+        }
+        return removed;
+    }
+
     /** How much this panel has asked for and not yet seen arrive. */
     public int outstanding(FactoryPanelBlock.PanelSlot slot) {
         return orders.outstanding(slot);
+    }
+
+    /**
+     * Carries the distant-gauge half of this board into a mixed signal-panel board.
+     *
+     * <p>Adding a second panel can legitimately replace the dedicated remote-gauge block entity
+     * with {@link SignalPanelBlockEntity}.  Create's panel NBT only contains the factory-gauge
+     * state; our warehouse binding, Distant Stock scope and in-flight count live in
+     * {@link RemoteOrderBook}.  Copy the whole book so the conversion is an identity-preserving
+     * board migration rather than a silent downgrade to ordinary factory gauges.
+     */
+    public void copyRemoteStateTo(SignalPanelBlockEntity target) {
+        if (target == null || level == null) return;
+        CompoundTag snapshot = new CompoundTag();
+        orders.write(snapshot);
+        target.importRemoteOrderState(snapshot, level.registryAccess());
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, RemoteGaugeBlockEntity be) {

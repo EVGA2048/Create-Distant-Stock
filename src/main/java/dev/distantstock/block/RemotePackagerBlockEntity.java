@@ -7,8 +7,6 @@ import com.simibubi.create.content.logistics.packager.PackagingRequest;
 import com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour;
 import com.simibubi.create.content.logistics.packagerLink.PackagerLinkBlockEntity;
 import dev.distantstock.item.ModItems;
-import dev.distantstock.routing.OrderRouteDirectory;
-import dev.distantstock.routing.RemoteRouteData;
 import dev.distantstock.routing.TowerActivation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
@@ -19,9 +17,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Reuses Create's complete packing/link/redstone implementation and changes
- * only the parcel skin. ItemStack.transmuteCopy preserves all data
- * components, including the address and package contents.
+ * Reuses Create's complete packing/link/redstone implementation and changes only the parcel skin.
+ * Remote-terminal routing is stamped for every Create packager by PackagerBlockEntityMixin; this
+ * subclass only selects the blue Distant Stock package item. transmuteCopy preserves that metadata.
  */
 public final class RemotePackagerBlockEntity extends PackagerBlockEntity {
     public RemotePackagerBlockEntity(BlockPos pos, BlockState state) {
@@ -63,27 +61,26 @@ public final class RemotePackagerBlockEntity extends PackagerBlockEntity {
         }
     }
 
+    /**
+     * Reject the order before Create enters performPackageRequests().
+     *
+     * <p>Create flashes the stock link and then calls attemptToSend up to 100 times while the
+     * request list remains non-empty. Returning early from attemptToSend when the tower is inactive
+     * therefore looks like a successful request animation but silently drops the temporary request
+     * list after the loop. Report the machine as unavailable here instead; both Create's native
+     * broadcast path and Distant Stock's routed request path check this before performing requests.
+     */
+    @Override
+    public boolean isTooBusyFor(LogisticallyLinkedBehaviour.RequestType type) {
+        return !TowerActivation.active(level, worldPosition) || super.isTooBusyFor(type);
+    }
+
     private ItemStack asRemotePackage(ItemStack stack) {
         if (stack.isEmpty() || !PackageItem.isPackage(stack)
                 || stack.getItem() == ModItems.REMOTE_PACKAGE.get()) {
             return stack;
         }
-        ItemStack remote = stack.transmuteCopy(ModItems.REMOTE_PACKAGE.get());
-        attachRoute(remote);
-        return remote;
-    }
-
-    private void attachRoute(ItemStack stack) {
-        if (level == null || level.isClientSide || level.getServer() == null
-                || !PackageItem.hasOrderData(stack) || RemoteRouteData.read(stack).isPresent()) {
-            return;
-        }
-        var directory = OrderRouteDirectory.get(level.getServer());
-        int orderId = PackageItem.getOrderId(stack);
-        directory.find(orderId).ifPresent(route -> RemoteRouteData.write(stack, route,
-                dev.distantstock.link.RouteLabels.describe(level.getServer(), route),
-                // 过海以后要穿的地址。留空 = 这件货不过海，或者发它的那版只有一个地址。
-                directory.homeAddress(orderId)));
+        return stack.transmuteCopy(ModItems.REMOTE_PACKAGE.get());
     }
 
     /**
@@ -103,9 +100,13 @@ public final class RemotePackagerBlockEntity extends PackagerBlockEntity {
      *
      * <p>所以走 Create 自己的索引：{@code getAllPresent(freq, false)} 给出这张网上所有链接，
      * 每个链接再用 {@code getPackager()} 问它指向哪台打包机 —— 和 Create 发货时找打包机走的是同一条
-     * 关系。两个条件仍然要满足：打包机得**加载着**，而且**在塔的范围里**（{@code attemptToSend} 就是
-     * 这么判的）。只有会做远仓包裹的那种算数：同一张网上的原版打包机会把货打成没有路线的普通包裹，
-     * 到了港只会被扣下。
+     * 关系。远仓终端订单的路由属性由 {@code PackagerBlockEntityMixin} 统一盖到所有 Create 包裹上，
+     * 所以普通打包机和远仓打包机都能履约；二者的区别只在包裹外观（普通纸箱 / 蓝色远仓纸箱）。
+     *
+     * <p>This method answers only "does the Create network have a connected packager?". Tower
+     * activation is a separate runtime condition checked by {@link #isTooBusyFor}; folding it into
+     * discovery made a perfectly real remote packager appear in the UI as "no packager" whenever a
+     * tower snapshot was stale/offline, which is both misleading and impossible to diagnose.
      */
     public static boolean canPack(UUID frequency) {
         if (frequency == null) {
@@ -116,8 +117,7 @@ public final class RemotePackagerBlockEntity extends PackagerBlockEntity {
             if (!(behaviour.blockEntity instanceof PackagerLinkBlockEntity link)) {
                 continue;
             }
-            if (link.getPackager() instanceof RemotePackagerBlockEntity packager
-                    && TowerActivation.active(packager.getLevel(), packager.getBlockPos())) {
+            if (link.getPackager() instanceof PackagerBlockEntity) {
                 return true;
             }
         }

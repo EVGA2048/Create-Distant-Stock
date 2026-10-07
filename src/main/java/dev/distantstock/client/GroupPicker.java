@@ -16,7 +16,7 @@ import java.util.UUID;
  * 于是看起来就是"填了没用、关掉再开又变回去了"。终端那边早有这张清单（同样是这份数据），这里把它
  * 搬过来：**同一个问题的同一个答案，不该在两张界面上长得不一样**。
  *
- * <p>数据来源和终端的下拉完全一致：{@link DockGroupsS2C}（本服、已按玩家的权限筛过）+
+ * <p>数据来源和终端的下拉完全一致：{@link DockGroupsS2C}（本服、已按远仓网络和可发现性筛过）+
  * {@link RemoteGroupsS2C}（对面服务器公告过来的）。本服的排前面 —— 玩家要选的通常是自己的。
  *
  * <p>只做"选一个名字"这一件事：上锁、改名、删除、看成员都在终端的「网络…」那一页，这里重复一遍
@@ -39,7 +39,6 @@ public final class GroupPicker {
     private static final int ROW_OVER = 0xFF3E5A61;
     private static final int INK = 0xFFD8EEEA;
     private static final int MUTED = 0xFF9BB0B6;
-    private static final int CLOSED = 0xFF8A8090;
     private static final int HERE = 0xFF9BE0C4;
     private static final int REMOTE = 0xFFC8B6E8;
 
@@ -135,23 +134,18 @@ public final class GroupPicker {
             if (i < localCount) {
                 DockGroupsS2C.Entry entry = local.groups().get(i);
                 g.fill(x, rowY, x + width, rowY + ROW_H, over ? ROW_OVER : ROW);
-                // 没被放行的行画灰：名单是权限，不是装饰。这一格玩家点得下去但发不出去，所以先把
-                // 它说在点之前 —— 灰字配"未加入"比点完什么也没发生好。
-                boolean usable = entry.admitted();
-                String head = usable ? Integer.toString(entry.docks())
-                        : Component.translatable("gui.distantstock.net.join_short").getString();
-                g.drawString(font, head, x + 3, rowY + 1, usable ? MUTED : 0xFF7FD8E8, false);
+                String head = Integer.toString(entry.docks());
+                g.drawString(font, head, x + 3, rowY + 1, MUTED, false);
                 // 组主跟在名字后面：一排「仓库」谁也认不出哪个是自己的（终端那边玩家就这么说过）。
                 String label = entry.mine() || entry.owner().isEmpty()
                         ? entry.name() : entry.name() + " · " + entry.owner();
                 boolean here = current != null && current.trim().equalsIgnoreCase(entry.name());
                 g.drawString(font, trim(font, label, width - 12 - font.width(head)),
                         x + 7 + font.width(head), rowY + 1,
-                        !usable ? CLOSED : here ? HERE : INK, false);
+                        here ? HERE : INK, false);
             } else {
                 RemoteGroupsS2C.Entry entry = remotes.groups().get(i - localCount);
                 g.fill(x, rowY, x + width, rowY + ROW_H, over ? ROW_OVER : ROW);
-                boolean usable = entry.admitted();
                 String head = entry.docks() > 0 ? Integer.toString(entry.docks())
                         : Component.translatable("gui.distantstock.group.no_dock").getString();
                 g.drawString(font, head, x + 3, rowY + 1, entry.docks() > 0 ? MUTED : 0xFFC08080,
@@ -159,7 +153,7 @@ public final class GroupPicker {
                 boolean here = current != null && current.trim().equalsIgnoreCase(entry.name());
                 g.drawString(font, trim(font, entry.display(), width - 12 - font.width(head)),
                         x + 7 + font.width(head), rowY + 1,
-                        !usable ? CLOSED : here ? HERE : REMOTE, false);
+                        here ? HERE : REMOTE, false);
             }
         }
         if (extra > 0) {
@@ -171,8 +165,7 @@ public final class GroupPicker {
     /**
      * 点中了哪一行：要填进框里的名字，或者 null。
      *
-     * <p>没被放行的行也返回名字：填进去之后服务端会拒绝并说明原因（那是唯一判得了的地方），
-     * 比在这里假装它不存在强 —— 玩家至少能看到"我选了它、它说我不在里面"。
+     * <p>PUBLIC / UNLISTED 只决定一行会不会出现在这里；一旦已经出现在清单里，它就是可选地址。
      */
     String hit(double mouseX, double mouseY, int x, int y, int width) {
         int rows = rows();

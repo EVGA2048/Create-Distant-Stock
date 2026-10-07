@@ -6,8 +6,13 @@ import dev.distantstock.block.TowerCoreBlockEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import com.simibubi.create.content.kinetics.base.KineticBlockEntityRenderer;
+import com.simibubi.create.foundation.blockEntity.renderer.SafeBlockEntityRenderer;
+import dev.engine_room.flywheel.lib.model.baked.PartialModel;
+import net.createmod.catnip.render.CachedBuffers;
+import net.minecraft.resources.ResourceLocation;
+import dev.distantstock.DistantStock;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.Direction;
@@ -27,7 +32,13 @@ import org.joml.Matrix4f;
  * <p>画的是四片贴在玻璃芯外缘的面，高度按罐里的量走。不做真正的立方体液面：底座内部是实心的
  * 机壳与贯穿的轴，透视进去只会看到它们；而玩家要的是「一眼看到还剩多少」。
  */
-public final class TowerCoreRenderer implements BlockEntityRenderer<TowerCoreBlockEntity> {
+public final class TowerCoreRenderer extends SafeBlockEntityRenderer<TowerCoreBlockEntity> {
+    private static final PartialModel SHAFT = PartialModel.of(ResourceLocation.fromNamespaceAndPath(
+            DistantStock.MODID, "block/tower/tower_core_shaft"));
+
+    /** Force the kinetic partial into the model bake before the first tower is ever rendered. */
+    public static void registerModels() {
+    }
     /**
      * 模型用 0..16 像素，方块实体渲染器用 0..1 方块 —— 这里按像素写，出口处除一次。
      *
@@ -47,11 +58,20 @@ public final class TowerCoreRenderer implements BlockEntityRenderer<TowerCoreBlo
     private static final float PROUD = 0.0625f * PIXEL;
 
     public TowerCoreRenderer(BlockEntityRendererProvider.Context context) {
+        super();
     }
 
     @Override
-    public void render(TowerCoreBlockEntity be, float partialTick, PoseStack ms, MultiBufferSource buffer,
-                       int light, int overlay) {
+    protected void renderSafe(TowerCoreBlockEntity be, float partialTick, PoseStack ms,
+                              MultiBufferSource buffer, int light, int overlay) {
+        // Draw our own kinetic partial instead of delegating to Create's ShaftRenderer. The latter
+        // deliberately returns early whenever Flywheel visualization is supported, assuming its BE
+        // type has a registered visual. TowerCore is our type and has no Flywheel visual, so that
+        // path made the shaft disappear on real Flywheel-enabled clients even though it worked in
+        // a vanilla renderer smoke test. Rendering this cached partial directly is safe in both.
+        KineticBlockEntityRenderer.renderRotatingBuffer(be,
+                CachedBuffers.partial(SHAFT, be.getBlockState()), ms,
+                buffer.getBuffer(RenderType.cutoutMipped()), light);
         int stored = be.ether();
         if (stored <= 0) {
             return;

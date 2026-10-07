@@ -66,7 +66,7 @@ public final class ParcelEscrowPump {
         ParcelReturnInbox returns = ParcelReturnInbox.get(server);
         ParcelQuarantine quarantine = ParcelQuarantine.get(server);
         returns.reconcile(escrow, quarantine);
-        resolveCompleted(escrow);
+        resolveCompleted(server, escrow);
         expireHeld(server, escrow);
         handleRejected(server, escrow, returns, quarantine);
         deliverReturns(server, returns, quarantine);
@@ -113,6 +113,7 @@ public final class ParcelEscrowPump {
                     record.parcelId(), record.destinationNode(), record.receivingDockGroupId(),
                     gameTime - record.createdAt());
             escrow.rejected(record.parcelId(), "delivery_timeout");
+            ParcelJournal.get(server).record(record.parcelId(), "HELD_TIMEOUT", "delivery_timeout");
         }
     }
 
@@ -139,6 +140,7 @@ public final class ParcelEscrowPump {
                 ItemStack parcel = PackageCodec.decode(record.encodedPackage(), server.registryAccess());
                 if (parcel.isEmpty()) {
                     escrow.rejected(record.parcelId(), "source_decode_failed");
+                    ParcelJournal.get(server).record(record.parcelId(), "REJECTED_SOURCE_DECODE", "source_decode_failed");
                     continue;
                 }
                 PackageDispatchCodec.Dispatch dispatch = PackageDispatchCodec.create(
@@ -156,12 +158,17 @@ public final class ParcelEscrowPump {
                     // the record silently stays HELD forever: the parcel has left the dock, the goggles
                     // count it as in flight, and it never arrives. Running the receiver's own apply() here
                     // is what makes "send to my other dock group" work on a save with no Transerver at all.
+                    UUID localNode = TranserverBridge.localNodeUuid();
+                    if (localNode == null) {
+                        continue;
+                    }
                     DeliveryResult result = TranserverPackageService.apply(server, dispatch,
-                            TranserverBridge.localNodeId());
+                            localNode.toString());
                     if (result == DeliveryResult.APPLIED) {
                         // The parcel is in the target dock now. Remove the escrow record first and flush,
                         // because a crash between the two leaves a record the ledger will recognise as a
                         // duplicate (apply() short-circuits on it) rather than a second parcel.
+                        ParcelJournal.get(server).record(record.parcelId(), "APPLIED_LOCAL", "target accepted parcel");
                         escrow.remove(record.parcelId());
                         escrow.flush(server);
                         LOG.info("[DistantStock/Parcel] delivered parcel={} target=local group={} strips={}",
@@ -172,6 +179,7 @@ public final class ParcelEscrowPump {
                         // 它要去的那个收货港组**（那个组等多久都不会出现，见 TranserverPackageService）。
                         // 交给既有的退件流程。
                         escrow.rejected(record.parcelId(), "target_refused");
+                        ParcelJournal.get(server).record(record.parcelId(), "REJECTED", "target_refused");
                     }
                     // RETRY 不是失败：目标港所在区块还没加载、港满了或在忙，下一个 tick 会再试。
                     // RETRY is not a failure: it is the same "not yet" the transport path reports, and the
@@ -182,6 +190,8 @@ public final class ParcelEscrowPump {
                         PackageDispatchCodec.encode(dispatch), record.parcelId().toString());
                 if (messageId != null) {
                     escrow.submitted(record.parcelId(), messageId);
+                    ParcelJournal.get(server).record(record.parcelId(), "SUBMITTED",
+                            "message=" + messageId + " target=" + record.destinationNode());
                     LOG.info("[DistantStock/Parcel] submitted parcel={} message={} target={} group={} strips={}",
                             record.parcelId(), messageId, record.destinationNode(),
                             record.receivingDockGroupId(), record.strips());
@@ -193,12 +203,12 @@ public final class ParcelEscrowPump {
         }
     }
 
-    private static void resolveCompleted(ParcelEscrow escrow) {
+    private static void resolveCompleted(MinecraftServer server, ParcelEscrow escrow) {
         TranserverApi api = TranserverBridge.attachedApi();
         if (api == null) {
             return;
         }
-        for (CompletedSend completed : api.completedSends(64)) {
+        for (CompletedSend completed : TranserverBridge.completedSends(256)) {
             if (!RoutingChannels.PACKAGE_DISPATCH.equals(completed.channel())) {
                 continue;
             }
@@ -211,14 +221,17 @@ public final class ParcelEscrowPump {
                     if (completed.state() == DeliveryState.APPLIED) {
                         LOG.info("[DistantStock/Parcel] completed parcel={} message={} result=APPLIED",
                                 parcelId, completed.messageId());
+                        ParcelJournal.get(server).record(parcelId, "TRANSPORT_APPLIED",
+                                "message=" + completed.messageId());
                         escrow.remove(parcelId);
                     } else if (completed.state() == DeliveryState.REJECTED) {
                         LOG.warn("[DistantStock/Parcel] completed parcel={} message={} result=REJECTED detail={}",
                                 parcelId, completed.messageId(), completed.detail());
+                        ParcelJournal.get(server).record(parcelId, "TRANSPORT_REJECTED", completed.detail());
                         escrow.rejected(parcelId, completed.detail());
                     }
                 }
-                api.acknowledgeCompletedSend(completed.messageId());
+                TranserverBridge.acknowledgeCompletedSend(completed.messageId());
             } catch (IOException | RuntimeException ignored) {
                 // Leave an undecodable completion visible for administrator diagnosis.
             }
@@ -260,6 +273,7 @@ public final class ParcelEscrowPump {
                 if (gameTime - since >= RETURN_GRACE_TICKS) {
                     try {
                         returns.handOver(escrow, record, "origin_dock_unavailable", () -> returns.flush(server));
+                        ParcelJournal.get(server).record(record.parcelId(), "RETURN_INBOX", "origin_dock_unavailable");
                     } catch (IllegalStateException full) {
                         // The return inbox is full: the escrow stays the single owner and /distantstock
                         // status reports the backlog until an administrator frees space.
@@ -279,6 +293,7 @@ public final class ParcelEscrowPump {
                 continue;
             }
             LOG.info("[DistantStock] Rejected parcel {} returned to origin dock (route cleared)", record.parcelId());
+            ParcelJournal.get(server).record(record.parcelId(), "RETURNED_ORIGIN", "origin dock fallback");
             origin.noteFallback(wantsStrip
                     ? "goggle.distantstock.fallback.strip_unmatched" : "goggle.distantstock.fallback.parcel");
             if (wantsStrip) {
@@ -326,6 +341,8 @@ public final class ParcelEscrowPump {
         if (encoded.isBlank() || !escrow.replacePayload(record.parcelId(), encoded, record.strips() + 1)) {
             return false;
         }
+        ParcelJournal.get(server).record(record.parcelId(), "STRIPPED_RESEND",
+                "removed=" + stripped.size() + " strips=" + (record.strips() + 1));
         for (ItemStack stack : stripped) {
             if (!origin.offerFallback(stack)) {
                 origin.noteReleaseRefused();
@@ -367,6 +384,7 @@ public final class ParcelEscrowPump {
                 continue;
             }
             LOG.info("[DistantStock] Return inbox parcel {} delivered to origin dock (route cleared)", record.parcelId());
+            ParcelJournal.get(server).record(record.parcelId(), "RETURNED_ORIGIN", "return inbox delivered");
             origin.noteFallback("goggle.distantstock.fallback.parcel");
             returns.remove(record.parcelId());
             returns.flush(server);
@@ -378,6 +396,14 @@ public final class ParcelEscrowPump {
                                          String reason, String detail) {
         try {
             quarantine.transfer(escrow, record, reason, detail, () -> quarantine.flush(server));
+            dev.distantstock.event.EventRegistry.get(server).raise(
+                    dev.distantstock.event.EventRegistry.Severity.ERROR,
+                    dev.distantstock.event.EventRegistry.Codes.PARCEL_QUARANTINED,
+                    "parcel", record.parcelId().toString(),
+                    reason + (detail == null || detail.isBlank() ? "" : " · " + detail),
+                    null, null, System.currentTimeMillis());
+            ParcelJournal.get(server).record(record.parcelId(), "QUARANTINED",
+                    reason + (detail == null || detail.isBlank() ? "" : " · " + detail));
             LOG.error("[DistantStock/Parcel] quarantined parcel={} source=escrow reason={} detail={}",
                     record.parcelId(), reason, detail);
         } catch (IllegalStateException full) {
@@ -390,6 +416,14 @@ public final class ParcelEscrowPump {
                                          String reason, String detail) {
         try {
             quarantine.transfer(returns, record, reason, detail, () -> quarantine.flush(server));
+            dev.distantstock.event.EventRegistry.get(server).raise(
+                    dev.distantstock.event.EventRegistry.Severity.ERROR,
+                    dev.distantstock.event.EventRegistry.Codes.PARCEL_QUARANTINED,
+                    "parcel", record.parcelId().toString(),
+                    reason + (detail == null || detail.isBlank() ? "" : " · " + detail),
+                    null, null, System.currentTimeMillis());
+            ParcelJournal.get(server).record(record.parcelId(), "QUARANTINED",
+                    reason + (detail == null || detail.isBlank() ? "" : " · " + detail));
             LOG.error("[DistantStock/Parcel] quarantined parcel={} source=return_inbox reason={} detail={}",
                     record.parcelId(), reason, detail);
         } catch (IllegalStateException full) {

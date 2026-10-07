@@ -1,0 +1,44 @@
+{
+  "parent": "minecraft:block/block",
+  "render_type": "minecraft:translucent",
+  "textures": {
+    "particle": "distantstock:block/logger/receipt",
+    "receipt": "distantstock:block/logger/receipt"
+  },
+  "elements": [
+    {
+      "name": "receipt_feed_fold",
+      "from": [
+        7,
+        4,
+        9
+      ],
+      "to": [
+        13,
+        4,
+        10
+      ],
+      "faces": {
+        "up": {
+          "texture": "#receipt",
+          "uv": [
+            0,
+            0,
+            6,
+            1
+          ]
+        },
+        "down": {
+          "texture": "#receipt",
+          "uv": [
+            0,
+            0,
+            6,
+            1
+          ]
+        }
+      }
+    }
+  ],
+  "credit": "Distant Stock logger animated receipt part"
+}

@@ -147,7 +147,7 @@ public final class TranserverStockService {
         }
         CompletableFuture<DeliveryResult> applied = new CompletableFuture<>();
         server.execute(() -> {
-            DeliveryResult valid = validateLocal(server, TranserverBridge.nodeId(), query.networkId());
+            DeliveryResult valid = validateLocal(server, TranserverBridge.localNodeUuid(), query.networkId());
             if (valid != DeliveryResult.APPLIED) {
                 noteQuery(shortId(query.networkId()) + " " + valid);
                 applied.complete(valid);
@@ -252,7 +252,7 @@ public final class TranserverStockService {
         if (api == null) {
             return;
         }
-        for (var completed : api.completedSends(64)) {
+        for (var completed : TranserverBridge.completedSends(256)) {
             if (RoutingChannels.STOCK_QUERY.equals(completed.channel())) {
                 try {
                     StockWireCodec.Query query = StockWireCodec.decodeQuery(completed.payload());
@@ -266,9 +266,9 @@ public final class TranserverStockService {
                     }
                 } catch (IOException ignored) {
                 }
-                api.acknowledgeCompletedSend(completed.messageId());
+                TranserverBridge.acknowledgeCompletedSend(completed.messageId());
             } else if (RoutingChannels.STOCK_RESULT.equals(completed.channel())) {
-                api.acknowledgeCompletedSend(completed.messageId());
+                TranserverBridge.acknowledgeCompletedSend(completed.messageId());
             }
         }
     }

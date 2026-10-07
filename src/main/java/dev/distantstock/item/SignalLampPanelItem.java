@@ -198,6 +198,8 @@ public final class SignalLampPanelItem extends BlockItem {
         if (!(level.getBlockEntity(pos) instanceof FactoryPanelBlockEntity oldBe)) {
             return null;
         }
+        dev.distantstock.block.RemoteGaugeBlockEntity remoteSource =
+                oldBe instanceof dev.distantstock.block.RemoteGaugeBlockEntity remote ? remote : null;
 
         EnumMap<FactoryPanelBlock.PanelSlot, CompoundTag> saved =
                 new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
@@ -241,6 +243,9 @@ public final class SignalLampPanelItem extends BlockItem {
             newBe.addPanel(entry.getKey(), null);
             newBe.panels.get(entry.getKey()).read(entry.getValue(), level.registryAccess(), false);
             if (oldState.is(ModBlocks.REMOTE_GAUGE.get())) newBe.setRemoteGauge(entry.getKey(), true);
+        }
+        if (remoteSource != null) {
+            remoteSource.copyRemoteStateTo(newBe);
         }
         reconnectCopiedPanels(level, newBe, outputs);
         newBe.redraw = true;

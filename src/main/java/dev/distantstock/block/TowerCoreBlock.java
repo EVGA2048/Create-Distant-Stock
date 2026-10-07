@@ -6,9 +6,14 @@ import com.simibubi.create.content.kinetics.base.KineticBlock;
 import com.simibubi.create.foundation.block.IBE;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.BlockHitResult;
 
 /**
  * The centre of a tower's 3x3 base, and the only part of a tower that turns.
@@ -45,14 +50,14 @@ public final class TowerCoreBlock extends KineticBlock implements IBE<TowerCoreB
     }
 
     /**
-     * The same bar the chunk loaders set: thirty rpm.
+     * Ordinary Create motors and steam engines can run this tower at slow speed.
      *
      * <p>Deliberately low. A tower's cost is its stress draw, which runs to five figures at the top
      * of the table — how fast it has to spin is not where the difficulty should live.
      */
     @Override
     public IRotate.SpeedLevel getMinimumRequiredSpeedLevel() {
-        return IRotate.SpeedLevel.MEDIUM;
+        return IRotate.SpeedLevel.SLOW;
     }
 
     @Override
@@ -63,5 +68,52 @@ public final class TowerCoreBlock extends KineticBlock implements IBE<TowerCoreB
     @Override
     public BlockEntityType<? extends TowerCoreBlockEntity> getBlockEntityType() {
         return ModBlockEntities.TOWER_CORE.get();
+    }
+
+    @Override
+    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
+                                               Player player, BlockHitResult hit) {
+        return TowerControl.open(level, pos, player);
+    }
+
+    @Override
+    public void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean isMoving) {
+        super.onPlace(state, level, pos, oldState, isMoving);
+        if (!oldState.is(this)) {
+            invalidateSkirtCapabilities(level, pos);
+        }
+    }
+
+    @Override
+    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState,
+                         boolean movedByPiston) {
+        if (!state.is(newState.getBlock())) {
+            // Do this while the old core still exists. Capability listeners only need the invalidation
+            // signal; their next query happens after the world has settled on the new state.
+            invalidateSkirtCapabilities(level, pos);
+        }
+        super.onRemove(state, level, pos, newState, movedByPiston);
+    }
+
+    static void invalidateSkirtCapabilities(Level level, BlockPos corePos) {
+        // Never turn capability invalidation into chunk loading. This method runs from the core
+        // block entity's load/unload lifecycle as well as placement/removal. Calling
+        // Level#getBlockState across a chunk boundary while a chunk is unloading can synchronously
+        // request that chunk again and stall the server thread. An unloaded casing cannot retain a
+        // live BlockCapabilityCache, so only chunks that are already resident need invalidation.
+        if (!(level instanceof ServerLevel server)) {
+            return;
+        }
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) continue;
+                BlockPos casingPos = corePos.offset(dx, 0, dz);
+                var chunk = server.getChunkSource().getChunkNow(
+                        casingPos.getX() >> 4, casingPos.getZ() >> 4);
+                if (chunk != null && chunk.getBlockState(casingPos).is(ModBlocks.TOWER_CASING.get())) {
+                    server.invalidateCapabilities(casingPos);
+                }
+            }
+        }
     }
 }

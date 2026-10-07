@@ -58,7 +58,18 @@ public final class RemoteGaugeRenderer extends FactoryPanelRenderer {
      * Create art.
      */
     public static PartialModel housingFor(FactoryPanelBlockEntity be, FactoryPanelBehaviour behaviour) {
-        if (dev.distantstock.block.RemoteGaugeBlockEntity.isOurPanel(behaviour)) {
+        return housingFor(be, behaviour, dev.distantstock.block.RemoteGaugeBlockEntity.isOurPanel(behaviour));
+    }
+
+    /**
+     * Variant used by mixed four-slot boards, where the host block entity owns the slot-kind bit.
+     * A remote gauge installed into SignalPanelBlockEntity is still backed by that board's generic
+     * behaviour, so instanceof alone cannot identify its art and used to fall back to Create's
+     * vanilla housing whenever several panel types shared the same board.
+     */
+    public static PartialModel housingFor(FactoryPanelBlockEntity be, FactoryPanelBehaviour behaviour,
+                                          boolean remoteGaugeSlot) {
+        if (remoteGaugeSlot) {
             return panelModel(be.restocker, behaviour.count != 0);
         }
         FactoryPanelBlock.PanelState panelState = behaviour.count == 0

@@ -2,14 +2,26 @@
   "type": "minecraft:crafting_shaped",
   "category": "redstone",
   "key": {
-    "A": { "item": "minecraft:andesite" },
-    "W": { "item": "minecraft:stripped_warped_stem" },
-    "R": { "item": "minecraft:redstone" }
+    "B": {
+      "item": "create:brass_sheet"
+    },
+    "P": {
+      "item": "distantstock:polished_ether_quartz"
+    },
+    "T": {
+      "item": "create:stock_ticker"
+    },
+    "M": {
+      "item": "distantstock:ether_mechanism"
+    }
   },
   "pattern": [
-    "AWA",
-    "WRW",
-    "AWA"
+    "BPB",
+    "PTP",
+    "BMB"
   ],
-  "result": { "count": 1, "id": "distantstock:gauge" }
+  "result": {
+    "count": 1,
+    "id": "distantstock:gauge"
+  }
 }

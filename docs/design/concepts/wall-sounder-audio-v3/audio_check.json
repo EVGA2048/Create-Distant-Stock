@@ -1,0 +1,42 @@
+{
+  "playback_performed": false,
+  "sample_rate": 48000,
+  "channels": 1,
+  "leading_silence_s": 2,
+  "repeat_period_s": 4.5,
+  "repeats": 2,
+  "preview_duration_s": 11.65,
+  "wav": {
+    "duration_s": 4.15,
+    "peak_dbfs": -23.35,
+    "rms_dbfs": -30.0,
+    "mean": 1e-08
+  },
+  "ogg": {
+    "duration_s": 4.15,
+    "peak_dbfs": -23.24,
+    "rms_dbfs": -29.94,
+    "mean": 0.0
+  },
+  "descent_window": "2.05–3.40s; 40ms RMS windows, 25ms hop; excludes intentional tail release",
+  "sweep_timing": "rise 0.30–1.95s (1.65s), fall 1.95–3.60s (1.65s)",
+  "tail_release": "raised cosine, 3.46–3.62s; ends inside falling sweep, then digital silence",
+  "original_descent_range_db": 1.207,
+  "revised_descent_range_db": 0.04,
+  "decoded_descent_range_db": 0.108,
+  "v2_audio_unchanged": true,
+  "v2_sha256": {
+    "single_cycle/b2_worn_speaker.wav": "60433e8a9aa3daad767653c9f5cb4f88c5d12a7b468ad8f7de96f82f7954caaf",
+    "single_cycle/b2_worn_speaker.ogg": "acf67284d5c5e8fbc47a710ac3aa5cdcf885a0aedbf7db910c92c8b2c1e96211",
+    "single_cycle/f2_fire_alternating.ogg": "bc541a05bbbee663a9fa4ea2c5f91572921e4c540e0c1c9703dca2d6268063d2",
+    "single_cycle/f2_fire_alternating.wav": "8bbe090452686d023a47835951d7fbde49fb1307e72d49f025845302a7b44e8e",
+    "single_cycle/f1_fire_sweep.ogg": "182dc1f7f4e237b6ec25225f0a9d773c1129a9f90d37a9078907f90dc789490f",
+    "single_cycle/b1_small_speaker.ogg": "4a2f750a3795c9c7957736da964438b6f09cd0a8627f184fbc7a56f11779d2c7",
+    "single_cycle/b1_small_speaker.wav": "a61e5df054fe269222554c0fcedcb5ffe6a9e52d40ea4623905772b75c1f2c59",
+    "single_cycle/f1_fire_sweep.wav": "8050d0d906172ccb742de77473a55a3135c25a32469083e683f5d8c2b803330d",
+    "manual_listen/f2_fire_alternating_preview.wav": "e95a7787ac44b63cded1000de804037c72f83dac05127f40075bc6cebb1dd79e",
+    "manual_listen/b1_small_speaker_preview.wav": "d1b07920ac3ecf64aef118a5b9e34d3d76cc19ea50035207fb0bc3641cea94dc",
+    "manual_listen/f1_fire_sweep_preview.wav": "145327cfb3975ef6cbac9bd33ae0b6cfbfcdc2b0387cc36bac580a98f0217f5f",
+    "manual_listen/b2_worn_speaker_preview.wav": "45bd150e128822d680387d8c1a69d2279b4c4bf647cc76201930d33fd5998cd5"
+  }
+}

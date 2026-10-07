@@ -1,0 +1,11 @@
+{
+  "source": "docs/design/concepts/lemon-ping-package-cable-blue",
+  "user_confirmation": "就这样；实机修正：把 Ping 标志改到另一个方向的面上，避免与眼睛重叠",
+  "sha256": {
+    "README.md": "bd6e81b3af1be7830ce2e080bf75dc8cd892938e996f9e95964afbe17020665f",
+    "preview.png": "c19c22a3a3afa2c29d48f6317925e34c6be9e77ed7d7d479b632679e2e108a52",
+    "remote_package_particle.png": "9d45d08b7bda3b7ca257a3b17fc484f8946f12e36c8904de48d128a617e10f16",
+    "remote_package_ping.png": "1f3722cff54b135e64c21836bba23a45f237df62645c0c0b01dd6bf6253a49e5",
+    "side_pixels.png": "e45ddcdcbd0af696fd88e09cc042c8247a29aa889abf6ade3be33597ce84e77e"
+  }
+}

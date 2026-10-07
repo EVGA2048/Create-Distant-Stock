@@ -107,7 +107,25 @@ public final class RemoteGaugeOrders {
     public static boolean orderAll(MinecraftServer server, RemoteNetworkId network, String address,
                                    java.util.UUID receivingGroup, String homeAddress,
                                    List<LinkQueues.Line> lines) {
+        return orderAll(server, network, null, address, receivingGroup, homeAddress, lines);
+    }
+
+    public static boolean orderAll(MinecraftServer server, RemoteNetworkId network,
+                                   java.util.UUID distantNetworkId, String address,
+                                   java.util.UUID receivingGroup, String homeAddress,
+                                   List<LinkQueues.Line> lines) {
+        return orderAll(server, network, distantNetworkId, true, address,
+                receivingGroup, homeAddress, lines);
+    }
+
+    public static boolean orderAll(MinecraftServer server, RemoteNetworkId network,
+                                   java.util.UUID distantNetworkId, boolean distantNetworkKnown,
+                                   String address, java.util.UUID receivingGroup, String homeAddress,
+                                   List<LinkQueues.Line> lines) {
         if (server == null || network == null || lines == null || lines.isEmpty()) {
+            return false;
+        }
+        if (!distantNetworkKnown || !DistantNetworkDirectory.isFormalId(distantNetworkId)) {
             return false;
         }
         // 没选接收港组的订单不出去：默认组等于没有收件人，货发出去谁都不认（玩家 2026-09-18 报的
@@ -121,6 +139,7 @@ public final class RemoteGaugeOrders {
             return false;
         }
         OrderService.Result result = OrderService.place(server, network, network.createFrequency(),
+                distantNetworkKnown ? distantNetworkId : null,
                 address == null ? "" : address, receivingGroup, List.copyOf(lines),
                 homeAddress == null ? "" : homeAddress);
         return result == OrderService.Result.QUEUED;

@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:block",
+  "pools": [{
+    "rolls": 1,
+    "entries": [{"type": "minecraft:item", "name": "distantstock:nixie_clock"}],
+    "conditions": [{"condition": "minecraft:survives_explosion"}]
+  }],
+  "random_sequence": "distantstock:blocks/nixie_clock"
+}

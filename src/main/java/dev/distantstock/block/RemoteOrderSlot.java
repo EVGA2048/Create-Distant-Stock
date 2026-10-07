@@ -103,6 +103,11 @@ public final class RemoteOrderSlot {
         if (behaviour == null || !behaviour.isActive()) {
             return;
         }
+        if (!RemoteGaugeBlockEntity.localNetworkConfigured(behaviour.network)) {
+            // The item is deliberately placeable before local Create tuning. Never interpret an
+            // unconfigured local monitor as "stock = 0" and start ordering forever.
+            return;
+        }
         ItemStack filter = behaviour.getFilter();
         if (filter.isEmpty()) {
             return;
@@ -116,8 +121,12 @@ public final class RemoteOrderSlot {
         if (count <= 0) {
             return;
         }
-        if (RemoteGaugeOrders.order(level.getServer(), binding.network(), binding.address(),
-                binding.receivingGroup(), filter, count)) {
+        if (RemoteGaugeOrders.orderAll(level.getServer(), binding.network(),
+                binding.distantNetworkId(), binding.distantNetworkKnown(),
+                binding.address(), binding.receivingGroup(),
+                binding.homeAddress(), java.util.List.of(new dev.distantstock.link.LinkQueues.Line(
+                        net.minecraft.core.registries.BuiltInRegistries.ITEM
+                                .getKey(filter.getItem()).toString(), count)))) {
             outstanding = count;
             since = level.getGameTime();
             changed();

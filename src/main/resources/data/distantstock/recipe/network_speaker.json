@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    " C ",
+    "EAE",
+    " C "
+  ],
+  "key": {
+    "C": {
+      "item": "create:andesite_casing"
+    },
+    "E": {
+      "item": "create:electron_tube"
+    },
+    "A": {
+      "item": "distantstock:announcer"
+    }
+  },
+  "result": {
+    "id": "distantstock:network_speaker",
+    "count": 1
+  }
+}

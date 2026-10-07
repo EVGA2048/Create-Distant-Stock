@@ -25,19 +25,28 @@ public final class DistantStockPonderPlugin implements PonderPlugin {
         ResourceLocation towerCasing = id("tower_casing");
         ResourceLocation remoteGauge = id("remote_gauge");
         ResourceLocation remoteRedstoneRequester = id("remote_redstone_requester");
+        ResourceLocation diagnosticFrogport = id("diagnostic_frogport");
+        ResourceLocation cacheFrogport = id("cache_frogport");
+        ResourceLocation logger = id("logger");
+        ResourceLocation stackLight = id("stack_light");
+        ResourceLocation redSounder = id("red_wall_sounder");
+        ResourceLocation orangeSounder = id("orange_wall_sounder");
 
         helper.forComponents(dock, requester, manual, remotePackager)
-                .addStoryBoard("export", DistantStockScenes::export)
-                .addStoryBoard("import", DistantStockScenes::receive);
+                .addStoryBoard("export", DeliveryScenes::export)
+                .addStoryBoard("import", DeliveryScenes::receive);
         helper.forComponents(requester, gauge, dock)
-                .addStoryBoard("tune", DistantStockScenes::tune);
+                .addStoryBoard("tune", ControlScenes::tune);
         helper.forComponents(monitor, dock)
-                .addStoryBoard("status", DistantStockScenes::status);
-        // 塔的四个方块都挂同一场戏：玩家手上拿着哪一块，想学的都是同一座塔怎么立起来。
+                .addStoryBoard("status", ControlScenes::status);
         helper.forComponents(towerCore, towerCoupler, etherResonator, towerCasing)
-                .addStoryBoard("tower", DistantStockScenes::tower);
+                .addStoryBoard("tower", TowerScenes::tower);
         helper.forComponents(remoteGauge, remoteRedstoneRequester, requester, manual)
-                .addStoryBoard("replenish", DistantStockScenes::replenish);
+                .addStoryBoard("replenish", ControlScenes::replenish);
+        helper.forComponents(diagnosticFrogport, cacheFrogport)
+                .addStoryBoard("diagnostics", DiagnosticScenes::chain);
+        helper.forComponents(logger, stackLight, redSounder, orangeSounder)
+                .addStoryBoard("logger", DiagnosticScenes::logger);
     }
 
     private static ResourceLocation id(String path) {

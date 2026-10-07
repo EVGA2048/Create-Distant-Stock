@@ -67,7 +67,7 @@ public final class SignalPanelRenderer extends SmartBlockEntityRenderer<SignalPa
             // Every panel keeps its own art even when it shares a board: a remote gauge stays blue,
             // a gauge from another mod stays that mod's. housingFor answers for all of them.
             boolean remote = be.isRemoteGauge(entry.getKey());
-            renderPartial(RemoteGaugeRenderer.housingFor(be, behaviour),
+            renderPartial(RemoteGaugeRenderer.housingFor(be, behaviour, remote),
                     state, entry.getKey(), ms, buffer, light, overlay, RenderType.cutout());
             if (behaviour.getAmount() > 0) {
                 if (remote) {

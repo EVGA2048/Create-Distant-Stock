@@ -42,9 +42,11 @@ public final class TerminalPanelGesture {
         if (!(held.getItem() instanceof RequesterItem)) {
             return false;
         }
-        if (!RequesterData.tuned(held)) {
-            // 拿着没调谐的终端点面板：说清楚为什么不绑，并且**不开界面** —— 界面里也没有调谐的地方。
-            RequesterItem.sayUntuned(player);
+        if (RequesterData.distantNetwork(held)
+                .filter(dev.distantstock.routing.DistantNetworkDirectory::isFormalId)
+                .isEmpty()) {
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "message.distantstock.network.required"), true);
             return true;
         }
         PacketDistributor.sendToServer(new BindPanelFromTerminalC2S(

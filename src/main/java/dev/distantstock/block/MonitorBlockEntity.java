@@ -38,7 +38,7 @@ import java.util.Locale;
  * <p>Two things had to be arranged. Create only lets its <em>own</em> display block be a controller
  * ({@code updateControllerStatus} gives up on anything that is not a {@code FlapDisplayBlock}), so
  * the size is declared here instead. And the board is not driven by a shaft: a block that is not
- * {@code IRotate} answers "speed requirement fulfilled" with true, which is what lets the flaps
+ * {@code IRotate} has no shaft on any face and requests speed level NONE, which lets the flaps
  * turn while {@code updateSpeed} keeps rotation propagation away from us entirely.
  *
  * <p>What it shows is one reading at a time, two lines, turning over every few seconds — see
@@ -48,18 +48,15 @@ import java.util.Locale;
 public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements IHaveGoggleInformation {
     private double localTps = 20;
     private double localMspt = 50;
-    private boolean peerUp;
-    private double peerTps;
-    /** Whether a peer has said anything recently, as opposed to the link merely answering. */
-    private boolean peerFresh;
     private int backlog;
-    private int rtt = -1;
     private String role = "host";
     private int fails;
     private int inFlight;
     private java.util.UUID freq;
     private RemoteNetworkId networkId;
     private int deviceCount;
+    private int diagnosticFaults;
+    private int diagnosticInFlight;
 
     /** How long one reading stays up before the board turns to the next. */
     private static final int PAGE_TICKS = 100;
@@ -114,10 +111,10 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
         return java.util.List.of(
                 new String[]{"TPS", short3(localTps)},
                 new String[]{"MSPT", short3(localMspt)},
-                new String[]{"PING", rtt < 0 ? "----" : Integer.toString(Math.min(rtt, 9999))},
                 new String[]{"BACK", Integer.toString(Math.min(backlog, 9999))},
-                new String[]{"PEER", peerUp && peerFresh ? short3(peerTps) : "----"},
-                new String[]{"DEV", Integer.toString(Math.min(deviceCount, 9999))});
+                new String[]{"DEV", Integer.toString(Math.min(deviceCount, 9999))},
+                new String[]{"ERR", Integer.toString(Math.min(diagnosticFaults, 9999))},
+                new String[]{"PING", Integer.toString(Math.min(diagnosticInFlight, 9999))});
     }
 
     /** A reading in at most four characters, which is one line of the board. */
@@ -137,6 +134,12 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
     private static MonitorBlock.Link linkState(LinkSnapshot.View v) {
         if (!v.linkUp()) {
             return MonitorBlock.Link.OFF;
+        }
+        // Transerver is multi-peer. There is no single peer whose heartbeat can define this lamp;
+        // transport-up is the only unambiguous process-wide state. Legacy point-to-point mode keeps
+        // its old freshness distinction.
+        if (v.transerverAttached()) {
+            return MonitorBlock.Link.ONLINE;
         }
         if (v.peerFresh()) {
             return MonitorBlock.Link.ONLINE;
@@ -160,6 +163,11 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
 
     public RemoteNetworkId networkId() {
         return networkId;
+    }
+
+    /** Create logistics network displayed by this monitor, used by tower-alarm scoping. */
+    public java.util.UUID frequency() {
+        return freq;
     }
 
     public void setNetwork(RemoteNetworkId networkId) {
@@ -201,15 +209,13 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
         LinkSnapshot.View v = LinkSnapshot.view(TowerReadout.survey(level, worldPosition));
         localTps = v.localTps();
         localMspt = v.localMspt();
-        peerUp = v.linkUp();
-        peerTps = v.peerTps();
-        peerFresh = v.peerFresh();
         backlog = v.orderDepth() + v.packageDepth();
-        rtt = (int) v.peerRttMs();
         role = v.selfId();
         fails = v.peerFails();
         inFlight = v.inFlight();
         deviceCount = freq == null ? 0 : CreateStock.deviceCount(freq);
+        diagnosticFaults = v.diagnosticFaults();
+        diagnosticInFlight = v.diagnosticInFlight();
         // The board turns to the next reading on its own beat, which is slower than this one.
         showPage(level.getGameTime());
         MonitorBlock.Status status = MonitorBlock.Status.fromTps(localTps);
@@ -244,18 +250,9 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
             GoggleText.line(tip, "goggle.distantstock.freq", RequesterData.shortFreq(freq));
         }
         GoggleText.line(tip, "goggle.distantstock.local_tps", fmt(localTps), fmt(localMspt));
-        if (peerUp && !peerFresh) {
-            // The link is up but the other server has not said what it is doing — a broadcast is
-            // seconds apart, and one missed is not an outage. Saying "0.0 TPS" here would send an
-            // operator to look for a broken server that is running fine.
-            GoggleText.line(tip, "goggle.distantstock.peer_silent");
-        } else if (peerUp) {
-            GoggleText.line(tip, "goggle.distantstock.peer_tps", fmt(peerTps));
-        } else {
-            GoggleText.value(tip, "goggle.distantstock.peer_down", ChatFormatting.RED);
-        }
-        GoggleText.line(tip, "goggle.distantstock.pressure", backlog, rtt < 0 ? "—" : rtt);
+        GoggleText.line(tip, "goggle.distantstock.pressure", backlog);
         GoggleText.line(tip, "goggle.distantstock.devices", deviceCount);
+        GoggleText.line(tip, "goggle.distantstock.monitor.diagnostics", diagnosticFaults, diagnosticInFlight);
         return true;
     }
 
@@ -301,14 +298,13 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
         super.write(tag, regs, clientPacket);
         tag.putDouble("Tps", localTps);
         tag.putDouble("Mspt", localMspt);
-        tag.putBoolean("PeerUp", peerUp);
-        tag.putDouble("PeerTps", peerTps);
         tag.putInt("Backlog", backlog);
-        tag.putInt("Rtt", rtt);
         tag.putString("Role", role);
         tag.putInt("Fails", fails);
         tag.putInt("InFlight", inFlight);
         tag.putInt("DeviceCount", deviceCount);
+        tag.putInt("DiagnosticFaults", diagnosticFaults);
+        tag.putInt("DiagnosticInFlight", diagnosticInFlight);
         if (freq != null) {
             tag.putUUID("Freq", freq);
         }
@@ -322,14 +318,13 @@ public final class MonitorBlockEntity extends FlapDisplayBlockEntity implements 
         super.read(tag, regs, clientPacket);
         localTps = tag.getDouble("Tps");
         localMspt = tag.getDouble("Mspt");
-        peerUp = tag.getBoolean("PeerUp");
-        peerTps = tag.getDouble("PeerTps");
         backlog = tag.getInt("Backlog");
-        rtt = tag.getInt("Rtt");
         role = tag.getString("Role");
         fails = tag.getInt("Fails");
         inFlight = tag.getInt("InFlight");
         deviceCount = tag.getInt("DeviceCount");
+        diagnosticFaults = tag.getInt("DiagnosticFaults");
+        diagnosticInFlight = tag.getInt("DiagnosticInFlight");
         freq = tag.hasUUID("Freq") ? tag.getUUID("Freq") : null;
         networkId = tag.contains("RemoteNetwork")
                 ? RemoteNetworkId.read(tag.getCompound("RemoteNetwork")).orElse(null) : null;

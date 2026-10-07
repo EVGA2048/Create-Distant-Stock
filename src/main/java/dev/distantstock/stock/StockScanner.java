@@ -24,8 +24,24 @@ public final class StockScanner {
     }
 
     public static void scan(MinecraftServer server) {
-        List<NetworkDirectory.Entry> local = CreateStock.openNetworks(
-                server, StockConfig.selfId(), TranserverBridge.nodeId());
+        UUID localNode = TranserverBridge.localNodeUuid();
+        if (localNode == null) {
+            return;
+        }
+        var distantNetworks = dev.distantstock.routing.DistantNetworkDirectory.get(server);
+        List<NetworkDirectory.Entry> discovered = CreateStock.openNetworks(
+                server, StockConfig.selfId(), localNode);
+        for (NetworkDirectory.Entry entry : discovered) {
+            if (entry.networkId() != null) {
+                distantNetworks.canonicalizeLocalMember(entry.networkId());
+            }
+        }
+        List<NetworkDirectory.Entry> local = discovered.stream()
+                .map(entry -> new NetworkDirectory.Entry(entry.freq(), entry.server(), entry.links(),
+                        entry.networkId(), entry.local(), entry.packable(),
+                        distantNetworks.scopeOf(entry.networkId()),
+                        distantNetworks.memberName(entry.networkId()).orElse("")))
+                .toList();
         NetworkDirectory.replaceLocal(local);
         for (NetworkDirectory.Entry entry : local) {
             if (entry.networkId() != null) {

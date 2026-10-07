@@ -22,7 +22,9 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.material.FluidState;
+import com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem;
 
 import java.util.Arrays;
 import java.util.Objects;
@@ -88,15 +90,41 @@ public final class RemoteGaugeBlock extends FactoryPanelBlock {
         if (!(level.getBlockEntity(pos) instanceof RemoteGaugeBlockEntity be)) {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);
         }
-        if (stack.getItem() instanceof RequesterItem && !RequesterData.tuned(stack)) {
-            if (!level.isClientSide) {
-                RequesterItem.sayUntuned(player);
+        if (!(stack.getItem() instanceof RequesterItem)) {
+            // A placed remote gauge may be given (or changed to) its local inventory-monitor
+            // network after placement. This is intentionally separate from the Distant Stock
+            // source network configured below with a requester / Join Code.
+            if (stack.getItem() instanceof dev.distantstock.item.RemoteGaugeItem
+                    && LogisticallyLinkedBlockItem.isTuned(stack)) {
+                PanelSlot slot = getTargetedSlot(pos, state, hit.getLocation());
+                if (slot == null || !be.panels.get(slot).isActive()) {
+                    return ItemInteractionResult.sidedSuccess(level.isClientSide);
+                }
+                if (!level.isClientSide) {
+                    java.util.UUID localNetwork = LogisticallyLinkedBlockItem.networkFromStack(stack);
+                    if (localNetwork != null
+                            && com.simibubi.create.Create.LOGISTICS.mayInteract(localNetwork, player)) {
+                        be.panels.get(slot).setNetwork(localNetwork);
+                        be.setChanged();
+                        be.sendData();
+                        player.displayClientMessage(Component.translatable(
+                                "message.distantstock.remote_gauge.local_network_bound"), true);
+                    } else {
+                        player.displayClientMessage(Component.translatable(
+                                "message.distantstock.network.interact_denied"), true);
+                    }
+                }
+                return ItemInteractionResult.sidedSuccess(level.isClientSide);
             }
-            return ItemInteractionResult.sidedSuccess(level.isClientSide);
-        }
-        var network = networkFromStack(stack);
-        if (network == null) {
             return super.useItemOn(stack, state, level, pos, player, hand, hit);
+        }
+        java.util.UUID distantNetworkId = RequesterData.distantNetwork(stack)
+                .filter(dev.distantstock.routing.DistantNetworkDirectory::isFormalId)
+                .orElse(null);
+        if (distantNetworkId == null) {
+            if (!level.isClientSide) player.displayClientMessage(Component.translatable(
+                    "message.distantstock.network.required"), true);
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
         PanelSlot slot = getTargetedSlot(pos, state, hit.getLocation());
         if (slot == null || !be.panels.get(slot).isActive()) {
@@ -113,17 +141,55 @@ public final class RemoteGaugeBlock extends FactoryPanelBlock {
         }
         if (player.isShiftKeyDown()) {
             be.unbind(slot);
+            be.setDistantNetworkScope(slot, null);
             player.displayClientMessage(
                     Component.translatable("gui.distantstock.remote_gauge.unbound"), true);
             return ItemInteractionResult.sidedSuccess(false);
         }
+        be.setDistantNetworkScope(slot, distantNetworkId);
+        var network = networkFromStack(stack);
+        if (network == null) {
+            player.displayClientMessage(Component.translatable(
+                    "message.distantstock.device.network_paired"), true);
+            return ItemInteractionResult.sidedSuccess(false);
+        }
+        java.util.UUID warehouseScope = RequesterData.formalDistantNetwork(stack, level.getServer())
+                .orElse(null);
+        if (!distantNetworkId.equals(warehouseScope)) {
+            player.displayClientMessage(Component.translatable(
+                    "message.distantstock.network.warehouse_other_short"), true);
+            return ItemInteractionResult.sidedSuccess(false);
+        }
         // A requester carries where its goods come from and where they come out, and both are
         // needed: a panel bound to a warehouse but to no group would order into nowhere.
-        be.bind(slot, network, RequesterData.receivingGroup(stack).orElse(null),
-                RequesterData.address(stack));
+        be.bind(slot, new RemoteBinding(network, distantNetworkId,
+                RequesterData.receivingGroup(stack).orElse(null),
+                RequesterData.address(stack), RequesterData.homeAddress(stack)));
         player.displayClientMessage(Component.translatable("gui.distantstock.remote_gauge.bound",
                 network.shortLabel()), true);
         return ItemInteractionResult.sidedSuccess(false);
+    }
+
+    @Override
+    public void setPlacedBy(Level level, BlockPos pos, BlockState state,
+                            @Nullable LivingEntity placer, ItemStack stack) {
+        super.setPlacedBy(level, pos, state, placer, stack);
+        if (LogisticallyLinkedBlockItem.isTuned(stack)) {
+            return;
+        }
+        if (!(level.getBlockEntity(pos) instanceof RemoteGaugeBlockEntity be)) {
+            return;
+        }
+        // FactoryPanelBehaviour starts life with a random UUID. For an intentionally untuned remote
+        // gauge that UUID would look like a real local Create network and could later be queried.
+        // Replace it with our explicit serializable "unconfigured local inventory" marker.
+        for (var panel : be.panels.values()) {
+            if (panel != null && panel.isActive()) {
+                panel.setNetwork(RemoteGaugeBlockEntity.UNCONFIGURED_LOCAL_NETWORK);
+            }
+        }
+        be.setChanged();
+        be.sendData();
     }
 
     /** The warehouse a stack names, or null for anything that cannot name one across servers. */
@@ -149,7 +215,7 @@ public final class RemoteGaugeBlock extends FactoryPanelBlock {
                                        boolean willHarvest, FluidState fluid) {
         if (!level.isClientSide
                 && level.getBlockEntity(pos) instanceof FactoryPanelBlockEntity be
-                && be.activePanels() > 1) {
+                && be.activePanels() > 0) {
             List<PanelSlot> active = Arrays.stream(PanelSlot.values())
                     .filter(slot -> be.panels.get(slot).isActive())
                     .toList();
@@ -160,7 +226,13 @@ public final class RemoteGaugeBlock extends FactoryPanelBlock {
                 player.getInventory().placeItemBackInInventory(new ItemStack(ModItems.REMOTE_GAUGE.get()));
             }
             be.sendData();
-            return false;
+            // More panels remain: this hit peeled exactly one remote gauge and the board stays.
+            if (be.activePanels() > 0) {
+                return false;
+            }
+            // Last panel: its identity has already been handled above. The now-empty board may be
+            // destroyed by Create's normal path, but with zero active panels there is nothing left
+            // for FactoryPanelBlockEntity.destroy() to convert into a factory_gauge drop.
         }
         return super.onDestroyedByPlayer(state, level, pos, player, willHarvest, fluid);
     }

@@ -3,15 +3,18 @@ package dev.distantstock.block;
 import com.simibubi.create.api.equipment.goggles.IHaveGoggleInformation;
 import com.simibubi.create.content.logistics.BigItemStack;
 import com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterBlockEntity;
+import com.simibubi.create.content.logistics.redstoneRequester.RedstoneRequesterEffectPacket;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.link.LinkQueues;
 import dev.distantstock.routing.RemoteGaugeOrders;
 import dev.distantstock.stock.StockCache;
 import dev.distantstock.routing.TowerActivation;
+import net.createmod.catnip.platform.CatnipServices;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
@@ -41,6 +44,8 @@ import java.util.Map;
 public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterBlockEntity
         implements IHaveGoggleInformation {
     private RemoteBinding binding;
+    /** Distant Stock network joined by this device; source warehouse is selected separately. */
+    private java.util.UUID distantNetworkScope;
     /** 组名的**客户端副本**。服务端从不读它，读的时候现算（见 {@link #knownGroupName()}）。 */
     private String syncedGroupName;
 
@@ -53,10 +58,32 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
         return binding;
     }
 
+    public java.util.UUID distantNetworkScope() {
+        if (distantNetworkScope != null) return distantNetworkScope;
+        return binding != null && binding.distantNetworkKnown()
+                ? binding.distantNetworkId() : null;
+    }
+
+    public void setDistantNetworkScope(java.util.UUID scope) {
+        distantNetworkScope = scope != null
+                && dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope) ? scope : null;
+        if (binding != null && distantNetworkScope != null
+                && binding.distantNetworkKnown()
+                && !distantNetworkScope.equals(binding.distantNetworkId())) {
+            binding = null;
+        }
+        setChanged();
+        sendData();
+    }
+
     /** Points this requester at a warehouse. Null unbinds it, leaving Create's own behaviour. */
     public void bind(@Nullable RemoteBinding next) {
         this.binding = next;
         if (next != null) {
+            if (next.distantNetworkKnown()
+                    && dev.distantstock.routing.DistantNetworkDirectory.isFormalId(next.distantNetworkId())) {
+                distantNetworkScope = next.distantNetworkId();
+            }
             // The far stock is only refreshed for networks something is watching, and the partial
             // check below is the only reason this machine reads it.
             StockCache.watch(next.network());
@@ -92,13 +119,13 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
             // Carried by a tower or it does not send. The unbound path above is Create's own machine
             // and is left alone; this one spends a warehouse's stock across a server boundary, and
             // that is the tower's to carry.
-            playEffect(false);
+            sendEffect(false);
             lastRequestSucceeded = false;
             return;
         }
         List<LinkQueues.Line> lines = linesFor(bound);
         if (lines.isEmpty()) {
-            playEffect(false);
+            sendEffect(false);
             lastRequestSucceeded = false;
             return;
         }
@@ -109,9 +136,25 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
         // 终端抄下来的快照，之后再没更新过。一个看得见、能改、而且显然在问"送到哪"的框填了等于
         // 没填。现在它是唯一说了算的：绑定剩下的只是"从哪台服务器的哪张网络发货"。
         boolean ok = RemoteGaugeOrders.orderAll(level == null ? null : level.getServer(),
-                bound.network(), encodedTargetAdress, bound.receivingGroup(), bound.homeAddress(), lines);
+                bound.network(), bound.distantNetworkId(), bound.distantNetworkKnown(), encodedTargetAdress,
+                bound.receivingGroup(), bound.homeAddress(), lines);
         lastRequestSucceeded = ok;
-        playEffect(ok);
+        sendEffect(ok);
+    }
+
+    /**
+     * Uses Create's own effect packet path.
+     *
+     * <p>{@link #playEffect(boolean)} is a client-side renderer/sound method. Calling it on the
+     * dedicated server, as the old remote branch did, never told nearby clients anything — hence a
+     * perfectly real redstone edge with no requester animation. The vanilla requester sends this
+     * packet after every attempt; keep the exact same contract here.
+     */
+    private void sendEffect(boolean success) {
+        if (level instanceof ServerLevel serverLevel) {
+            CatnipServices.NETWORK.sendToClientsAround(serverLevel, worldPosition, 32,
+                    new RedstoneRequesterEffectPacket(worldPosition, success));
+        }
     }
 
     /** The configured items as order lines, cut down to what the warehouse is known to hold. */
@@ -195,6 +238,9 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
         if (binding != null) {
             tag.put("RemoteBinding", binding.save());
         }
+        if (distantNetworkScope != null) {
+            tag.putUUID("DistantNetworkScope", distantNetworkScope);
+        }
         if (clientPacket) {
             tag.putString("GroupName", liveGroupName());
         }
@@ -208,12 +254,24 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
         if (binding != null) {
             tag.put("RemoteBinding", binding.save());
         }
+        // Distant-network membership is independent from the selected source warehouse. A player
+        // may join the machine to a formal Distant Stock network first and choose/bind a warehouse
+        // later; in that perfectly valid state binding == null. Persist the scope explicitly so
+        // breaking and replacing the requester does not silently throw it back to Legacy scope.
+        if (distantNetworkScope != null) {
+            tag.putUUID("DistantNetworkScope", distantNetworkScope);
+        }
     }
 
     @Override
     protected void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.read(tag, registries, clientPacket);
         binding = RemoteBinding.read(tag.getCompound("RemoteBinding"));
+        distantNetworkScope = tag.hasUUID("DistantNetworkScope")
+                ? tag.getUUID("DistantNetworkScope")
+                : tag.hasUUID("DistantNetwork")
+                ? tag.getUUID("DistantNetwork")
+                : binding != null && binding.distantNetworkKnown() ? binding.distantNetworkId() : null;
         if (clientPacket || level == null || level.isClientSide) {
             // 只读同步过来的那一份。组名是要在屏幕上画出来的，而客户端没有目录可查 —— 一个 uuid
             // 前八位在一行写着「接收港组」的框里等于什么都没说。
@@ -241,10 +299,22 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
                 || level == null || level.getServer() == null) {
             return "";
         }
-        return dev.distantstock.routing.DockGroupDirectory.get(level.getServer())
+        var server = level.getServer();
+        String local = dev.distantstock.routing.DockGroupDirectory.get(server)
                 .find(binding.receivingGroup())
                 .map(dev.distantstock.routing.DockGroup::name)
-                .orElseGet(() -> RequesterData.shortFreq(binding.receivingGroup()));
+                .orElse(null);
+        if (local != null && !local.isBlank()) {
+            return local;
+        }
+        String remote = dev.distantstock.routing.RemoteGroups.get(server)
+                .find(binding.receivingGroup())
+                .filter(entry -> !binding.distantNetworkKnown()
+                        || entry.distantNetworkId().equals(binding.distantNetworkId()))
+                .map(dev.distantstock.routing.RemoteGroups.Entry::name)
+                .orElse(null);
+        return remote == null || remote.isBlank()
+                ? RequesterData.shortFreq(binding.receivingGroup()) : remote;
     }
 
     /** 屏幕改完目标以后写回来：网络和送货地址不动，只换接收港组和本端地址。 */
@@ -252,7 +322,9 @@ public final class RemoteRedstoneRequesterBlockEntity extends RedstoneRequesterB
         if (binding == null) {
             return;
         }
-        bind(new RemoteBinding(binding.network(), group, binding.address(), homeAddress));
+        bind(new RemoteBinding(binding.network(), binding.distantNetworkId(),
+                binding.distantNetworkKnown(), group,
+                binding.address(), homeAddress));
     }
 
     /**

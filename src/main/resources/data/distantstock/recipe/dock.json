@@ -2,14 +2,29 @@
   "type": "minecraft:crafting_shaped",
   "category": "redstone",
   "key": {
-    "A": { "item": "minecraft:andesite" },
-    "W": { "item": "minecraft:stripped_warped_stem" },
-    "C": { "item": "minecraft:copper_ingot" }
+    "P": {
+      "item": "distantstock:polished_ether_quartz"
+    },
+    "M": {
+      "item": "distantstock:ether_mechanism"
+    },
+    "B": {
+      "item": "create:brass_casing"
+    },
+    "S": {
+      "item": "create:stock_link"
+    },
+    "C": {
+      "item": "create:chute"
+    }
   },
   "pattern": [
-    "AWA",
-    "WCW",
-    "AWA"
+    "PMP",
+    "BSB",
+    " C "
   ],
-  "result": { "count": 1, "id": "distantstock:dock" }
+  "result": {
+    "count": 1,
+    "id": "distantstock:dock"
+  }
 }

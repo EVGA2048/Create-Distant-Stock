@@ -44,6 +44,40 @@ public final class DockGroupGameTests {
         h.succeed();
     }
 
+    /** A legacy save containing duplicate names is ambiguous until one row is renamed. */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void legacyDuplicateNamesAreRefusedInsteadOfPickingTheFirstRow(GameTestHelper h) {
+        String name = "Legacy Duplicate " + UUID.randomUUID().toString().substring(0, 8);
+        UUID firstId = UUID.randomUUID();
+        UUID secondId = UUID.randomUUID();
+        CompoundTag root = new CompoundTag();
+        net.minecraft.nbt.ListTag rows = new net.minecraft.nbt.ListTag();
+        for (UUID id : java.util.List.of(firstId, secondId)) {
+            CompoundTag row = new CompoundTag();
+            row.putUUID("Id", id);
+            row.putString("Name", name);
+            row.putBoolean("Open", true);
+            rows.add(row);
+        }
+        root.put("Groups", rows);
+
+        DockGroupDirectory directory = DockGroupDirectory.load(root, h.getLevel().registryAccess());
+        h.assertTrue(directory.named(name).size() == 2, "the legacy duplicate rows were not loaded");
+        h.assertTrue(directory.findByName(name).isEmpty(),
+                "an ambiguous legacy name silently selected one row");
+        try {
+            directory.create(name);
+            h.fail("a third group was created on top of an ambiguous legacy name");
+        } catch (IllegalArgumentException expected) {
+            // expected
+        }
+
+        directory.rename(firstId, name + " A");
+        h.assertTrue(directory.findByName(name).orElseThrow().id().equals(secondId),
+                "renaming one legacy duplicate did not make the remaining address usable");
+        h.succeed();
+    }
+
     /**
      * 开放的网络：谁都能自己加入，但**加入之前谁都用不了**。
      *
@@ -289,23 +323,30 @@ public final class DockGroupGameTests {
     public static void anOrderGoesWhereItsGroupLivesAndIsRefusedWhenNobodyKnowsIt(GameTestHelper h) {
         DockGroupDirectory directory = DockGroupDirectory.get(h.getLevel().getServer());
         UUID owner = UUID.randomUUID();
+        UUID scope = UUID.randomUUID();
 
-        DockGroup mine = directory.createFor("下单组 " + UUID.randomUUID().toString().substring(0, 8), owner);
-        var here = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, mine.id());
+        DockGroup mine = directory.createForNetwork("下单组 " + UUID.randomUUID().toString().substring(0, 8),
+                owner, scope, DockGroup.Visibility.PUBLIC);
+        var here = dev.distantstock.routing.OrderDestination.resolve(
+                h.getLevel().getServer(), owner, scope, mine.id());
         h.assertTrue(here.allowed() && here.group().equals(mine.id()), "本服的组没有被认成本服的");
         h.assertTrue(here.kind() == dev.distantstock.routing.OrderDestination.Kind.HERE,
                 "本服的组被判成了别的去向");
 
-        // 别人锁着的组：拒绝，且要说得出理由（界面用 REFUSED 那条文案）。
-        DockGroup theirs = directory.createFor("别人组 " + UUID.randomUUID().toString().substring(0, 8), UUID.randomUUID());
-        var refused = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, theirs.id());
-        h.assertFalse(refused.allowed(), "别人锁着的组被放行了");
-        h.assertTrue(refused.kind() == dev.distantstock.routing.OrderDestination.Kind.REFUSED,
-                "别人锁着的组没有报成 REFUSED");
+        // 公开 / 私密现在只控制“能不能被发现”，不是投递白名单。只要已经知道准确地址，
+        // 即使它仍带着旧版的 owner/member/lock 元数据，也应该能作为目的地。
+        DockGroup theirs = directory.createForNetwork("别人组 " + UUID.randomUUID().toString().substring(0, 8),
+                UUID.randomUUID(), scope, DockGroup.Visibility.PUBLIC);
+        var known = dev.distantstock.routing.OrderDestination.resolve(
+                h.getLevel().getServer(), owner, scope, theirs.id());
+        h.assertTrue(known.allowed(), "知道准确接收地址后仍被旧成员权限拒绝");
+        h.assertTrue(known.kind() == dev.distantstock.routing.OrderDestination.Kind.HERE,
+                "已知本地接收地址没有被判成 HERE");
 
         // 一个谁也不认识的 id：必须是 UNKNOWN，绝不能变成默认组。
         UUID ghost = UUID.randomUUID();
-        var unknown = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, ghost);
+        var unknown = dev.distantstock.routing.OrderDestination.resolve(
+                h.getLevel().getServer(), owner, scope, ghost);
         h.assertFalse(unknown.allowed(), "不存在的组被放行了（这正是货会悄悄落到别人港里的那条路）");
         h.assertTrue(unknown.kind() == dev.distantstock.routing.OrderDestination.Kind.UNKNOWN,
                 "不存在的组没有报成 UNKNOWN");
@@ -314,12 +355,13 @@ public final class DockGroupGameTests {
         //
         // 这条 2026-09-18 反过来了：以前它断言"落在本服默认组"，那是"货进虚空"那条路的入口 ——
         // 默认组等于没有收件人，发出去谁都不认。玩家拍板「必须新建或加入一个港组而不是默认的」。
-        var none = dev.distantstock.routing.OrderDestination.resolve(h.getLevel().getServer(), owner, null);
+        var none = dev.distantstock.routing.OrderDestination.resolve(
+                h.getLevel().getServer(), owner, scope, null);
         h.assertFalse(none.allowed(), "没选组的订单被放行了（这正是货会进虚空的那条路）");
         h.assertTrue(none.kind() == dev.distantstock.routing.OrderDestination.Kind.NO_GROUP,
                 "没选组没有报成 NO_GROUP");
         var placeholder = dev.distantstock.routing.OrderDestination.resolve(
-                h.getLevel().getServer(), owner, DockGroupDirectory.DEFAULT_GROUP_ID);
+                h.getLevel().getServer(), owner, scope, DockGroupDirectory.DEFAULT_GROUP_ID);
         h.assertFalse(placeholder.allowed(), "默认组那个占位被当成目的地放行了");
         h.succeed();
     }
@@ -343,6 +385,33 @@ public final class DockGroupGameTests {
         h.succeed();
     }
 
+    /** Renaming must obey the same uniqueness rule as creating. */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void aGroupMayNotBeRenamedOntoAnExistingName(GameTestHelper h) {
+        DockGroupDirectory directory = DockGroupDirectory.get(h.getLevel().getServer());
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        DockGroup first = directory.createFor("North " + suffix, OWNER);
+        DockGroup second = directory.createFor("South " + suffix, STRANGER);
+
+        try {
+            directory.rename(second.id(), "  " + first.name().toLowerCase(java.util.Locale.ROOT) + "  ");
+            h.fail("a group was renamed onto a name that was already taken");
+        } catch (IllegalArgumentException expected) {
+            h.assertTrue(directory.require(first.id()).name().equals(first.name()),
+                    "the existing group changed during the refused rename");
+            h.assertTrue(directory.require(second.id()).name().equals(second.name()),
+                    "the refused rename still changed the group");
+        }
+
+        // Renaming a group to its own spelling/case-normalized name is harmless and must not
+        // collide with itself.
+        DockGroup same = directory.rename(first.id(), "  " + first.name().toLowerCase(java.util.Locale.ROOT) + "  ");
+        h.assertTrue(same.id().equals(first.id()), "renaming a group to its own name changed its identity");
+        h.assertTrue(same.name().equals(first.name().toLowerCase(java.util.Locale.ROOT)),
+                "the group's requested display spelling was not kept");
+        h.succeed();
+    }
+
     /**
      * A request desk keeps the group it is pointed at, in the desk.
      *
@@ -359,16 +428,24 @@ public final class DockGroupGameTests {
         h.assertTrue(desk != null, "the desk did not appear");
 
         Player player = h.makeMockPlayer(GameType.SURVIVAL);
+        UUID localNode = UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId());
+        var warehouse = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA, localNode,
+                dev.distantstock.routing.WorldIdentity.get(h.getLevel()),
+                h.getLevel().dimension().location().toString(), UUID.randomUUID());
+        var distant = dev.distantstock.routing.DistantNetworkDirectory.get(h.getLevel().getServer())
+                .create("desk-" + UUID.randomUUID().toString().substring(0, 8), localNode,
+                        player.getUUID(), warehouse);
+        desk.setNetwork(warehouse, distant.id());
         RequesterMenu menu = new RequesterMenu(0, player.getInventory(), pos);
         h.assertTrue(DockGroupDirectory.DEFAULT_GROUP_ID.equals(desk.receivingGroup()),
                 "a fresh desk was pointed somewhere other than the default group");
 
-        // A name nobody has used before. The test world is a save like any other and keeps its dock
-        // groups between runs: a fixed name here made a group owned by the previous run's player,
-        // and every run after that was silently refused entry to its own fixture — the write went
-        // nowhere and the failure looked like a bug in the desk.
+        // Receiving addresses are authored by docks now. A requester is only a selector, so make
+        // the address the same way a player does: type it into a Distant Dock on this formal network.
         String name = "甲站收货-" + UUID.randomUUID();
         DockGroupDirectory directory = DockGroupDirectory.get(h.getLevel().getServer());
+        directory.resolveAddress(distant.id(), name);
         menu.writeDockGroup(player, name, SetDockGroupC2S.SELECT);
         DockGroup stored = directory.find(desk.receivingGroup()).orElse(null);
         h.assertTrue(stored != null && stored.name().equals(name),
@@ -385,6 +462,7 @@ public final class DockGroupGameTests {
         BlockPos other = h.absolutePos(new BlockPos(3, 2, 1));
         h.getLevel().setBlock(other, ModBlocks.GAUGE.get().defaultBlockState(), 3);
         GaugeBlockEntity second = (GaugeBlockEntity) h.getLevel().getBlockEntity(other);
+        second.setNetwork(warehouse, distant.id());
         new RequesterMenu(1, player.getInventory(), other)
                 .writeDockGroup(player, name, SetDockGroupC2S.SELECT);
         h.assertTrue(second.receivingGroup().equals(desk.receivingGroup()),
@@ -503,6 +581,26 @@ public final class DockGroupGameTests {
                     "港还留在被删掉的系统里");
             h.succeed();
         });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void receivingAddressNamesAreScopedByDistantNetwork(GameTestHelper h) {
+        DockGroupDirectory directory = new DockGroupDirectory();
+        UUID networkA = UUID.randomUUID();
+        UUID networkB = UUID.randomUUID();
+        String address = "主仓-" + UUID.randomUUID().toString().substring(0, 6);
+
+        DockGroup a1 = directory.resolveAddress(networkA, address);
+        DockGroup a2 = directory.resolveAddress(networkA, "  " + address + "  ");
+        DockGroup b = directory.resolveAddress(networkB, address);
+
+        h.assertTrue(a1.id().equals(a2.id()),
+                "同一个远仓网络输入相同接收地址却创建了两个内部组");
+        h.assertTrue(!a1.id().equals(b.id()),
+                "两个不同远仓网络的同名接收地址串成了同一个组");
+        h.assertTrue(a1.distantNetworkId().equals(networkA) && b.distantNetworkId().equals(networkB),
+                "自动解析的接收地址丢失了远仓网络命名空间");
+        h.succeed();
     }
 
 }

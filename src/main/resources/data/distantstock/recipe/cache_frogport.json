@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    " E ",
+    "CFC",
+    " H "
+  ],
+  "key": {
+    "E": { "item": "create:electron_tube" },
+    "C": { "item": "create:brass_casing" },
+    "F": { "item": "create:package_frogport" },
+    "H": { "item": "minecraft:chest" }
+  },
+  "result": {
+    "id": "distantstock:cache_frogport",
+    "count": 1
+  }
+}

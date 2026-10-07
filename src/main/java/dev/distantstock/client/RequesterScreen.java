@@ -5,6 +5,8 @@ import dev.distantstock.menu.RequesterMenu;
 import dev.distantstock.net.PlaceOrderC2S;
 import dev.distantstock.net.SetAddressC2S;
 import dev.distantstock.net.JoinNetworkC2S;
+import dev.distantstock.net.CreateNetworkLockS2C;
+import dev.distantstock.net.SetCreateNetworkLockC2S;
 import dev.distantstock.stock.NetworkDirectory;
 import dev.distantstock.stock.StockCache;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -20,6 +22,7 @@ import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
@@ -60,7 +63,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
      */
     private EditBox homeAddress;
     private EditBox receivingGroup;
-    private net.minecraft.client.gui.components.Button renameButton;
+    private net.minecraft.client.gui.components.Button warehouseButton;
+    private net.minecraft.client.gui.components.Button distantNetworkButton;
+    private boolean createLockVisible;
+    private boolean createLockAdmin;
+    private boolean createLocked;
     private final List<CartLine> cart = new ArrayList<>();
     /** The last name sent to the server, so closing a screen the player did not edit sends nothing. */
     private String committedGroup = "";
@@ -68,6 +75,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private int emptyTicks;
     private int successTicks;
     private boolean opened;
+    /** Tuned terminals can temporarily replace the stock view with members of their Distant network. */
+    private boolean warehousePickerOpen;
 
     public RequesterScreen(RequesterMenu menu, Inventory inv, Component title) {
         super(menu, inv, title);
@@ -75,6 +84,12 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         this.imageHeight = CreateSheets.HEADER.h + CreateSheets.FOOTER.h + CreateSheets.BODY.h * 8;
         this.inventoryLabelY = 10000;
         this.titleLabelY = 10000;
+    }
+
+    public void applyCreateNetworkLock(CreateNetworkLockS2C state) {
+        createLockVisible = state != null && state.visible();
+        createLockAdmin = state != null && state.admin();
+        createLocked = state != null && state.locked();
     }
 
     @Override
@@ -97,6 +112,20 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         search.setResponder(v -> scroll = 0);
         addWidget(search);
 
+        warehouseButton = addRenderableWidget(net.minecraft.client.gui.components.Button
+                .builder(Component.translatable("gui.distantstock.distant_network.warehouse_button"), b -> {
+                    warehousePickerOpen = !warehousePickerOpen;
+                    netScroll = 0;
+                })
+                .bounds(leftPos + 27, topPos + 20, 38, 13).build());
+        distantNetworkButton = addRenderableWidget(net.minecraft.client.gui.components.Button
+                .builder(Component.translatable("gui.distantstock.distant_network.network_button"), b -> {
+                    warehousePickerOpen = false;
+                    minecraft.setScreen(new DistantNetworkScreen(this));
+                })
+                .bounds(leftPos + WINDOW_W - 61, topPos + 20, 34, 13).build());
+        PacketDistributor.sendToServer(new SetCreateNetworkLockC2S(false, false));
+
         address = new EditBox(font, leftPos + 27, topPos + imageHeight - 36, 92, 10,
                 Component.translatable("create.gui.stock_keeper.package_address"));
         address.setBordered(false);
@@ -108,10 +137,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
 
 
-        // The field stops short of the plate's right edge so the rename button beside it has
-        // somewhere to sit: it used to hang twenty pixels off the end of the artwork, which is
-        // what "突兀且错位" was about.
-        int groupField = Math.max(60, imageWidth - 144);
+        int groupField = Math.max(60, imageWidth - 116);
 
         // 本端地址：和收货港组同一套版式的一行，紧挨在它上面。放在这里是因为它和港组回答的是
         // 同一个问题（货落在哪一边），而底下那个地址回答的是另一个（包裹在对面被谁认领）。
@@ -129,29 +155,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 Component.translatable("gui.distantstock.route.group"));
         receivingGroup.setBordered(false);
         receivingGroup.setTextColor(INK);
-        // Editable, and it starts on what this requester already carries. Typing a name nobody has
-        // used makes that system; typing one that exists points at it. One field for both, because
-        // the design has the player never see a UUID and there is nothing else to type.
+        // Editable search/selection field. Receiving addresses are authored by Distant Docks now;
+        // typing an unknown name is rejected by the server rather than silently creating a hidden
+        // group object behind the player's back.
         receivingGroup.setMaxLength(dev.distantstock.routing.DockGroup.MAX_NAME_LENGTH);
-        // Renaming needs a gesture of its own. Typing a new name and pressing Enter means "point at
-        // this", and pointing at a name nobody has used makes a new system — so without a button,
-        // renaming one is not reachable at all: it would quietly make a second system instead.
-        renameButton = addRenderableWidget(net.minecraft.client.gui.components.Button
-                .builder(net.minecraft.network.chat.Component.translatable("gui.distantstock.group.rename"),
-                        b -> commitDockGroup(dev.distantstock.net.SetDockGroupC2S.RENAME))
-                .bounds(leftPos + groupField + 84, topPos + this.imageHeight - 89, 28, 14).build());
-        // A small arrow inside the right end of the field, which opens the list of systems. Clicking
-        // the field itself still works the old way — this is for the player who would not think to.
-        addRenderableWidget(net.minecraft.client.gui.components.Button
-                .builder(Component.literal("▾"), b -> {
-                    // 箭头就是开关键：翻转它，并且跟着聚焦/失焦输入框。
-                    //
-                    // 它以前只翻标志、不碰焦点，而列表的显示条件是「有焦点 或 标志」——
-                    // 点一下输入框之后标志再怎么翻都被焦点盖住，箭头看上去就是个摆设。
-                    groupPickerOpen = !groupPickerOpen;
-                    receivingGroup.setFocused(groupPickerOpen);
-                })
-                .bounds(leftPos + 82 + groupField - 12, topPos + imageHeight - 88, 12, 12).build());
         receivingGroup.setValue(keepGroup);
         // Remember what was put in the box, so closing an untouched screen sends nothing. Without
         // this the field's contents were compared against an empty string, so every close looked
@@ -161,6 +168,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         receivingGroup.setResponder(ignore -> {
         });
         addRenderableWidget(receivingGroup);
+        if (minecraft != null && minecraft.player != null) {
+            boolean inDistantNetwork = dev.distantstock.routing.DistantNetworkDirectory.isFormalId(
+                    menu.distantNetworkId(minecraft.player));
+            warehouseButton.active = inDistantNetwork;
+        }
 
         if (!opened) {
             opened = true;
@@ -198,6 +210,22 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
      */
     private String defaultGroupName() {
         var menu = this.getMenu();
+        // The opening payload is server-authored. Once it exists, never fall back to the client's
+        // possibly stale held ItemStack: this menu has no inventory slots, so a server-side edit to
+        // the portable requester is not guaranteed to have reached the client before the next open.
+        if (menu.hasOpenedState()) {
+            String opened = menu.openedReceivingGroupName();
+            if (!opened.isBlank()) {
+                return opened;
+            }
+            if (menu.openedReceivingGroup().isEmpty()) {
+                return "";
+            }
+            // The group id is known but its name may arrive a moment later in DockGroupsS2C.
+            // Leave the field blank until that authoritative row arrives instead of resurrecting a
+            // stale local name.
+            return "";
+        }
         var stack = menu.device(this.minecraft == null ? null : this.minecraft.player);
         if (!menu.isGauge() && stack != null && !stack.isEmpty()) {
             var carried = dev.distantstock.item.RequesterData.receivingGroupName(stack);
@@ -220,9 +248,8 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     /**
      * Sends the field to the server when the player is done with it.
      *
-     * <p>On Enter and on close, not on every keystroke: the field is a name, and the server turns an
-     * unknown name into a new group. Committing per key would leave a trail of systems called "甲",
-     * "甲站", "甲站二".
+     * <p>On Enter and on close, not on every keystroke. The server resolves this against addresses
+     * already authored by Distant Docks; unknown names are never created from the terminal.
      */
     private void commitDockGroup(int action) {
         if (minecraft == null || minecraft.player == null || receivingGroup == null) {
@@ -336,20 +363,15 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
      * <p>共用是重点。以前字用一个偏移画、命中区用另一个偏移算，两者差了几像素，于是「网络…」右边
      * 那半个字落在"锁"的格子里：点它只会把小圆点换个颜色，玩家看到的就是"这个按钮没反应"。
      */
-    private static final int NET_BUTTON_W = 34;
-    private static final int LOCK_BUTTON_W = 12;
+    private static final int VIS_BUTTON_W = 12;
     private static final int DELETE_BUTTON_W = 11;
 
     private static int deleteButtonX(int x, int w) {
         return x + w - DELETE_BUTTON_W;
     }
 
-    private static int lockButtonX(int x, int w) {
-        return deleteButtonX(x, w) - LOCK_BUTTON_W;
-    }
-
-    private static int netButtonX(int x, int w) {
-        return lockButtonX(x, w) - NET_BUTTON_W;
+    private static int visibilityButtonX(int x, int w) {
+        return deleteButtonX(x, w) - VIS_BUTTON_W;
     }
 
     /** 行内的小按钮：悬停时提亮一格，没有别的装饰。命中区就是这一格。 */
@@ -430,30 +452,16 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                         : entry.mine() || entry.owner().isEmpty()
                                 ? entry.name()
                                 : entry.name() + " · " + entry.owner();
-                g.drawString(font, trim(left, netButtonX(x, w) - x - 6), x + 3, rowY + 1,
+                g.drawString(font, trim(left, visibilityButtonX(x, w) - x - 6), x + 3, rowY + 1,
                         doomed ? 0xFFFFD0D0 : here ? 0xFF9BE0C4 : INK, false);
-                // 三个小按钮各自一格，画的和点的是同一组坐标（netButtonX / lockButtonX /
-                // deleteButtonX）。以前这里的字是手写偏移、命中区也是手写偏移，两者错开了几像素：
-                // 「网络…」右边那半个字落在"锁"的命中区里，点它只会把小圆点换个颜色 —— 从玩家那边看
-                // 就是"这个按钮没反应"。同一份坐标就不可能出现这种错。
-                drawRowButton(g, netButtonX(x, w), rowY, NET_BUTTON_W,
-                        Component.translatable("gui.distantstock.net.button").getString(),
-                        mouseX, mouseY, 0xFF9BC8D8);
-                if (entry.admitted()) {
-                    String count = Integer.toString(entry.docks());
-                    g.drawString(font, count, netButtonX(x, w) - 4 - font.width(count), rowY + 1,
-                            HINT, false);
-                } else {
-                    // 没加入的开放网络：整行点下去＝加入并选中，这里先把这件事写出来。
-                    String tag = Component.translatable("gui.distantstock.net.join_short").getString();
-                    g.drawString(font, tag, netButtonX(x, w) - 4 - font.width(tag), rowY + 1,
-                            0xFF7FD8E8, false);
-                }
+                String count = Integer.toString(entry.docks());
+                g.drawString(font, count, visibilityButtonX(x, w) - 4 - font.width(count), rowY + 1,
+                        HINT, false);
                 if (entry.mine()) {
-                    // 组主才有的两个：锁，和删掉它。别人的行上没有东西可以上锁或删掉。
-                    drawRowButton(g, lockButtonX(x, w), rowY, LOCK_BUTTON_W,
-                            entry.open() ? "○" : "●", mouseX, mouseY,
-                            entry.open() ? HINT : 0xFFC0A090);
+                    // 地址所有者才有的两个：公开/不公开，以及删除。可发现性不控制投递权限。
+                    drawRowButton(g, visibilityButtonX(x, w), rowY, VIS_BUTTON_W,
+                            entry.listed() ? "公" : "隐", mouseX, mouseY,
+                            entry.listed() ? 0xFF9BE0C4 : 0xFFC0A090);
                     drawRowButton(g, deleteButtonX(x, w), rowY, DELETE_BUTTON_W, "×",
                             mouseX, mouseY, doomed ? 0xFFFFD0D0 : 0xFFC0A090);
                 }
@@ -470,11 +478,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                 // and the group keeps working for whoever else was let into it.
                 g.drawString(font, "×", x + w - 8, rowY + 1, doomed ? 0xFFFFD0D0 : 0xFFC0A090, false);
                 boolean here = receivingGroup.getValue().trim().equalsIgnoreCase(entry.name());
-                // 对面没让你用的时候整行是灰的。这一条以前根本没有：名单只在那一台服务器里判过，
-                // 而且只在指着港的时候判 —— 跨服下的单上没有玩家，对面无从判起，于是"不是我家的仓库"
-                // 一直能被选中、发出一张对方照收、然后什么都不会发生的订单。
-                int colour = !entry.admitted() ? 0xFF8A8090
-                        : doomed ? 0xFFFFD0D0 : here ? 0xFF9BE0C4 : 0xFFC8B6E8;
+                int colour = doomed ? 0xFFFFD0D0 : here ? 0xFF9BE0C4 : 0xFFC8B6E8;
                 // 港数写在名字前面。0 个港＝这个目的地没有门可以进，说在点下去之前。
                 String count = entry.docks() > 0 ? Integer.toString(entry.docks())
                         : Component.translatable("gui.distantstock.group.no_dock").getString();
@@ -532,18 +536,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
                     return true;
                 }
                 pendingForget = null;
-                if (!remote.admitted()) {
-                    // 对面没让这个人用这个组。选它只会得到一张对面照收、然后没人认领的订单 —— 对面
-                    // 判不了这件事（订单上没有玩家），所以判据是从公告带过来的那份名单，只能在这边用。
-                    // 行留着，因为"昨天还能用、今天不能了"正是本人最需要看见的那句话。
-                    minecraft.player.displayClientMessage(Component.translatable(
-                            "gui.distantstock.group.not_admitted", remote.name()), true);
-                    return true;
-                }
-                // 写进去的是「哪台服务器 · 组名」而不是光秃秃的组名。这个框决定货从哪台服务器的哪个港
-                // 出来：本服的组＝货回来，对岸的组＝货留对面，两种名字长得一样、只有颜色不同，
-                // 选错了要到货出来才发现。把服务器名写进框里，选的是什么就一直看得见。
-                String name = remote.display();
+                // 地址名在远仓网络内唯一；服务器标签只用于列表里告诉玩家它当前在哪个节点，
+                // 不再写进逻辑地址本身。
+                String name = remote.name();
                 receivingGroup.setValue(name);
                 committedGroup = name;
                 net.neoforged.neoforge.network.PacketDistributor.sendToServer(
@@ -558,8 +553,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             // asks, the second does it. The command has asked the same question since it shipped;
             // this is the same question in the place the player actually is.
             int deleteX = deleteButtonX(x, w);
-            int lockX = lockButtonX(x, w);
-            int netX = netButtonX(x, w);
+            int visibilityX = visibilityButtonX(x, w);
             if (entry.mine() && mx >= deleteX) {
                 if (entry.name().equals(pendingDelete)) {
                     pendingDelete = null;
@@ -573,27 +567,14 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             }
             pendingDelete = null;
             pendingForget = null;
-            if (entry.mine() && mx >= lockX && mx < deleteX) {
+            if (entry.mine() && mx >= visibilityX && mx < deleteX) {
                 net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                         new dev.distantstock.net.SetDockGroupC2S(entry.name(),
-                                dev.distantstock.net.SetDockGroupC2S.TOGGLE_OPEN));
-                return true;
-            }
-            if (mx >= netX && mx < lockX) {
-                openGroup(entry);
+                                dev.distantstock.net.SetDockGroupC2S.TOGGLE_VISIBILITY));
                 return true;
             }
             receivingGroup.setValue(entry.name());
             committedGroup = entry.name();
-            if (!entry.admitted()) {
-                // 没加入的网络：点它＝加入它，并且选它。这就是运输蜂停泊港的「添加你自己」，
-                // 只是发生在你想用它的时候 —— 一个开着却没人在的网络，本来就是在等这句话。
-                //
-                // 两个包按顺序发：服务器按收到的顺序处理，加入先落地，后面那个选中才认得这个组。
-                net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-                        new dev.distantstock.net.GroupMemberC2S(entry.name(), "",
-                                dev.distantstock.net.GroupMemberC2S.JOIN));
-            }
             net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                     new dev.distantstock.net.SetDockGroupC2S(entry.name(),
                             dev.distantstock.net.SetDockGroupC2S.SELECT));
@@ -601,24 +582,6 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             return true;
         }
         return false;
-    }
-
-    /**
-     * Opens the page for a group, in place of this screen.
-     *
-     * <p>It used to be an overlay drawn on top of the list: 136 pixels wide, with room for one name
-     * and one field. Everything that screen is for — who else may use this, add somebody, join,
-     * leave, lock it — did not fit, so half of it did not exist and the rest was one row tall. It is
-     * a screen of its own now, shaped like the 运输蜂停泊港's network page, and this is the door to it.
-     */
-    private void openGroup(dev.distantstock.net.DockGroupsS2C.Entry entry) {
-        groupPickerOpen = false;
-        pendingDelete = null;
-        pendingForget = null;
-        if (receivingGroup != null) {
-            receivingGroup.setFocused(false);
-        }
-        minecraft.setScreen(new DockGroupScreen(this, entry));
     }
 
     /**
@@ -630,6 +593,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     private java.util.UUID carriedGroupId() {
         if (minecraft == null || minecraft.player == null) {
             return dev.distantstock.routing.DockGroupDirectory.DEFAULT_GROUP_ID;
+        }
+        if (getMenu().hasOpenedState()) {
+            return getMenu().openedReceivingGroup()
+                    .orElse(dev.distantstock.routing.DockGroupDirectory.DEFAULT_GROUP_ID);
         }
         // A desk's group lives in the block, and the list the server sent is the only thing on the
         // client that knows it. Reading the held item here would answer with the group of whatever
@@ -693,8 +660,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         }
         List<StockCache.Entry> out = new ArrayList<>();
         for (StockCache.Entry e : all) {
+            ItemStack stack = e.stack();
             if (e.itemId.toLowerCase(Locale.ROOT).contains(q)
-                    || e.stack().getHoverName().getString().toLowerCase(Locale.ROOT).contains(q)) {
+                    || (!stack.isEmpty()
+                    && stack.getHoverName().getString().toLowerCase(Locale.ROOT).contains(q))) {
                 out.add(e);
             }
         }
@@ -713,23 +682,55 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
         boolean tuned = menu.tuned(minecraft.player);
-        search.setVisible(tuned);
-        address.setVisible(tuned);
-        homeAddress.setVisible(tuned);
-        receivingGroup.setVisible(tuned);
-        if (renameButton != null) {
-            renameButton.visible = tuned;
+        boolean inDistantNetwork = dev.distantstock.routing.DistantNetworkDirectory.isFormalId(
+                menu.distantNetworkId(minecraft.player));
+        boolean routeVisible = tuned && !warehousePickerOpen;
+        search.setVisible(routeVisible);
+        address.setVisible(routeVisible);
+        homeAddress.setVisible(routeVisible);
+        receivingGroup.setVisible(routeVisible);
+        if (warehouseButton != null) {
+            warehouseButton.visible = inDistantNetwork;
+            warehouseButton.setMessage(Component.translatable(warehousePickerOpen
+                    ? "gui.distantstock.distant_network.back"
+                    : "gui.distantstock.distant_network.warehouse_button"));
+        }
+        if (distantNetworkButton != null) {
+            distantNetworkButton.visible = !warehousePickerOpen;
         }
         renderBackground(g, mouseX, mouseY, partial);
         super.render(g, mouseX, mouseY, partial);
         // After everything, because a dropdown that the widgets behind it paint over is not one.
         drawGroupList(g, mouseX, mouseY);
-        ItemStack hover = hoveredStock(mouseX, mouseY);
+        StockCache.Entry hoveredEntry = hoveredStockEntry(mouseX, mouseY);
+        ItemStack hover = hoveredEntry == null ? ItemStack.EMPTY : hoveredEntry.stack();
         if (hover.isEmpty()) {
             hover = hoveredCart(mouseX, mouseY);
         }
-        if (!hover.isEmpty()) {
+        if (hoveredEntry != null && !compatible(hoveredEntry)) {
+            g.renderComponentTooltip(font, List.of(
+                    Component.translatable("gui.distantstock.item.incompatible")
+                            .withStyle(ChatFormatting.RED),
+                    Component.literal(hoveredEntry.itemId)
+                            .withStyle(ChatFormatting.GRAY)
+            ), mouseX, mouseY);
+        } else if (!hover.isEmpty()) {
             g.renderTooltip(font, hover, mouseX, mouseY);
+        } else if (createLockHovered(mouseX, mouseY)) {
+            // Match Create's StockKeeperRequestScreen verbatim in meaning and presentation.  This
+            // is Create's network lock, so inventing a Distant Stock text button here only made the
+            // control look like a different feature (and the wording "from here" was misleading).
+            g.renderComponentTooltip(font, List.of(
+                    Component.translatable(createLocked
+                            ? "create.gui.stock_keeper.network_locked"
+                            : "create.gui.stock_keeper.network_open"),
+                    Component.translatable("create.gui.stock_keeper.network_lock_tip")
+                            .withStyle(ChatFormatting.GRAY),
+                    Component.translatable("create.gui.stock_keeper.network_lock_tip_1")
+                            .withStyle(ChatFormatting.GRAY),
+                    Component.translatable("create.gui.stock_keeper.network_lock_tip_2")
+                            .withStyle(ChatFormatting.DARK_GRAY, ChatFormatting.ITALIC)
+            ), mouseX, mouseY);
         } else if (address.getValue().isBlank() && !address.isFocused() && address.isHovered()) {
             g.renderComponentTooltip(font, List.of(
                     Component.translatable("create.gui.factory_panel.restocker_address"),
@@ -754,7 +755,13 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
         Component title = Component.translatable("gui.distantstock.title");
         g.drawString(font, title, x + WINDOW_W / 2 - font.width(title) / 2, y + 4, TITLE, false);
-        if (!menu.tuned(minecraft.player)) {
+        if (showCreateLock()) {
+            (createLocked
+                    ? com.simibubi.create.foundation.gui.AllGuiTextures.STOCK_KEEPER_REQUEST_LOCKED
+                    : com.simibubi.create.foundation.gui.AllGuiTextures.STOCK_KEEPER_REQUEST_UNLOCKED)
+                    .render(g, createLockX(), createLockY());
+        }
+        if (!menu.tuned(minecraft.player) || warehousePickerOpen) {
             renderNetworks(g, x, y);
             return;
         }
@@ -893,7 +900,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             ms.pushPose();
             ms.translate(sx, sy, 0);
             CreateSheets.SLOT.render(g, 0, 0);
-            renderEntry(g, e.stack(), e.count,
+            renderEntry(g, displayStack(e), remainingFor(e),
                     mouseX >= sx && mouseX < sx + SLOT && mouseY >= sy && mouseY < sy + SLOT);
             ms.popPose();
         }
@@ -967,9 +974,22 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     }
 
     private void renderNetworks(GuiGraphics g, int x, int y) {
-        Component heading = Component.translatable("gui.distantstock.networks");
+        java.util.UUID scope = minecraft == null || minecraft.player == null
+                ? null : menu.distantNetworkId(minecraft.player);
+        Component heading = Component.translatable("gui.distantstock.networks.members");
         g.drawString(font, heading, x + WINDOW_W / 2 - font.width(heading) / 2, y + 25, INK, false);
-        if (menu.networks.isEmpty()) {
+        if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope)) {
+            Component empty = Component.translatable("gui.distantstock.networks.join_first");
+            java.util.List<FormattedCharSequence> lines = font.split(empty, 164);
+            for (int i = 0; i < lines.size(); i++) {
+                FormattedCharSequence line = lines.get(i);
+                g.drawString(font, line, x + WINDOW_W / 2 - font.width(line) / 2,
+                        y + 54 + i * 11, INK, false);
+            }
+            return;
+        }
+        List<NetworkDirectory.Entry> choices = networkChoices();
+        if (choices.isEmpty()) {
             Component empty = Component.translatable("gui.distantstock.networks.empty");
             for (int i = 0; i < font.split(empty, 164).size(); i++) {
                 FormattedCharSequence line = font.split(empty, 164).get(i);
@@ -979,35 +999,37 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             return;
         }
         int rows = networkRows();
-        netScroll = Mth.clamp(netScroll, 0, Math.max(0, menu.networks.size() - rows));
-        int shown = Math.min(menu.networks.size() - netScroll, rows);
+        netScroll = Mth.clamp(netScroll, 0, Math.max(0, choices.size() - rows));
+        int shown = Math.min(choices.size() - netScroll, rows);
         for (int i = 0; i < shown; i++) {
-            NetworkDirectory.Entry entry = menu.networks.get(netScroll + i);
+            NetworkDirectory.Entry entry = choices.get(netScroll + i);
             int ry = y + 42 + i * 22;
             // The two servers are drawn apart, because a player has to know which warehouse they
             // are pointing at before they point at it, and both halves send an alias they chose.
             g.fill(x + 25, ry, x + WINDOW_W - 25, ry + 18, entry.local() ? 0x33FFFFFF : 0x33403060);
             g.fill(x + 25, ry + 17, x + WINDOW_W - 25, ry + 18, 0xFFB89C78);
-            String label = entry.local() || entry.networkId() == null
-                    ? entry.server()
-                    : entry.networkId().shortLabel() + "·" + entry.server();
+            String label = entry.warehouseName().isBlank()
+                    ? Component.translatable("gui.distantstock.warehouse.unnamed").getString()
+                    : entry.warehouseName();
             // 发不出货的网络整行都淡下去。这条是玩家报的那个"下单成功然后石沉大海"：对面服务器有这张
             // 网络、也在公告里报了它，可是对面没有任何一台远仓打包机挂在它下面 —— 订单发过去、
             // 对方收下、然后没有东西会把它打成包裹。两端都没有报错，因为两端都没做错事。
             int faded = entry.packable() ? 0xFF : 0x66;
             g.drawString(font, label, x + 31, ry + 3,
                     blend(entry.local() ? INK : 0xFFC8B6E8, faded), false);
-            String id = entry.freq().toString().substring(0, 8);
-            g.drawString(font, id, x + 31, ry + 10, blend(0x3A7774, faded), false);
+            String location = entry.local()
+                    ? Component.translatable("gui.distantstock.local").getString()
+                    : entry.server();
+            g.drawString(font, location, x + 31, ry + 10, blend(0x3A7774, faded), false);
             Component links = entry.packable()
                     ? Component.translatable("gui.distantstock.networks.links", entry.links())
                     : Component.translatable("gui.distantstock.networks.nopacker");
             g.drawString(font, links, x + WINDOW_W - 31 - font.width(links), ry + 6,
                     entry.packable() ? TITLE : 0xFFC08080, false);
         }
-        if (menu.networks.size() > rows) {
+        if (choices.size() > rows) {
             Component more = Component.translatable("gui.distantstock.networks.more",
-                    netScroll + shown, menu.networks.size());
+                    netScroll + shown, choices.size());
             g.drawString(font, more, x + WINDOW_W - 27 - font.width(more), y + imageHeight - 118,
                     HINT, false);
         }
@@ -1015,6 +1037,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
     private int networkRows() {
         return Math.max(1, (imageHeight - 96) / 22);
+    }
+
+    /** The server already filtered this to members of the terminal's Distant Stock network. */
+    private List<NetworkDirectory.Entry> networkChoices() {
+        return List.copyOf(menu.networks);
     }
 
     /**
@@ -1035,9 +1062,10 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
     }
 
     private int networkIndex(double mx, double my) {
-        if (menu.tuned(minecraft.player)) {
+        if (menu.tuned(minecraft.player) && !warehousePickerOpen) {
             return -1;
         }
+        List<NetworkDirectory.Entry> choices = networkChoices();
         int x = leftPos;
         int y = topPos;
         if (mx < x + 25 || mx >= x + WINDOW_W - 25 || my < y + 42) {
@@ -1045,7 +1073,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         }
         int index = (int) ((my - y - 42) / 22) + netScroll;
         int rowY = y + 42 + (index - netScroll) * 22;
-        return index >= 0 && index < menu.networks.size() && index - netScroll < networkRows()
+        return index >= 0 && index < choices.size() && index - netScroll < networkRows()
                 && my < rowY + 18 ? index : -1;
     }
 
@@ -1054,14 +1082,23 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (groupListClick(mx, my)) {
             return true;
         }
+        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && createLockHovered(mx, my)) {
+            // Create's own screen flips immediately and lets the server-authoritative packet correct
+            // it if necessary.  Do the same so this control feels exactly like the native one.
+            createLocked = !createLocked;
+            PacketDistributor.sendToServer(new SetCreateNetworkLockC2S(true, createLocked));
+            uiSound(SoundEvents.UI_BUTTON_CLICK.value(), 1f, 1f);
+            return true;
+        }
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
             focusTheRowUnder(mx, my);
         }
         int network = networkIndex(mx, my);
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT && network >= 0) {
-            NetworkDirectory.Entry entry = menu.networks.get(network);
+            NetworkDirectory.Entry entry = networkChoices().get(network);
             menu.selectedFreq = entry.freq();
             PacketDistributor.sendToServer(new JoinNetworkC2S(entry.freq(), entry.networkId()));
+            warehousePickerOpen = false;
             uiSound(SoundEvents.UI_BUTTON_CLICK.value(), 1f, 1.1f);
             return true;
         }
@@ -1090,12 +1127,40 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             removeCart(cartAt, rmb ? 1 : cart.get(cartAt).count);
             return true;
         }
-        ItemStack hit = hoveredStock((int) mx, (int) my);
+        StockCache.Entry stockHit = hoveredStockEntry((int) mx, (int) my);
+        ItemStack hit = stockHit == null ? ItemStack.EMPTY : stockHit.stack();
+        if (stockHit != null && !compatible(stockHit)) {
+            // The barrier is deliberately informational only. The target server cannot materialise
+            // this registry id, so do not let it enter the order cart in the first place.
+            return true;
+        }
         if (!hit.isEmpty()) {
             addCart(hit, amount(rmb));
             return true;
         }
         return super.mouseClicked(mx, my, button);
+    }
+
+    /** Create draws this as a 15x15 texture, not a vanilla text button. */
+    private boolean showCreateLock() {
+        return createLockVisible && createLockAdmin && !warehousePickerOpen;
+    }
+
+    private int createLockX() {
+        // The Distant Network button occupies Create's original x+186 slot on this derived header,
+        // so keep the native 15x15 artwork but move it to the otherwise-empty right margin.
+        return leftPos + WINDOW_W - 23;
+    }
+
+    private int createLockY() {
+        return topPos + 18;
+    }
+
+    private boolean createLockHovered(double mx, double my) {
+        if (!showCreateLock()) return false;
+        int x = createLockX();
+        int y = createLockY();
+        return mx > x && mx <= x + 15 && my > y && my <= y + 15;
     }
 
     @Override
@@ -1104,10 +1169,12 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             scroll = Mth.clamp(scroll - (int) Math.signum(sy), 0, maxScroll());
             return true;
         }
-        if (!menu.tuned(minecraft.player) && mx >= leftPos + 25 && mx < leftPos + WINDOW_W - 25
+        if ((!menu.tuned(minecraft.player) || warehousePickerOpen)
+                && mx >= leftPos + 25 && mx < leftPos + WINDOW_W - 25
                 && my >= topPos + 42) {
+            int choices = networkChoices().size();
             netScroll = Mth.clamp(netScroll - (int) Math.signum(sy), 0,
-                    Math.max(0, menu.networks.size() - networkRows()));
+                    Math.max(0, choices - networkRows()));
             return true;
         }
         return super.mouseScrolled(mx, my, sx, sy);
@@ -1224,7 +1291,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (cart.isEmpty()) {
             return;
         }
-        // The dual-address transport is not implemented yet: never silently discard an entered route.
+        // Address/home-address are synchronised to the server as the fields change. The order packet
+        // only needs the cart and destination group; its handler reads both addresses back from the
+        // authoritative RequesterMenu state so a stale client packet cannot overwrite either one.
         List<PlaceOrderC2S.Line> lines = new ArrayList<>();
         for (CartLine line : cart) {
             lines.add(new PlaceOrderC2S.Line(BuiltInRegistries.ITEM.getKey(line.stack.getItem()).toString(), line.count));
@@ -1257,6 +1326,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         if (n <= 0) {
             return;
         }
+        int remaining = Math.max(0, availableFor(stack) - selectedFor(stack));
+        n = Math.min(n, remaining);
+        if (n <= 0) {
+            return;
+        }
         for (CartLine line : cart) {
             if (ItemStack.isSameItemSameComponents(line.stack, stack)) {
                 line.count += n;
@@ -1269,6 +1343,29 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         cart.add(new CartLine(stack.copyWithCount(1), n));
         uiSound(SoundEvents.WOOL_STEP, 0.75f, 1.2f);
         uiSound(SoundEvents.BAMBOO_WOOD_STEP, 0.75f, 0.8f);
+    }
+
+    private int selectedFor(ItemStack stack) {
+        int selected = 0;
+        for (CartLine line : cart) {
+            if (ItemStack.isSameItemSameComponents(line.stack, stack)) {
+                selected += line.count;
+            }
+        }
+        return selected;
+    }
+
+    private int availableFor(ItemStack stack) {
+        for (StockCache.Entry entry : menu.stock) {
+            if (ItemStack.isSameItemSameComponents(entry.stack(), stack)) {
+                return Math.max(0, entry.count);
+            }
+        }
+        return 0;
+    }
+
+    private int remainingFor(StockCache.Entry entry) {
+        return Math.max(0, entry.count - selectedFor(entry.stack()));
     }
 
     private void removeCart(int index, int n) {
@@ -1287,9 +1384,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
         return mx >= cx && mx < cx + 78 && my >= cy && my < cy + 18;
     }
 
-    private ItemStack hoveredStock(int mx, int my) {
+    private StockCache.Entry hoveredStockEntry(int mx, int my) {
         if (my < topPos + 16 || my > topPos + imageHeight - 132) {
-            return ItemStack.EMPTY;
+            return null;
         }
         List<StockCache.Entry> list = filtered();
         int start = scroll * COLS;
@@ -1304,10 +1401,21 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             int sx = ix + (i % COLS) * CELL;
             int sy = iy + (i / COLS) * CELL;
             if (mx >= sx && mx < sx + SLOT && my >= sy && my < sy + SLOT) {
-                return list.get(idx).stack();
+                return list.get(idx);
             }
         }
-        return ItemStack.EMPTY;
+        return null;
+    }
+
+    private static boolean compatible(StockCache.Entry entry) {
+        if (entry == null) return false;
+        var id = net.minecraft.resources.ResourceLocation.tryParse(entry.itemId);
+        return id != null && BuiltInRegistries.ITEM.containsKey(id)
+                && BuiltInRegistries.ITEM.get(id) != Items.AIR;
+    }
+
+    private static ItemStack displayStack(StockCache.Entry entry) {
+        return compatible(entry) ? entry.stack() : new ItemStack(Items.BARRIER);
     }
 
     private int cartIndex(int mx, int my) {

@@ -2,6 +2,7 @@ package dev.distantstock.server;
 
 import dev.distantstock.DistantStock;
 import dev.distantstock.block.LoadedDocks;
+import dev.distantstock.event.AlarmSampler;
 import dev.distantstock.config.StockConfig;
 import dev.distantstock.link.LinkQueues;
 import dev.distantstock.link.LinkServer;
@@ -9,6 +10,8 @@ import dev.distantstock.link.LinkSnapshot;
 import dev.distantstock.link.OrderService;
 import dev.distantstock.link.PackagePump;
 import dev.distantstock.link.PackageStripService;
+import dev.distantstock.link.PackageTraceService;
+import dev.distantstock.link.ProtocolHelloService;
 import dev.distantstock.link.ParcelEscrowPump;
 import dev.distantstock.link.TranserverBridge;
 import dev.distantstock.link.TranserverPackageService;
@@ -21,6 +24,9 @@ import dev.distantstock.stock.StockScanner;
 import dev.distantstock.routing.WorldIdentity;
 import dev.distantstock.link.NetworkAnnouncementService;
 import dev.distantstock.link.TranserverStockService;
+import dev.distantstock.link.DistantNetworkJoinService;
+import dev.distantstock.link.DistantNetworkDeleteService;
+import dev.distantstock.link.ReceiverProbeService;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -52,8 +58,13 @@ public final class GameClock {
             TranserverPackageService.register();
             TranserverOrderService.register();
             PackageStripService.register();
+            PackageTraceService.register();
+            ProtocolHelloService.register();
             NetworkAnnouncementService.register();
             TranserverStockService.register();
+            DistantNetworkJoinService.register();
+            DistantNetworkDeleteService.register();
+            ReceiverProbeService.register();
             TranserverBridge.start(e.getServer());
             LOG.info("[DistantStock] Transerver channels registered, bridge started");
         }
@@ -66,7 +77,13 @@ public final class GameClock {
 
     @SubscribeEvent
     public static void stopping(ServerStoppingEvent e) {
+        AlarmSampler.stop();
+        dev.distantstock.diagnostics.ChainDiagnostics.stop();
+        dev.distantstock.block.TowerCasingBlock.clearWindowRipples();
         if (transerverActive) {
+            DistantNetworkJoinService.stop();
+            ReceiverProbeService.stop();
+            ProtocolHelloService.stop();
             TranserverBridge.stop();
         }
         if (legacyActive) {
@@ -102,27 +119,43 @@ public final class GameClock {
             dev.distantstock.block.LoadedDocks.forget(level);
             dev.distantstock.block.LoadedTowers.forget(level);
             dev.distantstock.block.LoadedDevices.forget(level);
+            dev.distantstock.diagnostics.ChainDiagnostics.forget(level);
+            dev.distantstock.block.TowerCasingBlock.forgetWindowRipples(level);
         }
     }
 
     @SubscribeEvent
     public static void tick(ServerTickEvent.Post e) {
         ticks++;
+        dev.distantstock.block.TowerCasingBlock.tickWindowRipples(e.getServer());
         LinkSnapshot.tickLocal(e.getServer());
         // 塔的地基：激活快照每秒重算一次（港每 tick 都要读），区块票每 tick 处理队列、每 20 tick 对齐。
         // The activation snapshot is what canSend/canReceive read, and the ticket queue is drained
         // every tick so a broken tower releases its chunks promptly rather than at the next beat.
         TowerActivation.tick(e.getServer());
         TowerChunkLoader.tick(e.getServer());
+        dev.distantstock.diagnostics.ChainDiagnostics.tick(e.getServer());
 
         if (transerverActive) {
-            TranserverBridge.tick();
+            // Transerver status() is not a cheap in-memory getter in the current runtime: it
+            // computes queue depths by listing the on-disk message-store directories. Calling it
+            // every server tick turns a large outbox into repeated full directory scans. One
+            // status refresh per second is plenty for diagnostics/UI and keeps the hot tick path
+            // off disk.
+            if (ticks % 20 == 0) {
+                TranserverBridge.tick();
+            }
             if (ticks % 10 == 0) {
                 ParcelEscrowPump.tick(e.getServer());
                 TranserverOrderService.tick(e.getServer());
             }
             if (ticks % 20 == 0) {
+                PackageTraceService.acknowledgeCompleted();
+                ProtocolHelloService.publish();
                 NetworkAnnouncementService.publish();
+                DistantNetworkJoinService.tick(e.getServer());
+                DistantNetworkDeleteService.tick();
+                ReceiverProbeService.tick();
             }
             if (ticks % 40 == 0) {
                 TranserverStockService.tick();
@@ -132,6 +165,7 @@ public final class GameClock {
         // 一秒一次，和 Create 自己那份近似汇总的刷新节拍一致（见 CreateStock.summary）：
         // 更快没有意义（读到的还是同一份缓存），更慢则让终端里的库存显得迟钝。
         if (ticks % 20 == 0) {
+            AlarmSampler.tick(e.getServer(), transerverActive);
             StockScanner.scan(e.getServer());
         }
 
@@ -139,7 +173,8 @@ public final class GameClock {
             for (ServerPlayer player : e.getServer().getPlayerList().getPlayers()) {
                 if (player.containerMenu instanceof RequesterMenu menu) {
                     menu.refresh(player);
-                    PacketDistributor.sendToPlayer(player, StockSyncS2C.of(menu.demo, menu.stock));
+                    PacketDistributor.sendToPlayer(player, StockSyncS2C.of(
+                            menu.demo, menu.stock, menu.distantNetworkId(player)));
                 }
             }
         }

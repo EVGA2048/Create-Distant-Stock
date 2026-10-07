@@ -38,6 +38,216 @@ import java.util.UUID;
 @GameTestHolder("distantstock")
 @PrefixGameTestTemplate(false)
 public final class SignalLampGameTests {
+
+
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void remoteGaugeBindingSurvivesReloadAndLocalRetune(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.REMOTE_GAUGE.get().defaultBlockState(), 3);
+        var gauge = (RemoteGaugeBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(gauge != null, "远仓仪表没有方块实体");
+
+        FactoryPanelBlock.PanelSlot slot = FactoryPanelBlock.PanelSlot.TOP_LEFT;
+        UUID localA = UUID.randomUUID();
+        UUID localB = UUID.randomUUID();
+        h.assertTrue(gauge.addPanel(slot, localA), "测试夹具无法创建远仓仪表面板");
+
+        UUID scope = UUID.randomUUID();
+        UUID group = UUID.randomUUID();
+        var source = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA,
+                UUID.randomUUID(), UUID.randomUUID(),
+                level.dimension().location().toString(), UUID.randomUUID());
+        gauge.bind(slot, new RemoteBinding(source, scope, group, "远端收货口", "本端回流口"));
+        gauge.setDistantNetworkScope(slot, scope);
+
+        CompoundTag saved = gauge.saveWithoutMetadata(level.registryAccess());
+        level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
+        level.setBlock(pos, ModBlocks.REMOTE_GAUGE.get().defaultBlockState(), 3);
+        var reloaded = (RemoteGaugeBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(reloaded != null && reloaded != gauge, "重载后远仓仪表没有重建");
+        reloaded.loadWithComponents(saved, level.registryAccess());
+
+        RemoteBinding beforeRetune = reloaded.binding(slot);
+        h.assertTrue(beforeRetune != null, "远仓仪表重载后丢了远端 binding");
+        h.assertTrue(source.equals(beforeRetune.network())
+                        && scope.equals(beforeRetune.distantNetworkId())
+                        && group.equals(beforeRetune.receivingGroup())
+                        && "远端收货口".equals(beforeRetune.address())
+                        && "本端回流口".equals(beforeRetune.homeAddress()),
+                "远仓仪表重载后 binding 内容发生变化：" + beforeRetune);
+        h.assertTrue(scope.equals(reloaded.distantNetworkScope(slot)),
+                "远仓仪表重载后丢了独立 Distant Stock scope");
+
+        reloaded.panels.get(slot).setNetwork(localB);
+        RemoteBinding afterRetune = reloaded.binding(slot);
+        h.assertTrue(localB.equals(reloaded.panels.get(slot).network),
+                "重新调谐没有更新远仓仪表的本地 Create 网络");
+        h.assertTrue(beforeRetune.equals(afterRetune),
+                "重新调谐本地 Create 网络时误删/改写了远端仓库 binding");
+        h.assertTrue(scope.equals(reloaded.distantNetworkScope(slot)),
+                "重新调谐本地 Create 网络时误删了 Distant Stock scope");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void removedRemoteGaugeSlotDoesNotLeakBindingIntoReplacement(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.REMOTE_GAUGE.get().defaultBlockState(), 3);
+        var gauge = (RemoteGaugeBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(gauge != null, "远仓仪表没有方块实体");
+
+        FactoryPanelBlock.PanelSlot slot = FactoryPanelBlock.PanelSlot.TOP_LEFT;
+        FactoryPanelBlock.PanelSlot keep = FactoryPanelBlock.PanelSlot.TOP_RIGHT;
+        h.assertTrue(gauge.addPanel(slot, UUID.randomUUID()), "无法创建待移除远仓仪表面板");
+        h.assertTrue(gauge.addPanel(keep, UUID.randomUUID()), "无法创建保留面板");
+
+        UUID scope = UUID.randomUUID();
+        UUID group = UUID.randomUUID();
+        var source = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA,
+                UUID.randomUUID(), UUID.randomUUID(),
+                level.dimension().location().toString(), UUID.randomUUID());
+        gauge.bind(slot, new RemoteBinding(source, scope, group, "旧远端地址", "旧本端地址"));
+        gauge.setDistantNetworkScope(slot, scope);
+
+        h.assertTrue(gauge.removePanel(slot), "移除远仓仪表面板失败");
+        h.assertTrue(gauge.binding(slot) == null && gauge.distantNetworkScope(slot) == null,
+                "被拆掉的远仓仪表面板留下了 binding/scope");
+
+        h.assertTrue(gauge.addPanel(slot, UUID.randomUUID()), "无法在原槽位安装新面板");
+        h.assertTrue(gauge.binding(slot) == null && gauge.distantNetworkScope(slot) == null,
+                "新装到原槽位的远仓仪表继承了上一块面板的幽灵配置");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void removedRemoteGaugeFromSignalPanelDoesNotLeakBinding(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.SIGNAL_PANEL.get().defaultBlockState(), 3);
+        var panel = (SignalPanelBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(panel != null, "信号面板没有方块实体");
+
+        FactoryPanelBlock.PanelSlot slot = FactoryPanelBlock.PanelSlot.BOTTOM_LEFT;
+        FactoryPanelBlock.PanelSlot keep = FactoryPanelBlock.PanelSlot.BOTTOM_RIGHT;
+        h.assertTrue(panel.addPanel(slot, UUID.randomUUID()), "无法创建混合板远仓仪表槽");
+        h.assertTrue(panel.addPanel(keep, UUID.randomUUID()), "无法创建混合板保留槽");
+        panel.setRemoteGauge(slot, true);
+
+        UUID scope = UUID.randomUUID();
+        UUID group = UUID.randomUUID();
+        var source = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA,
+                UUID.randomUUID(), UUID.randomUUID(),
+                level.dimension().location().toString(), UUID.randomUUID());
+        panel.bind(slot, new RemoteBinding(source, scope, group, "旧远端地址", "旧本端地址"));
+        panel.setDistantNetworkScope(slot, scope);
+
+        h.assertTrue(panel.removePanel(slot), "移除混合板远仓仪表失败");
+        h.assertTrue(!panel.isRemoteGauge(slot) && panel.binding(slot) == null
+                        && panel.distantNetworkScope(slot) == null,
+                "混合板移除远仓仪表后留下了类型/binding/scope");
+
+        h.assertTrue(panel.addPanel(slot, UUID.randomUUID()), "无法在混合板原槽位安装新面板");
+        panel.setRemoteGauge(slot, true);
+        h.assertTrue(panel.binding(slot) == null && panel.distantNetworkScope(slot) == null,
+                "混合板新装远仓仪表继承了上一块面板的幽灵配置");
+        h.succeed();
+    }
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void remoteGaugeMayBePlacedBeforeLocalCreateTuning(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos wall = h.absolutePos(new BlockPos(2, 2, 3));
+        level.setBlock(wall, Blocks.STONE.defaultBlockState(), 3);
+        Vec3 hit = Vec3.atLowerCornerOf(wall).add(.5, .5, 0);
+        player.setPos(hit.x, hit.y - player.getEyeHeight(), hit.z - 2);
+
+        ItemStack gauge = new ItemStack(ModItems.REMOTE_GAUGE.get(), 2);
+        h.assertFalse(LogisticallyLinkedBlockItem.isTuned(gauge),
+                "fresh remote gauge unexpectedly starts Create-tuned");
+        player.setItemInHand(InteractionHand.MAIN_HAND, gauge);
+        var result = gauge.getItem().useOn(new UseOnContext(player, InteractionHand.MAIN_HAND,
+                new BlockHitResult(hit, Direction.NORTH, wall, false)));
+        h.assertTrue(result.consumesAction(), "untuned remote gauge refused placement");
+
+        BlockPos placed = wall.north();
+        h.assertTrue(level.getBlockEntity(placed) instanceof RemoteGaugeBlockEntity,
+                "untuned remote gauge placed the wrong block entity");
+        var board = (RemoteGaugeBlockEntity) level.getBlockEntity(placed);
+        h.assertTrue(board.activePanels() == 1, "fresh remote gauge did not create exactly one panel");
+        var active = board.panels.values().stream().filter(FactoryPanelBehaviour::isActive).findFirst().orElse(null);
+        h.assertTrue(active != null, "placed remote gauge has no active panel");
+        h.assertTrue(RemoteGaugeBlockEntity.UNCONFIGURED_LOCAL_NETWORK.equals(active.network),
+                "untuned remote gauge did not keep the explicit unconfigured-local-network state");
+        h.assertTrue(gauge.getCount() == 1, "untuned remote gauge placement consumed the wrong amount");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void tunedRemoteGaugeKeepsItsLocalCreateNetworkOnPlacement(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos wall = h.absolutePos(new BlockPos(2, 2, 3));
+        level.setBlock(wall, Blocks.STONE.defaultBlockState(), 3);
+        Vec3 hit = Vec3.atLowerCornerOf(wall).add(.5, .5, 0);
+        player.setPos(hit.x, hit.y - player.getEyeHeight(), hit.z - 2);
+
+        UUID freq = UUID.randomUUID();
+        ItemStack gauge = new ItemStack(ModItems.REMOTE_GAUGE.get(), 2);
+        CompoundTag data = new CompoundTag();
+        data.putUUID("Freq", freq);
+        gauge.set(DataComponents.BLOCK_ENTITY_DATA, CustomData.of(data));
+        h.assertTrue(LogisticallyLinkedBlockItem.isTuned(gauge), "test remote gauge was not Create-tuned");
+        player.setItemInHand(InteractionHand.MAIN_HAND, gauge);
+        var result = gauge.getItem().useOn(new UseOnContext(player, InteractionHand.MAIN_HAND,
+                new BlockHitResult(hit, Direction.NORTH, wall, false)));
+        h.assertTrue(result.consumesAction(), "tuned remote gauge refused placement");
+
+        var board = (RemoteGaugeBlockEntity) level.getBlockEntity(wall.north());
+        h.assertTrue(board != null, "tuned remote gauge did not place");
+        var active = board.panels.values().stream().filter(FactoryPanelBehaviour::isActive).findFirst().orElse(null);
+        h.assertTrue(active != null, "tuned remote gauge has no active panel");
+        h.assertTrue(freq.equals(active.network), "tuned remote gauge lost its local Create network");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void placedRemoteGaugeCanBeCreateTunedAfterwards(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos.south(), Blocks.STONE.defaultBlockState(), 3);
+        BlockState state = ModBlocks.REMOTE_GAUGE.get().defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH);
+        level.setBlock(pos, state, 3);
+        var board = (RemoteGaugeBlockEntity) level.getBlockEntity(pos);
+        var slot = FactoryPanelBlock.PanelSlot.BOTTOM_LEFT;
+        board.addPanel(slot, RemoteGaugeBlockEntity.UNCONFIGURED_LOCAL_NETWORK);
+        board.panels.get(slot).setNetwork(RemoteGaugeBlockEntity.UNCONFIGURED_LOCAL_NETWORK);
+
+        UUID freq = UUID.randomUUID();
+        ItemStack tuned = new ItemStack(ModItems.REMOTE_GAUGE.get(), 2);
+        CompoundTag data = new CompoundTag();
+        data.putUUID("Freq", freq);
+        tuned.set(DataComponents.BLOCK_ENTITY_DATA, CustomData.of(data));
+        player.setItemInHand(InteractionHand.MAIN_HAND, tuned);
+        Vec3 hit = hitForSlot(pos, state, slot);
+        h.assertTrue(hit != null, "no hit position maps to the remote gauge slot");
+        GaugePlacementEvents.install(new PlayerInteractEvent.RightClickBlock(player,
+                InteractionHand.MAIN_HAND, pos,
+                new BlockHitResult(hit, Direction.NORTH, pos, false)));
+
+        h.assertTrue(freq.equals(board.panels.get(slot).network),
+                "post-placement tuning never reached the occupied remote gauge slot");
+        h.assertTrue(tuned.getCount() == 2, "retuning an existing remote gauge consumed an item");
+        h.succeed();
+    }
+
     @GameTest(template = "empty", timeoutTicks = 40)
     public static void placementAndUnbind(GameTestHelper h) {
         var player = h.makeMockPlayer(GameType.SURVIVAL);
@@ -88,6 +298,43 @@ public final class SignalLampGameTests {
                 "解绑弄丢了对端的地址");
         h.assertTrue(RequesterData.homeAddress(requester).equals("本端收货口"),
                 "解绑弄丢了本端的地址");
+        h.succeed();
+    }
+
+    /** Event alarms use the same Andon ladder, with ACK changing blink but not severity colour. */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void eventAlarmAcknowledgementChangesBlinkNotSeverity(GameTestHelper h) {
+        var registry = new dev.distantstock.event.EventRegistry();
+        UUID freq = UUID.randomUUID();
+        var warning = registry.raise(dev.distantstock.event.EventRegistry.Severity.WARN,
+                "WARN_TEST", "dock", "one", "", freq, null, 1);
+        h.assertTrue(SignalPanelBlockEntity.eventLevel(registry.activeForFrequency(freq))
+                        == LampState.WARN_URGENT,
+                "an unacknowledged WARN did not map to orange flashing");
+        registry.acknowledge(warning.id(), 2);
+        h.assertTrue(SignalPanelBlockEntity.eventLevel(registry.activeForFrequency(freq))
+                        == LampState.WARN,
+                "an acknowledged WARN did not become steady orange");
+
+        var error = registry.raise(dev.distantstock.event.EventRegistry.Severity.ERROR,
+                "ERROR_TEST", "dock", "two", "", freq, null, 3);
+        h.assertTrue(SignalPanelBlockEntity.eventLevel(registry.activeForFrequency(freq))
+                        == LampState.FATAL,
+                "an unacknowledged ERROR did not map to red flashing");
+        registry.acknowledge(error.id(), 4);
+        h.assertTrue(SignalPanelBlockEntity.eventLevel(registry.activeForFrequency(freq))
+                        == LampState.FATAL_ACK,
+                "an acknowledged ERROR did not remain steady red");
+        h.assertTrue(LampReadings.colorFor(LampState.FATAL_ACK)
+                        == dev.distantstock.item.SignalLampPanelItem.Color.RED,
+                "acknowledging an ERROR changed its red severity colour");
+
+        // A second unacknowledged ERROR at the same severity must make the network flash again.
+        registry.raise(dev.distantstock.event.EventRegistry.Severity.ERROR,
+                "ERROR_TEST_2", "dock", "three", "", freq, null, 5);
+        h.assertTrue(SignalPanelBlockEntity.eventLevel(registry.activeForFrequency(freq))
+                        == LampState.FATAL,
+                "one acknowledged ERROR hid another unacknowledged ERROR");
         h.succeed();
     }
 
@@ -299,6 +546,61 @@ public final class SignalLampGameTests {
         var be = (FactoryPanelBlockEntity) level.getBlockEntity(pos);
         h.assertTrue(placed == 4, "only " + placed + " of 4 remote gauges were accepted");
         h.assertTrue(be.activePanels() == 4, "expected 4 panels, got " + be.activePanels());
+        h.assertTrue(be instanceof SignalPanelBlockEntity,
+                "multi-gauge board did not become the mixed-panel host");
+        var mixed = (SignalPanelBlockEntity) be;
+        for (var slot : FactoryPanelBlock.PanelSlot.values()) {
+            h.assertTrue(mixed.isRemoteGauge(slot),
+                    "remote gauge slot silently downgraded to a factory gauge: " + slot);
+        }
+        h.succeed();
+    }
+
+    /** Converting a dedicated remote-gauge board must carry its warehouse binding with it. */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void secondRemoteGaugePreservesExistingRemoteBinding(GameTestHelper h) {
+        var level = h.getLevel();
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos.south(), Blocks.STONE.defaultBlockState(), 3);
+        var state = ModBlocks.REMOTE_GAUGE.get().defaultBlockState()
+                .setValue(FactoryPanelBlock.FACE, AttachFace.WALL)
+                .setValue(FactoryPanelBlock.FACING, Direction.NORTH);
+        level.setBlock(pos, state, 3);
+
+        var first = FactoryPanelBlock.PanelSlot.BOTTOM_LEFT;
+        var original = (dev.distantstock.block.RemoteGaugeBlockEntity) level.getBlockEntity(pos);
+        UUID localFreq = UUID.randomUUID();
+        original.addPanel(first, localFreq);
+        UUID distantScope = UUID.randomUUID();
+        var remote = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA,
+                UUID.randomUUID(), UUID.randomUUID(), "minecraft:overworld", UUID.randomUUID());
+        var binding = new dev.distantstock.block.RemoteBinding(
+                remote, distantScope, UUID.randomUUID(), "remote-door", "home-door");
+        original.bind(first, binding);
+        original.setDistantNetworkScope(first, distantScope);
+
+        var second = FactoryPanelBlock.PanelSlot.TOP_LEFT;
+        Vec3 hit = hitForSlot(pos, state, second);
+        h.assertTrue(hit != null, "no hit position maps to the second remote gauge slot");
+        ItemStack gauge = new ItemStack(ModItems.REMOTE_GAUGE.get(), 2);
+        CompoundTag data = new CompoundTag();
+        data.putUUID("Freq", UUID.randomUUID());
+        gauge.set(DataComponents.BLOCK_ENTITY_DATA, CustomData.of(data));
+        player.setItemInHand(InteractionHand.MAIN_HAND, gauge);
+        GaugePlacementEvents.install(new PlayerInteractEvent.RightClickBlock(player,
+                InteractionHand.MAIN_HAND, pos, new BlockHitResult(hit, Direction.NORTH, pos, false)));
+
+        h.assertTrue(level.getBlockEntity(pos) instanceof SignalPanelBlockEntity,
+                "second remote gauge did not produce the mixed-panel host");
+        var mixed = (SignalPanelBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(mixed.isRemoteGauge(first) && mixed.isRemoteGauge(second),
+                "one of the two remote gauges lost its remote identity");
+        h.assertTrue(binding.equals(mixed.binding(first)),
+                "existing remote gauge lost its warehouse binding during board conversion");
+        h.assertTrue(distantScope.equals(mixed.distantNetworkScope(first)),
+                "existing remote gauge lost its Distant Stock scope during board conversion");
         h.succeed();
     }
 
@@ -555,6 +857,7 @@ public final class SignalLampGameTests {
                 "a forced gauge should be FATAL, got " + board.lampState(slot));
         h.assertTrue(LampState.FATAL.blink() == LampState.Blink.FAST
                 && LampState.WARN_URGENT.blink() == LampState.Blink.FAST
+                && LampState.FATAL_ACK.blink() == LampState.Blink.NONE
                 && LampState.IDLE.blink() == LampState.Blink.SLOW
                 && LampState.ALL_GOOD.blink() == LampState.Blink.NONE, "blink mapping is wrong");
         h.assertTrue(LampState.worst(LampState.ALL_GOOD, LampState.WARN) == LampState.WARN

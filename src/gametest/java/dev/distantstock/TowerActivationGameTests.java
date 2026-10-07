@@ -51,14 +51,12 @@ import java.util.UUID;
 @PrefixGameTestTemplate(false)
 public final class TowerActivationGameTests {
     /**
-     * **没塔就不能用** —— 这条规则本身。
+     * **没塔就不能运行，但物理舱位仍然能收货。**
      *
-     * <p>它原来断言的是反过来的事（"没有塔的存档照常收发"），那是模组早期的一条兼容承诺。用户
-     * 2026-09-17 拍板推翻：机器必须站在一座**正在运行**的塔的范围内才工作，否则"塔是必需品"这句
-     * 话在新玩家那里永远学不会，而且真正的后果是"邻居建了座塔，我全厂停产"。
-     *
-     * <p>这里没有任何 pin：这个世界的状态就是"一座塔都没有"，而那正是新存档、也是玩家第一次
-     * 放下港时的样子。包裹必须被拒收，而且港要说得出为什么（无塔时灯是暗的、护目镜第一行就是红的）。
+     * <p>Tower coverage gates transport, not the existence of the bay. Bad/offline cargo must be
+     * admitted so the dock can hold it visibly and report the fault through Logger; making the
+     * hopper/UI act like an invisible wall prevents diagnosis and is indistinguishable from a
+     * broken inventory capability.
      */
     @GameTest(template = "empty", timeoutTicks = 200)
     public static void withoutATowerADockRefusesToWork(GameTestHelper h) {
@@ -72,9 +70,23 @@ public final class TowerActivationGameTests {
 
         h.assertFalse(dock.canSend(), "a dock in a world without towers still reports that it can send");
         h.assertFalse(dock.canReceive(), "a dock in a world without towers still reports that it can receive");
-        h.assertFalse(insertParcel(level, pos),
-                "a dock no tower carries took a parcel in — 塔的硬门槛没有生效");
-        h.succeed();
+        h.assertTrue(insertParcel(level, pos),
+                "a dock no tower carries rejected a parcel at the physical bay");
+        h.assertTrue(!dock.displayedStack().isEmpty(),
+                "offline dock accepted the parcel but did not keep it visible/recoverable");
+        h.runAfterDelay(20, () -> {
+            String source = dev.distantstock.event.EventRegistry.blockSource(level, pos);
+            var events = dev.distantstock.event.EventRegistry.get(level.getServer());
+            h.assertTrue(events.active(dev.distantstock.event.EventRegistry.Codes.DOCK_NO_TOWER,
+                            "dock", source).isPresent(),
+                    "blocked outbound parcel did not explain that the dock has no tower coverage");
+            h.assertTrue(events.active(dev.distantstock.event.EventRegistry.Codes.DOCK_OUTBOUND_STUCK,
+                            "dock", source).isEmpty(),
+                    "no-tower condition also produced a duplicate generic outbound-stuck alarm");
+            h.assertTrue(dock.status() == dev.distantstock.block.DockStatus.INACTIVE,
+                    "dock outside tower coverage did not show INACTIVE status");
+            h.succeed();
+        });
     }
 
     /** The edge of a tower's reach, which is a sphere around the base and nothing else. */
@@ -283,9 +295,35 @@ public final class TowerActivationGameTests {
         BlockPos freeDock = h.absolutePos(new BlockPos(2, 2, 2));
         BlockPos paidCore = h.absolutePos(new BlockPos(5, 0, 5));
         BlockPos paidDock = h.absolutePos(new BlockPos(6, 2, 6));
+        BlockPos receiverPos = h.absolutePos(new BlockPos(8, 2, 2));
+        BlockPos secondReceiverPos = h.absolutePos(new BlockPos(8, 2, 4));
         TowerCoreBlockEntity freeTower = placeTowerAndDock(h, level, freeCore, freeDock);
         TowerCoreBlockEntity paidTower = placeTowerAndDock(h, level, paidCore, paidDock);
         DockBlockEntity dock = (DockBlockEntity) level.getBlockEntity(paidDock);
+        level.setBlock(receiverPos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        DockBlockEntity receiver = (DockBlockEntity) level.getBlockEntity(receiverPos);
+        receiver.setImport();
+        TowerActivation.pinDevice(TowerSystem.TowerId.of(level.dimension(), receiverPos), true, null);
+        level.setBlock(secondReceiverPos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        DockBlockEntity secondReceiver = (DockBlockEntity) level.getBlockEntity(secondReceiverPos);
+        secondReceiver.setImport();
+        TowerActivation.pinDevice(TowerSystem.TowerId.of(level.dimension(), secondReceiverPos), true, null);
+
+        UUID localNode = UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId());
+        var member = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA, localNode,
+                dev.distantstock.routing.WorldIdentity.get(level), level.dimension().location().toString(),
+                UUID.randomUUID());
+        var distant = dev.distantstock.routing.DistantNetworkDirectory.get(level.getServer())
+                .create("billing-" + UUID.randomUUID().toString().substring(0, 8), localNode,
+                        UUID.randomUUID(), member);
+        var receiving = DockGroupDirectory.get(level.getServer()).createForNetwork(
+                "billing-receiver-" + UUID.randomUUID().toString().substring(0, 8), null,
+                distant.id(), dev.distantstock.routing.DockGroup.Visibility.PUBLIC);
+        receiver.setGroupId(receiving.id());
+        secondReceiver.setGroupId(receiving.id());
+        ((DockBlockEntity) level.getBlockEntity(freeDock)).setDefaultDestination(localNode, receiving.id());
+        dock.setDefaultDestination(localNode, receiving.id());
 
         TowerActivation.pinDevice(TowerSystem.TowerId.of(level.dimension(), freeDock), true,
                 TowerSystem.TowerId.of(level.dimension(), freeCore));
@@ -321,6 +359,8 @@ public final class TowerActivationGameTests {
                         TowerBilling.clearOverride();
                         TowerActivation.unpinDevice(TowerSystem.TowerId.of(level.dimension(), freeDock));
                         TowerActivation.unpinDevice(TowerSystem.TowerId.of(level.dimension(), paidDock));
+                        TowerActivation.unpinDevice(TowerSystem.TowerId.of(level.dimension(), receiverPos));
+                        TowerActivation.unpinDevice(TowerSystem.TowerId.of(level.dimension(), secondReceiverPos));
                     }
                 });
             });
@@ -401,8 +441,9 @@ public final class TowerActivationGameTests {
 
     private static boolean insertParcel(ServerLevel level, BlockPos pos) {
         var handler = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, Direction.UP);
-        return handler != null
-                && handler.insertItem(0, new ItemStack(ModItems.REMOTE_PACKAGE.get()), false).isEmpty();
+        ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        com.simibubi.create.content.logistics.box.PackageItem.addAddress(parcel, "tower-test");
+        return handler != null && handler.insertItem(0, parcel, false).isEmpty();
     }
 
     private static TowerSystem.Member tower(BlockPos base, int radius, int devices, boolean running) {

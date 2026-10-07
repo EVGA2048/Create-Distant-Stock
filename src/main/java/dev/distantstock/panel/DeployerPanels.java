@@ -204,6 +204,7 @@ public final class DeployerPanels {
         }
         // receivingGroup == null = 保持原来那个组（界面上那一格空的，或者名字认不出来）。
         remote.orders().bind(new dev.distantstock.block.RemoteBinding(current.network(),
+                current.distantNetworkId(), current.distantNetworkKnown(),
                 receivingGroup == null ? current.receivingGroup() : receivingGroup, address,
                 current.homeAddress()));
         return true;
@@ -231,6 +232,32 @@ public final class DeployerPanels {
         }
         dev.distantstock.block.RemoteBinding binding = remote.orders().binding();
         return binding == null ? "" : binding.address();
+    }
+
+    /** Full remote binding for callers that need its warehouse identity, or null. */
+    public static dev.distantstock.block.RemoteBinding bindingOf(
+            FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot) {
+        if (!(board.panels.get(slot) instanceof RemoteGaugePanelBehaviour remote)) {
+            return null;
+        }
+        return remote.orders().binding();
+    }
+
+    /** Distant Stock network joined by this panel, even before a source warehouse is selected. */
+    public static java.util.UUID distantNetworkScope(
+            FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot) {
+        return board.panels.get(slot) instanceof RemoteGaugePanelBehaviour remote
+                ? remote.distantNetworkScope() : null;
+    }
+
+    /** Pair this panel to a Distant Stock network without requiring a source warehouse yet. */
+    public static boolean setDistantNetworkScope(
+            FactoryPanelBlockEntity board, FactoryPanelBlock.PanelSlot slot, java.util.UUID scope) {
+        if (!(board.panels.get(slot) instanceof RemoteGaugePanelBehaviour remote)) {
+            return false;
+        }
+        remote.setDistantNetworkScope(scope);
+        return true;
     }
 
     /** Unbinds the remote gauge in this slot, leaving it an ordinary factory gauge. */
