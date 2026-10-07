@@ -5,8 +5,11 @@ import com.simibubi.create.foundation.blockEntity.SmartBlockEntity;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import dev.distantstock.ModSounds;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.block.state.BlockState;
@@ -41,34 +44,34 @@ public final class NetworkSpeakerBlockEntity extends SmartBlockEntity implements
     }
 
     @Override
-    public void receiveNetworkBroadcast(String text, int soundProfile) {
-        if (!(level instanceof ServerLevel serverLevel) || text == null || text.isBlank()) return;
-
-        double cx = worldPosition.getX() + .5;
-        double cy = worldPosition.getY() + .5;
-        double cz = worldPosition.getZ() + .5;
-        double maxDistance = (double) RADIUS * RADIUS;
-        int listeners = 0;
-
-        for (var player : serverLevel.players()) {
-            if (player.distanceToSqr(cx, cy, cz) > maxDistance) continue;
-            player.sendSystemMessage(Component.literal(text));
-            listeners++;
-        }
-
-        // A PA endpoint only emits when somebody is actually in its service area, matching the
-        // local brass announcer and avoiding pointless server sound packets in empty chunks.
-        if (listeners > 0) {
-            serverLevel.playSound(null, worldPosition, soundFor(soundProfile),
-                    SoundSource.BLOCKS, 1.15f, 1.0f);
-        }
+    public ServerLevel broadcastLevel() {
+        return level instanceof ServerLevel serverLevel ? serverLevel : null;
     }
 
-    static SoundEvent soundFor(int soundProfile) {
+    @Override
+    public BlockPos broadcastPosition() {
+        return worldPosition;
+    }
+
+    @Override
+    public int broadcastRadius() {
+        return RADIUS;
+    }
+
+    @Override
+    public void deliverNetworkBroadcast(ServerPlayer player, String text, int soundProfile) {
+        if (player == null || text == null || text.isBlank()) return;
+        player.sendSystemMessage(Component.literal(text));
+        player.connection.send(new ClientboundSoundPacket(soundFor(soundProfile), SoundSource.BLOCKS,
+                worldPosition.getX() + .5, worldPosition.getY() + .5, worldPosition.getZ() + .5,
+                1.15f, 1.0f, player.getRandom().nextLong()));
+    }
+
+    static Holder<SoundEvent> soundFor(int soundProfile) {
         return switch (Math.clamp(soundProfile, 0, 2)) {
-            case 1 -> ModSounds.ANNOUNCER_IPPHONE.get();
-            case 2 -> ModSounds.ANNOUNCER_RELAY.get();
-            default -> ModSounds.ANNOUNCER_HMI.get();
+            case 1 -> ModSounds.ANNOUNCER_IPPHONE;
+            case 2 -> ModSounds.ANNOUNCER_RELAY;
+            default -> ModSounds.ANNOUNCER_HMI;
         };
     }
 }

@@ -257,7 +257,14 @@ tasks.named('check').configure {
     dependsOn 'verifyClientAssets'
     dependsOn 'verifyPackagerParity'
     dependsOn 'verifyDockMotion'
+    dependsOn 'verifyNetworkBroadcast'
     dependsOn 'verifyRequesterUnbind'
+}
+
+tasks.register('verifyNetworkBroadcast', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.distantstock.block.NetworkBroadcastBusCheck'
 }
 
 tasks.register('verifyRequesterUnbind', JavaExec) {
