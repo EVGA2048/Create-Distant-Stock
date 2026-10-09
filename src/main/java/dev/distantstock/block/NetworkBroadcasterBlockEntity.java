@@ -71,7 +71,7 @@ public final class NetworkBroadcasterBlockEntity extends SmartBlockEntity implem
 
     public int broadcastToNetwork() {
         if (level == null || level.isClientSide) return 0;
-        return NetworkBroadcastBus.send(networkId(), renderMessage(), soundProfile);
+        return NetworkBroadcastBus.send(level, networkId(), renderMessage(), soundProfile);
     }
 
     @Override
