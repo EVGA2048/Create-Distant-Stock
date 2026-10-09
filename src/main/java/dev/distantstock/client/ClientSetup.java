@@ -170,10 +170,22 @@ public final class ClientSetup {
                     MonitorFlapRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.LOGGER.get(), LoggerRenderer::new);
             e.registerBlockEntityRenderer(ModBlockEntities.NIXIE_CLOCK.get(), NixieClockRenderer::new);
-            e.registerBlockEntityRenderer(ModBlockEntities.FLAP_CLOCK.get(), FlapClockRenderer::new);
             // 底座里的以太。四个观察窗是模型的一部分，液面是这里画的 —— 机壳通上红石变成窗户
             // 之后才看得见，所以它平时不占任何画面。
             e.registerBlockEntityRenderer(ModBlockEntities.TOWER_CORE.get(), TowerCoreRenderer::new);
+        }
+
+        @SubscribeEvent
+        public static void addLayers(EntityRenderersEvent.AddLayers e) {
+            var models = e.getEntityModels();
+            var wingModel = new net.minecraft.client.model.ElytraModel<>(
+                    models.bakeLayer(net.minecraft.client.model.geom.ModelLayers.ELYTRA));
+            for (var skin : e.getSkins()) {
+                var renderer = e.getSkin(skin);
+                if (renderer instanceof net.minecraft.client.renderer.entity.LivingEntityRenderer living) {
+                    living.addLayer(new EtherWingLayer(living, wingModel));
+                }
+            }
         }
 
         @SubscribeEvent

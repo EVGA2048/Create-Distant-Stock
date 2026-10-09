@@ -13,7 +13,8 @@ public final class ModNet {
         // v13: local announcer editor packets were added alongside the 9.4.3 control-plane work.
         // Keep mixed client/server builds from silently accepting payload sets they do not share.
         // v12 introduced LinkSnapshotS2C protocol-compatibility counters.
-        PayloadRegistrar r = e.registrar("19");
+        // v20: ether boost payload for resonant chestplate flight.
+        PayloadRegistrar r = e.registrar("20");
         r.playToServer(SetAddressC2S.TYPE, SetAddressC2S.STREAM_CODEC, SetAddressC2S::handle);
         r.playToServer(PlaceOrderC2S.TYPE, PlaceOrderC2S.STREAM_CODEC, PlaceOrderC2S::handle);
         r.playToServer(JoinNetworkC2S.TYPE, JoinNetworkC2S.STREAM_CODEC, JoinNetworkC2S::handle);
@@ -42,6 +43,7 @@ public final class ModNet {
         r.playToServer(SetCacheFrogportReleaseC2S.TYPE, SetCacheFrogportReleaseC2S.STREAM_CODEC,
                 SetCacheFrogportReleaseC2S::handle);
         r.playToServer(SaveAnnouncerC2S.TYPE, SaveAnnouncerC2S.STREAM_CODEC, SaveAnnouncerC2S::handle);
+        r.playToServer(EtherBoostC2S.TYPE, EtherBoostC2S.STREAM_CODEC, EtherBoostC2S::handle);
         r.playToClient(RemoteGroupsS2C.TYPE, RemoteGroupsS2C.STREAM_CODEC, RemoteGroupsS2C::handle);
         r.playToClient(OpenMonitorS2C.TYPE, OpenMonitorS2C.STREAM_CODEC, OpenMonitorS2C::handle);
         r.playToClient(LinkSnapshotS2C.TYPE, LinkSnapshotS2C.STREAM_CODEC, LinkSnapshotS2C::handle);
