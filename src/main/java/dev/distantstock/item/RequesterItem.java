@@ -1,17 +1,20 @@
 package dev.distantstock.item;
 
+import dev.distantstock.block.LoggerBlockEntity;
 import dev.distantstock.menu.MenuSync;
 import dev.distantstock.menu.RequesterMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.SimpleMenuProvider;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 
 import java.util.List;
@@ -60,6 +63,36 @@ public final class RequesterItem extends Item {
             ), buf -> MenuSync.writeItem(buf, hand, stack));
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide());
+    }
+
+    /**
+     * The sneak half of the logger gesture: gives a placed logger back to "all events".
+     *
+     * <p>This has to live here rather than in {@code LoggerBlock#useItemOn}, because a sneak-click
+     * never reaches the block. Vanilla's {@code ServerPlayerGameMode#useItemOn} skips
+     * {@code BlockState#useItemOn} entirely when the player is sneaking with an item in hand that
+     * does not sneak-bypass, and hands the click to {@code Item#useOn} instead. A terminal does not
+     * bypass, so the block's own shift branch was unreachable and a placed logger could not be
+     * unbound by any gesture at all.
+     *
+     * <p>Nothing else is claimed here. A plain click belongs to the block -- it answers
+     * {@code SUCCESS} while the terminal is held and consumes the interaction -- so this only ever
+     * sees the sneak case, and passes on everything that is not a logger.
+     */
+    @Override
+    public InteractionResult useOn(UseOnContext context) {
+        Player player = context.getPlayer();
+        if (player == null || !player.isShiftKeyDown()) return InteractionResult.PASS;
+        if (!(context.getLevel().getBlockEntity(context.getClickedPos())
+                instanceof LoggerBlockEntity logger)) {
+            return InteractionResult.PASS;
+        }
+        if (!context.getLevel().isClientSide) {
+            logger.clearBinding();
+            player.displayClientMessage(Component.translatable(
+                    "gui.distantstock.logger.scope_all"), true);
+        }
+        return InteractionResult.sidedSuccess(context.getLevel().isClientSide);
     }
 
     @Override

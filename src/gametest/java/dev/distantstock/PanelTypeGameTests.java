@@ -207,9 +207,183 @@ public final class PanelTypeGameTests {
         h.succeed();
     }
 
+    /**
+     * The reported case: a lamp beside a factory gauge on Create's board, as the client sees it.
+     *
+     * <p>Deployer replaces the slot tag Create writes, and the lamp's filter used to go with it: the
+     * client got a lamp panel holding nothing, which is not a lamp, so it was drawn as a factory
+     * gauge while the goggles — reading the panel type — still said "signal lamp".
+     */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void aLampBesideAGaugeReachesTheClientAsALamp(GameTestHelper h) {
+        var level = h.getLevel();
+        var board = (FactoryPanelBlockEntity) level.getBlockEntity(createBoard(h));
+        h.assertTrue(board.addPanel(FactoryPanelBlock.PanelSlot.TOP_LEFT, UUID.randomUUID()),
+                "the factory gauge would not go on");
+        h.assertTrue(DeployerPanels.installLamp(board, SLOT,
+                new ItemStack(ModItems.ORANGE_INDICATOR_LAMP.get())), "the lamp would not install");
+
+        var mirror = (FactoryPanelBlockEntity) level.getBlockEntity(createBoardAt(h, 5));
+        mirror.readClient(board.writeClient(new CompoundTag(), level.registryAccess()),
+                level.registryAccess());
+
+        h.assertTrue(mirror.panels.get(SLOT) instanceof dev.distantstock.panel.SignalLampPanelBehaviour,
+                "the client does not see a lamp panel in the slot");
+        var lamp = (dev.distantstock.panel.SignalLampPanelBehaviour) mirror.panels.get(SLOT);
+        h.assertTrue(lamp.isLampSlot(), "the client's lamp lost its item, so it draws as a gauge");
+        h.assertTrue(lamp.getFilter().is(ModItems.ORANGE_INDICATOR_LAMP.get()),
+                "the client's lamp holds a different item");
+        h.assertTrue(mirror.panels.get(FactoryPanelBlock.PanelSlot.TOP_LEFT).isActive(),
+                "the factory gauge beside it did not reach the client");
+        h.succeed();
+    }
+
+    /** Item, mode and binding of a lamp on Create's board survive a reload. */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void aLampOnACreateBoardSurvivesReload(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = createBoard(h);
+        var board = (FactoryPanelBlockEntity) level.getBlockEntity(pos);
+        h.assertTrue(DeployerPanels.installLamp(board, SLOT,
+                new ItemStack(ModItems.RED_INDICATOR_LAMP.get())), "the lamp would not install");
+        board.panels.get(SLOT).count = 1;
+        UUID freq = UUID.randomUUID();
+        h.assertTrue(DeployerPanels.bindLamp(board, SLOT, freq), "the lamp would not bind");
+
+        var reloaded = reload(h, pos, board);
+
+        h.assertTrue(DeployerPanels.holdsSignalLamp(reloaded, SLOT), "the lamp panel was lost");
+        var lamp = (dev.distantstock.panel.SignalLampPanelBehaviour) reloaded.panels.get(SLOT);
+        h.assertTrue(lamp.getFilter().is(ModItems.RED_INDICATOR_LAMP.get()), "the lamp item was lost");
+        h.assertTrue(lamp.inverted(), "the lamp's mode was lost");
+        h.assertTrue(freq.equals(lamp.lampNetwork()), "the lamp's binding was lost");
+        h.succeed();
+    }
+
+    /**
+     * Item, amount and frequency of a remote gauge on Create's board survive a reload.
+     *
+     * <p>Lost, the panel came back with no item to count, and Deployer's base class ignores the
+     * frequency it is given, so a retune never stuck either.
+     */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void aRemoteGaugeOnACreateBoardSurvivesReload(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = createBoard(h);
+        var board = (FactoryPanelBlockEntity) level.getBlockEntity(pos);
+        UUID freq = UUID.randomUUID();
+        h.assertTrue(DeployerPanels.install(board, SLOT, freq), "the panel would not install");
+        var gauge = board.panels.get(SLOT);
+        h.assertTrue(freq.equals(gauge.network), "the panel ignored the frequency it was given");
+        gauge.setFilter(new ItemStack(net.minecraft.world.item.Items.IRON_INGOT));
+        gauge.count = 12;
+        gauge.upTo = true;
+
+        var reloaded = reload(h, pos, board);
+
+        h.assertTrue(DeployerPanels.holdsRemoteGauge(reloaded, SLOT), "the remote gauge was lost");
+        var back = reloaded.panels.get(SLOT);
+        h.assertTrue(back.getFilter().is(net.minecraft.world.item.Items.IRON_INGOT),
+                "the gauge's item was lost");
+        h.assertTrue(back.count == 12, "the gauge's amount was lost: " + back.count);
+        h.assertTrue(back.upTo, "the gauge's up-to setting was lost");
+        h.assertTrue(freq.equals(back.network), "the gauge's frequency was lost");
+        h.succeed();
+    }
+
+    /**
+     * A lamp wired to an Extra Gauges logic gauge follows the gate, not its inverse.
+     *
+     * <p>The logic gauge keeps {@code redstonePowered} as the opposite of its answer, so a lamp that
+     * read it like a Create gauge was lit exactly while the gate was false.
+     */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void aLampFollowsAnExtraGaugesLogicGauge(GameTestHelper h) {
+        var logicType = net.liukrast.deployer.lib.registry.DeployerRegistries.PANEL.get(
+                ResourceLocation.fromNamespaceAndPath("extra_gauges", "logic"));
+        if (logicType == null) {
+            h.fail("extra_gauges is not loaded, so there is no logic gauge to wire a lamp to");
+            return;
+        }
+        var board = (FactoryPanelBlockEntity) h.getLevel().getBlockEntity(createBoard(h));
+        var gateSlot = FactoryPanelBlock.PanelSlot.TOP_LEFT;
+        var gate = logicType.create(board, gateSlot);
+        gate.active = true;
+        board.attachBehaviourLate(gate);
+        board.panels.put(gateSlot, gate);
+        h.assertTrue(DeployerPanels.installLamp(board, SLOT,
+                new ItemStack(ModItems.GREEN_INDICATOR_LAMP.get())), "the lamp would not install");
+        var lamp = (dev.distantstock.panel.SignalLampPanelBehaviour) board.panels.get(SLOT);
+
+        gate.targeting.add(lamp.getPanelPosition());
+        lamp.targetedBy.put(gate.getPanelPosition(),
+                new com.simibubi.create.content.logistics.factoryBoard.FactoryPanelConnection(
+                        gate.getPanelPosition(), 1));
+
+        gate.redstonePowered = false; // the gate reads true
+        h.assertTrue(lamp.lit(), "the lamp is dark while the gate is true");
+        gate.redstonePowered = true; // the gate reads false
+        h.assertTrue(!lamp.lit(), "the lamp is lit while the gate is false");
+        h.succeed();
+    }
+
+    /**
+     * An Extra Gauges logic gauge pointed at a remote gauge pauses it, as it pauses a factory gauge.
+     *
+     * <p>Deployer seals the redstone check on its panel types, so a remote gauge that did not read
+     * its inputs itself — and had none to read — ignored the gate entirely.
+     */
+    @GameTest(template = "empty", timeoutTicks = 60)
+    public static void aLogicGaugePausesARemoteGauge(GameTestHelper h) {
+        var logicType = net.liukrast.deployer.lib.registry.DeployerRegistries.PANEL.get(
+                ResourceLocation.fromNamespaceAndPath("extra_gauges", "logic"));
+        if (logicType == null) {
+            h.fail("extra_gauges is not loaded, so there is no logic gauge to wire a gauge to");
+            return;
+        }
+        var board = (FactoryPanelBlockEntity) h.getLevel().getBlockEntity(createBoard(h));
+        var gateSlot = FactoryPanelBlock.PanelSlot.TOP_LEFT;
+        var gate = logicType.create(board, gateSlot);
+        gate.active = true;
+        board.attachBehaviourLate(gate);
+        board.panels.put(gateSlot, gate);
+        h.assertTrue(DeployerPanels.install(board, SLOT, UUID.randomUUID()), "the panel would not install");
+        var remote = board.panels.get(SLOT);
+
+        gate.targeting.add(remote.getPanelPosition());
+        remote.targetedBy.put(gate.getPanelPosition(),
+                new com.simibubi.create.content.logistics.factoryBoard.FactoryPanelConnection(
+                        gate.getPanelPosition(), 1));
+
+        gate.redstonePowered = false; // the gate reads true
+        remote.checkForRedstoneInput();
+        h.assertTrue(remote.redstonePowered, "a true gate did not pause the remote gauge");
+        gate.redstonePowered = true; // the gate reads false
+        remote.checkForRedstoneInput();
+        h.assertTrue(!remote.redstonePowered, "a false gate left the remote gauge paused");
+        h.succeed();
+    }
+
+    /** Saves the board, replaces the block and loads the save into the new one. */
+    private static FactoryPanelBlockEntity reload(GameTestHelper h, BlockPos pos,
+                                                  FactoryPanelBlockEntity board) {
+        var level = h.getLevel();
+        CompoundTag saved = board.saveWithoutMetadata(level.registryAccess());
+        BlockState state = level.getBlockState(pos);
+        level.removeBlock(pos, false);
+        level.setBlock(pos, state, 3);
+        var reloaded = (FactoryPanelBlockEntity) level.getBlockEntity(pos);
+        reloaded.loadWithComponents(saved, level.registryAccess());
+        return reloaded;
+    }
+
     /** A factory gauge board facing north on a wall at a known spot. */
     private static BlockPos createBoard(GameTestHelper h) {
-        BlockPos wall = h.absolutePos(new BlockPos(2, 2, 3));
+        return createBoardAt(h, 2);
+    }
+
+    private static BlockPos createBoardAt(GameTestHelper h, int x) {
+        BlockPos wall = h.absolutePos(new BlockPos(x, 2, 3));
         h.getLevel().setBlock(wall, Blocks.STONE.defaultBlockState(), 3);
         BlockPos board = wall.north();
         h.getLevel().setBlock(board, CREATE_GAUGE.defaultBlockState()

@@ -12,6 +12,7 @@ import dev.engine_room.flywheel.lib.model.baked.PartialModel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.core.Direction;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.RandomSource;
 import net.neoforged.api.distmarker.Dist;
@@ -20,14 +21,36 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 /** Opt-in client smoke test: bake real assets and load client mixins, then close without opening a save. */
 @EventBusSubscriber(modid = DistantStock.MODID, value = Dist.CLIENT)
 public final class SignalLampClientSmoke {
     private static boolean done;
+    /** Non-null while the second phase waits for the resource reload it asked for. */
+    private static CompletableFuture<Void> reload;
 
     @SubscribeEvent
     public static void tick(ClientTickEvent.Post event) {
+        if (!Boolean.getBoolean("distantstock.clientSmoke")) return;
+        if (reload != null) {
+            if (!reload.isDone()) return;
+            reload = null;
+            var mc = Minecraft.getInstance();
+            try {
+                assertCasingUsesConnectedTextures(mc);
+                LogUtils.getLogger().info(
+                        "DISTANTSTOCK_CASING_CT_AFTER_RELOAD_OK: 机壳重载资源之后仍然是连接纹理模型");
+                checkFluidTankArt(mc);
+                LogUtils.getLogger().info(
+                        "DISTANTSTOCK_FLUID_TANK_AFTER_RELOAD_OK: 流体罐重载资源之后模型与染色照旧");
+            } catch (Throwable failure) {
+                LogUtils.getLogger().error("DISTANTSTOCK_CLIENT_SMOKE_FAILED", failure);
+            } finally {
+                mc.stop();
+            }
+            return;
+        }
         if (!Boolean.getBoolean("distantstock.clientSmoke") || done) return;
         var mc = Minecraft.getInstance();
         if (mc.getOverlay() != null || mc.screen == null || mc.getModelManager().getMissingModel() == null) return;
@@ -140,15 +163,7 @@ public final class SignalLampClientSmoke {
                 LogUtils.getLogger().info(
                         "DISTANTSTOCK_REMOTE_FLUID_ENTITY_RENDERER_OK: 1.3.x renderer mixin applied and blue 12x12 shell partial baked");
             }
-            // The casing's connected texture attaches by swapping its baked model, and a swap that
-            // silently did not happen leaves a perfectly ordinary-looking block with no connection
-            // logic at all. Nothing else in the game reports that, so it is asserted here.
-            for (var state : ModBlocks.TOWER_CASING.get().getStateDefinition().getPossibleStates()) {
-                if (!(mc.getBlockRenderer().getBlockModel(state)
-                        instanceof com.simibubi.create.foundation.block.connected.CTModel)) {
-                    throw new AssertionError("Distant casing is not using a connected-texture model: " + state);
-                }
-            }
+            assertCasingUsesConnectedTextures(mc);
             for (boolean powered : new boolean[]{false, true}) {
                 var topPort = ModBlocks.TOWER_CASING.get().defaultBlockState()
                         .setValue(dev.distantstock.block.TowerCasingBlock.POWERED, powered)
@@ -249,6 +264,7 @@ public final class SignalLampClientSmoke {
                 sprites++;
             }
             LogUtils.getLogger().info("DISTANTSTOCK_ATLAS_SPRITES_OK: {} sprites stitched", sprites);
+            checkFluidTankArt(mc);
             // A Ponder scene is three things that have to agree and none of which the game checks
             // together: a structure file, a storyboard registered under that name, and one text key
             // per line the scene shows. Get any of them wrong and the scene either never opens or
@@ -295,10 +311,99 @@ public final class SignalLampClientSmoke {
             }
             LogUtils.getLogger().info("DISTANTSTOCK_CLIENT_SMOKE_PASSED: {} block states, {} quarter-lamp models, {} remote gauge models, factory panel, client mixin",
                     states, partials.size(), gaugePartials.size());
+            // Then do it all again, the way a player does. Everything above only proves the first
+            // bake was right, and F3+T is the same bake a second time: a listener that cannot run
+            // twice takes the casing's connected texture down with it and breaks nothing else
+            // loudly enough to be noticed. KeyboardHandler calls exactly this method for F3+T.
+            reload = mc.reloadResourcePacks();
         } catch (Throwable failure) {
             LogUtils.getLogger().error("DISTANTSTOCK_CLIENT_SMOKE_FAILED", failure);
-        } finally {
             mc.stop();
+        }
+    }
+
+    /**
+     * The tanks: six sprites stitched, nine models baked, and a tint that lands on the fluid only.
+     *
+     * <p>Three things here fail silently in the game and nowhere else. A sprite that is not stitched
+     * draws as the checkerboard. An {@code overrides} list that names the wrong models draws the same
+     * icon at every fill level, which looks like a working tank. And a tint registered for the wrong
+     * layer recolours the metal shell instead of the contents -- with the additional trap that
+     * NeoForge gives vanilla water no client tint at all, so a provider that simply forwards
+     * {@code getTintColor} paints a tank of water white. That last one is why the colour is compared
+     * against "no colour" rather than merely against -1.
+     */
+    private static void checkFluidTankArt(Minecraft mc) {
+        var atlas = mc.getModelManager().getAtlas(net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS);
+        var missing = atlas.getSprite(
+                net.minecraft.client.renderer.texture.MissingTextureAtlasSprite.getLocation()).contents().name();
+        for (String sprite : new String[]{"portable_fluid_tank_copper", "portable_fluid_tank_sturdy",
+                "portable_fluid_tank_resonant", "portable_fluid_tank_fluid_empty",
+                "portable_fluid_tank_fluid_level1", "portable_fluid_tank_fluid_level2"}) {
+            var name = ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "item/" + sprite);
+            if (atlas.getSprite(name).contents().name().equals(missing)) {
+                throw new AssertionError("罐体贴图没有进方块图集: " + name);
+            }
+        }
+
+        for (var holder : ModItems.FLUID_TANKS) {
+            var item = holder.get();
+            BakedModel[] levels = new BakedModel[3];
+            for (int level = 0; level < 3; level++) {
+                ItemStack stack = new ItemStack(item);
+                stack.set(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA,
+                        new net.minecraft.world.item.component.CustomModelData(level));
+                levels[level] = mc.getItemRenderer().getModel(stack, null, null, 0);
+                verify(levels[level], mc);
+            }
+            for (int a = 0; a < 3; a++) {
+                for (int b = a + 1; b < 3; b++) {
+                    if (levels[a] == levels[b]) {
+                        throw new AssertionError(item + " 在液位 " + a + " 和 " + b + " 用的是同一个模型");
+                    }
+                }
+            }
+
+            ItemStack full = new ItemStack(item);
+            var handler = filled(full);
+            if (handler == null) throw new AssertionError(item + " has no fluid capability");
+            int contents = mc.getItemColors().getColor(full, 0);
+            if (contents == -1 || contents == 0xFFFFFFFF) {
+                throw new AssertionError(item + " 装水时液体层没有颜色（tint "
+                        + Integer.toHexString(contents) + "）");
+            }
+            if (mc.getItemColors().getColor(full, 1) != -1) {
+                throw new AssertionError(item + " 连罐壳一起染色了");
+            }
+            if (mc.getItemColors().getColor(new ItemStack(item), 0) != -1) {
+                throw new AssertionError(item + " 给空罐也染了色");
+            }
+        }
+        LogUtils.getLogger().info(
+                "DISTANTSTOCK_FLUID_TANK_ART_OK: 三档 × 三液位都烘出来了，染色只落在液体层");
+    }
+
+    private static net.neoforged.neoforge.fluids.capability.IFluidHandlerItem filled(ItemStack stack) {
+        var handler = stack.getCapability(net.neoforged.neoforge.capabilities.Capabilities.FluidHandler.ITEM);
+        if (handler == null) return null;
+        handler.fill(new net.neoforged.neoforge.fluids.FluidStack(
+                        net.minecraft.world.level.material.Fluids.WATER, 1000),
+                net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE);
+        return handler;
+    }
+
+    /**
+     * The casing's connected texture attaches by swapping its baked model, and a swap that silently
+     * did not happen leaves a perfectly ordinary-looking block with no connection logic at all --
+     * a wall of individual framed panels instead of one metal surface. Nothing else in the game
+     * reports that, so it is asserted here, on the first bake and again after a reload.
+     */
+    private static void assertCasingUsesConnectedTextures(Minecraft mc) {
+        for (var state : ModBlocks.TOWER_CASING.get().getStateDefinition().getPossibleStates()) {
+            if (!(mc.getBlockRenderer().getBlockModel(state)
+                    instanceof com.simibubi.create.foundation.block.connected.CTModel)) {
+                throw new AssertionError("Distant casing is not using a connected-texture model: " + state);
+            }
         }
     }
 

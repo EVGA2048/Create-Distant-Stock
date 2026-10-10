@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "distantstock:copper_fluid_tank",
+    "distantstock:sturdy_fluid_tank",
+    "distantstock:resonant_canister"
+  ]
+}

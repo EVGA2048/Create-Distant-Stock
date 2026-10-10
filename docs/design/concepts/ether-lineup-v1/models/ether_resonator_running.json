@@ -1,0 +1,1281 @@
+{
+ "parent": "minecraft:block/block",
+ "credit": "Distant Stock concept; concept:* are files in ./textures",
+ "textures": {
+  "particle": "create:block/andesite_casing"
+ },
+ "elements": [
+  {
+   "name": "deck",
+   "from": [
+    0,
+    0,
+    0
+   ],
+   "to": [
+    16,
+    3,
+    16
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      13,
+      16,
+      16
+     ]
+    },
+    "south": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      13,
+      16,
+      16
+     ]
+    },
+    "west": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      13,
+      16,
+      16
+     ]
+    },
+    "east": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      13,
+      16,
+      16
+     ]
+    },
+    "up": {
+     "texture": "concept:resonator_deck",
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ]
+    },
+    "down": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      0,
+      16,
+      16
+     ]
+    }
+   }
+  },
+  {
+   "name": "hub",
+   "from": [
+    6,
+    3,
+    6
+   ],
+   "to": [
+    10,
+    6,
+    10
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      6,
+      10,
+      10,
+      13
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      6,
+      10,
+      10,
+      13
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      6,
+      10,
+      10,
+      13
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      6,
+      10,
+      10,
+      13
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      6,
+      6,
+      10,
+      10
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      6,
+      6,
+      10,
+      10
+     ]
+    }
+   }
+  },
+  {
+   "name": "arm",
+   "from": [
+    1,
+    6,
+    7
+   ],
+   "to": [
+    15,
+    7,
+    9
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      1,
+      9,
+      15,
+      10
+     ]
+    },
+    "south": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      1,
+      9,
+      15,
+      10
+     ]
+    },
+    "west": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      7,
+      9,
+      9,
+      10
+     ]
+    },
+    "east": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      7,
+      9,
+      9,
+      10
+     ]
+    },
+    "up": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      1,
+      7,
+      15,
+      9
+     ]
+    },
+    "down": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      1,
+      7,
+      15,
+      9
+     ]
+    }
+   },
+   "rotation": {
+    "origin": [
+     8,
+     8,
+     8
+    ],
+    "axis": "y",
+    "angle": 22.5
+   }
+  },
+  {
+   "name": "fork_bridge",
+   "from": [
+    1,
+    6,
+    6
+   ],
+   "to": [
+    2,
+    7,
+    10
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      14,
+      9,
+      15,
+      10
+     ]
+    },
+    "south": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      1,
+      9,
+      2,
+      10
+     ]
+    },
+    "west": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      6,
+      9,
+      10,
+      10
+     ]
+    },
+    "east": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      6,
+      9,
+      10,
+      10
+     ]
+    },
+    "up": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      1,
+      6,
+      2,
+      10
+     ]
+    },
+    "down": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      1,
+      6,
+      2,
+      10
+     ]
+    }
+   },
+   "rotation": {
+    "origin": [
+     8,
+     8,
+     8
+    ],
+    "axis": "y",
+    "angle": 22.5
+   }
+  },
+  {
+   "name": "fork_prong",
+   "from": [
+    1,
+    7,
+    6
+   ],
+   "to": [
+    2,
+    11,
+    7
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      14,
+      5,
+      15,
+      9
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      1,
+      5,
+      2,
+      9
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      6,
+      5,
+      7,
+      9
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      9,
+      5,
+      10,
+      9
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      1,
+      6,
+      2,
+      7
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      1,
+      9,
+      2,
+      10
+     ]
+    }
+   },
+   "rotation": {
+    "origin": [
+     8,
+     8,
+     8
+    ],
+    "axis": "y",
+    "angle": 22.5
+   }
+  },
+  {
+   "name": "fork_tip",
+   "from": [
+    1,
+    11,
+    6
+   ],
+   "to": [
+    2,
+    12,
+    7
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:ether_core",
+     "uv": [
+      14,
+      4,
+      15,
+      5
+     ]
+    },
+    "south": {
+     "texture": "concept:ether_core",
+     "uv": [
+      1,
+      4,
+      2,
+      5
+     ]
+    },
+    "west": {
+     "texture": "concept:ether_core",
+     "uv": [
+      6,
+      4,
+      7,
+      5
+     ]
+    },
+    "east": {
+     "texture": "concept:ether_core",
+     "uv": [
+      9,
+      4,
+      10,
+      5
+     ]
+    },
+    "up": {
+     "texture": "concept:ether_core",
+     "uv": [
+      1,
+      6,
+      2,
+      7
+     ]
+    },
+    "down": {
+     "texture": "concept:ether_core",
+     "uv": [
+      1,
+      9,
+      2,
+      10
+     ]
+    }
+   },
+   "rotation": {
+    "origin": [
+     8,
+     8,
+     8
+    ],
+    "axis": "y",
+    "angle": 22.5
+   }
+  },
+  {
+   "name": "fork_prong",
+   "from": [
+    1,
+    7,
+    9
+   ],
+   "to": [
+    2,
+    11,
+    10
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      14,
+      5,
+      15,
+      9
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      1,
+      5,
+      2,
+      9
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      9,
+      5,
+      10,
+      9
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      6,
+      5,
+      7,
+      9
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      1,
+      9,
+      2,
+      10
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      1,
+      6,
+      2,
+      7
+     ]
+    }
+   },
+   "rotation": {
+    "origin": [
+     8,
+     8,
+     8
+    ],
+    "axis": "y",
+    "angle": 22.5
+   }
+  },
+  {
+   "name": "fork_tip",
+   "from": [
+    1,
+    11,
+    9
+   ],
+   "to": [
+    2,
+    12,
+    10
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:ether_core",
+     "uv": [
+      14,
+      4,
+      15,
+      5
+     ]
+    },
+    "south": {
+     "texture": "concept:ether_core",
+     "uv": [
+      1,
+      4,
+      2,
+      5
+     ]
+    },
+    "west": {
+     "texture": "concept:ether_core",
+     "uv": [
+      9,
+      4,
+      10,
+      5
+     ]
+    },
+    "east": {
+     "texture": "concept:ether_core",
+     "uv": [
+      6,
+      4,
+      7,
+      5
+     ]
+    },
+    "up": {
+     "texture": "concept:ether_core",
+     "uv": [
+      1,
+      9,
+      2,
+      10
+     ]
+    },
+    "down": {
+     "texture": "concept:ether_core",
+     "uv": [
+      1,
+      6,
+      2,
+      7
+     ]
+    }
+   },
+   "rotation": {
+    "origin": [
+     8,
+     8,
+     8
+    ],
+    "axis": "y",
+    "angle": 22.5
+   }
+  },
+  {
+   "name": "fork_bridge",
+   "from": [
+    14,
+    6,
+    6
+   ],
+   "to": [
+    15,
+    7,
+    10
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      1,
+      9,
+      2,
+      10
+     ]
+    },
+    "south": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      14,
+      9,
+      15,
+      10
+     ]
+    },
+    "west": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      6,
+      9,
+      10,
+      10
+     ]
+    },
+    "east": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      6,
+      9,
+      10,
+      10
+     ]
+    },
+    "up": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      14,
+      6,
+      15,
+      10
+     ]
+    },
+    "down": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      14,
+      6,
+      15,
+      10
+     ]
+    }
+   },
+   "rotation": {
+    "origin": [
+     8,
+     8,
+     8
+    ],
+    "axis": "y",
+    "angle": 22.5
+   }
+  },
+  {
+   "name": "fork_prong",
+   "from": [
+    14,
+    7,
+    6
+   ],
+   "to": [
+    15,
+    11,
+    7
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      1,
+      5,
+      2,
+      9
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      14,
+      5,
+      15,
+      9
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      6,
+      5,
+      7,
+      9
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      9,
+      5,
+      10,
+      9
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      14,
+      6,
+      15,
+      7
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      14,
+      9,
+      15,
+      10
+     ]
+    }
+   },
+   "rotation": {
+    "origin": [
+     8,
+     8,
+     8
+    ],
+    "axis": "y",
+    "angle": 22.5
+   }
+  },
+  {
+   "name": "fork_tip",
+   "from": [
+    14,
+    11,
+    6
+   ],
+   "to": [
+    15,
+    12,
+    7
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:ether_core",
+     "uv": [
+      1,
+      4,
+      2,
+      5
+     ]
+    },
+    "south": {
+     "texture": "concept:ether_core",
+     "uv": [
+      14,
+      4,
+      15,
+      5
+     ]
+    },
+    "west": {
+     "texture": "concept:ether_core",
+     "uv": [
+      6,
+      4,
+      7,
+      5
+     ]
+    },
+    "east": {
+     "texture": "concept:ether_core",
+     "uv": [
+      9,
+      4,
+      10,
+      5
+     ]
+    },
+    "up": {
+     "texture": "concept:ether_core",
+     "uv": [
+      14,
+      6,
+      15,
+      7
+     ]
+    },
+    "down": {
+     "texture": "concept:ether_core",
+     "uv": [
+      14,
+      9,
+      15,
+      10
+     ]
+    }
+   },
+   "rotation": {
+    "origin": [
+     8,
+     8,
+     8
+    ],
+    "axis": "y",
+    "angle": 22.5
+   }
+  },
+  {
+   "name": "fork_prong",
+   "from": [
+    14,
+    7,
+    9
+   ],
+   "to": [
+    15,
+    11,
+    10
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      1,
+      5,
+      2,
+      9
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      14,
+      5,
+      15,
+      9
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      9,
+      5,
+      10,
+      9
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      6,
+      5,
+      7,
+      9
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      14,
+      9,
+      15,
+      10
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      14,
+      6,
+      15,
+      7
+     ]
+    }
+   },
+   "rotation": {
+    "origin": [
+     8,
+     8,
+     8
+    ],
+    "axis": "y",
+    "angle": 22.5
+   }
+  },
+  {
+   "name": "fork_tip",
+   "from": [
+    14,
+    11,
+    9
+   ],
+   "to": [
+    15,
+    12,
+    10
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:ether_core",
+     "uv": [
+      1,
+      4,
+      2,
+      5
+     ]
+    },
+    "south": {
+     "texture": "concept:ether_core",
+     "uv": [
+      14,
+      4,
+      15,
+      5
+     ]
+    },
+    "west": {
+     "texture": "concept:ether_core",
+     "uv": [
+      9,
+      4,
+      10,
+      5
+     ]
+    },
+    "east": {
+     "texture": "concept:ether_core",
+     "uv": [
+      6,
+      4,
+      7,
+      5
+     ]
+    },
+    "up": {
+     "texture": "concept:ether_core",
+     "uv": [
+      14,
+      9,
+      15,
+      10
+     ]
+    },
+    "down": {
+     "texture": "concept:ether_core",
+     "uv": [
+      14,
+      6,
+      15,
+      7
+     ]
+    }
+   },
+   "rotation": {
+    "origin": [
+     8,
+     8,
+     8
+    ],
+    "axis": "y",
+    "angle": 22.5
+   }
+  },
+  {
+   "name": "emitter",
+   "from": [
+    6,
+    7,
+    6
+   ],
+   "to": [
+    10,
+    14,
+    10
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:ether_glass",
+     "uv": [
+      6,
+      2,
+      10,
+      9
+     ]
+    },
+    "south": {
+     "texture": "concept:ether_glass",
+     "uv": [
+      6,
+      2,
+      10,
+      9
+     ]
+    },
+    "west": {
+     "texture": "concept:ether_glass",
+     "uv": [
+      6,
+      2,
+      10,
+      9
+     ]
+    },
+    "east": {
+     "texture": "concept:ether_glass",
+     "uv": [
+      6,
+      2,
+      10,
+      9
+     ]
+    },
+    "up": {
+     "texture": "concept:ether_glass",
+     "uv": [
+      6,
+      6,
+      10,
+      10
+     ]
+    }
+   },
+   "rotation": {
+    "origin": [
+     8,
+     8,
+     8
+    ],
+    "axis": "y",
+    "angle": 45
+   }
+  },
+  {
+   "name": "emitter_core",
+   "from": [
+    7,
+    7,
+    7
+   ],
+   "to": [
+    9,
+    13,
+    9
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7,
+      3,
+      9,
+      9
+     ]
+    },
+    "south": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7,
+      3,
+      9,
+      9
+     ]
+    },
+    "west": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7,
+      3,
+      9,
+      9
+     ]
+    },
+    "east": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7,
+      3,
+      9,
+      9
+     ]
+    },
+    "up": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7,
+      7,
+      9,
+      9
+     ]
+    }
+   },
+   "rotation": {
+    "origin": [
+     8,
+     8,
+     8
+    ],
+    "axis": "y",
+    "angle": 45
+   }
+  },
+  {
+   "name": "emitter_cap",
+   "from": [
+    7,
+    14,
+    7
+   ],
+   "to": [
+    9,
+    15,
+    9
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:ether_glass",
+     "uv": [
+      7,
+      1,
+      9,
+      2
+     ]
+    },
+    "south": {
+     "texture": "concept:ether_glass",
+     "uv": [
+      7,
+      1,
+      9,
+      2
+     ]
+    },
+    "west": {
+     "texture": "concept:ether_glass",
+     "uv": [
+      7,
+      1,
+      9,
+      2
+     ]
+    },
+    "east": {
+     "texture": "concept:ether_glass",
+     "uv": [
+      7,
+      1,
+      9,
+      2
+     ]
+    },
+    "up": {
+     "texture": "concept:ether_glass",
+     "uv": [
+      7,
+      7,
+      9,
+      9
+     ]
+    },
+    "down": {
+     "texture": "concept:ether_glass",
+     "uv": [
+      7,
+      7,
+      9,
+      9
+     ]
+    }
+   },
+   "rotation": {
+    "origin": [
+     8,
+     8,
+     8
+    ],
+    "axis": "y",
+    "angle": 45
+   }
+  },
+  {
+   "name": "beam",
+   "from": [
+    6.5,
+    16,
+    6.5
+   ],
+   "to": [
+    9.5,
+    32,
+    9.5
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:ether_beam",
+     "uv": [
+      6.5,
+      0,
+      9.5,
+      16
+     ]
+    },
+    "south": {
+     "texture": "concept:ether_beam",
+     "uv": [
+      6.5,
+      0,
+      9.5,
+      16
+     ]
+    },
+    "west": {
+     "texture": "concept:ether_beam",
+     "uv": [
+      6.5,
+      0,
+      9.5,
+      16
+     ]
+    },
+    "east": {
+     "texture": "concept:ether_beam",
+     "uv": [
+      6.5,
+      0,
+      9.5,
+      16
+     ]
+    }
+   },
+   "rotation": {
+    "origin": [
+     8,
+     8,
+     8
+    ],
+    "axis": "y",
+    "angle": 45
+   }
+  }
+ ]
+}

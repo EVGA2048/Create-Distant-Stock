@@ -2,19 +2,27 @@ package dev.distantstock.panel;
 
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock;
 import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlockEntity;
+import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelConnection;
+import com.simibubi.create.content.logistics.factoryBoard.FactoryPanelSupportBehaviour;
+import com.simibubi.create.content.redstone.displayLink.source.FactoryGaugeDisplaySource;
 import dev.distantstock.block.RemoteGaugeModels;
 import dev.distantstock.block.RemoteOrderSlot;
 import dev.distantstock.item.ModItems;
 import dev.distantstock.routing.TowerActivation;
 import dev.engine_room.flywheel.lib.model.baked.PartialModel;
-import net.liukrast.deployer.lib.logistics.board.AbstractPanelBehaviour;
+import net.createmod.catnip.data.IntAttached;
 import net.liukrast.deployer.lib.logistics.board.PanelType;
 import net.liukrast.deployer.lib.logistics.board.connection.PanelConnectionBuilder;
+import net.liukrast.deployer.lib.logistics.board.connection.StockConnection;
+import net.liukrast.deployer.lib.registry.DeployerPanelConnections;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.neoforged.neoforge.registries.DeferredHolder;
+
+import java.util.List;
 
 /**
  * A remote gauge as a panel <em>type</em>: the same machine, able to sit on anybody's board.
@@ -29,7 +37,14 @@ import net.minecraft.world.level.Level;
  * while a tower carries this position. A panel that ordered on every tick would drain a warehouse;
  * one that ordered without a tower would spend stock nothing is able to move.
  */
-public class RemoteGaugePanelBehaviour extends AbstractPanelBehaviour {
+public class RemoteGaugePanelBehaviour extends CreateStatePanelBehaviour {
+    /**
+     * The text a display link shows for a factory gauge. Create's registered instance sits behind
+     * Registrate, which this project does not compile against; {@code createEntry} keeps no state,
+     * so a private instance says the same thing.
+     */
+    private static final FactoryGaugeDisplaySource GAUGE_STATUS = new FactoryGaugeDisplaySource();
+
     private final RemoteOrderSlot orders;
     /** Distant Stock network joined by this panel, independent of its selected source warehouse. */
     private java.util.UUID distantNetworkScope;
@@ -66,30 +81,74 @@ public class RemoteGaugePanelBehaviour extends AbstractPanelBehaviour {
     }
 
     /**
-     * Nothing to offer a neighbour.
+     * The same connections a factory gauge has under Deployer, so the remote gauge on somebody
+     * else's board wires the way the one on our board does.
      *
-     * <p>A connection between panels carries a promise: one panel undertakes to supply the other's
-     * item. This panel's goods come from another server, so it has nothing to promise locally, and
-     * advertising a connection it cannot honour would be worse than advertising none.
+     * <p>Without them the panel was a dead end: a factory gauge could not use it as an ingredient,
+     * and an Extra Gauges logic or number gauge could neither pause it nor set its amount, nor read
+     * it back. The stock connection names the filter item, as a factory gauge's does, so a recipe
+     * pointing at this panel counts the stock it watches.
      */
     @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public void addConnections(PanelConnectionBuilder builder) {
+        builder.registerBoth((DeferredHolder) DeployerPanelConnections.STOCK_CONNECTION,
+                () -> filter.item().isEmpty() ? null : StockConnection.itemStack(filter.item()));
+        builder.registerBoth(DeployerPanelConnections.REDSTONE, () -> satisfied && count != 0);
+        builder.registerBoth(DeployerPanelConnections.NUMBERS, () -> (float) getLevelInStorage());
+        builder.registerBoth(DeployerPanelConnections.STRING, () -> {
+            IntAttached<MutableComponent> entry = GAUGE_STATUS.createEntry(getWorld(), getPanelPosition());
+            return entry == null ? null : entry.getFirst() + entry.getValue().getString();
+        });
     }
 
     /**
-     * The item in this panel's filter slot.
+     * What arrives on those connections, applied the way Create applies it to a factory gauge.
      *
-     * <p>Deployer's base class deliberately answers {@code EMPTY} here — a panel type that has no
-     * filter should not pretend to have one — so every type that does have one has to say so. Drop
-     * this and the panel still shows its filter and still reads its network; it simply never sees
-     * the item, which on a gauge means it never orders and on a lamp means it is not a lamp.
+     * <p>Deployer seals {@code checkForRedstoneInput} on its panel types and calls this instead, so
+     * a panel type that does not read its inputs here ignores them all.
      */
     @Override
-    public ItemStack getFilter() {
-        // Not super.getFilter(): Deployer's base class answers EMPTY on purpose, for panel types
-        // that have no filter at all, and calling up to it would hand us that empty stack. The
-        // filter itself is Create's, kept where Create keeps it.
-        return filter.item();
+    public void notifiedFromInput() {
+        if (!active) {
+            return;
+        }
+        boolean changed = false;
+        List<Boolean> powered = getAllValues(DeployerPanelConnections.REDSTONE.get());
+        boolean shouldPower = powered != null && powered.stream().anyMatch(b -> b);
+        for (FactoryPanelConnection connection : targetedByLinks.values()) {
+            if (!getWorld().isLoaded(connection.from.pos())) {
+                return;
+            }
+            FactoryPanelSupportBehaviour link = linkAt(getWorld(), connection);
+            if (link == null) {
+                return;
+            }
+            shouldPower |= link.shouldPanelBePowered();
+        }
+        if (shouldPower != redstonePowered) {
+            redstonePowered = shouldPower;
+            changed = true;
+        }
+        List<Float> numbers = getAllValues(DeployerPanelConnections.NUMBERS.get());
+        if (numbers != null && !numbers.isEmpty()) {
+            int total = (int) numbers.stream().reduce(0f, Float::sum).floatValue();
+            if (total != count) {
+                count = total;
+                changed = true;
+            }
+        }
+        List<String> strings = getAllValues(DeployerPanelConnections.STRING.get());
+        if (strings != null && !strings.isEmpty()) {
+            String address = String.join("", strings);
+            if (!address.equals(recipeAddress)) {
+                recipeAddress = address;
+                changed = true;
+            }
+        }
+        if (changed) {
+            blockEntity.notifyUpdate();
+        }
     }
 
     @Override
@@ -165,6 +224,11 @@ public class RemoteGaugePanelBehaviour extends AbstractPanelBehaviour {
     @Override
     public void easyRead(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.easyRead(tag, registries, clientPacket);
+        if (!tag.hasUUID("Freq")) {
+            // Saved before the frequency was kept (see CreateStatePanelBehaviour). The constructor's
+            // random one is a network nobody tuned, so the panel waits to be tuned instead.
+            network = dev.distantstock.block.RemoteGaugeBlockEntity.UNCONFIGURED_LOCAL_NETWORK;
+        }
         if (tag.contains("DistantStock")) {
             CompoundTag ours = tag.getCompound("DistantStock");
             orders.load(ours, clientPacket);

@@ -3,12 +3,38 @@
   "accept_mirrored": false,
   "category": "equipment",
   "key": {
-    "P": { "item": "distantstock:polished_ether_quartz" },
-    "E": { "item": "distantstock:ether_mechanism" },
-    "C": { "item": "distantstock:tower_casing" },
-    "N": { "item": "minecraft:netherite_boots" }
+    "S": {
+      "item": "distantstock:resonant_sturdy_sheet"
+    },
+    "Q": {
+      "item": "create:copper_sheet"
+    },
+    "E": {
+      "item": "distantstock:ether_mechanism"
+    },
+    "P": {
+      "item": "distantstock:polished_ether_quartz"
+    },
+    "T": {
+      "item": "create:fluid_tank"
+    },
+    "N": {
+      "item": "create:netherite_diving_boots"
+    },
+    "C": {
+      "item": "distantstock:tower_casing"
+    }
   },
-  "pattern": ["PPPPP", "ECNCE", "PPPPP"],
-  "result": { "count": 1, "id": "distantstock:ether_casing_boots" },
+  "pattern": [
+    " SQEQS ",
+    "PQQTQQP",
+    "SESNSES",
+    "PQQEQQP",
+    " SQCQS "
+  ],
+  "result": {
+    "count": 1,
+    "id": "distantstock:ether_casing_boots"
+  },
   "show_notification": true
 }

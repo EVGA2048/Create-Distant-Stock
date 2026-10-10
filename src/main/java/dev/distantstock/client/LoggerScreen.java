@@ -199,12 +199,21 @@ public final class LoggerScreen extends Screen {
         // event detail (for chain diagnostics this is the actual Frogport address) so the console
         // tells the operator what failed instead of showing an opaque hashed source id.
         String context = row.detail() == null || row.detail().isBlank() ? row.sourceId() : row.detail();
-        g.drawString(font, fit(context, 78), x + 154, y + 3, MUTED, false);
+
+        // Keep a dedicated operator-action lane on the right.  The old layout drew the recurrence
+        // count at x+235 and then started the PRINT/ACK button at roughly the same x coordinate, so
+        // repeated alarms literally printed their count underneath the button.  Reserve the lane
+        // first, then fit context/count into what remains.
+        int actionX = x + w - 45;
+        String countText = row.count() > 1 ? "×" + row.count() : "";
+        int countW = countText.isEmpty() ? 0 : font.width(countText) + 5;
+        int contextW = Math.max(24, actionX - 5 - countW - (x + 154));
+        g.drawString(font, fit(context, contextW), x + 154, y + 3, MUTED, false);
         if (row.count() > 1) {
-            g.drawString(font, "×" + row.count(), x + 235, y + 3, MUTED, false);
+            g.drawString(font, countText, actionX - countW, y + 3, MUTED, false);
         }
 
-        int ax = x + w - 44;
+        int ax = actionX;
         if (!row.active()) {
             g.drawString(font, Component.translatable("gui.distantstock.logger.cleared"),
                     ax, y + 3, GOOD, false);
@@ -214,19 +223,30 @@ public final class LoggerScreen extends Screen {
         } else if (row.severity() != EventRegistry.Severity.INFO) {
             boolean paperAvailable = snapshot.paperRemaining() > 0;
             if (paperAvailable) {
-                boolean over = inside(mouseX, mouseY, ax - 3, y + 1, 42, 14);
-                g.fill(ax - 3, y + 1, ax + 39, y + 15,
+                boolean over = inside(mouseX, mouseY, ax - 1, y + 1, 43, 14);
+                g.fill(ax - 1, y + 1, ax + 42, y + 15,
                         over ? 0xFF5A4B36 : 0xFF463A2E);
                 Component print = Component.translatable("gui.distantstock.logger.print");
-                g.drawString(font, print, ax + 18 - font.width(print) / 2, y + 4,
+                g.drawString(font, print, ax + 20 - font.width(print) / 2, y + 4,
                         WARN, false);
-                hits.add(new Hit(ax - 3, y + 1, 42, 14,
+                hits.add(new Hit(ax - 1, y + 1, 43, 14,
                         () -> PacketDistributor.sendToServer(LoggerActionC2S.print(source(), row.id()))));
+            } else if (!row.acknowledged()) {
+                // No paper is a degraded state, not a reason to hide the one operation the operator
+                // still has: ACK silences the horn but deliberately leaves the incident pending for
+                // a real print once a roll is installed.  Keeping this as an explicit button makes
+                // the state transition visible instead of tying it to a blind right-click shortcut.
+                boolean over = inside(mouseX, mouseY, ax - 1, y + 1, 43, 14);
+                g.fill(ax - 1, y + 1, ax + 42, y + 15,
+                        over ? 0xFF4C5558 : 0xFF354145);
+                Component ack = Component.translatable("gui.distantstock.logger.ack");
+                g.drawString(font, ack, ax + 20 - font.width(ack) / 2, y + 4,
+                        MUTED, false);
+                hits.add(new Hit(ax - 1, y + 1, 43, 14,
+                        () -> PacketDistributor.sendToServer(LoggerActionC2S.acknowledge(source(), row.id()))));
             } else {
-                Component pending = Component.translatable(row.acknowledged()
-                        ? "gui.distantstock.logger.pending_print"
-                        : "gui.distantstock.logger.no_paper_short");
-                g.drawString(font, pending, ax, y + 3, row.acknowledged() ? WARN : MUTED, false);
+                Component pending = Component.translatable("gui.distantstock.logger.pending_print");
+                g.drawString(font, pending, ax, y + 3, WARN, false);
             }
         }
     }

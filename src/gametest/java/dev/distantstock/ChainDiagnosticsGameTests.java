@@ -1454,6 +1454,65 @@ public final class ChainDiagnosticsGameTests {
     }
 
     @GameTest(template = "empty")
+    public static void unaddressedFrogportDoesNotShadowRealRoutes(GameTestHelper h) {
+        // A Frogport the player never addressed hands Create a blank filter, which registers at
+        // distance zero and matches every unaddressed parcel. Vanilla therefore answers with that
+        // port's connection before any real destination is reached, and parcels drift to a Frogport
+        // nobody aimed them at. The blank entry has to stop counting as a destination.
+        ChainConveyorRoutingTable table = new ChainConveyorRoutingTable();
+        BlockPos blankExit = new BlockPos(8, 0, 0);
+        BlockPos normalExit = new BlockPos(4, 0, 0);
+        BlockPos diagnosticExit = new BlockPos(-3, 0, 0);
+        table.receivePortInfo("", blankExit);                    // unaddressed Frogport, distance 0
+        table.receivePortInfo("GOOD-LINE", normalExit);
+        table.receivePortInfo(ChainDiagnostics.diagnosticAddress(new BlockPos(9, 2, 1)), diagnosticExit);
+
+        ItemStack unaddressed = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        h.assertTrue(ChainDiagnostics.blankPortExit(table.entriesByDistance, blankExit),
+                "an exit owned only by an unaddressed Frogport was not recognised as blank");
+        h.assertFalse(ChainDiagnostics.blankPortExit(table.entriesByDistance, normalExit),
+                "an exit owned by a real Frogport was mistaken for an unaddressed one");
+
+        ItemStack routed = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        PackageItem.addAddress(routed, "GOOD-LINE");
+        h.assertTrue(ChainDiagnostics.normalExit(table.entriesByDistance, routed).equals(normalExit),
+                "addressed parcel no longer reaches its real Frogport");
+
+        // With no destination behind the blank port the parcel is genuinely unroutable, so the
+        // diagnostic has to catch it instead of it circling the chain.
+        h.assertTrue(ChainDiagnostics.shouldCatchUnroutable(table.entriesByDistance, unaddressed),
+                "unaddressed Frogport still counted as a route, so the parcel was never catchable");
+        h.assertTrue(ChainDiagnostics.diagnosticExit(table.entriesByDistance, unaddressed).equals(diagnosticExit),
+                "unroutable parcel did not choose the diagnostic Frogport route");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void unaddressedPortStillServesItsOwnParcel(GameTestHelper h) {
+        // Blank ports are skipped as destinations, but nothing else changes for them: the wildcard
+        // Frogport a player deliberately aims at keeps collecting, and addressing a parcel to the
+        // blank port's neighbour still resolves to that neighbour. Skipping must not become a
+        // blanket refusal to route anything.
+        ChainConveyorRoutingTable table = new ChainConveyorRoutingTable();
+        BlockPos wildcardExit = new BlockPos(6, 0, 0);
+        BlockPos blankExit = new BlockPos(8, 0, 0);
+        table.receivePortInfo("", blankExit);
+        table.receivePortInfo("*", wildcardExit);
+
+        ItemStack unaddressed = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        h.assertTrue(ChainDiagnostics.normalExit(table.entriesByDistance, unaddressed).equals(wildcardExit),
+                "the wildcard Frogport stopped accepting unaddressed parcels");
+        h.assertFalse(ChainDiagnostics.shouldCatchUnroutable(table.entriesByDistance, unaddressed),
+                "diagnostic stole a parcel the wildcard Frogport would have accepted");
+
+        ItemStack addressed = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        PackageItem.addAddress(addressed, "WILDCARD-ONLY");
+        h.assertFalse(ChainDiagnostics.shouldCatchUnroutable(table.entriesByDistance, addressed),
+                "diagnostic stole an addressed parcel while a wildcard Frogport was present");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty")
     public static void playerRemovedPingBecomesStaleReturnProbe(GameTestHelper h) {
         BlockPos controller = new BlockPos(7, 3, 5);
         UUID id = UUID.randomUUID();

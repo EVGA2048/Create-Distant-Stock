@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " S ",
+    "STS",
+    " S "
+  ],
+  "key": {
+    "S": {
+      "item": "create:sturdy_sheet"
+    },
+    "T": {
+      "item": "distantstock:copper_fluid_tank"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "distantstock:sturdy_fluid_tank"
+  }
+}

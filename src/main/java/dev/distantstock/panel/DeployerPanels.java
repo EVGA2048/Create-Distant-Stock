@@ -7,6 +7,7 @@ import dev.distantstock.DistantStock;
 import dev.distantstock.routing.RemoteNetworkId;
 import net.liukrast.deployer.lib.logistics.board.AbstractPanelBehaviour;
 import net.liukrast.deployer.lib.logistics.board.PanelType;
+import net.liukrast.deployer.lib.registry.DeployerPanelConnections;
 import net.liukrast.deployer.lib.registry.DeployerRegistries;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -134,6 +135,24 @@ public final class DeployerPanels {
             FactoryPanelBehaviour behaviour, FactoryPanelBlock.PanelState state,
             FactoryPanelBlock.PanelType type) {
         return behaviour instanceof AbstractPanelBehaviour panel ? panel.getModel(state, type) : null;
+    }
+
+    /**
+     * What another mod's panel says on Deployer's redstone connection, or null when it says nothing
+     * there and should be read like a Create gauge.
+     *
+     * <p>A logic gauge from Extra Gauges is not a stock gauge: it carries its answer on this
+     * connection and keeps {@code redstonePowered} as the <em>inverse</em> of it, so reading it the
+     * way a Create gauge is read lights a lamp exactly when the gate is false.
+     */
+    public static Boolean redstoneOutput(FactoryPanelBehaviour source) {
+        if (!(source instanceof AbstractPanelBehaviour panel)
+                || source instanceof RemoteGaugePanelBehaviour
+                || source instanceof SignalLampPanelBehaviour
+                || !panel.getOutputConnections().contains(DeployerPanelConnections.REDSTONE.get())) {
+            return null;
+        }
+        return panel.getConnectionValue(DeployerPanelConnections.REDSTONE.get()).orElse(false);
     }
 
     /** Whether the given slot of the given board holds a remote gauge of ours. */

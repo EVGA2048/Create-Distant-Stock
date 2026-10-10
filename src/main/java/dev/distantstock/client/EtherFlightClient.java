@@ -14,27 +14,20 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 @EventBusSubscriber(modid = DistantStock.MODID, value = Dist.CLIENT)
 public final class EtherFlightClient {
-    private static boolean wasJumping = false;
+    private static boolean sentBoosting = false;
 
     @SubscribeEvent
     public static void clientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         LocalPlayer player = mc.player;
-        if (player == null) return;
-        if (!player.isFallFlying()) {
-            wasJumping = false;
-            return;
+        boolean shouldBoost = player != null
+                && player.isFallFlying()
+                && player.getItemBySlot(EquipmentSlot.CHEST).is(dev.distantstock.item.ModItems.ETHER_CASING_CHESTPLATE.get())
+                && mc.options.keyJump.isDown();
+        if (shouldBoost != sentBoosting) {
+            PacketDistributor.sendToServer(new EtherBoostC2S(shouldBoost));
+            sentBoosting = shouldBoost;
         }
-        if (!(player.getItemBySlot(EquipmentSlot.CHEST).getItem() instanceof EtherCasingArmorItem)) {
-            wasJumping = false;
-            return;
-        }
-
-        boolean jumping = mc.options.keyJump.isDown();
-        if (jumping && !wasJumping) {
-            PacketDistributor.sendToServer(new EtherBoostC2S());
-        }
-        wasJumping = jumping;
     }
 
     private EtherFlightClient() {

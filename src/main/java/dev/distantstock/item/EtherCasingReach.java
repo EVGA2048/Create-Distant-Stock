@@ -2,7 +2,6 @@ package dev.distantstock.item;
 
 import dev.distantstock.DistantStock;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
@@ -36,18 +35,10 @@ public final class EtherCasingReach {
         // etc.). Let vanilla/NeoForge sync the server modifier to the client instead.
         if (!(player instanceof ServerPlayer)) return;
         boolean equipped = EtherCasingArmorItem.hasFullSet(player);
-        update(player.getAttribute(Attributes.BLOCK_INTERACTION_RANGE), BLOCK_MODIFIER, equipped);
-        update(player.getAttribute(Attributes.ENTITY_INTERACTION_RANGE), ENTITY_MODIFIER, equipped);
-    }
-
-    private static void update(AttributeInstance attribute, AttributeModifier modifier, boolean equipped) {
-        if (attribute == null) return;
-        boolean present = attribute.hasModifier(modifier.id());
-        if (equipped && !present) {
-            attribute.addTransientModifier(modifier);
-        } else if (!equipped && present) {
-            attribute.removeModifier(modifier.id());
-        }
+        EtherCasingStatsServer.update(player.getAttribute(Attributes.BLOCK_INTERACTION_RANGE),
+                BLOCK_MODIFIER, equipped);
+        EtherCasingStatsServer.update(player.getAttribute(Attributes.ENTITY_INTERACTION_RANGE),
+                ENTITY_MODIFIER, equipped);
     }
 
     private EtherCasingReach() {

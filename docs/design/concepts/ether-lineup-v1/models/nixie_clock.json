@@ -1,0 +1,1038 @@
+{
+ "parent": "minecraft:block/block",
+ "credit": "Distant Stock concept; concept:* are files in ./textures",
+ "textures": {
+  "particle": "create:block/brass_casing"
+ },
+ "elements": [
+  {
+   "name": "backplate",
+   "from": [
+    0,
+    3,
+    14
+   ],
+   "to": [
+    16,
+    13,
+    16
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:clock_plate",
+     "uv": [
+      0,
+      3,
+      16,
+      13
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      3,
+      16,
+      13
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      14,
+      3,
+      16,
+      13
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      3,
+      2,
+      13
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      14,
+      16,
+      16
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      0,
+      16,
+      2
+     ]
+    }
+   }
+  },
+  {
+   "name": "shelf",
+   "from": [
+    0,
+    3,
+    10
+   ],
+   "to": [
+    16,
+    5,
+    14
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      11,
+      16,
+      13
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      11,
+      16,
+      13
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      10,
+      11,
+      14,
+      13
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      2,
+      11,
+      6,
+      13
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      10,
+      16,
+      14
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      2,
+      16,
+      6
+     ]
+    }
+   }
+  },
+  {
+   "name": "sync_pip",
+   "from": [
+    7.5,
+    11,
+    13.5
+   ],
+   "to": [
+    8.5,
+    12,
+    14
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      4,
+      8.5,
+      5
+     ]
+    },
+    "south": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      4,
+      8.5,
+      5
+     ]
+    },
+    "west": {
+     "texture": "concept:ether_core",
+     "uv": [
+      13.5,
+      4,
+      14,
+      5
+     ]
+    },
+    "east": {
+     "texture": "concept:ether_core",
+     "uv": [
+      2,
+      4,
+      2.5,
+      5
+     ]
+    },
+    "up": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      13.5,
+      8.5,
+      14
+     ]
+    },
+    "down": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      2,
+      8.5,
+      2.5
+     ]
+    }
+   }
+  },
+  {
+   "name": "tube_0",
+   "from": [
+    12.5,
+    5,
+    10.5
+   ],
+   "to": [
+    15.5,
+    11,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      1,
+      5,
+      4,
+      11
+     ]
+    },
+    "south": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      1,
+      5,
+      4,
+      11
+     ]
+    },
+    "west": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      10.5,
+      5,
+      13,
+      11
+     ]
+    },
+    "east": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      3,
+      5,
+      5.5,
+      11
+     ]
+    },
+    "up": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      12.5,
+      10.5,
+      15.5,
+      13
+     ]
+    },
+    "down": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      12.5,
+      3,
+      15.5,
+      5.5
+     ]
+    }
+   }
+  },
+  {
+   "name": "cap_0",
+   "from": [
+    12.5,
+    11,
+    10.5
+   ],
+   "to": [
+    15.5,
+    11.5,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      0.5,
+      4.5,
+      3.5,
+      5
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      12.5,
+      4.5,
+      15.5,
+      5
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      10.5,
+      4.5,
+      13,
+      5
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      3,
+      4.5,
+      5.5,
+      5
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      12.5,
+      10.5,
+      15.5,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      12.5,
+      3,
+      15.5,
+      5.5
+     ]
+    }
+   }
+  },
+  {
+   "name": "digit_0",
+   "from": [
+    12.5,
+    5.5,
+    11.75
+   ],
+   "to": [
+    15.5,
+    10.5,
+    11.75
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:clock_nixie_digits",
+     "uv": [
+      0,
+      0,
+      3,
+      5
+     ]
+    },
+    "south": {
+     "texture": "concept:clock_nixie_digits",
+     "uv": [
+      0,
+      0,
+      3,
+      5
+     ]
+    }
+   }
+  },
+  {
+   "name": "tube_1",
+   "from": [
+    9,
+    5,
+    10.5
+   ],
+   "to": [
+    12,
+    11,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      1,
+      5,
+      4,
+      11
+     ]
+    },
+    "south": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      1,
+      5,
+      4,
+      11
+     ]
+    },
+    "west": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      10.5,
+      5,
+      13,
+      11
+     ]
+    },
+    "east": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      3,
+      5,
+      5.5,
+      11
+     ]
+    },
+    "up": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      9,
+      10.5,
+      12,
+      13
+     ]
+    },
+    "down": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      9,
+      3,
+      12,
+      5.5
+     ]
+    }
+   }
+  },
+  {
+   "name": "cap_1",
+   "from": [
+    9,
+    11,
+    10.5
+   ],
+   "to": [
+    12,
+    11.5,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      4,
+      4.5,
+      7,
+      5
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      9,
+      4.5,
+      12,
+      5
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      10.5,
+      4.5,
+      13,
+      5
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      3,
+      4.5,
+      5.5,
+      5
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      9,
+      10.5,
+      12,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      9,
+      3,
+      12,
+      5.5
+     ]
+    }
+   }
+  },
+  {
+   "name": "digit_1",
+   "from": [
+    9,
+    5.5,
+    11.75
+   ],
+   "to": [
+    12,
+    10.5,
+    11.75
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:clock_nixie_digits",
+     "uv": [
+      4,
+      0,
+      7,
+      5
+     ]
+    },
+    "south": {
+     "texture": "concept:clock_nixie_digits",
+     "uv": [
+      4,
+      0,
+      7,
+      5
+     ]
+    }
+   }
+  },
+  {
+   "name": "tube_2",
+   "from": [
+    4,
+    5,
+    10.5
+   ],
+   "to": [
+    7,
+    11,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      1,
+      5,
+      4,
+      11
+     ]
+    },
+    "south": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      1,
+      5,
+      4,
+      11
+     ]
+    },
+    "west": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      10.5,
+      5,
+      13,
+      11
+     ]
+    },
+    "east": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      3,
+      5,
+      5.5,
+      11
+     ]
+    },
+    "up": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      4,
+      10.5,
+      7,
+      13
+     ]
+    },
+    "down": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      4,
+      3,
+      7,
+      5.5
+     ]
+    }
+   }
+  },
+  {
+   "name": "cap_2",
+   "from": [
+    4,
+    11,
+    10.5
+   ],
+   "to": [
+    7,
+    11.5,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      9,
+      4.5,
+      12,
+      5
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      4,
+      4.5,
+      7,
+      5
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      10.5,
+      4.5,
+      13,
+      5
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      3,
+      4.5,
+      5.5,
+      5
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      4,
+      10.5,
+      7,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      4,
+      3,
+      7,
+      5.5
+     ]
+    }
+   }
+  },
+  {
+   "name": "digit_2",
+   "from": [
+    4,
+    5.5,
+    11.75
+   ],
+   "to": [
+    7,
+    10.5,
+    11.75
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:clock_nixie_digits",
+     "uv": [
+      8,
+      0,
+      11,
+      5
+     ]
+    },
+    "south": {
+     "texture": "concept:clock_nixie_digits",
+     "uv": [
+      8,
+      0,
+      11,
+      5
+     ]
+    }
+   }
+  },
+  {
+   "name": "tube_3",
+   "from": [
+    0.5,
+    5,
+    10.5
+   ],
+   "to": [
+    3.5,
+    11,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      1,
+      5,
+      4,
+      11
+     ]
+    },
+    "south": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      1,
+      5,
+      4,
+      11
+     ]
+    },
+    "west": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      10.5,
+      5,
+      13,
+      11
+     ]
+    },
+    "east": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      3,
+      5,
+      5.5,
+      11
+     ]
+    },
+    "up": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      0.5,
+      10.5,
+      3.5,
+      13
+     ]
+    },
+    "down": {
+     "texture": "concept:clock_nixie_glass",
+     "uv": [
+      0.5,
+      3,
+      3.5,
+      5.5
+     ]
+    }
+   }
+  },
+  {
+   "name": "cap_3",
+   "from": [
+    0.5,
+    11,
+    10.5
+   ],
+   "to": [
+    3.5,
+    11.5,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      12.5,
+      4.5,
+      15.5,
+      5
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      0.5,
+      4.5,
+      3.5,
+      5
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      10.5,
+      4.5,
+      13,
+      5
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      3,
+      4.5,
+      5.5,
+      5
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      0.5,
+      10.5,
+      3.5,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_block",
+     "uv": [
+      0.5,
+      3,
+      3.5,
+      5.5
+     ]
+    }
+   }
+  },
+  {
+   "name": "digit_3",
+   "from": [
+    0.5,
+    5.5,
+    11.75
+   ],
+   "to": [
+    3.5,
+    10.5,
+    11.75
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:clock_nixie_digits",
+     "uv": [
+      12,
+      0,
+      15,
+      5
+     ]
+    },
+    "south": {
+     "texture": "concept:clock_nixie_digits",
+     "uv": [
+      12,
+      0,
+      15,
+      5
+     ]
+    }
+   }
+  },
+  {
+   "name": "colon_6.5",
+   "from": [
+    7.5,
+    6.5,
+    11.5
+   ],
+   "to": [
+    8.5,
+    7.5,
+    12.5
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      8.5,
+      8.5,
+      9.5
+     ]
+    },
+    "south": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      8.5,
+      8.5,
+      9.5
+     ]
+    },
+    "west": {
+     "texture": "concept:ether_core",
+     "uv": [
+      11.5,
+      8.5,
+      12.5,
+      9.5
+     ]
+    },
+    "east": {
+     "texture": "concept:ether_core",
+     "uv": [
+      3.5,
+      8.5,
+      4.5,
+      9.5
+     ]
+    },
+    "up": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      11.5,
+      8.5,
+      12.5
+     ]
+    },
+    "down": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      3.5,
+      8.5,
+      4.5
+     ]
+    }
+   }
+  },
+  {
+   "name": "colon_8.5",
+   "from": [
+    7.5,
+    8.5,
+    11.5
+   ],
+   "to": [
+    8.5,
+    9.5,
+    12.5
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      6.5,
+      8.5,
+      7.5
+     ]
+    },
+    "south": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      6.5,
+      8.5,
+      7.5
+     ]
+    },
+    "west": {
+     "texture": "concept:ether_core",
+     "uv": [
+      11.5,
+      6.5,
+      12.5,
+      7.5
+     ]
+    },
+    "east": {
+     "texture": "concept:ether_core",
+     "uv": [
+      3.5,
+      6.5,
+      4.5,
+      7.5
+     ]
+    },
+    "up": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      11.5,
+      8.5,
+      12.5
+     ]
+    },
+    "down": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      3.5,
+      8.5,
+      4.5
+     ]
+    }
+   }
+  }
+ ]
+}

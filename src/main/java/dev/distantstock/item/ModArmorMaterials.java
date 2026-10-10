@@ -19,27 +19,30 @@ public final class ModArmorMaterials {
             DeferredRegister.create(Registries.ARMOR_MATERIAL, DistantStock.MODID);
 
     /**
-     * A small step above netherite rather than a second creative-mode armour tier:
-     * one extra armour point, +1 toughness, slightly more knockback resistance and durability.
+     * Resonant quartz is hard rather than bulky. The figures are in {@link EtherCasingBalance},
+     * together with the reasoning; the short version is that extra armour points past twenty are
+     * discarded by {@code CombatRules} and toughness is the dial that actually does something.
      */
     public static final DeferredHolder<ArmorMaterial, ArmorMaterial> ETHER_CASING =
             MATERIALS.register("ether_casing", () -> new ArmorMaterial(
                     defenses(),
                     18,
                     SoundEvents.ARMOR_EQUIP_DIAMOND,
+                    // What an anvil repairs the suit with. A piece that is not charged wears out, so
+                    // this is maintenance stock the player has to keep making.
                     () -> Ingredient.of(ModItems.POLISHED_ETHER_QUARTZ.get()),
                     List.of(new ArmorMaterial.Layer(ResourceLocation.fromNamespaceAndPath(
                             DistantStock.MODID, "ether_casing"))),
-                    4.0F,
-                    0.15F));
+                    EtherCasingBalance.TOUGHNESS,
+                    EtherCasingBalance.KNOCKBACK_RESISTANCE));
 
     private static EnumMap<ArmorItem.Type, Integer> defenses() {
         EnumMap<ArmorItem.Type, Integer> values = new EnumMap<>(ArmorItem.Type.class);
-        values.put(ArmorItem.Type.BOOTS, 3);
-        values.put(ArmorItem.Type.LEGGINGS, 6);
-        values.put(ArmorItem.Type.CHESTPLATE, 8);
-        values.put(ArmorItem.Type.HELMET, 4);
-        values.put(ArmorItem.Type.BODY, 12);
+        values.put(ArmorItem.Type.BOOTS, EtherCasingBalance.BOOTS_DEFENSE);
+        values.put(ArmorItem.Type.LEGGINGS, EtherCasingBalance.LEGGINGS_DEFENSE);
+        values.put(ArmorItem.Type.CHESTPLATE, EtherCasingBalance.CHESTPLATE_DEFENSE);
+        values.put(ArmorItem.Type.HELMET, EtherCasingBalance.HELMET_DEFENSE);
+        values.put(ArmorItem.Type.BODY, EtherCasingBalance.BODY_DEFENSE);
         return values;
     }
 

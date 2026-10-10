@@ -4,10 +4,7 @@ import com.mojang.serialization.MapCodec;
 import com.simibubi.create.content.equipment.wrench.IWrenchable;
 import dev.distantstock.item.RequesterData;
 import dev.distantstock.item.RequesterItem;
-import dev.distantstock.item.EventReceiptItem;
 import dev.distantstock.item.ModItems;
-import dev.distantstock.event.EventRegistry;
-import dev.distantstock.net.LoggerActionC2S;
 import dev.distantstock.net.OpenLoggerS2C;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -92,6 +89,11 @@ public final class LoggerBlock extends WallPanelBlock implements IWrenchable {
         if (stack.getItem() instanceof RequesterItem
                 && level.getBlockEntity(pos) instanceof LoggerBlockEntity logger) {
             if (!level.isClientSide) {
+                // The shift branch below is a fallback, not the path a player takes. Vanilla's
+                // ServerPlayerGameMode#useItemOn skips BlockState#useItemOn whenever the player
+                // sneaks with an item in hand, so a sneak-click with the terminal never arrives
+                // here; RequesterItem#useOn catches it instead. Keep both -- a forced block
+                // interaction would land back on this one.
                 if (player.isShiftKeyDown()) {
                     logger.clearBinding();
                     player.displayClientMessage(Component.translatable(
@@ -137,37 +139,11 @@ public final class LoggerBlock extends WallPanelBlock implements IWrenchable {
                                                 Player player, BlockHitResult hit) {
         if (!level.isClientSide && player instanceof ServerPlayer serverPlayer
                 && level.getBlockEntity(pos) instanceof LoggerBlockEntity logger) {
-            if (!player.isShiftKeyDown()) {
-                EventRegistry.Record alarm = logger.nextPrintableAlarm();
-                if (alarm != null) {
-                    EventRegistry events = EventRegistry.get(serverPlayer.getServer());
-                    long now = System.currentTimeMillis();
-                    if (logger.hasPaper() && LoggerActionC2S.printAndAcknowledge(logger,
-                            events, alarm.id(), stack -> {
-                                if (!serverPlayer.addItem(stack)) serverPlayer.drop(stack, false);
-                            }, now)) {
-                        player.displayClientMessage(Component.translatable(
-                                "message.distantstock.logger.printed", EventReceiptItem.eventLabel(
-                                        alarm.severity(), alarm.id())), true);
-                        return InteractionResult.sidedSuccess(false);
-                    }
-
-                    // No paper: the physical ACK key is still allowed to silence the horn. The
-                    // event remains unprinted, so the front tubes stay on AC until a roll is loaded
-                    // and the incident slip is actually produced.
-                    if (!logger.hasPaper()) {
-                        if (!alarm.acknowledged() && events.acknowledge(alarm.id(), now)) {
-                            logger.operatorEventChanged();
-                            player.displayClientMessage(Component.translatable(
-                                    "message.distantstock.logger.silenced_no_paper"), true);
-                        } else {
-                            player.displayClientMessage(Component.translatable(
-                                    "message.distantstock.logger.no_paper"), true);
-                        }
-                        return InteractionResult.sidedSuccess(false);
-                    }
-                }
-            }
+            // Opening the console must never have an implicit side effect.  The old interaction
+            // treated an ordinary empty-hand right click as a physical PRINT/ACK button whenever an
+            // alarm happened to be active, so the same gesture sometimes opened a UI and sometimes
+            // changed process state.  Printing and acknowledgement now live on explicit row buttons
+            // in LoggerScreen; right click is always "inspect/open".
             PacketDistributor.sendToPlayer(serverPlayer, OpenLoggerS2C.from(logger));
         }
         return InteractionResult.sidedSuccess(level.isClientSide);

@@ -34,7 +34,7 @@ public final class NixieClockBlock extends BaseEntityBlock implements IWrenchabl
     public static final MapCodec<NixieClockBlock> CODEC = simpleCodec(NixieClockBlock::new);
     public static final DirectionProperty FACING = HorizontalDirectionalBlock.FACING;
 
-    // Same 16x8x3 wall body as Flap Clock. The glass tubes protrude visually from this base.
+    // A 16x8x3 wall body. The glass tubes protrude visually from this base.
     private static final VoxelShape NORTH = Block.box(0, 4, 13, 16, 12, 16);
     private static final VoxelShape SOUTH = Block.box(0, 4, 0, 16, 12, 3);
     private static final VoxelShape WEST = Block.box(13, 4, 0, 16, 12, 16);

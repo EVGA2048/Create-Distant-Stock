@@ -103,7 +103,22 @@ public final class ResonatorRenderer extends SmartBlockEntityRenderer<ResonatorB
                         .noneMatch(core -> TowerStructure.running(be.getLevel(), core))) {
             return;
         }
-        float angle = ((be.getLevel().getGameTime() + partialTick) * SPEED) % 360.0f;
+        // Compute in double, and reduce to a single revolution before scaling.
+        //
+        // Was `((getGameTime() + partialTick) * SPEED) % 360.0f`, which reads as obviously correct
+        // and is not. getGameTime() is a long, and `long + float` promotes it to float; a float
+        // holds consecutive integers only up to 2^24 — 16.7M ticks, about ten real days of server
+        // uptime. Past that the tick count is rounded to steps of 2, then 4, so the angle stops
+        // advancing smoothly and the arms snap between positions. Reported from play as stuttering;
+        // it is precision loss in the time term, not a frame-rate problem.
+        //
+        // `double % double` is an exact remainder, so folding the tick count into [0, one turn)
+        // first costs nothing and leaves an operand near 1e3, where a double resolves far finer than
+        // a float can display. The residual drift between the fold and the raw product is ~1e-13
+        // degrees per revolution, and the phase is unchanged.
+        double period = 360.0 / SPEED;
+        double wrapped = be.getLevel().getGameTime() % period + partialTick;
+        float angle = (float) ((wrapped * SPEED) % 360.0);
         CachedBuffers.partial(ROTOR, state)
                 .rotateCentered(angle, Direction.UP)
                 .light(light)

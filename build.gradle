@@ -164,6 +164,9 @@ def mobilePackagesJar = new File(modpackMods, 'create_mobile_packages-1.21.1-0.7
 def fluidLogisticsPackJar = new File(modpackMods, 'fluidlogistics-1.3.1-mc1.21.1.jar')
 def fluidLogisticsDevJar = file("libs/fluidlogistics-1.3.1-mc1.21.1.jar")
 def fluidLogisticsJar = fluidLogisticsPackJar.exists() ? fluidLogisticsPackJar : fluidLogisticsDevJar
+def thirstPackJar = new File(modpackMods, 'ThirstWasTaken-1.21.1-2.1.5.jar')
+def thirstDevJar = file("libs/ThirstWasTaken-1.21.1-2.1.5.jar")
+def thirstJar = thirstPackJar.exists() ? thirstPackJar : thirstDevJar
 
 tasks.register('extractPonder') {
     onlyIf { !ponderJar.exists() }
@@ -221,6 +224,15 @@ dependencies {
             runtimeOnly files(fluidLogisticsJar)
         }
     }
+    // Same terms as FluidLogistics, for the same reason: the tanks' drinking code has to keep
+    // working on a pack without Thirst Was Taken, so the dev and test runs deliberately do not have
+    // it. Ask for it with -PwithThirst when testing the drinking side against the real mod.
+    if (thirstJar.exists()) {
+        compileOnly files(thirstJar)
+        if (providers.gradleProperty('withThirst').isPresent()) {
+            runtimeOnly files(thirstJar)
+        }
+    }
 }
 
 // The protocol and custody checks live in the test source set and need the game classes to build NBT tags.
@@ -259,6 +271,13 @@ tasks.named('check').configure {
     dependsOn 'verifyDockMotion'
     dependsOn 'verifyNetworkBroadcast'
     dependsOn 'verifyRequesterUnbind'
+    dependsOn 'verifyArmorStats'
+}
+
+tasks.register('verifyArmorStats', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.distantstock.item.EtherCasingStatsCheck'
 }
 
 tasks.register('verifyNetworkBroadcast', JavaExec) {

@@ -37,18 +37,31 @@ import java.util.UUID;
  * one colour means one thing wherever the lamp is standing.
  *
  * <p>A lamp has no amount, but it still owns a value panel: the same board picks the andesite lamp's
- * mode. The mode lives in {@code count}, which is otherwise unused on a lamp and already persisted
- * and synced by Create.
+ * mode. The mode lives in {@code count}, which is otherwise unused on a lamp and is persisted and
+ * synced with the rest of Create's panel state (see {@link CreateStatePanelBehaviour}).
  *
  * <p><b>What a lamp on somebody else's board does not carry is the watch list.</b> The brass lamp's
  * list of watched items, and the screen that edits it, are answered by our own lamp board's block
  * entity, which knows the position the menu was opened on. A lamp elsewhere still reports the state
  * of the network it is bound to — it simply cannot be told which items to look at.
  */
-public class SignalLampPanelBehaviour extends AbstractPanelBehaviour {
-    /** The Create frequency this lamp reports on, or null while it reports its wired gauges. */
-    private UUID network;
+public class SignalLampPanelBehaviour extends CreateStatePanelBehaviour {
+    /**
+     * The Create frequency this lamp reports on, or null while it reports its wired gauges.
+     *
+     * <p>Not Create's {@code network}: that one is the frequency the panel itself sits on, which a
+     * lamp never orders from, and a field of the same name here would hide it from everything that
+     * reads a panel's frequency.
+     */
+    private UUID boundNetwork;
+    /** Sampled on the server; travels to the client with the panel, which cannot sample it. */
     private NetworkHealth health = NetworkHealth.UNKNOWN;
+    /** What the housing showed when last synced, so a change can be redrawn. Server only. */
+    private Look shown;
+
+    /** The parts of a lamp's look that need its model rebuilt. */
+    private record Look(SignalLampPanelItem.Color color, boolean lit) {
+    }
 
     public SignalLampPanelBehaviour(PanelType<?> type, FactoryPanelBlockEntity board,
                                     FactoryPanelBlock.PanelSlot slot) {
@@ -70,17 +83,14 @@ public class SignalLampPanelBehaviour extends AbstractPanelBehaviour {
     }
 
     public UUID lampNetwork() {
-        return network;
+        return boundNetwork;
     }
 
     /** Points this lamp at a Create network, or back at its wired gauges when null. */
     public void setLampNetwork(UUID freq) {
-        if (freq == null) {
-            network = null;
-            health = NetworkHealth.UNKNOWN;
-        } else {
-            network = freq;
-        }
+        boundNetwork = freq;
+        health = freq == null ? NetworkHealth.UNKNOWN : CreateStock.health(freq, 3);
+        refreshLook();
         blockEntity.sendData();
         blockEntity.setChanged();
     }
@@ -91,18 +101,60 @@ public class SignalLampPanelBehaviour extends AbstractPanelBehaviour {
      * <p>Null is a real answer: an unwired, unbound lamp is dark, and it must not read as green.
      */
     public LampState lampState() {
-        if (network != null) {
-            LampState overall = LampReadings.ofNetwork(health);
+        if (boundNetwork != null) {
             // Without a reachable network every per-item reading is just "no stock", which would
             // masquerade as a shortage. The missing network is the real problem.
-            return overall;
+            return LampReadings.ofNetwork(health);
         }
         return LampReadings.worstFromGauges(blockEntity.getLevel(), this);
     }
 
-    /** Whether the light is on at all, before the blink phase is applied. */
+    /**
+     * Whether the light is on at all, before the blink phase is applied.
+     *
+     * <p>Brass reports a rung, so it is lit whenever it has one. Andesite is a plain light and works
+     * the way it does on our own lamp board: lit while what it watches is satisfied, or — inverted —
+     * while it is not.
+     */
     public boolean lit() {
-        return lampState() != null;
+        SignalLampPanelItem lamp = lamp();
+        if (lamp == null) {
+            return false;
+        }
+        if (lamp.material() == SignalLampPanelItem.Material.BRASS) {
+            return lampState() != null;
+        }
+        if (boundNetwork != null) {
+            LampState state = LampReadings.ofNetwork(health);
+            boolean healthy = state == LampState.IDLE || state == LampState.ALL_GOOD;
+            return inverted() != healthy;
+        }
+        return LampReadings.wiredLit(blockEntity.getLevel(), this, inverted());
+    }
+
+    /** The colour the housing shows: a brass lamp's rung, or an andesite lamp's own colour. */
+    private SignalLampPanelItem.Color color(SignalLampPanelItem lamp) {
+        LampState level = lamp.material() == SignalLampPanelItem.Material.BRASS ? lampState() : null;
+        return level != null ? LampReadings.colorFor(level) : lamp.color();
+    }
+
+    /**
+     * Rebuilds the board's model when this lamp's look has changed.
+     *
+     * <p>A panel on somebody else's board is drawn into the board's baked model, not by a renderer
+     * that asks every frame, so a change of colour shows only once the board is told to redraw.
+     */
+    private void refreshLook() {
+        SignalLampPanelItem lamp = lamp();
+        Look next = lamp == null ? null : new Look(color(lamp), lit());
+        if (java.util.Objects.equals(next, shown)) {
+            return;
+        }
+        shown = next;
+        if (blockEntity instanceof FactoryPanelBlockEntity board) {
+            board.redraw = true;
+        }
+        blockEntity.sendData();
     }
 
     @Override
@@ -112,57 +164,53 @@ public class SignalLampPanelBehaviour extends AbstractPanelBehaviour {
     }
 
     /**
-     * The item in this panel's filter slot.
-     *
-     * <p>Deployer's base class deliberately answers {@code EMPTY} here — a panel type that has no
-     * filter should not pretend to have one — so every type that does have one has to say so. Drop
-     * this and the panel still shows its filter and still reads its network; it simply never sees
-     * the item, which on a gauge means it never orders and on a lamp means it is not a lamp.
+     * A logic gauge from another mod tells the panels it points at the moment it flips, rather than
+     * waiting for the once-a-second check in {@link #tick()}.
      */
     @Override
-    public ItemStack getFilter() {
-        // Not super.getFilter(): Deployer's base class answers EMPTY on purpose, for panel types
-        // that have no filter at all, and calling up to it would hand us that empty stack. The
-        // filter itself is Create's, kept where Create keeps it.
-        return filter.item();
+    public void notifiedFromInput() {
+        Level level = blockEntity.getLevel();
+        if (level != null && !level.isClientSide && isActive()) {
+            refreshLook();
+        }
     }
 
+    /** The lamp item itself, so the goggles and Deployer's screen name the lamp that is there. */
     @Override
     public Item getItem() {
-        return dev.distantstock.item.ModItems.CYAN_INDICATOR_LAMP.get();
+        SignalLampPanelItem lamp = lamp();
+        return lamp != null ? lamp : dev.distantstock.item.ModItems.CYAN_INDICATOR_LAMP.get();
     }
 
     @Override
     public PartialModel getModel(FactoryPanelBlock.PanelState state, FactoryPanelBlock.PanelType type) {
         SignalLampPanelItem lamp = lamp();
         if (lamp == null) {
+            // Only while the first sync is in flight; a lamp always carries its item as the filter.
             return null;
         }
-        LampState level = lampState();
-        SignalLampPanelItem.Color color = lamp.material() == SignalLampPanelItem.Material.BRASS
-                && level != null ? LampReadings.colorFor(level) : lamp.color();
-        return SignalLampModels.lamp(lamp.material(), color, level != null);
+        return SignalLampModels.lamp(lamp.material(), color(lamp), lit());
     }
 
     @Override
     public void tick() {
         super.tick();
         Level level = blockEntity.getLevel();
-        if (level == null || level.isClientSide || !isActive() || network == null) {
+        if (level == null || level.isClientSide || !isActive()) {
             return;
         }
         if (level.getGameTime() % 20 != 0) {
             return;
         }
-        NetworkHealth next = CreateStock.health(network, 3);
-        if (!next.equals(health)) {
-            health = next;
-            // The housing is what changes colour, so the board has to rebuild this panel's model.
-            if (blockEntity instanceof FactoryPanelBlockEntity board) {
-                board.redraw = true;
+        if (boundNetwork != null) {
+            NetworkHealth next = CreateStock.health(boundNetwork, 3);
+            if (!next.equals(health)) {
+                health = next;
+                blockEntity.sendData();
             }
-            blockEntity.sendData();
         }
+        // Wired lamps change with the gauges pointing at them, which say nothing to the lamp.
+        refreshLook();
     }
 
     // ------------------------------------------------------------------ the mode value panel
@@ -196,6 +244,8 @@ public class SignalLampPanelBehaviour extends AbstractPanelBehaviour {
             return;
         }
         count = Math.clamp(settings.value(), 0, 1);
+        blockEntity.setChanged();
+        refreshLook();
         blockEntity.sendData();
     }
 
@@ -253,14 +303,31 @@ public class SignalLampPanelBehaviour extends AbstractPanelBehaviour {
     @Override
     public void easyWrite(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.easyWrite(tag, registries, clientPacket);
-        if (network != null) {
-            tag.putUUID("LampNetwork", network);
+        if (boundNetwork != null) {
+            tag.putUUID("LampNetwork", boundNetwork);
+            if (clientPacket) {
+                // Sampling needs Create's logistics, which only exist on the server.
+                CompoundTag row = new CompoundTag();
+                row.putBoolean("Known", health.known());
+                row.putInt("Loaded", health.loadedLinks());
+                row.putInt("Total", health.totalLinks());
+                row.putBoolean("Idle", health.idle());
+                row.putBoolean("Locked", health.locked());
+                tag.put("LampHealth", row);
+            }
         }
     }
 
     @Override
     public void easyRead(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.easyRead(tag, registries, clientPacket);
-        network = tag.hasUUID("LampNetwork") ? tag.getUUID("LampNetwork") : null;
+        boundNetwork = tag.hasUUID("LampNetwork") ? tag.getUUID("LampNetwork") : null;
+        if (boundNetwork != null && clientPacket && tag.contains("LampHealth")) {
+            CompoundTag row = tag.getCompound("LampHealth");
+            health = new NetworkHealth(row.getBoolean("Known"), row.getInt("Loaded"),
+                    row.getInt("Total"), row.getBoolean("Idle"), row.getBoolean("Locked"), List.of());
+        } else if (boundNetwork == null) {
+            health = NetworkHealth.UNKNOWN;
+        }
     }
 }

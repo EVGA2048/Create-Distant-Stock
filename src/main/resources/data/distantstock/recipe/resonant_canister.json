@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    " R ",
+    "RTR",
+    " R "
+  ],
+  "key": {
+    "R": {
+      "item": "distantstock:resonant_sturdy_sheet"
+    },
+    "T": {
+      "item": "distantstock:sturdy_fluid_tank"
+    }
+  },
+  "result": {
+    "count": 1,
+    "id": "distantstock:resonant_canister"
+  }
+}

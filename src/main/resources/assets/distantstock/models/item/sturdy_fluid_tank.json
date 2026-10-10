@@ -1,0 +1,21 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "distantstock:item/portable_fluid_tank_fluid_empty",
+    "layer1": "distantstock:item/portable_fluid_tank_sturdy"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "custom_model_data": 1
+      },
+      "model": "distantstock:item/portable_fluid_tank_sturdy_level1"
+    },
+    {
+      "predicate": {
+        "custom_model_data": 2
+      },
+      "model": "distantstock:item/portable_fluid_tank_sturdy_level2"
+    }
+  ]
+}

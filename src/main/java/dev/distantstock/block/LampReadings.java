@@ -22,8 +22,28 @@ public final class LampReadings {
     private LampReadings() {
     }
 
+    private static final boolean DEPLOYER = net.neoforged.fml.ModList.get().isLoaded("deployer");
+
+    /**
+     * A panel that answers true or false instead of counting stock — a logic gauge from Extra
+     * Gauges — or null for a stock gauge. Only Deployer's panels can be one, and naming them is left
+     * to the panel package so a pack without Deployer never loads them.
+     */
+    private static Boolean logicOutput(FactoryPanelBehaviour source) {
+        if (!DEPLOYER || source.getClass() == FactoryPanelBehaviour.class) {
+            return null;
+        }
+        return dev.distantstock.panel.DeployerPanels.redstoneOutput(source);
+    }
+
     /** The rung one gauge reports. */
     public static LampState ofGauge(FactoryPanelBehaviour gauge) {
+        Boolean logic = logicOutput(gauge);
+        if (logic != null) {
+            // A gate has no stock, no address and nothing on order: true is "fine", false is the
+            // same "not satisfied" an unfilled gauge reports.
+            return logic ? LampState.ALL_GOOD : LampState.WARN;
+        }
         if (gauge.isMissingAddress() || gauge.redstonePowered) {
             return LampState.FATAL;
         }
@@ -72,6 +92,32 @@ public final class LampReadings {
             }
         }
         return worst;
+    }
+
+    /**
+     * Whether an andesite lamp wired to gauges is lit.
+     *
+     * <p>Normal: lit while any gauge pointing at it is satisfied or powered. Inverted, it is a
+     * shortage alarm: lit while it is wired and none of them are.
+     */
+    public static boolean wiredLit(Level level, FactoryPanelBehaviour lamp, boolean inverted) {
+        if (level == null) {
+            return false;
+        }
+        boolean connected = false;
+        boolean satisfied = false;
+        for (FactoryPanelConnection connection : lamp.targetedBy.values()) {
+            FactoryPanelBehaviour source = FactoryPanelBehaviour.at(level, connection);
+            if (source == null) {
+                continue;
+            }
+            connected = true;
+            Boolean logic = logicOutput(source);
+            if (logic != null ? logic : source.satisfied || source.redstonePowered) {
+                satisfied = true;
+            }
+        }
+        return inverted ? connected && !satisfied : satisfied;
     }
 
     /** The colour a lamp shows for a rung. The andesite lamps keep their own colour instead. */

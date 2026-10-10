@@ -64,12 +64,6 @@ public final class ModBlocks {
                     .strength(2.0f, 4.0f)
                     .sound(SoundType.METAL)
                     .noOcclusion()));
-    public static final DeferredHolder<net.minecraft.world.level.block.Block, FlapClockBlock> FLAP_CLOCK =
-            BLOCKS.register("flap_clock", () -> new FlapClockBlock(BlockBehaviour.Properties.of()
-                    .mapColor(MapColor.METAL)
-                    .strength(2.0f, 4.0f)
-                    .sound(SoundType.METAL)
-                    .noOcclusion()));
     public static final DeferredHolder<net.minecraft.world.level.block.Block, RemotePackagerBlock> REMOTE_PACKAGER =
             BLOCKS.register("remote_packager", () -> new RemotePackagerBlock(
                     BlockBehaviour.Properties.ofFullCopy(net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(

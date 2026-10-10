@@ -1,6 +1,0 @@
-{
-  "parent":"minecraft:block/block",
-  "render_type":"minecraft:cutout",
-  "textures":{"particle":"create:block/flap_display_front","front":"create:block/flap_display_front","side":"create:block/flap_display_side","top":"create:block/flap_display_top","inside":"create:block/flap_display_inside"},
-  "elements":[{"name":"half_height_display","from":[0,4,13],"to":[16,12,16],"faces":{"north":{"uv":[0,0,16,8],"texture":"#front"},"south":{"uv":[0,0,16,8],"texture":"#inside","cullface":"south"},"west":{"uv":[0,0,3,8],"texture":"#side"},"east":{"uv":[13,0,16,8],"texture":"#side"},"up":{"uv":[0,0,3,16],"rotation":90,"texture":"#top"},"down":{"uv":[7,0,10,16],"rotation":90,"texture":"#top"}}}]
-}

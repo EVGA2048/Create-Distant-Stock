@@ -205,6 +205,10 @@ public final class SignalLampPanelItem extends BlockItem {
                 new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
         EnumMap<FactoryPanelBlock.PanelSlot, Map<FactoryPanelPosition, FactoryPanelConnection>> outputs =
                 new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
+        // Track which slots contain remote gauges vs factory gauges vs lamps
+        EnumMap<FactoryPanelBlock.PanelSlot, Boolean> isRemoteGauge =
+                new EnumMap<>(FactoryPanelBlock.PanelSlot.class);
+
         for (var entry : oldBe.panels.entrySet()) {
             if (!entry.getValue().isActive()) {
                 continue;
@@ -212,6 +216,18 @@ public final class SignalLampPanelItem extends BlockItem {
             CompoundTag tag = new CompoundTag();
             entry.getValue().write(tag, level.registryAccess(), false);
             saved.put(entry.getKey(), tag);
+
+            // Determine if this slot is a remote gauge
+            boolean isRemote = false;
+            if (oldState.is(ModBlocks.REMOTE_GAUGE.get())) {
+                isRemote = true;
+            } else if (oldBe instanceof SignalPanelBlockEntity signalPanel) {
+                isRemote = signalPanel.isRemoteGauge(entry.getKey());
+            } else if (net.neoforged.fml.ModList.get().isLoaded("deployer")) {
+                isRemote = dev.distantstock.panel.DeployerPanels.holdsRemoteGauge(oldBe, entry.getKey());
+            }
+            isRemoteGauge.put(entry.getKey(), isRemote);
+
             Map<FactoryPanelPosition, FactoryPanelConnection> peers = new HashMap<>();
             for (var targetPos : entry.getValue().targeting) {
                 FactoryPanelBehaviour target = FactoryPanelBehaviour.at(level, targetPos);
@@ -242,7 +258,10 @@ public final class SignalLampPanelItem extends BlockItem {
         for (var entry : saved.entrySet()) {
             newBe.addPanel(entry.getKey(), null);
             newBe.panels.get(entry.getKey()).read(entry.getValue(), level.registryAccess(), false);
-            if (oldState.is(ModBlocks.REMOTE_GAUGE.get())) newBe.setRemoteGauge(entry.getKey(), true);
+            // Restore the remote gauge flag for each slot based on what it was before conversion
+            if (isRemoteGauge.getOrDefault(entry.getKey(), false)) {
+                newBe.setRemoteGauge(entry.getKey(), true);
+            }
         }
         if (remoteSource != null) {
             remoteSource.copyRemoteStateTo(newBe);

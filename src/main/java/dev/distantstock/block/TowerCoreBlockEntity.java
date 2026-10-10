@@ -59,7 +59,19 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
     private boolean charging;
 
     private final FluidTank tank = new FluidTank(ETHER_CAPACITY,
-            stack -> stack.getFluid() == ModFluids.ETHER.get());
+            stack -> stack.getFluid() == ModFluids.ETHER.get()) {
+        @Override
+        protected void onContentsChanged() {
+            // Pipes and other capabilities mutate the FluidTank directly, bypassing drawEther()
+            // and storeEther().  setChanged() alone would only make the new amount persistent; the
+            // goggles render from the client-side block entity, so the new amount must also be sent
+            // across the block-entity update packet whenever the server-side tank changes.
+            TowerCoreBlockEntity.this.setChanged();
+            if (level != null && !level.isClientSide) {
+                TowerCoreBlockEntity.this.notifyUpdate();
+            }
+        }
+    };
 
     public TowerCoreBlockEntity(BlockPos pos, BlockState state) {
         this(ModBlockEntities.TOWER_CORE.get(), pos, state);
@@ -95,9 +107,6 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
             return 0;
         }
         FluidStack drained = tank.drain(amount, IFluidHandler.FluidAction.EXECUTE);
-        if (!drained.isEmpty()) {
-            setChanged();
-        }
         return drained.getAmount();
     }
 
@@ -106,10 +115,7 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
         if (amount <= 0) {
             return;
         }
-        int stored = tank.fill(new FluidStack(ModFluids.ETHER.get(), amount), IFluidHandler.FluidAction.EXECUTE);
-        if (stored > 0) {
-            setChanged();
-        }
+        tank.fill(new FluidStack(ModFluids.ETHER.get(), amount), IFluidHandler.FluidAction.EXECUTE);
     }
 
     @Override
@@ -301,7 +307,10 @@ public final class TowerCoreBlockEntity extends KineticBlockEntity implements IH
                 GoggleText.line(tip, "goggle.distantstock.tower.no_shaft");
             }
         }
-        addStressImpactStats(tip, getSpeed());
+        // addStressImpactStats() expects the stress IMPACT and multiplies it by the current
+        // theoretical speed itself. Passing getSpeed() here used to make the displayed load roughly
+        // speed² and, more importantly, made changing tower tiers invisible to the readout.
+        addStressImpactStats(tip, calculateStressApplied());
         return true;
     }
 

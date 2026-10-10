@@ -1,6 +1,8 @@
 {
   "parent": "distantstock:block/network_broadcaster",
   "textures": {
-    "indicator": "create:block/packager_horizontal_powered"
+    "particle": "distantstock:block/network_broadcaster_side_on",
+    "side": "distantstock:block/network_broadcaster_side_on",
+    "top": "distantstock:block/network_broadcaster_top_on"
   }
 }

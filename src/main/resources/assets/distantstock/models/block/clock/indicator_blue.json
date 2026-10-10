@@ -10,12 +10,12 @@
       "name": "factory_gauge_style_2x2_bulb",
       "from": [
         0.55,
-        9.0,
+        4.0,
         10.9
       ],
       "to": [
         2.55,
-        11.0,
+        6.0,
         12.9
       ],
       "faces": {

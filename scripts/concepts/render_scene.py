@@ -156,7 +156,13 @@ def render(mesh, textures, size=(800,900), yaw=32, pitch=18,
         cam=(world-np.array(center)) @ camera.T
         projected=np.column_stack((w/2+cam[:,0]*scale,h/2-cam[:,1]*scale,cam[:,2]))
         cross=np.cross(projected[1,:2]-projected[0,:2],projected[2,:2]-projected[0,:2])
-        if cross>=0:
+        if cross>=0 and not blend:
+            # Opaque surfaces are cutout in the game and cull their back faces, so they keep the
+            # test. Translucent ones do not: Minecraft renders entityTranslucent with NO_CULL, and
+            # a glass membrane is visible from both sides. Culling them here made every translucent
+            # surface vanish when viewed from behind -- and because mirroring a face reverses its
+            # winding, a mirrored pair of wings always lost exactly one of the two. That is the
+            # artifact that got reported as clipping.
             continue
         # Winding normal is outward for Minecraft box faces.
         shade=.70+.30*max(0,float(np.dot(normal,light)))

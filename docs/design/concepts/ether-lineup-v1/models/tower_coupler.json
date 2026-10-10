@@ -1,0 +1,660 @@
+{
+ "parent": "minecraft:block/block",
+ "credit": "Distant Stock concept; concept:* are files in ./textures",
+ "textures": {
+  "particle": "create:block/andesite_casing"
+ },
+ "elements": [
+  {
+   "name": "post_0_0",
+   "from": [
+    0,
+    2,
+    0
+   ],
+   "to": [
+    3,
+    16,
+    3
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      13,
+      0,
+      16,
+      14
+     ]
+    },
+    "south": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      0,
+      3,
+      14
+     ]
+    },
+    "west": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      0,
+      3,
+      14
+     ]
+    },
+    "east": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      13,
+      0,
+      16,
+      14
+     ]
+    }
+   }
+  },
+  {
+   "name": "post_0_13",
+   "from": [
+    0,
+    2,
+    13
+   ],
+   "to": [
+    3,
+    16,
+    16
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      13,
+      0,
+      16,
+      14
+     ]
+    },
+    "south": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      0,
+      3,
+      14
+     ]
+    },
+    "west": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      13,
+      0,
+      16,
+      14
+     ]
+    },
+    "east": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      0,
+      3,
+      14
+     ]
+    }
+   }
+  },
+  {
+   "name": "post_13_0",
+   "from": [
+    13,
+    2,
+    0
+   ],
+   "to": [
+    16,
+    16,
+    3
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      0,
+      3,
+      14
+     ]
+    },
+    "south": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      13,
+      0,
+      16,
+      14
+     ]
+    },
+    "west": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      0,
+      3,
+      14
+     ]
+    },
+    "east": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      13,
+      0,
+      16,
+      14
+     ]
+    }
+   }
+  },
+  {
+   "name": "post_13_13",
+   "from": [
+    13,
+    2,
+    13
+   ],
+   "to": [
+    16,
+    16,
+    16
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      0,
+      3,
+      14
+     ]
+    },
+    "south": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      13,
+      0,
+      16,
+      14
+     ]
+    },
+    "west": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      13,
+      0,
+      16,
+      14
+     ]
+    },
+    "east": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      0,
+      3,
+      14
+     ]
+    }
+   }
+  },
+  {
+   "name": "collar_n",
+   "from": [
+    0,
+    0,
+    0
+   ],
+   "to": [
+    16,
+    2,
+    3
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      14,
+      16,
+      16
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      14,
+      16,
+      16
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      14,
+      3,
+      16
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      13,
+      14,
+      16,
+      16
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      0,
+      16,
+      3
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      13,
+      16,
+      16
+     ]
+    }
+   }
+  },
+  {
+   "name": "collar_s",
+   "from": [
+    0,
+    0,
+    13
+   ],
+   "to": [
+    16,
+    2,
+    16
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      14,
+      16,
+      16
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      14,
+      16,
+      16
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      13,
+      14,
+      16,
+      16
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      14,
+      3,
+      16
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      13,
+      16,
+      16
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      0,
+      16,
+      3
+     ]
+    }
+   }
+  },
+  {
+   "name": "collar_w",
+   "from": [
+    0,
+    0,
+    3
+   ],
+   "to": [
+    3,
+    2,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      13,
+      14,
+      16,
+      16
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      14,
+      3,
+      16
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      3,
+      14,
+      13,
+      16
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      3,
+      14,
+      13,
+      16
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      3,
+      3,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      3,
+      3,
+      13
+     ]
+    }
+   }
+  },
+  {
+   "name": "collar_e",
+   "from": [
+    13,
+    0,
+    3
+   ],
+   "to": [
+    16,
+    2,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      0,
+      14,
+      3,
+      16
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      13,
+      14,
+      16,
+      16
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      3,
+      14,
+      13,
+      16
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      3,
+      14,
+      13,
+      16
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      13,
+      3,
+      16,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      13,
+      3,
+      16,
+      13
+     ]
+    }
+   }
+  },
+  {
+   "name": "ether_column",
+   "from": [
+    6,
+    0,
+    6
+   ],
+   "to": [
+    10,
+    16,
+    10
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:ether_glass",
+     "uv": [
+      6,
+      0,
+      10,
+      16
+     ]
+    },
+    "south": {
+     "texture": "concept:ether_glass",
+     "uv": [
+      6,
+      0,
+      10,
+      16
+     ]
+    },
+    "west": {
+     "texture": "concept:ether_glass",
+     "uv": [
+      6,
+      0,
+      10,
+      16
+     ]
+    },
+    "east": {
+     "texture": "concept:ether_glass",
+     "uv": [
+      6,
+      0,
+      10,
+      16
+     ]
+    }
+   }
+  },
+  {
+   "name": "ether_core",
+   "from": [
+    7,
+    0,
+    7
+   ],
+   "to": [
+    9,
+    16,
+    9
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7,
+      0,
+      9,
+      16
+     ]
+    },
+    "south": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7,
+      0,
+      9,
+      16
+     ]
+    },
+    "west": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7,
+      0,
+      9,
+      16
+     ]
+    },
+    "east": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7,
+      0,
+      9,
+      16
+     ]
+    }
+   }
+  },
+  {
+   "name": "clamp",
+   "from": [
+    5,
+    7,
+    5
+   ],
+   "to": [
+    11,
+    9,
+    11
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      5,
+      7,
+      11,
+      9
+     ]
+    },
+    "south": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      5,
+      7,
+      11,
+      9
+     ]
+    },
+    "west": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      5,
+      7,
+      11,
+      9
+     ]
+    },
+    "east": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      5,
+      7,
+      11,
+      9
+     ]
+    },
+    "up": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      5,
+      5,
+      11,
+      11
+     ]
+    },
+    "down": {
+     "texture": "create:block/brass_casing",
+     "uv": [
+      5,
+      5,
+      11,
+      11
+     ]
+    }
+   }
+  }
+ ]
+}

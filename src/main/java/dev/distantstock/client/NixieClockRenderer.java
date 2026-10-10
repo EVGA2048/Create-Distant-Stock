@@ -34,15 +34,15 @@ public final class NixieClockRenderer implements BlockEntityRenderer<NixieClockB
             String hour = text.substring(0, colon);
             String minute = text.substring(colon + 1);
             if (hour.length() >= 2) {
-                drawGlyph(be, pose, buffers, hour.substring(hour.length() - 2, hour.length() - 1), 14.35f);
-                drawGlyph(be, pose, buffers, hour.substring(hour.length() - 1), 11.85f);
+                drawGlyph(be, pose, buffers, hour.substring(hour.length() - 2, hour.length() - 1), 13.0f);
+                drawGlyph(be, pose, buffers, hour.substring(hour.length() - 1), 10.5f);
             } else {
                 // 12-hour mode intentionally has no leading zero: the first physical tube stays dark.
-                drawGlyph(be, pose, buffers, hour, 11.85f);
+                drawGlyph(be, pose, buffers, hour, 10.5f);
             }
-            drawGlyph(be, pose, buffers, ":", 9.35f);
-            drawGlyph(be, pose, buffers, minute.substring(0, 1), 6.85f);
-            drawGlyph(be, pose, buffers, minute.substring(1, 2), 4.35f);
+            drawGlyph(be, pose, buffers, ":", 8.0f);
+            drawGlyph(be, pose, buffers, minute.substring(0, 1), 5.5f);
+            drawGlyph(be, pose, buffers, minute.substring(1, 2), 3.0f);
         }
         ClockIndicatorRenderer.render(be.twentyFourHour(), be.getBlockState(), pose, buffers, packedOverlay);
         pose.popPose();

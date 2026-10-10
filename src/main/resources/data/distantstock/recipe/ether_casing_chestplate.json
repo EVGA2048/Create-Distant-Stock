@@ -3,12 +3,47 @@
   "accept_mirrored": false,
   "category": "equipment",
   "key": {
-    "P": { "item": "distantstock:polished_ether_quartz" },
-    "E": { "item": "distantstock:ether_mechanism" },
-    "C": { "item": "distantstock:tower_casing" },
-    "N": { "item": "minecraft:netherite_chestplate" }
+    "S": {
+      "item": "distantstock:resonant_sturdy_sheet"
+    },
+    "Y": {
+      "item": "minecraft:elytra"
+    },
+    "C": {
+      "item": "distantstock:tower_casing"
+    },
+    "E": {
+      "item": "distantstock:ether_mechanism"
+    },
+    "B": {
+      "item": "create:brass_sheet"
+    },
+    "T": {
+      "item": "create:fluid_tank"
+    },
+    "L": {
+      "item": "create:electron_tube"
+    },
+    "R": {
+      "item": "create:precision_mechanism"
+    },
+    "N": {
+      "item": "create:netherite_backtank"
+    },
+    "P": {
+      "item": "distantstock:polished_ether_quartz"
+    }
   },
-  "pattern": ["PPPPP", "ECNCE", "PPPPP"],
-  "result": { "count": 1, "id": "distantstock:ether_casing_chestplate" },
+  "pattern": [
+    "  SYS  ",
+    "CEBTBEC",
+    "SLRNRLS",
+    "PEBTBEP",
+    " PSCSP "
+  ],
+  "result": {
+    "count": 1,
+    "id": "distantstock:ether_casing_chestplate"
+  },
   "show_notification": true
 }

@@ -83,13 +83,11 @@ final class ClockHourModeBehaviour extends BlockEntityBehaviour implements Value
 
     private boolean twentyFourHour() {
         if (blockEntity instanceof NixieClockBlockEntity clock) return clock.twentyFourHour();
-        if (blockEntity instanceof FlapClockBlockEntity clock) return clock.twentyFourHour();
         return true;
     }
 
     private void setTwentyFourHour(boolean value) {
         if (blockEntity instanceof NixieClockBlockEntity clock) clock.setTwentyFourHour(value);
-        if (blockEntity instanceof FlapClockBlockEntity clock) clock.setTwentyFourHour(value);
     }
 
     private static final class ClockTransform extends ValueBoxTransform.Sided {

@@ -1,3 +1,10 @@
 {
-  "parent": "distantstock:block/announcer"
+  "parent": "distantstock:block/announcer",
+  "textures": {
+    "north": "distantstock:block/announcer_side_on",
+    "south": "distantstock:block/announcer_side_on",
+    "east": "distantstock:block/announcer_side_on",
+    "west": "distantstock:block/announcer_side_on",
+    "up": "distantstock:block/announcer_front_on"
+  }
 }

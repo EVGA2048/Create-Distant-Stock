@@ -14,6 +14,8 @@ import net.minecraft.world.item.ArmorItem;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
+import java.util.List;
+
 public final class ModItems {
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(Registries.ITEM, DistantStock.MODID);
     public static final DeferredRegister<CreativeModeTab> TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, DistantStock.MODID);
@@ -56,7 +58,6 @@ public final class ModItems {
             ITEMS.register("network_speaker", () -> new com.simibubi.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem(
                     ModBlocks.NETWORK_SPEAKER.get(), new Item.Properties()));
     public static final DeferredHolder<Item, BlockItem> NIXIE_CLOCK = block("nixie_clock", ModBlocks.NIXIE_CLOCK);
-    public static final DeferredHolder<Item, BlockItem> FLAP_CLOCK = block("flap_clock", ModBlocks.FLAP_CLOCK);
     public static final DeferredHolder<Item, BlockItem> REMOTE_PACKAGER = ITEMS.register("remote_packager",
             () -> new BlockItem(ModBlocks.REMOTE_PACKAGER.get(), new Item.Properties()));
     public static final DeferredHolder<Item, SignalLampPanelItem> CYAN_INDICATOR_LAMP = lamp("cyan_indicator_lamp", SignalLampPanelItem.Color.CYAN);
@@ -101,9 +102,19 @@ public final class ModItems {
             () -> new Item(new Item.Properties()));
     public static final DeferredHolder<Item, Item> POLISHED_ETHER_QUARTZ = ITEMS.register("polished_ether_quartz",
             () -> new Item(new Item.Properties()));
+    /**
+     * Create's sturdy sheet put through our own line: a deployer lays polished ether quartz onto it.
+     * The suit is built out of these, so the sheet stops being a Create material the player buys in
+     * bulk and becomes one more thing this mod's production has to supply.
+     */
+    public static final DeferredHolder<Item, Item> RESONANT_STURDY_SHEET = ITEMS.register("resonant_sturdy_sheet",
+            () -> new Item(new Item.Properties()));
     public static final DeferredHolder<Item, Item> INCOMPLETE_ETHER_MECHANISM = ITEMS.register("incomplete_ether_mechanism",
             () -> new Item(new Item.Properties()));
     public static final DeferredHolder<Item, Item> ETHER_MECHANISM = ITEMS.register("ether_mechanism",
+            () -> new Item(new Item.Properties()));
+    /** The transitional stock of the sheet's sequenced assembly; never obtained by hand. */
+    public static final DeferredHolder<Item, Item> INCOMPLETE_RESONANT_SHEET = ITEMS.register("incomplete_resonant_sheet",
             () -> new Item(new Item.Properties()));
     public static final DeferredHolder<Item, BucketItem> ETHER_BUCKET = ITEMS.register("ether_bucket",
             () -> new BucketItem(dev.distantstock.fluid.ModFluids.ETHER.get(),
@@ -122,6 +133,26 @@ public final class ModItems {
     public static final DeferredHolder<Item, FluidBottleItem> MOLTEN_AMETHYST_BOTTLE = ITEMS.register("molten_amethyst_bottle",
             () -> new FluidBottleItem(dev.distantstock.fluid.ModFluids.MOLTEN_AMETHYST.get(),
                     new Item.Properties().stacksTo(1)));
+    /**
+     * The three portable fluid tanks, smallest first.
+     *
+     * <p>One class, three registrations, differing in capacity and in the artwork their models name.
+     * The last id is historical: the item was the suit's medium canister before it became a general
+     * tank, and keeping the id means every stack already in a world carries over instead of turning
+     * into a missing item.
+     *
+     * <p>{@link #FLUID_TANKS} is what the rest of the mod asks when it means "any tank"; a fourth
+     * tier added here and not there would be a tank the armour refuses to drink from.
+     */
+    public static final DeferredHolder<Item, PortableFluidTankItem> COPPER_FLUID_TANK = ITEMS.register("copper_fluid_tank",
+            () -> new PortableFluidTankItem(PortableFluidTankItem.Tier.COPPER, new Item.Properties().stacksTo(1)));
+    public static final DeferredHolder<Item, PortableFluidTankItem> STURDY_FLUID_TANK = ITEMS.register("sturdy_fluid_tank",
+            () -> new PortableFluidTankItem(PortableFluidTankItem.Tier.STURDY, new Item.Properties().stacksTo(1)));
+    public static final DeferredHolder<Item, PortableFluidTankItem> RESONANT_CANISTER = ITEMS.register("resonant_canister",
+            () -> new PortableFluidTankItem(PortableFluidTankItem.Tier.RESONANT, new Item.Properties().stacksTo(1)));
+
+    public static final List<DeferredHolder<Item, PortableFluidTankItem>> FLUID_TANKS =
+            List.of(COPPER_FLUID_TANK, STURDY_FLUID_TANK, RESONANT_CANISTER);
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB = TABS.register("main", () -> CreativeModeTab.builder()
             .title(Component.translatable("itemGroup.distantstock"))
@@ -144,7 +175,6 @@ public final class ModItems {
                 out.accept(NETWORK_BROADCASTER.get());
                 out.accept(NETWORK_SPEAKER.get());
                 out.accept(NIXIE_CLOCK.get());
-                out.accept(FLAP_CLOCK.get());
                 out.accept(REMOTE_PACKAGER.get());
                 out.accept(CYAN_INDICATOR_LAMP.get());
                 out.accept(ORANGE_INDICATOR_LAMP.get());
@@ -170,12 +200,17 @@ public final class ModItems {
                 out.accept(ENDER_DUST.get());
                 out.accept(ETHER_QUARTZ.get());
                 out.accept(POLISHED_ETHER_QUARTZ.get());
+                out.accept(RESONANT_STURDY_SHEET.get());
+                out.accept(INCOMPLETE_RESONANT_SHEET.get());
                 out.accept(INCOMPLETE_ETHER_MECHANISM.get());
                 out.accept(ETHER_MECHANISM.get());
                 out.accept(ETHER_BUCKET.get());
                 out.accept(MOLTEN_AMETHYST_BUCKET.get());
                 out.accept(ETHER_BOTTLE.get());
                 out.accept(MOLTEN_AMETHYST_BOTTLE.get());
+                out.accept(COPPER_FLUID_TANK.get());
+                out.accept(STURDY_FLUID_TANK.get());
+                out.accept(RESONANT_CANISTER.get());
                 out.accept(MANUAL.get());
             })
             .build());

@@ -47,9 +47,15 @@ public final class LoggerItem extends BlockItem {
                 return InteractionResult.sidedSuccess(level.isClientSide);
             }
             if (!level.isClientSide && level instanceof ServerLevel serverLevel) {
-                bind(stack, serverLevel, linked.freqId);
-                player.displayClientMessage(Component.translatable(
-                        "message.distantstock.logger.bound", RequesterData.shortFreq(linked.freqId)), true);
+                switch (bind(stack, serverLevel, linked.freqId)) {
+                    case BOUND -> player.displayClientMessage(Component.translatable(
+                            "message.distantstock.logger.bound",
+                            RequesterData.shortFreq(linked.freqId)), true);
+                    case NO_REGISTRY -> player.displayClientMessage(Component.translatable(
+                            "message.distantstock.logger.bind_failed"), true);
+                    case NO_NODE -> player.displayClientMessage(Component.translatable(
+                            "message.distantstock.logger.bind_no_node"), true);
+                }
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
@@ -64,22 +70,47 @@ public final class LoggerItem extends BlockItem {
         return super.useOn(context);
     }
 
-    private static void bind(ItemStack stack, ServerLevel level, UUID frequency) {
-        RequesterData.setFreq(stack, frequency);
-        if (Create.LOGISTICS == null || Create.LOGISTICS.logisticsNetworks == null) return;
+    /**
+     * Copies a Create logistics network onto the item, as a distant address.
+     *
+     * <p>Reports what happened rather than assuming it worked. The old version wrote the frequency
+     * first and then returned early -- with no message -- when Create's registry was missing or
+     * when there was no Transerver node identity. What came out was a stack with a frequency, a
+     * glint and a "bound" tooltip but no distant network, which placed a logger that was quietly
+     * local-only while the player believed it covered both servers.
+     *
+     * <p>So nothing is written until the whole address resolves, and a failed attempt leaves the
+     * item exactly as it was. The dock item already answers the same two conditions out loud; this
+     * is the same rule, kept one file over.
+     */
+    private static BindOutcome bind(ItemStack stack, ServerLevel level, UUID frequency) {
+        if (Create.LOGISTICS == null || Create.LOGISTICS.logisticsNetworks == null) {
+            return BindOutcome.NO_REGISTRY;
+        }
         var network = Create.LOGISTICS.logisticsNetworks.get(frequency);
         GlobalPos link = network == null || network.loadedLinks == null || network.loadedLinks.isEmpty()
                 ? null : network.loadedLinks.iterator().next();
         ServerLevel home = link == null ? level : level.getServer().getLevel(link.dimension());
+        // The dimension a network's first loaded link sits in is the one its identity is taken
+        // from, so the two halves of the address always describe the same place.
         if (home == null) home = level;
-        String dimension = link == null ? home.dimension().location().toString()
-                : link.dimension().location().toString();
         UUID node = TranserverBridge.localNodeUuid();
-        if (node == null) return;
+        if (node == null) return BindOutcome.NO_NODE;
         RemoteNetworkId remote = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, node,
-                WorldIdentity.get(home), dimension, frequency);
+                WorldIdentity.get(home), home.dimension().location().toString(), frequency);
         UUID distant = DistantNetworkDirectory.get(level.getServer()).scopeOf(remote);
+        RequesterData.setFreq(stack, frequency);
         RequesterData.setNetwork(stack, remote, distant);
+        return BindOutcome.BOUND;
+    }
+
+    /** Why a bind attempt did or did not leave a usable address on the item. */
+    private enum BindOutcome {
+        BOUND,
+        /** Create's own registry is not up yet, so there is no network to copy. */
+        NO_REGISTRY,
+        /** No Transerver node identity, so this server has no name to put in the address. */
+        NO_NODE
     }
 
     @Override

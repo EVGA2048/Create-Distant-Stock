@@ -1,0 +1,801 @@
+{
+ "parent": "minecraft:block/block",
+ "credit": "Distant Stock concept; concept:* are files in ./textures",
+ "textures": {
+  "particle": "create:block/andesite_casing"
+ },
+ "elements": [
+  {
+   "name": "housing",
+   "from": [
+    0,
+    3,
+    13
+   ],
+   "to": [
+    16,
+    13,
+    16
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:clock_housing",
+     "uv": [
+      0,
+      3,
+      16,
+      13
+     ]
+    },
+    "south": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      3,
+      16,
+      13
+     ]
+    },
+    "west": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      13,
+      3,
+      16,
+      13
+     ]
+    },
+    "east": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      3,
+      3,
+      13
+     ]
+    },
+    "up": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      13,
+      16,
+      16
+     ]
+    },
+    "down": {
+     "texture": "create:block/andesite_casing",
+     "uv": [
+      0,
+      0,
+      16,
+      3
+     ]
+    }
+   }
+  },
+  {
+   "name": "sync_pip",
+   "from": [
+    7.5,
+    11.5,
+    12.5
+   ],
+   "to": [
+    8.5,
+    12.5,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      3.5,
+      8.5,
+      4.5
+     ]
+    },
+    "south": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      3.5,
+      8.5,
+      4.5
+     ]
+    },
+    "west": {
+     "texture": "concept:ether_core",
+     "uv": [
+      12.5,
+      3.5,
+      13,
+      4.5
+     ]
+    },
+    "east": {
+     "texture": "concept:ether_core",
+     "uv": [
+      3,
+      3.5,
+      3.5,
+      4.5
+     ]
+    },
+    "up": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      12.5,
+      8.5,
+      13
+     ]
+    },
+    "down": {
+     "texture": "concept:ether_core",
+     "uv": [
+      7.5,
+      3,
+      8.5,
+      3.5
+     ]
+    }
+   }
+  },
+  {
+   "name": "card_0",
+   "from": [
+    12.5,
+    4.5,
+    12
+   ],
+   "to": [
+    15.5,
+    11.5,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:clock_flap_digits",
+     "uv": [
+      0,
+      0,
+      3,
+      7
+     ]
+    },
+    "south": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      12.5,
+      4.5,
+      15.5,
+      11.5
+     ]
+    },
+    "west": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      12,
+      4.5,
+      13,
+      11.5
+     ]
+    },
+    "east": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      3,
+      4.5,
+      4,
+      11.5
+     ]
+    },
+    "up": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      12.5,
+      12,
+      15.5,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      12.5,
+      3,
+      15.5,
+      4
+     ]
+    }
+   }
+  },
+  {
+   "name": "hinge_0",
+   "from": [
+    12.25,
+    7.75,
+    12.25
+   ],
+   "to": [
+    15.75,
+    8.25,
+    13
+   ],
+   "faces": {
+    "south": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      12.25,
+      7.75,
+      15.75,
+      8.25
+     ]
+    },
+    "west": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      12.25,
+      7.75,
+      13,
+      8.25
+     ]
+    },
+    "east": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      3,
+      7.75,
+      3.75,
+      8.25
+     ]
+    },
+    "up": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      12.25,
+      12.25,
+      15.75,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      12.25,
+      3,
+      15.75,
+      3.75
+     ]
+    }
+   }
+  },
+  {
+   "name": "card_1",
+   "from": [
+    9,
+    4.5,
+    12
+   ],
+   "to": [
+    12,
+    11.5,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:clock_flap_digits",
+     "uv": [
+      4,
+      0,
+      7,
+      7
+     ]
+    },
+    "south": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      9,
+      4.5,
+      12,
+      11.5
+     ]
+    },
+    "west": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      12,
+      4.5,
+      13,
+      11.5
+     ]
+    },
+    "east": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      3,
+      4.5,
+      4,
+      11.5
+     ]
+    },
+    "up": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      9,
+      12,
+      12,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      9,
+      3,
+      12,
+      4
+     ]
+    }
+   }
+  },
+  {
+   "name": "hinge_1",
+   "from": [
+    8.75,
+    7.75,
+    12.25
+   ],
+   "to": [
+    12.25,
+    8.25,
+    13
+   ],
+   "faces": {
+    "south": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      8.75,
+      7.75,
+      12.25,
+      8.25
+     ]
+    },
+    "west": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      12.25,
+      7.75,
+      13,
+      8.25
+     ]
+    },
+    "east": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      3,
+      7.75,
+      3.75,
+      8.25
+     ]
+    },
+    "up": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      8.75,
+      12.25,
+      12.25,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      8.75,
+      3,
+      12.25,
+      3.75
+     ]
+    }
+   }
+  },
+  {
+   "name": "card_2",
+   "from": [
+    4,
+    4.5,
+    12
+   ],
+   "to": [
+    7,
+    11.5,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:clock_flap_digits",
+     "uv": [
+      8,
+      0,
+      11,
+      7
+     ]
+    },
+    "south": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      4,
+      4.5,
+      7,
+      11.5
+     ]
+    },
+    "west": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      12,
+      4.5,
+      13,
+      11.5
+     ]
+    },
+    "east": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      3,
+      4.5,
+      4,
+      11.5
+     ]
+    },
+    "up": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      4,
+      12,
+      7,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      4,
+      3,
+      7,
+      4
+     ]
+    }
+   }
+  },
+  {
+   "name": "hinge_2",
+   "from": [
+    3.75,
+    7.75,
+    12.25
+   ],
+   "to": [
+    7.25,
+    8.25,
+    13
+   ],
+   "faces": {
+    "south": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      3.75,
+      7.75,
+      7.25,
+      8.25
+     ]
+    },
+    "west": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      12.25,
+      7.75,
+      13,
+      8.25
+     ]
+    },
+    "east": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      3,
+      7.75,
+      3.75,
+      8.25
+     ]
+    },
+    "up": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      3.75,
+      12.25,
+      7.25,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      3.75,
+      3,
+      7.25,
+      3.75
+     ]
+    }
+   }
+  },
+  {
+   "name": "card_3",
+   "from": [
+    0.5,
+    4.5,
+    12
+   ],
+   "to": [
+    3.5,
+    11.5,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "concept:clock_flap_digits",
+     "uv": [
+      12,
+      0,
+      15,
+      7
+     ]
+    },
+    "south": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      0.5,
+      4.5,
+      3.5,
+      11.5
+     ]
+    },
+    "west": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      12,
+      4.5,
+      13,
+      11.5
+     ]
+    },
+    "east": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      3,
+      4.5,
+      4,
+      11.5
+     ]
+    },
+    "up": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      0.5,
+      12,
+      3.5,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/flap_display_inside",
+     "uv": [
+      0.5,
+      3,
+      3.5,
+      4
+     ]
+    }
+   }
+  },
+  {
+   "name": "hinge_3",
+   "from": [
+    0.25,
+    7.75,
+    12.25
+   ],
+   "to": [
+    3.75,
+    8.25,
+    13
+   ],
+   "faces": {
+    "south": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      0.25,
+      7.75,
+      3.75,
+      8.25
+     ]
+    },
+    "west": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      12.25,
+      7.75,
+      13,
+      8.25
+     ]
+    },
+    "east": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      3,
+      7.75,
+      3.75,
+      8.25
+     ]
+    },
+    "up": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      0.25,
+      12.25,
+      3.75,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/industrial_iron_block",
+     "uv": [
+      0.25,
+      3,
+      3.75,
+      3.75
+     ]
+    }
+   }
+  },
+  {
+   "name": "colon_6",
+   "from": [
+    7.5,
+    6,
+    12.5
+   ],
+   "to": [
+    8.5,
+    7,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/andesite_block",
+     "uv": [
+      7.5,
+      9,
+      8.5,
+      10
+     ]
+    },
+    "south": {
+     "texture": "create:block/andesite_block",
+     "uv": [
+      7.5,
+      9,
+      8.5,
+      10
+     ]
+    },
+    "west": {
+     "texture": "create:block/andesite_block",
+     "uv": [
+      12.5,
+      9,
+      13,
+      10
+     ]
+    },
+    "east": {
+     "texture": "create:block/andesite_block",
+     "uv": [
+      3,
+      9,
+      3.5,
+      10
+     ]
+    },
+    "up": {
+     "texture": "create:block/andesite_block",
+     "uv": [
+      7.5,
+      12.5,
+      8.5,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/andesite_block",
+     "uv": [
+      7.5,
+      3,
+      8.5,
+      3.5
+     ]
+    }
+   }
+  },
+  {
+   "name": "colon_9",
+   "from": [
+    7.5,
+    9,
+    12.5
+   ],
+   "to": [
+    8.5,
+    10,
+    13
+   ],
+   "faces": {
+    "north": {
+     "texture": "create:block/andesite_block",
+     "uv": [
+      7.5,
+      6,
+      8.5,
+      7
+     ]
+    },
+    "south": {
+     "texture": "create:block/andesite_block",
+     "uv": [
+      7.5,
+      6,
+      8.5,
+      7
+     ]
+    },
+    "west": {
+     "texture": "create:block/andesite_block",
+     "uv": [
+      12.5,
+      6,
+      13,
+      7
+     ]
+    },
+    "east": {
+     "texture": "create:block/andesite_block",
+     "uv": [
+      3,
+      6,
+      3.5,
+      7
+     ]
+    },
+    "up": {
+     "texture": "create:block/andesite_block",
+     "uv": [
+      7.5,
+      12.5,
+      8.5,
+      13
+     ]
+    },
+    "down": {
+     "texture": "create:block/andesite_block",
+     "uv": [
+      7.5,
+      3,
+      8.5,
+      3.5
+     ]
+    }
+   }
+  }
+ ]
+}

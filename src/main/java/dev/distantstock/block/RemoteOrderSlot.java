@@ -103,6 +103,11 @@ public final class RemoteOrderSlot {
         if (behaviour == null || !behaviour.isActive()) {
             return;
         }
+        if (behaviour.redstonePowered) {
+            // Create's rule for a factory gauge: powered means paused. A redstone link or a logic
+            // gauge pointed at this panel is how a player says "not now".
+            return;
+        }
         if (!RemoteGaugeBlockEntity.localNetworkConfigured(behaviour.network)) {
             // The item is deliberately placeable before local Create tuning. Never interpret an
             // unconfigured local monitor as "stock = 0" and start ordering forever.

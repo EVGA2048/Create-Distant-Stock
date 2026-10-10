@@ -8,6 +8,7 @@ import dev.distantstock.display.ModDisplayTargets;
 import dev.distantstock.fluid.ModFluids;
 import dev.distantstock.item.ModItems;
 import dev.distantstock.item.ModArmorMaterials;
+import dev.distantstock.item.ModDataComponents;
 import dev.distantstock.menu.ModMenus;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -25,6 +26,7 @@ public final class DistantStock {
         ModBlocks.BLOCKS.register(bus);
         ModBlockEntities.BES.register(bus);
         ModArmorMaterials.MATERIALS.register(bus);
+        ModDataComponents.COMPONENTS.register(bus);
         ModItems.ITEMS.register(bus);
         ModSounds.SOUNDS.register(bus);
         ModItems.TABS.register(bus);
@@ -44,6 +46,11 @@ public final class DistantStock {
         // therefore never resolved on packs that do not have the mod installed.
         if (net.neoforged.fml.ModList.get().isLoaded("fluidlogistics")) {
             dev.distantstock.compat.fluidlogistics.FluidLogisticsCompat.register(bus);
+        }
+        // Thirst Was Taken, on the same terms. What it buys is a tank of water being water: the
+        // purity it was drawn at, the effects that come with it, and the thirst it quenches.
+        if (net.neoforged.fml.ModList.get().isLoaded("thirst")) {
+            dev.distantstock.compat.thirst.ThirstDrinkCompat.register();
         }
     }
 

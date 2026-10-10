@@ -11,25 +11,44 @@ import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.LivingChangeTargetEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
 /** Server authority for cloak phase and hostile-target suppression. */
 @EventBusSubscriber(modid = DistantStock.MODID)
 public final class EtherCasingStealthServer {
+    private static final int ARM_TICKS = 10;
+    private static final int HIT_REVEAL_TICKS = 20;
     private static final Set<UUID> CLOAKED = new HashSet<>();
+    private static final Map<UUID, Integer> SNEAK_TICKS = new HashMap<>();
+    private static final Map<UUID, Integer> REVEAL_UNTIL = new HashMap<>();
+
+    public static boolean isCloaked(Player player) {
+        return player != null && CLOAKED.contains(player.getUUID());
+    }
 
     @SubscribeEvent
     public static void playerTick(PlayerTickEvent.Post event) {
         Player player = event.getEntity();
         if (!(player.level() instanceof ServerLevel level)) return;
         UUID id = player.getUUID();
-        boolean cloaking = EtherCasingArmorItem.isCloaking(player);
+        boolean wants = EtherCasingArmorItem.wantsCloak(player);
+        int held = wants ? Math.min(ARM_TICKS, SNEAK_TICKS.getOrDefault(id, 0) + 1) : 0;
+        if (held == 0) SNEAK_TICKS.remove(id);
+        else SNEAK_TICKS.put(id, held);
+
+        int revealUntil = REVEAL_UNTIL.getOrDefault(id, 0);
+        boolean disrupted = player.tickCount < revealUntil;
+        if (!disrupted && revealUntil != 0) REVEAL_UNTIL.remove(id);
+        boolean cloaking = wants && held >= ARM_TICKS && !disrupted;
         boolean wasCloaking = CLOAKED.contains(id);
 
         if (cloaking == wasCloaking) {
@@ -78,8 +97,24 @@ public final class EtherCasingStealthServer {
     @SubscribeEvent
     public static void changeTarget(LivingChangeTargetEvent event) {
         if (event.getNewAboutToBeSetTarget() instanceof Player player
-                && EtherCasingArmorItem.isCloaking(player)) {
+                && isCloaked(player)) {
             event.setNewAboutToBeSetTarget(null);
+        }
+    }
+
+    /**
+     * A hit disturbs the optical phase instead of cancelling the player's crouch. The casing fades
+     * back in, remains targetable for about a second, then re-enters phase automatically if the
+     * player is still crouching. Damage that never got through (newDamage == 0) does not reveal it.
+     */
+    @SubscribeEvent
+    public static void damaged(LivingDamageEvent.Post event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (event.getNewDamage() <= 0 || !CLOAKED.contains(player.getUUID())) return;
+        UUID id = player.getUUID();
+        REVEAL_UNTIL.put(id, player.tickCount + HIT_REVEAL_TICKS);
+        if (CLOAKED.remove(id)) {
+            PacketDistributor.sendToPlayersTrackingEntityAndSelf(player, new CloakStateS2C(id, false));
         }
     }
 
@@ -89,13 +124,15 @@ public final class EtherCasingStealthServer {
         if (!(event.getEntity() instanceof ServerPlayer observer)) return;
         if (!(event.getTarget() instanceof Player target)) return;
         PacketDistributor.sendToPlayer(observer,
-                new CloakStateS2C(target.getUUID(), EtherCasingArmorItem.isCloaking(target)));
+                new CloakStateS2C(target.getUUID(), isCloaked(target)));
     }
 
     @SubscribeEvent
     public static void playerLoggedOut(PlayerEvent.PlayerLoggedOutEvent event) {
         UUID id = event.getEntity().getUUID();
         CLOAKED.remove(id);
+        SNEAK_TICKS.remove(id);
+        REVEAL_UNTIL.remove(id);
     }
 
     private EtherCasingStealthServer() {

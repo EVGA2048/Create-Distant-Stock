@@ -1,0 +1,659 @@
+{
+  "units": "Minecraft model pixels",
+  "format": "offline concept geometry, not a game-ready armour model",
+  "parts": [
+    {
+      "name": "left_optical_housing",
+      "bone": "head",
+      "lo": [
+        5.01,
+        27.4,
+        -3.25
+      ],
+      "hi": [
+        6.05,
+        30.1,
+        -0.35
+      ],
+      "material": "shell",
+      "turns": []
+    },
+    {
+      "name": "left_optical_cap",
+      "bone": "head",
+      "lo": [
+        5.01,
+        30.1,
+        -2.9
+      ],
+      "hi": [
+        6.05,
+        30.45,
+        -0.65
+      ],
+      "material": "edge",
+      "turns": []
+    },
+    {
+      "name": "left_optical_socket",
+      "bone": "head",
+      "lo": [
+        5.13,
+        27.85,
+        -3.45
+      ],
+      "hi": [
+        5.93,
+        29.65,
+        -3.25
+      ],
+      "material": "recess",
+      "turns": []
+    },
+    {
+      "name": "left_optical_glass",
+      "bone": "head",
+      "lo": [
+        5.26,
+        28.1,
+        -3.5
+      ],
+      "hi": [
+        5.8,
+        29.4,
+        -3.45
+      ],
+      "material": "glass",
+      "turns": []
+    },
+    {
+      "name": "right_optical_housing",
+      "bone": "head",
+      "lo": [
+        -6.05,
+        27.4,
+        -3.25
+      ],
+      "hi": [
+        -5.01,
+        30.1,
+        -0.35
+      ],
+      "material": "shell",
+      "turns": []
+    },
+    {
+      "name": "right_optical_cap",
+      "bone": "head",
+      "lo": [
+        -6.05,
+        30.1,
+        -2.9
+      ],
+      "hi": [
+        -5.01,
+        30.45,
+        -0.65
+      ],
+      "material": "edge",
+      "turns": []
+    },
+    {
+      "name": "right_optical_socket",
+      "bone": "head",
+      "lo": [
+        -5.93,
+        27.85,
+        -3.45
+      ],
+      "hi": [
+        -5.13,
+        29.65,
+        -3.25
+      ],
+      "material": "recess",
+      "turns": []
+    },
+    {
+      "name": "right_optical_glass",
+      "bone": "head",
+      "lo": [
+        -5.8,
+        28.1,
+        -3.5
+      ],
+      "hi": [
+        -5.26,
+        29.4,
+        -3.45
+      ],
+      "material": "glass",
+      "turns": []
+    },
+    {
+      "name": "brow_lip",
+      "bone": "head",
+      "lo": [
+        -3.4,
+        29.0,
+        -5.55
+      ],
+      "hi": [
+        3.4,
+        29.45,
+        -5.0
+      ],
+      "material": "edge",
+      "turns": []
+    },
+    {
+      "name": "brow_inlay",
+      "bone": "head",
+      "lo": [
+        -1.7,
+        29.04,
+        -5.61
+      ],
+      "hi": [
+        1.7,
+        29.28,
+        -5.55
+      ],
+      "material": "glass",
+      "turns": []
+    },
+    {
+      "name": "left_shoulder_seal",
+      "bone": "left_arm",
+      "lo": [
+        4.45,
+        23.05,
+        -2.7
+      ],
+      "hi": [
+        9.25,
+        24.55,
+        2.7
+      ],
+      "material": "recess",
+      "turns": [
+        [
+          "z",
+          5,
+          [
+            4,
+            24,
+            0
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "left_shoulder_plate",
+      "bone": "left_arm",
+      "lo": [
+        4.5,
+        23.5,
+        -2.95
+      ],
+      "hi": [
+        9.25,
+        24.65,
+        2.95
+      ],
+      "material": "shell",
+      "turns": [
+        [
+          "z",
+          5,
+          [
+            4,
+            24,
+            0
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "left_shoulder_crown",
+      "bone": "left_arm",
+      "lo": [
+        4.85,
+        24.65,
+        -2.55
+      ],
+      "hi": [
+        8.95,
+        25.1,
+        2.55
+      ],
+      "material": "edge",
+      "turns": [
+        [
+          "z",
+          5,
+          [
+            4,
+            24,
+            0
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "left_shoulder_outer_lip",
+      "bone": "left_arm",
+      "lo": [
+        8.95,
+        22.95,
+        -2.35
+      ],
+      "hi": [
+        9.55,
+        24.1,
+        2.35
+      ],
+      "material": "shell",
+      "turns": [
+        [
+          "z",
+          5,
+          [
+            4,
+            24,
+            0
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "left_shoulder_side_insert",
+      "bone": "left_arm",
+      "lo": [
+        9.55,
+        23.15,
+        -0.85
+      ],
+      "hi": [
+        9.65,
+        23.8,
+        0.85
+      ],
+      "material": "steel",
+      "turns": [
+        [
+          "z",
+          5,
+          [
+            4,
+            24,
+            0
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "right_shoulder_seal",
+      "bone": "right_arm",
+      "lo": [
+        -9.25,
+        23.05,
+        -2.7
+      ],
+      "hi": [
+        -4.45,
+        24.55,
+        2.7
+      ],
+      "material": "recess",
+      "turns": [
+        [
+          "z",
+          -5,
+          [
+            -4,
+            24,
+            0
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "right_shoulder_plate",
+      "bone": "right_arm",
+      "lo": [
+        -9.25,
+        23.5,
+        -2.95
+      ],
+      "hi": [
+        -4.5,
+        24.65,
+        2.95
+      ],
+      "material": "shell",
+      "turns": [
+        [
+          "z",
+          -5,
+          [
+            -4,
+            24,
+            0
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "right_shoulder_crown",
+      "bone": "right_arm",
+      "lo": [
+        -8.95,
+        24.65,
+        -2.55
+      ],
+      "hi": [
+        -4.85,
+        25.1,
+        2.55
+      ],
+      "material": "edge",
+      "turns": [
+        [
+          "z",
+          -5,
+          [
+            -4,
+            24,
+            0
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "right_shoulder_outer_lip",
+      "bone": "right_arm",
+      "lo": [
+        -9.55,
+        22.95,
+        -2.35
+      ],
+      "hi": [
+        -8.95,
+        24.1,
+        2.35
+      ],
+      "material": "shell",
+      "turns": [
+        [
+          "z",
+          -5,
+          [
+            -4,
+            24,
+            0
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "right_shoulder_side_insert",
+      "bone": "right_arm",
+      "lo": [
+        -9.65,
+        23.15,
+        -0.85
+      ],
+      "hi": [
+        -9.55,
+        23.8,
+        0.85
+      ],
+      "material": "steel",
+      "turns": [
+        [
+          "z",
+          -5,
+          [
+            -4,
+            24,
+            0
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "back_mount",
+      "bone": "body",
+      "lo": [
+        -2.7,
+        17.6,
+        3.0
+      ],
+      "hi": [
+        2.7,
+        23.3,
+        3.55
+      ],
+      "material": "recess",
+      "turns": []
+    },
+    {
+      "name": "back_shell",
+      "bone": "body",
+      "lo": [
+        -2.45,
+        17.7,
+        3.55
+      ],
+      "hi": [
+        2.45,
+        23.15,
+        5.0
+      ],
+      "material": "shell",
+      "turns": []
+    },
+    {
+      "name": "back_top_bevel",
+      "bone": "body",
+      "lo": [
+        -2.1,
+        23.15,
+        3.55
+      ],
+      "hi": [
+        2.1,
+        23.6,
+        4.7
+      ],
+      "material": "edge",
+      "turns": []
+    },
+    {
+      "name": "back_bottom_bevel",
+      "bone": "body",
+      "lo": [
+        -2.1,
+        17.25,
+        3.55
+      ],
+      "hi": [
+        2.1,
+        17.7,
+        4.7
+      ],
+      "material": "steel",
+      "turns": []
+    },
+    {
+      "name": "window_socket",
+      "bone": "body",
+      "lo": [
+        -1.3,
+        19.25,
+        5.0
+      ],
+      "hi": [
+        1.3,
+        22.65,
+        5.12
+      ],
+      "material": "recess",
+      "turns": []
+    },
+    {
+      "name": "optical_window",
+      "bone": "body",
+      "lo": [
+        -0.9,
+        19.55,
+        5.12
+      ],
+      "hi": [
+        0.9,
+        22.35,
+        5.22
+      ],
+      "material": "glass",
+      "turns": []
+    },
+    {
+      "name": "window_upper_lip",
+      "bone": "body",
+      "lo": [
+        -1.1,
+        22.35,
+        5.12
+      ],
+      "hi": [
+        1.1,
+        22.65,
+        5.3
+      ],
+      "material": "edge",
+      "turns": []
+    },
+    {
+      "name": "window_lower_lip",
+      "bone": "body",
+      "lo": [
+        -1.1,
+        19.25,
+        5.12
+      ],
+      "hi": [
+        1.1,
+        19.55,
+        5.3
+      ],
+      "material": "steel",
+      "turns": []
+    },
+    {
+      "name": "back_slot_18.1",
+      "bone": "body",
+      "lo": [
+        -1.35,
+        18.1,
+        5.0
+      ],
+      "hi": [
+        1.35,
+        18.26,
+        5.06
+      ],
+      "material": "seal",
+      "turns": []
+    },
+    {
+      "name": "back_slot_18.6",
+      "bone": "body",
+      "lo": [
+        -1.35,
+        18.6,
+        5.0
+      ],
+      "hi": [
+        1.35,
+        18.76,
+        5.06
+      ],
+      "material": "seal",
+      "turns": []
+    },
+    {
+      "name": "left_heel_guard",
+      "bone": "left_leg",
+      "lo": [
+        1.4,
+        1.15,
+        3.0
+      ],
+      "hi": [
+        4.699999999999999,
+        2.0,
+        3.55
+      ],
+      "material": "steel",
+      "turns": []
+    },
+    {
+      "name": "left_heel_edge",
+      "bone": "left_leg",
+      "lo": [
+        1.5499999999999998,
+        2.0,
+        3.0
+      ],
+      "hi": [
+        4.55,
+        2.35,
+        3.35
+      ],
+      "material": "edge",
+      "turns": []
+    },
+    {
+      "name": "right_heel_guard",
+      "bone": "right_leg",
+      "lo": [
+        -4.699999999999999,
+        1.15,
+        3.0
+      ],
+      "hi": [
+        -1.4,
+        2.0,
+        3.55
+      ],
+      "material": "steel",
+      "turns": []
+    },
+    {
+      "name": "right_heel_edge",
+      "bone": "right_leg",
+      "lo": [
+        -4.55,
+        2.0,
+        3.0
+      ],
+      "hi": [
+        -1.5499999999999998,
+        2.35,
+        3.35
+      ],
+      "material": "edge",
+      "turns": []
+    }
+  ],
+  "palette": {
+    "shell": "#c7dbdf",
+    "edge": "#e6efea",
+    "recess": "#7f9da9",
+    "steel": "#a3bbc3",
+    "glass": "#9cd5e1",
+    "lens": "#76b3c7",
+    "seal": "#617f8c"
+  }
+}

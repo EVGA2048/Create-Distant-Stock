@@ -336,23 +336,8 @@ public final class SignalPanelBlockEntity extends FactoryPanelBlockEntity implem
         if (behaviour == null || !behaviour.isActive() || level == null) {
             return 0;
         }
-        boolean connected = false;
-        boolean satisfied = false;
-        for (FactoryPanelConnection connection : behaviour.targetedBy.values()) {
-            FactoryPanelBehaviour source = FactoryPanelBehaviour.at(level, connection);
-            if (source == null) {
-                continue;
-            }
-            connected = true;
-            if (source.satisfied || source.redstonePowered) {
-                satisfied = true;
-            }
-        }
-        if (lampInverted(slot)) {
-            // An inverted lamp is a shortage alarm: attached and short is exactly when it lights.
-            return connected && !satisfied ? 15 : 0;
-        }
-        return satisfied ? 15 : 0;
+        // An inverted lamp is a shortage alarm: attached and short is exactly when it lights.
+        return LampReadings.wiredLit(level, behaviour, lampInverted(slot)) ? 15 : 0;
     }
 
     /** How urgent one connected source gauge looks, using the fields Create syncs to the client. */

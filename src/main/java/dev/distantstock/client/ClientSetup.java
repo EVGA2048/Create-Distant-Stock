@@ -139,10 +139,15 @@ public final class ClientSetup {
          * registrate, so the same call is made by hand: a baking-result listener that swaps the model
          * behind every block state of the casing. The sheet size lives in the CT type and the layout
          * is Create's own 16x16 grid, so there is nothing to override on the shift itself.
+         *
+         * <p>Registering the CT type is deliberately <em>not</em> done here. This method runs on
+         * every bake, F3+T included, and Create's registry throws on a duplicate id; the type
+         * registers itself once from its own static initialiser instead. Anything added to this
+         * listener has to survive being run again, because that is exactly what a resource reload
+         * does to it.
          */
         @SubscribeEvent
         public static void connectedTextures(net.neoforged.neoforge.client.event.ModelEvent.ModifyBakingResult e) {
-            com.simibubi.create.foundation.block.connected.CTTypeRegistry.register(TowerCasingCTType.INSTANCE);
             com.simibubi.create.foundation.model.ModelSwapper.swapModels(e.getModels(),
                     com.simibubi.create.foundation.model.ModelSwapper.getAllBlockStateModelLocations(
                             ModBlocks.TOWER_CASING.get()),

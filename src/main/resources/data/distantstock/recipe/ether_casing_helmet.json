@@ -3,12 +3,44 @@
   "accept_mirrored": false,
   "category": "equipment",
   "key": {
-    "P": { "item": "distantstock:polished_ether_quartz" },
-    "E": { "item": "distantstock:ether_mechanism" },
-    "C": { "item": "distantstock:tower_casing" },
-    "N": { "item": "minecraft:netherite_helmet" }
+    "P": {
+      "item": "distantstock:polished_ether_quartz"
+    },
+    "S": {
+      "item": "distantstock:resonant_sturdy_sheet"
+    },
+    "C": {
+      "item": "distantstock:tower_casing"
+    },
+    "L": {
+      "item": "create:electron_tube"
+    },
+    "R": {
+      "item": "create:precision_mechanism"
+    },
+    "E": {
+      "item": "distantstock:ether_mechanism"
+    },
+    "B": {
+      "item": "create:brass_sheet"
+    },
+    "G": {
+      "item": "create:goggles"
+    },
+    "N": {
+      "item": "create:netherite_diving_helmet"
+    }
   },
-  "pattern": ["PPPPP", "ECNCE", "PPPPP"],
-  "result": { "count": 1, "id": "distantstock:ether_casing_helmet" },
+  "pattern": [
+    " PSCSP ",
+    "CLRERLC",
+    "SBGNGBS",
+    "PLRERLP",
+    " PSCSP "
+  ],
+  "result": {
+    "count": 1,
+    "id": "distantstock:ether_casing_helmet"
+  },
   "show_notification": true
 }

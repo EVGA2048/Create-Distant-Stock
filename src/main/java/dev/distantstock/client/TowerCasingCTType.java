@@ -1,6 +1,7 @@
 package dev.distantstock.client;
 
 import com.simibubi.create.foundation.block.connected.CTType;
+import com.simibubi.create.foundation.block.connected.CTTypeRegistry;
 import com.simibubi.create.foundation.block.connected.ConnectedTextureBehaviour;
 import dev.distantstock.DistantStock;
 import net.minecraft.resources.ResourceLocation;
@@ -26,6 +27,16 @@ public final class TowerCasingCTType implements CTType {
     public static final TowerCasingCTType INSTANCE = new TowerCasingCTType();
     private static final ResourceLocation ID =
             ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "tower_casing");
+
+    static {
+        // Registered here rather than from the model-bake listener, because it has to happen
+        // exactly once per client. Create's registry keeps a map that is never cleared and throws
+        // an IllegalArgumentException on a second registration of the same id, while the bake
+        // listener runs again on every resource reload. Doing it there worked on world load and
+        // then threw on F3+T -- before the model swap on the next line, so every casing fell back
+        // to its plain unconnected model: a wall of framed panels instead of one metal surface.
+        CTTypeRegistry.register(INSTANCE);
+    }
 
     @Override
     public ResourceLocation getId() {

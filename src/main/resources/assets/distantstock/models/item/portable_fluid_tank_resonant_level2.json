@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "distantstock:item/portable_fluid_tank_fluid_level2",
+    "layer1": "distantstock:item/portable_fluid_tank_resonant"
+  }
+}

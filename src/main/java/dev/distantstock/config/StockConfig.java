@@ -31,6 +31,7 @@ public final class StockConfig {
     public static final ModConfigSpec.IntValue TOWER_MAX_SELECTED_CHUNKS;
     public static final ModConfigSpec.IntValue REMOTE_GAUGE_ORDER_STACKS;
     public static final ModConfigSpec.IntValue TOWER_STANDBY_COST;
+    public static final ModConfigSpec.BooleanValue FLUID_TANK_KEYWORD_DRINK;
 
     static {
         ModConfigSpec.Builder b = new ModConfigSpec.Builder();
@@ -93,6 +94,15 @@ public final class StockConfig {
                         "so a panel pointed at a target of thousands refills in instalments instead",
                         "of pulling the far warehouse's whole stock in one parcel.")
                 .defineInRange("remoteGauge.orderStacks", 1, 1, 27);
+        FLUID_TANK_KEYWORD_DRINK = b.comment(
+                        "Guess that a fluid is drinkable from its name, for fluids no tag claims.",
+                        "This is the last of four tests a tank runs and the only one that guesses:",
+                        "anything in distantstock:drinkable, or carrying a convention tag like",
+                        "c:water or c:tea, is drinkable whether or not this is on. What the guess",
+                        "adds is the long tail -- a drink from a mod that tagged nothing.",
+                        "Turn it off if you would rather a tank refuse an untagged beverage than",
+                        "risk accepting something that is not one.")
+                .define("fluidTank.keywordDrink", true);
         SPEC = b.build();
     }
 
@@ -141,6 +151,20 @@ public final class StockConfig {
             return TOWER_CHARGE_PARCELS.get();
         } catch (IllegalStateException notLoaded) {
             return false;
+        }
+    }
+
+    /**
+     * Whether a tank may guess that an untagged fluid is drinkable from its name.
+     *
+     * <p>The compile-time default is the answer, so a tank asked before the config is read behaves
+     * the way a fresh install does rather than the way a switched-off one would.
+     */
+    public static boolean fluidTankKeywordDrink() {
+        try {
+            return FLUID_TANK_KEYWORD_DRINK.get();
+        } catch (IllegalStateException notLoaded) {
+            return true;
         }
     }
 

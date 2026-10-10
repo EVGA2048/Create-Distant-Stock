@@ -3,12 +3,41 @@
   "accept_mirrored": false,
   "category": "equipment",
   "key": {
-    "P": { "item": "distantstock:polished_ether_quartz" },
-    "E": { "item": "distantstock:ether_mechanism" },
-    "C": { "item": "distantstock:tower_casing" },
-    "N": { "item": "minecraft:netherite_leggings" }
+    "S": {
+      "item": "distantstock:resonant_sturdy_sheet"
+    },
+    "P": {
+      "item": "distantstock:polished_ether_quartz"
+    },
+    "E": {
+      "item": "distantstock:ether_mechanism"
+    },
+    "I": {
+      "item": "create:iron_sheet"
+    },
+    "A": {
+      "item": "create:andesite_alloy"
+    },
+    "R": {
+      "item": "create:precision_mechanism"
+    },
+    "N": {
+      "item": "minecraft:netherite_leggings"
+    },
+    "C": {
+      "item": "distantstock:tower_casing"
+    }
   },
-  "pattern": ["PPPPP", "ECNCE", "PPPPP"],
-  "result": { "count": 1, "id": "distantstock:ether_casing_leggings" },
+  "pattern": [
+    " SPEPS ",
+    "SIIEIIS",
+    "PARNRAP",
+    "SIIEIIS",
+    " SCECS "
+  ],
+  "result": {
+    "count": 1,
+    "id": "distantstock:ether_casing_leggings"
+  },
   "show_notification": true
 }

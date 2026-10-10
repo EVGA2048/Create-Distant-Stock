@@ -273,6 +273,22 @@ public final class ChainDiagnostics {
     }
 
     /**
+     * A Frogport that carries no address filter at all. Create hands one to the routing table with a
+     * distance of zero — ahead of the {@code "*"} wildcard, which is pushed to 1000 — and because
+     * {@code matchAddress} resolves a blank filter to {@code address.isBlank()}, it then accepts
+     * every unaddressed parcel on the chain before any real port is consulted.
+     *
+     * <p>It only ever captures parcels that have no address themselves: for an addressed parcel the
+     * blank filter resolves to false. So treating it as "not a destination" cannot divert addressed
+     * mail, and the wildcard Frogport still collects whatever a player deliberately aims at it. What
+     * it does mean is that an unaddressed parcel is genuinely unroutable, which is the condition the
+     * diagnostic port exists to pick up.
+     */
+    private static boolean hasNoAddress(String port) {
+        return port == null || port.isBlank();
+    }
+
+    /**
      * Called by the chain-conveyor mixin instead of PackageItem.matchAddress for the diagnostic
      * private port. A stale ping explicitly addressed home still matches normally; ordinary parcels
      * match the diagnostic only when Create has no real route for them.
@@ -291,6 +307,7 @@ public final class ChainDiagnostics {
         boolean diagnosticReachable = false;
         for (var entry : entries) {
             String port = entry.port();
+            if (hasNoAddress(port)) continue;
             if (isDiagnosticAddress(port)) {
                 diagnosticReachable = true;
                 continue;
@@ -299,6 +316,42 @@ public final class ChainDiagnostics {
             if (PackageItem.matchAddress(stack, port)) return false;
         }
         return diagnosticReachable;
+    }
+
+    /**
+     * Create's own exit choice with the address-less ports taken out of the running.
+     *
+     * <p>{@code getExitFor} walks the entries by distance and returns the first whose filter matches.
+     * A blank filter sits at distance zero and matches every address-less parcel, so it shadows any
+     * real destination behind it. Re-running the same walk with those entries skipped gives the exit
+     * the parcel would have had without the shadow — which is what the conveyor mixin substitutes
+     * when vanilla's answer came from a blank port.
+     */
+    public static BlockPos normalExit(Collection<ChainConveyorRoutingTable.RoutingTableEntry> entries,
+                                      ItemStack stack) {
+        for (var entry : entries) {
+            String port = entry.port();
+            if (hasNoAddress(port)) continue;
+            if (PackageItem.matchAddress(stack, port)) return entry.nextConnection();
+        }
+        return BlockPos.ZERO;
+    }
+
+    /**
+     * Whether an exit is reachable only through address-less ports. Two ports sharing one chain
+     * connection are one physical destination, so a real port on that same connection keeps the
+     * exit legitimate; only an exit whose every owning entry is blank gets reconsidered.
+     */
+    public static boolean blankPortExit(Collection<ChainConveyorRoutingTable.RoutingTableEntry> entries,
+                                        BlockPos exit) {
+        if (exit == null || exit.equals(BlockPos.ZERO)) return false;
+        boolean owned = false;
+        for (var entry : entries) {
+            if (!exit.equals(entry.nextConnection())) continue;
+            if (!hasNoAddress(entry.port())) return false;
+            owned = true;
+        }
+        return owned;
     }
 
     /** Fallback next chain connection for an otherwise unroutable parcel. */

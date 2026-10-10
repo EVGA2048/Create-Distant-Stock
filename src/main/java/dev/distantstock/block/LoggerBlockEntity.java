@@ -253,10 +253,17 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
     }
 
     public LoggerBlock.Status status() {
+        return status(scopedActive());
+    }
+
+    /**
+     * @param scoped this panel's active rows, already computed by the caller
+     */
+    private LoggerBlock.Status status(List<EventRegistry.Record> scoped) {
         if (!networkKnown) return LoggerBlock.Status.OFFLINE;
         EventRegistry.Severity worst = null;
         boolean unacknowledged = false;
-        for (EventRegistry.Record record : scopedActive()) {
+        for (EventRegistry.Record record : scoped) {
             if (record.severity() == EventRegistry.Severity.INFO) continue;
             if (worst == null || record.severity().ordinal() > worst.ordinal()) {
                 worst = record.severity();
@@ -277,6 +284,15 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         return LoggerBlock.Status.NORMAL;
     }
 
+    /**
+     * This panel's active rows: in scope, above the severity filter, most urgent first.
+     *
+     * <p>Not cheap. {@code EventRegistry.active()} sorts the whole ledger every time it is asked,
+     * and {@link #inScope} answers tower and chain records by sweeping every loaded tower, dock,
+     * gauge, monitor and stock link. Readers on the tick path therefore take one list from
+     * {@link #serverTick} and share it instead of each asking again; the convenience overloads
+     * below are for the callers that run once an operator action or once a second.
+     */
     private List<EventRegistry.Record> scopedActive() {
         if (level == null || level.getServer() == null) return List.of();
         return EventRegistry.get(level.getServer()).active().stream()
@@ -287,7 +303,11 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
 
     /** Highest-priority active warning/error that has not been printed/acknowledged yet. */
     public EventRegistry.Record nextPrintableAlarm() {
-        for (EventRegistry.Record record : scopedActive()) {
+        return nextPrintableAlarm(scopedActive());
+    }
+
+    private EventRegistry.Record nextPrintableAlarm(List<EventRegistry.Record> scoped) {
+        for (EventRegistry.Record record : scoped) {
             if (record.severity() != EventRegistry.Severity.INFO && !record.printed()) return record;
         }
         return null;
@@ -295,7 +315,11 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
 
     /** Highest-priority active alarm that still needs the operator's silence/ACK gesture. */
     public EventRegistry.Record nextUnacknowledgedAlarm() {
-        for (EventRegistry.Record record : scopedActive()) {
+        return nextUnacknowledgedAlarm(scopedActive());
+    }
+
+    private EventRegistry.Record nextUnacknowledgedAlarm(List<EventRegistry.Record> scoped) {
+        for (EventRegistry.Record record : scoped) {
             if (record.severity() != EventRegistry.Severity.INFO && !record.acknowledged()) return record;
         }
         return null;
@@ -314,12 +338,18 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
                 && level.getGameTime() >= be.printedUntilTick) {
             be.setPrinted(false);
         }
+        List<EventRegistry.Record> scoped;
         if (level.getGameTime() % 20 == 0) {
             be.sampleNetworkHealth();
             be.tickOperationNotices();
-            be.updateStatus();
+            // sampleNetworkHealth raises and clears this panel's own conditions, so the rows have
+            // to be read back after it rather than before.
+            scoped = be.scopedActive();
+            be.updateStatus(scoped);
+        } else {
+            scoped = be.scopedActive();
         }
-        be.tickBuzzer();
+        be.tickBuzzer(scoped);
     }
 
     /** Shows the physical paper output briefly after a successful print/ack operation. */
@@ -378,33 +408,38 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
     }
 
     private void updateStatus() {
+        updateStatus(scopedActive());
+    }
+
+    private void updateStatus(List<EventRegistry.Record> scoped) {
         if (level == null || level.isClientSide) return;
         BlockState state = getBlockState();
         if (!state.hasProperty(LoggerBlock.STATUS)) return;
-        LoggerBlock.Status next = status();
-        String nextCode = codeFor(next);
+        LoggerBlock.Status next = status(scoped);
+        String nextCode = codeFor(next, scoped);
         boolean codeChanged = !nextCode.equals(displayCode);
         displayCode = nextCode;
         if (state.getValue(LoggerBlock.STATUS) != next) level.setBlock(worldPosition, state.setValue(LoggerBlock.STATUS, next), 3);
         if (codeChanged) sync();
     }
 
-    private String codeFor(LoggerBlock.Status status) {
+    private String codeFor(LoggerBlock.Status status, List<EventRegistry.Record> scoped) {
         if (status == LoggerBlock.Status.OFFLINE) return "--";
         if (status == LoggerBlock.Status.NORMAL) return hasPaper() ? "OK" : "PE";
         if (status == LoggerBlock.Status.ERROR) return "ER";
         if (status == LoggerBlock.Status.ERROR_ACK) {
-            return hasAcknowledgedUnprinted(EventRegistry.Severity.ERROR) ? "AC" : "ER";
+            return hasAcknowledgedUnprinted(EventRegistry.Severity.ERROR, scoped) ? "AC" : "ER";
         }
         if (status == LoggerBlock.Status.WARN_ACK) {
-            return hasAcknowledgedUnprinted(EventRegistry.Severity.WARN) ? "AC" : "AL";
+            return hasAcknowledgedUnprinted(EventRegistry.Severity.WARN, scoped) ? "AC" : "AL";
         }
         return "AL";
     }
 
     /** AC is the operator-action latch: ACK/silenced, but the mandatory incident slip is not out. */
-    private boolean hasAcknowledgedUnprinted(EventRegistry.Severity severity) {
-        for (EventRegistry.Record record : scopedActive()) {
+    private boolean hasAcknowledgedUnprinted(EventRegistry.Severity severity,
+                                             List<EventRegistry.Record> scoped) {
+        for (EventRegistry.Record record : scoped) {
             if (record.severity() == severity && record.acknowledged() && !record.printed()) {
                 return true;
             }
@@ -412,9 +447,9 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
         return false;
     }
 
-    private void tickBuzzer() {
+    private void tickBuzzer(List<EventRegistry.Record> scoped) {
         if (level == null || level.isClientSide) return;
-        EventRegistry.Record printable = nextPrintableAlarm();
+        EventRegistry.Record printable = nextPrintableAlarm(scoped);
         if (printable == null) {
             if (alarmReceiptStartedTick != Long.MIN_VALUE) {
                 alarmReceiptStartedTick = Long.MIN_VALUE;
@@ -427,7 +462,7 @@ public final class LoggerBlockEntity extends BlockEntity implements IHaveGoggleI
 
         // Paper/printing and sound acknowledgement are deliberately independent. An out-of-paper
         // logger may be silenced; AC stays latched because nextPrintableAlarm still finds the event.
-        EventRegistry.Record alarm = nextUnacknowledgedAlarm();
+        EventRegistry.Record alarm = nextUnacknowledgedAlarm(scoped);
         if (alarm == null) {
             nextBuzzerTick = level.getGameTime();
             return;

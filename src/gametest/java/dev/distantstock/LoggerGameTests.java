@@ -8,8 +8,15 @@ import dev.distantstock.link.TranserverBridge;
 import dev.distantstock.routing.RemoteNetworkId;
 import dev.distantstock.routing.WorldIdentity;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -431,6 +438,42 @@ public final class LoggerGameTests {
                     "printed receipt stayed on the logger after its display interval");
             h.succeed();
         });
+    }
+
+    /**
+     * The sneak half of the terminal gesture belongs to the item, not to the block.
+     *
+     * <p>Vanilla's {@code ServerPlayerGameMode#useItemOn} never calls {@code BlockState#useItemOn}
+     * while the player sneaks with an item in hand, so a handler on the block is unreachable no
+     * matter how correct it looks. That is where this gesture used to live, and the effect was
+     * that a placed logger could not be unbound at all. The engine's dispatch cannot be driven
+     * from here, but the handler the sneak-click actually lands on can be: this fails if the
+     * gesture is moved back onto the block, or deleted as dead code.
+     */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void sneakWithTerminalCanUnbindAPlacedLogger(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos pos = h.absolutePos(new BlockPos(2, 2, 2));
+        level.setBlock(pos, ModBlocks.LOGGER.get().defaultBlockState(), 3);
+        LoggerBlockEntity logger = (LoggerBlockEntity) level.getBlockEntity(pos);
+        logger.setCreateFrequency(UUID.randomUUID());
+        h.assertTrue(logger.createFrequency() != null, "logger was not bound to begin with");
+
+        var player = h.makeMockPlayer(GameType.SURVIVAL);
+        ItemStack terminal = new ItemStack(dev.distantstock.item.ModItems.REQUESTER.get());
+        player.setItemInHand(InteractionHand.MAIN_HAND, terminal);
+        BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(pos), Direction.UP, pos, false);
+
+        player.setShiftKeyDown(false);
+        terminal.getItem().useOn(new UseOnContext(player, InteractionHand.MAIN_HAND, hit));
+        h.assertTrue(logger.createFrequency() != null,
+                "a plain click unbound the logger; binding is the block's gesture to keep");
+
+        player.setShiftKeyDown(true);
+        terminal.getItem().useOn(new UseOnContext(player, InteractionHand.MAIN_HAND, hit));
+        h.assertTrue(logger.createFrequency() == null,
+                "a sneak-click with the terminal did not restore the logger to all events");
+        h.succeed();
     }
 
     private LoggerGameTests() {

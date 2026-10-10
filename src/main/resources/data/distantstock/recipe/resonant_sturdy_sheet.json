@@ -1,0 +1,127 @@
+{
+  "type": "create:sequenced_assembly",
+  "ingredient": {
+    "item": "distantstock:ender_dust"
+  },
+  "loops": 1,
+  "results": [
+    {
+      "id": "distantstock:resonant_sturdy_sheet"
+    }
+  ],
+  "sequence": [
+    {
+      "type": "create:filling",
+      "ingredients": [
+        {
+          "item": "distantstock:incomplete_resonant_sheet"
+        },
+        {
+          "type": "neoforge:single",
+          "amount": 250,
+          "fluid": "distantstock:molten_amethyst"
+        }
+      ],
+      "results": [
+        {
+          "id": "distantstock:incomplete_resonant_sheet"
+        }
+      ]
+    },
+    {
+      "type": "create:pressing",
+      "ingredients": [
+        {
+          "item": "distantstock:incomplete_resonant_sheet"
+        }
+      ],
+      "results": [
+        {
+          "id": "distantstock:incomplete_resonant_sheet"
+        }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "distantstock:incomplete_resonant_sheet"
+        },
+        {
+          "item": "create:copper_sheet"
+        }
+      ],
+      "results": [
+        {
+          "id": "distantstock:incomplete_resonant_sheet"
+        }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "distantstock:incomplete_resonant_sheet"
+        },
+        {
+          "item": "create:golden_sheet"
+        }
+      ],
+      "results": [
+        {
+          "id": "distantstock:incomplete_resonant_sheet"
+        }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        {
+          "item": "distantstock:incomplete_resonant_sheet"
+        },
+        {
+          "item": "create:sturdy_sheet"
+        }
+      ],
+      "results": [
+        {
+          "id": "distantstock:incomplete_resonant_sheet"
+        }
+      ]
+    },
+    {
+      "type": "create:filling",
+      "ingredients": [
+        {
+          "item": "distantstock:incomplete_resonant_sheet"
+        },
+        {
+          "type": "neoforge:single",
+          "amount": 250,
+          "fluid": "distantstock:ether"
+        }
+      ],
+      "results": [
+        {
+          "id": "distantstock:incomplete_resonant_sheet"
+        }
+      ]
+    },
+    {
+      "type": "create:pressing",
+      "ingredients": [
+        {
+          "item": "distantstock:incomplete_resonant_sheet"
+        }
+      ],
+      "results": [
+        {
+          "id": "distantstock:incomplete_resonant_sheet"
+        }
+      ]
+    }
+  ],
+  "transitional_item": {
+    "id": "distantstock:incomplete_resonant_sheet"
+  }
+}

@@ -14,7 +14,8 @@ public final class ModNet {
         // Keep mixed client/server builds from silently accepting payload sets they do not share.
         // v12 introduced LinkSnapshotS2C protocol-compatibility counters.
         // v20: ether boost payload for resonant chestplate flight.
-        PayloadRegistrar r = e.registrar("20");
+        // v21: boost became a held on/off state instead of a one-shot impulse.
+        PayloadRegistrar r = e.registrar("21");
         r.playToServer(SetAddressC2S.TYPE, SetAddressC2S.STREAM_CODEC, SetAddressC2S::handle);
         r.playToServer(PlaceOrderC2S.TYPE, PlaceOrderC2S.STREAM_CODEC, PlaceOrderC2S::handle);
         r.playToServer(JoinNetworkC2S.TYPE, JoinNetworkC2S.STREAM_CODEC, JoinNetworkC2S::handle);
