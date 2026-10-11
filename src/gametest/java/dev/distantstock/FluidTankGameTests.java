@@ -441,6 +441,10 @@ public final class FluidTankGameTests {
         h.assertTrue(haste != null, "tea drunk from a tank was just coloured water");
         h.assertTrue(haste.getDuration() > 1000,
                 "tea's effect came from the pipe handler, not the drink: " + haste.getDuration() + " ticks");
+        // The effect Create hides is the one a tank has to show. A tank that drank in silence was
+        // reported as "drinking does nothing", and there is no other feedback it can give.
+        h.assertTrue(haste.showIcon() && haste.isVisible(),
+                "the drink's effect arrived invisible: no icon, no particles, no way to tell it worked");
         h.succeed();
     }
 

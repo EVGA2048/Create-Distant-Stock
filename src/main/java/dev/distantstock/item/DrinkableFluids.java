@@ -234,10 +234,32 @@ public final class DrinkableFluids {
         if (entity instanceof Player player) player.getFoodData().eat(food);
         for (FoodProperties.PossibleEffect possible : food.effects()) {
             if (entity.getRandom().nextFloat() < possible.probability()) {
-                entity.addEffect(new MobEffectInstance(possible.effect()));
+                entity.addEffect(shown(new MobEffectInstance(possible.effect())));
             }
         }
         return true;
+    }
+
+    /**
+     * The same effect, with its icon and its particles turned on.
+     *
+     * <p>Drinking out of a tank is otherwise silent: there is no bottle to disappear, no glass to
+     * hand back, nothing that moves in the inventory. When the drink's effect is hidden as well the
+     * player has no way to tell a working tank from a broken one -- which is exactly the report that
+     * produced this method. Create's builders tea is the case in point: its food carries
+     * {@code DIG_SPEED} for three minutes with {@code showIcon} and {@code visible} both false, so a
+     * real bottle of it does the same amount of visible nothing as an empty tank would.
+     *
+     * <p>What is changed is only the display: same effect, same duration, same amplifier, same
+     * ambient flag. A mod that hid its effect on purpose keeps its gameplay and loses its secrecy
+     * when the drink is poured into a tank -- a trade this mod makes deliberately, because the tank
+     * has no other way to say that it worked. Effects that are already visible are returned
+     * untouched, so nothing else about anyone's drink changes.
+     */
+    private static MobEffectInstance shown(MobEffectInstance effect) {
+        if (effect.isVisible() && effect.showIcon()) return effect;
+        return new MobEffectInstance(effect.getEffect(), effect.getDuration(), effect.getAmplifier(),
+                effect.isAmbient(), true, true);
     }
 
     /** Vanilla's own potion drinking, minus the bottle: instant effects fire, the rest are applied. */
@@ -248,7 +270,7 @@ public final class DrinkableFluids {
                 effect.getEffect().value().applyInstantenousEffect(player, player, entity,
                         effect.getAmplifier(), 1.0);
             } else {
-                entity.addEffect(new MobEffectInstance(effect));
+                entity.addEffect(shown(new MobEffectInstance(effect)));
             }
         });
     }
