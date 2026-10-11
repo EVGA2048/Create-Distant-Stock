@@ -44,6 +44,7 @@ public final class SignalLampClientSmoke {
                 checkFluidTankArt(mc);
                 LogUtils.getLogger().info(
                         "DISTANTSTOCK_FLUID_TANK_AFTER_RELOAD_OK: 流体罐重载资源之后模型与染色照旧");
+                checkArmorLore();
             } catch (Throwable failure) {
                 LogUtils.getLogger().error("DISTANTSTOCK_CLIENT_SMOKE_FAILED", failure);
             } finally {
@@ -265,6 +266,7 @@ public final class SignalLampClientSmoke {
             }
             LogUtils.getLogger().info("DISTANTSTOCK_ATLAS_SPRITES_OK: {} sprites stitched", sprites);
             checkFluidTankArt(mc);
+            checkArmorLore();
             // A Ponder scene is three things that have to agree and none of which the game checks
             // together: a structure file, a storyboard registered under that name, and one text key
             // per line the scene shows. Get any of them wrong and the scene either never opens or
@@ -333,6 +335,38 @@ public final class SignalLampClientSmoke {
      * {@code getTintColor} paints a tank of water white. That last one is why the colour is compared
      * against "no colour" rather than merely against -1.
      */
+    /**
+     * The suit's lore is Create's description shape, keyed per piece. Two failures would show up
+     * only in front of a player and in one language: the modifiers never being registered, and a
+     * language file losing a line, which renders as a raw translation id. Both are checked here.
+     *
+     * <p>This runs in both smoke phases, because a description is built from the language manager
+     * and a resource reload is exactly when that changes underneath it.
+     */
+    private static void checkArmorLore() {
+        for (var item : java.util.List.of(ModItems.ETHER_CASING_HELMET.get(),
+                ModItems.ETHER_CASING_CHESTPLATE.get(), ModItems.ETHER_CASING_LEGGINGS.get(),
+                ModItems.ETHER_CASING_BOOTS.get())) {
+            var modifier = com.simibubi.create.foundation.item.TooltipModifier.REGISTRY.get(item);
+            if (modifier == null
+                    || modifier == com.simibubi.create.foundation.item.TooltipModifier.EMPTY) {
+                throw new AssertionError("no tooltip description is registered for " + item);
+            }
+            // Building it here is the check: ItemDescription skips a line whose key does not exist,
+            // so an empty list means the piece would hover as a bare name in this language.
+            var description = com.simibubi.create.foundation.item.ItemDescription.create(item,
+                    net.createmod.catnip.lang.FontHelper.Palette.STANDARD_CREATE);
+            if (description.lines().isEmpty()) {
+                throw new AssertionError(item + " has no summary line in this language");
+            }
+            if (description.linesOnShift().isEmpty()) {
+                throw new AssertionError(item + " has no condition/behaviour lines in this language");
+            }
+        }
+        LogUtils.getLogger().info(
+                "DISTANTSTOCK_ARMOR_LORE_OK: 四件护甲的 Create 式描述已注册，语言文件里的每一行都在");
+    }
+
     private static void checkFluidTankArt(Minecraft mc) {
         var atlas = mc.getModelManager().getAtlas(net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS);
         var missing = atlas.getSprite(

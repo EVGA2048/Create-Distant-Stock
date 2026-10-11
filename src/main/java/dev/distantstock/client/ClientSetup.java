@@ -29,6 +29,8 @@ import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsE
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
+import java.util.List;
+
 public final class ClientSetup {
     @EventBusSubscriber(modid = DistantStock.MODID, bus = EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static final class Screens {
@@ -39,6 +41,33 @@ public final class ClientSetup {
             e.enqueueWork(() -> com.simibubi.create.content.equipment.goggles.GogglesItem
                     .addIsWearingPredicate(player -> player.getItemBySlot(EquipmentSlot.HEAD)
                             .is(ModItems.ETHER_CASING_HELMET.get())));
+        }
+
+        /**
+         * The suit's lore, written the way Create writes its own.
+         *
+         * <p>{@code ItemDescription} reads {@code <item>.tooltip.summary} for the line that always
+         * shows, and {@code condition}/{@code behaviour} pairs for the rest, which the player unfolds
+         * by holding Shift -- the same shape, palette and {@code _highlight_} markup as Create's
+         * diving gear and the equipment of every addon. Registering through
+         * {@code TooltipModifier.REGISTRY} is how the addons that do not build their items with
+         * CreateRegistrate hook it in.
+         *
+         * <p>Done here rather than at item registration because a description asks the language
+         * manager for its lines, and that is a client object.
+         */
+        @SubscribeEvent
+        public static void suitLore(FMLClientSetupEvent e) {
+            e.enqueueWork(() -> {
+                for (var item : List.of(ModItems.ETHER_CASING_HELMET.get(),
+                        ModItems.ETHER_CASING_CHESTPLATE.get(),
+                        ModItems.ETHER_CASING_LEGGINGS.get(),
+                        ModItems.ETHER_CASING_BOOTS.get())) {
+                    com.simibubi.create.foundation.item.TooltipModifier.REGISTRY.register(item,
+                            new com.simibubi.create.foundation.item.ItemDescription.Modifier(item,
+                                    net.createmod.catnip.lang.FontHelper.Palette.STANDARD_CREATE));
+                }
+            });
         }
 
         @SubscribeEvent

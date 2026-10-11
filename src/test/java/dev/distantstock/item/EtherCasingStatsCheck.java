@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Guards the Resonant Quartz suit's balance.
@@ -104,49 +105,67 @@ public final class EtherCasingStatsCheck {
     /**
      * The tooltips are the only place the player is told what the suit does, and the numbers in them
      * are written by hand. Derive what each line must contain from the constant and look for it.
+     *
+     * <p>The lines are Create's own description shape -- a {@code summary} plus
+     * {@code condition}/{@code behaviour} pairs the player unfolds by holding Shift -- and they are
+     * keyed per piece, under the piece's own item id.
      */
     private static void checkTooltips() {
         for (String file : List.of("en_us.json", "zh_cn.json")) {
             JsonObject lang = read(file);
-            state(lang, file, "leggings_bonus", reduction(EtherCasingBalance.LEGGINGS_ABSORB));
-            // The boots carry two numbers and one of them is not a percentage, so it is checked by
-            // name: "one level of Jump Boost" is what the constant buys, and a line that stopped
-            // saying so would be promising an unstated effect.
-            state(lang, file, "boots_bonus", gainPercent(EtherCasingBalance.BOOTS_SPEED),
-                    file.startsWith("zh") ? "跳跃提升" : "Jump Boost");
-            // Both attack lines are shares of the weapon, not flat additions, and both are withheld
-            // until something is in hand -- so the tooltips have to read that way. "+4" on a
-            // chestplate is a promise about a fist, and that promise is exactly what the scaling and
-            // the in-hand condition exist to break.
-            state(lang, file, "chestplate_bonus", gainPercent(EtherCasingBalance.CHEST_STRENGTH),
-                    file.startsWith("zh") ? "武器" : "weapon");
-            state(lang, file, "helmet_bonus", gain(EtherCasingBalance.HELMET_OXYGEN),
+            boolean zh = file.startsWith("zh");
+            // Each piece's own line is the one its constants belong to.
+            piece(lang, file, "helmet", zh,
+                    gain(EtherCasingBalance.HELMET_OXYGEN),
                     reduction(EtherCasingBalance.HELMET_PROJECTILE_ABSORB));
-            state(lang, file, "charged", reduction(EtherCasingBalance.CHARGED_ABSORB), "+10%",
-                    gainPercent(EtherCasingBalance.CHARGED_STRENGTH));
-            // The fire immunity is a four-piece rule, and it is the one line here that has no number
-            // to check against a constant, so what is checked is the claim itself: a player reading
-            // the tooltip on a lone helmet has to be told the other three pieces are part of the
-            // deal. EtherCasingArmorGameTests is what proves the rule does what the line says.
-            state(lang, file, "fire_immune", file.startsWith("zh") ? "全套" : "Full set");
-            // The rest of the lines the armour draws. None of them states a number, so there is no
-            // constant to check them against -- but this list has to match the send(...) calls in
-            // appendHoverText, because a key that loses its twin in the other language file is a
-            // piece that shows a raw translation id to whoever hovers it, in one language only.
-            for (String key : List.of("cloak", "reach", "goggles", "flight", "reserve", "wear")) {
-                state(lang, file, key);
-            }
+            // The attack line is a share of the weapon rather than a flat addition, and it is
+            // withheld until something is in hand -- so it has to read that way. "+4" on a
+            // chestplate is a promise about a fist, and that is the promise the scaling exists to
+            // break.
+            piece(lang, file, "chestplate", zh,
+                    gainPercent(EtherCasingBalance.CHEST_STRENGTH), zh ? "武器" : "weapon");
+            piece(lang, file, "leggings", zh, reduction(EtherCasingBalance.LEGGINGS_ABSORB));
+            // The boots carry one percentage and one named effect, so the effect is checked by name:
+            // "one level of Jump Boost" is what the constant buys, and a line that stopped saying so
+            // would be promising something unstated.
+            piece(lang, file, "boots", zh,
+                    gainPercent(EtherCasingBalance.BOOTS_SPEED), zh ? "跳跃提升" : "Jump Boost");
+            // The reserve line is the one that stayed in appendHoverText, because it is a number.
+            state(lang, file, "item.distantstock.ether_casing_armor.reserve");
         }
-        System.out.println("  tooltips  two files, every stated figure matches its constant");
+        System.out.println("  tooltips  four pieces, two files, every stated figure matches its constant");
     }
 
-    private static void state(JsonObject lang, String file, String suffix, String... fragments) {
-        String key = "item.distantstock.ether_casing_armor." + suffix;
+    /**
+     * One piece's description: every line present in both files, and the ones that state a figure
+     * checked against the constant behind it.
+     */
+    private static void piece(JsonObject lang, String file, String id, boolean zh, String... own) {
+        String prefix = "item.distantstock.ether_casing_" + id + ".tooltip.";
+        // A key that loses its twin in the other language file is a piece showing a raw translation
+        // id to whoever hovers it, in one language only, so all seven lines are checked for presence.
+        for (String suffix : List.of("summary", "condition1", "behaviour1", "condition2", "behaviour2",
+                "condition3", "behaviour3")) {
+            state(lang, file, prefix + suffix);
+        }
+        // The set-wide line is a four-piece promise and has to say so; EtherCasingArmorGameTests is
+        // what proves the rule does what the line says. The charged line is shared by all four and
+        // carries three figures.
+        state(lang, file, prefix + "condition1", zh ? "全套" : "Full set");
+        state(lang, file, prefix + "behaviour1", zh ? "火焰" : "fire");
+        state(lang, file, prefix + "behaviour2", own);
+        state(lang, file, prefix + "behaviour3", reduction(EtherCasingBalance.CHARGED_ABSORB), "+10%",
+                gainPercent(EtherCasingBalance.CHARGED_STRENGTH));
+    }
+
+    private static void state(JsonObject lang, String file, String key, String... fragments) {
         require(lang.has(key), file + " is missing " + key);
-        String line = lang.get(key).getAsString();
+        // Matched case-insensitively: what is being checked is that the line makes a claim, and
+        // sentence position is not part of the claim.
+        String line = lang.get(key).getAsString().toLowerCase(Locale.ROOT);
         for (String fragment : fragments) {
-            require(line.contains(fragment),
-                    file + " " + suffix + " says " + line + ", which lacks " + fragment);
+            require(line.contains(fragment.toLowerCase(Locale.ROOT)),
+                    file + " " + key + " says " + line + ", which lacks " + fragment);
         }
     }
 

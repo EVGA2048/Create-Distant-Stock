@@ -202,55 +202,25 @@ public final class EtherCasingArmorItem extends ArmorItem {
     }
 
     /**
-     * The suit's lore, in three blocks and always in the same order.
+     * Only the number that moves lives here.
      *
-     * <p>Every line is a label plus a fact, and the labels are the blocks: what all four pieces give
-     * ({@code 全套 · } and {@code 满套充能 · }), what this one piece gives on its own, then what it
-     * costs to keep running. A player comparing two pieces reads the same shape twice, and a player
-     * reading one piece knows which of its lines are about the suit rather than about the item.
+     * <p>The rest of the suit's lore is an {@code ItemDescription} -- the tooltip shape Create itself
+     * and its addons use: one {@code .tooltip.summary} line that always shows, plus
+     * {@code .tooltip.conditionN}/{@code .tooltip.behaviourN} pairs the player unfolds by holding
+     * Shift, with {@code _words_} picked out in the palette's highlight colour. Eight lines of rules
+     * stop crowding the item, and what remains on hover is a sentence about what the piece is.
      *
-     * <p>What lives here is the order and the colour of each block; the words are in the language
-     * files, and the numbers in them are checked against the constants in {@link EtherCasingBalance}
-     * by {@code EtherCasingStatsCheck} -- which is also what fails the build if a line loses one.
+     * <p>What that shape cannot carry is the medium reserve, because it is a live number, so it
+     * stays here and reads as the mechanical readout under the lore. The description is registered
+     * in {@code ClientSetup}: it reads the language manager, which only exists on a client.
      */
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context,
                                 List<Component> tooltip, TooltipFlag flag) {
         super.appendHoverText(stack, context, tooltip, flag);
-
-        // Set-wide. Same three lines on every piece, whether or not the other three are worn.
-        send(tooltip, "cloak", ChatFormatting.AQUA);
-        send(tooltip, "fire_immune", ChatFormatting.GOLD);
-        send(tooltip, "reach", ChatFormatting.GRAY);
-        send(tooltip, "charged", ChatFormatting.AQUA);
-
-        // This piece. One line, except for the helmet's goggles and the chestplate's flight.
-        switch (getType()) {
-            case HELMET -> {
-                send(tooltip, "helmet_bonus", ChatFormatting.BLUE);
-                send(tooltip, "goggles", ChatFormatting.GRAY);
-            }
-            case CHESTPLATE -> {
-                send(tooltip, "chestplate_bonus", ChatFormatting.BLUE);
-                send(tooltip, "flight", ChatFormatting.GOLD);
-            }
-            case LEGGINGS -> send(tooltip, "leggings_bonus", ChatFormatting.BLUE);
-            case BOOTS -> send(tooltip, "boots_bonus", ChatFormatting.BLUE);
-            default -> {
-            }
-        }
-
-        // Upkeep. The reserve is a number, so it is filled in; the last line says what happens when
-        // it runs out and where more comes from.
         tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.reserve",
                         reserve(stack), maxReserve(stack))
                 .withStyle(ChatFormatting.AQUA));
-        send(tooltip, "wear", ChatFormatting.DARK_GRAY);
-    }
-
-    private static void send(List<Component> tooltip, String key, ChatFormatting style) {
-        tooltip.add(Component.translatable("item.distantstock.ether_casing_armor." + key)
-                .withStyle(style));
     }
 
     /**
