@@ -48,6 +48,7 @@
   "item.distantstock.ether_casing_armor.leggings_bonus": "Damage taken -35%",
   "item.distantstock.ether_casing_armor.boots_bonus": "Movement speed +25%",
   "item.distantstock.ether_casing_armor.charged": "Full set, every piece charged: damage taken -50%, speed +10%, attack +2",
+  "item.distantstock.ether_casing_armor.fire_immune": "Full set: immune to fire and lava damage",
   "item.distantstock.ether_casing_armor.wear": "A charged piece spends medium instead of durability; an uncharged one wears out and is repaired with polished ether quartz",
   "item.distantstock.resonant_canister": "Resonant Fluid Tank",
   "item.distantstock.copper_fluid_tank": "Copper Fluid Tank",

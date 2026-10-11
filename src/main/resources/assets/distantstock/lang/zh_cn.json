@@ -48,6 +48,7 @@
   "item.distantstock.ether_casing_armor.leggings_bonus": "受到伤害 -35%",
   "item.distantstock.ether_casing_armor.boots_bonus": "移动速度 +25%",
   "item.distantstock.ether_casing_armor.charged": "满套且四件均已充能：受到伤害再 -50%，移速 +10%，攻击 +2",
+  "item.distantstock.ether_casing_armor.fire_immune": "全套装备：免疫火焰与岩浆伤害",
   "item.distantstock.ether_casing_armor.wear": "已充能的部件用介质顶替耐久；未充能则会磨损，用磨制以太石英修复",
   "item.distantstock.resonant_canister": "谐振流体罐",
   "item.distantstock.copper_fluid_tank": "铜流体罐",

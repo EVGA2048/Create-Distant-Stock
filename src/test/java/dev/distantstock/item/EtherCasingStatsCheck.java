@@ -114,6 +114,11 @@ public final class EtherCasingStatsCheck {
             state(lang, file, "helmet_bonus", gain(EtherCasingBalance.HELMET_OXYGEN),
                     reduction(EtherCasingBalance.HELMET_PROJECTILE_ABSORB));
             state(lang, file, "charged", reduction(EtherCasingBalance.CHARGED_ABSORB), "+10%", "+2");
+            // The fire immunity is a four-piece rule, and it is the one line here that has no number
+            // to check against a constant, so what is checked is the claim itself: a player reading
+            // the tooltip on a lone helmet has to be told the other three pieces are part of the
+            // deal. EtherCasingArmorGameTests is what proves the rule does what the line says.
+            state(lang, file, "fire_immune", file.startsWith("zh") ? "全套" : "Full set");
         }
         System.out.println("  tooltips  two files, every stated figure matches its constant");
     }

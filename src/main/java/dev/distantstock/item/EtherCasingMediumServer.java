@@ -6,6 +6,7 @@ import dev.distantstock.fluid.ModFluids;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
@@ -59,7 +60,13 @@ public final class EtherCasingMediumServer {
         }
     }
 
-    public static boolean fullPoweredSet(ServerPlayer player) {
+    /**
+     * The suit's best state: all four pieces worn and every one of them still holding medium.
+     *
+     * <p>Widened from {@link ServerPlayer} to any living wearer because the damage handler asks this
+     * and damage is not player-only; nothing here reads a player-only field.
+     */
+    public static boolean fullPoweredSet(LivingEntity player) {
         if (!EtherCasingArmorItem.hasFullSet(player)) return false;
         return EtherCasingArmorItem.hasReserve(player.getItemBySlot(EquipmentSlot.HEAD))
                 && EtherCasingArmorItem.hasReserve(player.getItemBySlot(EquipmentSlot.CHEST))

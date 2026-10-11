@@ -184,6 +184,8 @@ public final class EtherCasingArmorItem extends ArmorItem {
                 .withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.charged")
                 .withStyle(ChatFormatting.AQUA));
+        tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.fire_immune")
+                .withStyle(ChatFormatting.GOLD));
         // What this particular piece adds. The numbers are baked into the lang lines, the same way
         // the reach line above already states its own; EtherCasingStatsCheck is what keeps them
         // honest against the constants in EtherCasingStatsServer.

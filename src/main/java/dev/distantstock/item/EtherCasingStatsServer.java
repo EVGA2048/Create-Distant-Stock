@@ -5,6 +5,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
@@ -20,6 +21,10 @@ import net.neoforged.neoforge.event.tick.PlayerTickEvent;
  * <p>Everything here is an attribute or a damage multiplier. Nothing applies a mob effect, because
  * the brief for this suit was explicit that no potion particles may ever appear on the wearer -- a
  * shimmering cloud would give away a suit whose entire point is not being seen.
+ *
+ * <p>Except for one rule, which is about all four pieces at once: a complete suit turns fire aside
+ * entirely. It is the only absolute here, and it is deliberately not a multiplier -- see
+ * {@link #incomingDamage}.
  *
  * <p>The bonuses are laid out one per piece so that each slot is worth wearing on its own, and they
  * stack into a set. The defence is three independent multipliers applied before vanilla's armour
@@ -56,18 +61,33 @@ public final class EtherCasingStatsServer {
 
     @SubscribeEvent
     public static void incomingDamage(LivingIncomingDamageEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        LivingEntity wearer = event.getEntity();
+        // Wearing the four pieces is what turns fire aside, and it takes no medium: the immunity is
+        // the shell's, the charged tiers below are what the medium pays for. Fire here is vanilla's
+        // own is_fire tag -- campfires, standing in fire, burning, lava, magma blocks and fireballs
+        // -- so a wearer walks through the Nether rather than merely surviving it.
+        //
+        // Cancelling, rather than zeroing the amount, is deliberately the same shape as vanilla's own
+        // Fire Resistance check in LivingEntity#hurt: the hit never lands, so there is no hurt sound,
+        // no red flash and no invulnerability window, and the wearer still visibly burns. That last
+        // part is the point -- flames that do nothing say "the armour did this", where flames that
+        // went out would read as a potion.
+        if (EtherCasingArmorItem.hasFullSet(wearer)
+                && event.getSource().is(DamageTypeTags.IS_FIRE)) {
+            event.setCanceled(true);
+            return;
+        }
         float through = 1.0F;
-        if (wearing(player, EquipmentSlot.LEGS)) {
+        if (wearing(wearer, EquipmentSlot.LEGS)) {
             through *= EtherCasingBalance.LEGGINGS_ABSORB;
         }
-        if (wearing(player, EquipmentSlot.HEAD)
+        if (wearing(wearer, EquipmentSlot.HEAD)
                 && event.getSource().is(DamageTypeTags.IS_PROJECTILE)) {
             through *= EtherCasingBalance.HELMET_PROJECTILE_ABSORB;
         }
         // The charged tier is the whole four-piece set with working medium in every slot, so the
         // suit's best state is also its most expensive one to hold.
-        if (EtherCasingMediumServer.fullPoweredSet(player)) {
+        if (EtherCasingMediumServer.fullPoweredSet(wearer)) {
             through *= EtherCasingBalance.CHARGED_ABSORB;
         }
         if (through != 1.0F) {
@@ -76,7 +96,7 @@ public final class EtherCasingStatsServer {
     }
 
     /** Worn in its own slot, not merely carried. */
-    static boolean wearing(ServerPlayer player, EquipmentSlot slot) {
+    static boolean wearing(LivingEntity player, EquipmentSlot slot) {
         ItemStack stack = player.getItemBySlot(slot);
         return stack.getItem() instanceof EtherCasingArmorItem armour
                 && armour.getType().getSlot() == slot;
