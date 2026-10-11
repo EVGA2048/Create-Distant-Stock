@@ -5,6 +5,7 @@ The images produced here deliberately contain no labels or explanatory copy. REA
 Markdown, while the artwork stays a reproducible view of the models that actually ship with the
 mod. Requires Pillow, NumPy and the Create jar configured in ``scripts/render_block.py``.
 """
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -22,7 +23,7 @@ KEY = "#172c33"
 LINE = "#d4d1c8"
 
 
-def cutout(model: str, size=(720, 720), scale=16, yaw=30, pitch=25) -> Image.Image:
+def cutout(model: str | list[str] | tuple[str, ...], size=(720, 720), scale=16, yaw=30, pitch=25) -> Image.Image:
     """Render one shipped model and remove only the renderer's exact chroma-key background."""
     pixels = np.array(render(model, yaw=yaw, pitch=pitch, size=size, scale=scale, bg=KEY))
     pixels[np.all(pixels[:, :, :3] == (23, 44, 51), axis=2), 3] = 0
@@ -31,7 +32,7 @@ def cutout(model: str, size=(720, 720), scale=16, yaw=30, pitch=25) -> Image.Ima
     return image.crop(bbox) if bbox else image
 
 
-def place(canvas: Image.Image, model: str, box, *, scale=16, yaw=30, pitch=25) -> None:
+def place(canvas: Image.Image, model: str | list[str] | tuple[str, ...], box, *, scale=16, yaw=30, pitch=25) -> None:
     """Render a model into a box with a restrained soft shadow."""
     x, y, w, h = box
     model_image = cutout(model, scale=scale, yaw=yaw, pitch=pitch)
@@ -59,6 +60,27 @@ def panel(width: int, height: int) -> Image.Image:
 
 def save_rgb(image: Image.Image, name: str) -> None:
     image.convert("RGB").save(OUT / name, optimize=True)
+
+
+def place_item_texture(canvas: Image.Image, texture: str, box, *, pixel_scale=7) -> None:
+    """Place one shipped 16×16 inventory texture without smoothing its pixel art."""
+    x, y, w, h = box
+    source = ROOT / "src/main/resources/assets/distantstock/textures/item" / f"{texture}.png"
+    icon = Image.open(source).convert("RGBA")
+    assert icon.size == (16, 16), f"README item art expects a 16x16 texture: {source}"
+    size = min(w, h, 16 * pixel_scale)
+    size -= size % 16
+    icon = icon.resize((size, size), Image.Resampling.NEAREST)
+    px = x + (w - size) // 2
+    py = y + (h - size) // 2
+
+    shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    alpha = icon.getchannel("A").filter(ImageFilter.GaussianBlur(5))
+    shadow_piece = Image.new("RGBA", icon.size, (40, 45, 43, 44))
+    shadow_piece.putalpha(alpha.point(lambda value: value * 44 // 255))
+    shadow.alpha_composite(shadow_piece, (px + 5, py + 7))
+    canvas.alpha_composite(shadow)
+    canvas.alpha_composite(icon, (px, py))
 
 
 def render_icon() -> None:
@@ -115,8 +137,14 @@ def render_tower() -> None:
     image = panel(1200, 340)
     entries = [
         ("distantstock:block/tower/tower_core", (40, 20, 260, 285), 17),
-        ("distantstock:block/tower/tower_coupler_middle", (320, 20, 260, 285), 17),
-        ("distantstock:block/tower/ether_resonator", (610, 20, 260, 285), 17),
+        # The old README used tower_coupler_middle, which is the intentionally trimmed state used
+        # between neighbours. A standalone component preview must use the complete item/base model.
+        ("distantstock:block/tower/tower_coupler", (320, 20, 260, 285), 17),
+        # The rotor and beam are block-entity partials in game, so they must share the same depth
+        # buffer with the static resonator body or the release preview looks half-built.
+        (("distantstock:block/tower/ether_resonator",
+          "distantstock:block/tower/ether_resonator_beam",
+          "distantstock:block/tower/ether_resonator_rotor"), (610, 20, 260, 285), 17),
         ("distantstock:block/tower/tower_casing_active", (900, 20, 260, 285), 17),
     ]
     for model, box, scale in entries:
@@ -139,6 +167,28 @@ def render_control() -> None:
     save_rgb(image, "control.png")
 
 
+def render_equipment() -> None:
+    """Current wearable gear, portable tanks and one key production intermediate."""
+    image = panel(1200, 340)
+    textures = [
+        "ether_casing_helmet",
+        "ether_casing_chestplate",
+        "ether_casing_leggings",
+        "ether_casing_boots",
+        "portable_fluid_tank_copper",
+        "portable_fluid_tank_sturdy",
+        "portable_fluid_tank_resonant",
+        "resonant_sturdy_sheet",
+    ]
+    margin = 18
+    gap = 8
+    cell = (1200 - 2 * margin - 7 * gap) // 8
+    for index, texture in enumerate(textures):
+        x = margin + index * (cell + gap)
+        place_item_texture(image, texture, (x, 34, cell, 250), pixel_scale=7)
+    save_rgb(image, "equipment.png")
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     render_icon()
@@ -146,6 +196,7 @@ def main() -> None:
     render_logistics()
     render_tower()
     render_control()
+    render_equipment()
     print(OUT)
 
 

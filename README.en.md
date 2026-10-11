@@ -51,6 +51,7 @@ This makes Distant Stock suitable for a central warehouse, dedicated production 
 - **Interlink Tower infrastructure:** rotationally powered multiblocks provide device coverage, capacity and chunk loading, with optional Ether costs for shipping.
 - **Monitoring and industrial signalling:** monitors, loggers, stack lights, sounders and signal panels can form a practical factory control room.
 - **Diagnostics and buffering:** Diagnostic and Cache Frogports help recover from bad addresses and blocked local routes.
+- **Engineering gear and portable fluids:** the Resonant Quartz suit combines goggles, flight, phase cloaking and medium-powered assistance, while three portable tank tiers carry, transfer and drink fluids.
 - **Persistent hand-off state:** orders, parcels, acknowledgements, retries, returns and quarantine paths are tracked to reduce silent loss and duplicate delivery during interruptions.
 
 ## Devices and items
@@ -102,16 +103,48 @@ With the default configuration, each outgoing cross-server parcel costs the send
 | **Stack Light + Condition Linker** | Sends independent red/yellow/green states and a buzzer-enable signal to an industrial status light. |
 | **Red / Orange Wall Sounders** | Redstone-controlled visual and audible alarms for faults, shortages, stoppages or other factory states. |
 | **Signal Lamps and Panels** | Cyan, orange, red, green, white and brass signal lamps for standalone or quarter-panel installations. |
+| **Brass Announcer** | A local broadcast terminal. Display Link values fill message templates and a redstone rising edge broadcasts to nearby players; template, prefix, sound and range are configurable. |
+| **Network Broadcaster + Network Speaker** | Binds the same template system to a Create logistics network: the broadcaster sends and distributed speakers announce the message to nearby players. |
+| **Nixie Clock** | Displays Minecraft time, accepts dyes for digit colour and switches between 12- and 24-hour display. |
 | **Diagnostic Frogport** | Probes chain-conveyor addresses with Ping parcels and catches unroutable parcels as a diagnostic/quarantine exit. |
 | **Cache Frogport** | Temporarily takes over a blocked business address, stores real parcels and releases them again at a controlled rate after recovery. |
 
 Diagnostic Frogports expose a bottom-only extraction path for bad parcels. Cache Frogports hold 54 real inventory slots rather than a hidden infinite queue. See the [device guide](docs/wiki/设备.md) and [monitoring guide](docs/wiki/监控与日志.md) for the complete recovery behaviour.
 
-### Materials and other content
+### Equipment, portable fluids and materials
 
-Distant Stock includes its own production chain around **Ender Dust, Ether Quartz, Polished Ether Quartz, incomplete and completed Ether Mechanisms, Molten Amethyst and Ether fluid**. Fluids are available in buckets and bottles; recipes and processing steps are documented in the [materials guide](docs/wiki/材料与制作.md).
+![Resonant Quartz equipment and portable fluid tanks](docs/release/assets/equipment.png)
 
-The mod also includes Resonant Quartz armour, the Distant Stock manual, event receipts, logger paper rolls and Ping parcels used by route diagnostics.
+#### Resonant Quartz suit
+
+The Resonant Quartz suit is engineering equipment rather than a simple late-game armour upgrade. Every piece carries an internal working-medium reserve and can refill automatically from portable tanks in the player's inventory using **Ether** or **Molten Amethyst**. Medium-powered assistance turns off when a piece runs dry, while the armour itself remains wearable and can be repaired with Polished Ether Quartz.
+
+| Piece | Standalone capability |
+| --- | --- |
+| **Resonant Quartz Helmet** | Integrates Create Engineer's Goggles, improves underwater breathing and reduces projectile damage by 30%. |
+| **Resonant Quartz Chestplate** | Integrates elytra flight; with medium available it can glide and sustain thrust. Holding a weapon or tool grants +60% base attack power. |
+| **Resonant Quartz Leggings** | Reduces incoming damage by 35% before normal armour mitigation. |
+| **Resonant Quartz Boots** | Grants +25% movement speed and improved jumping. |
+
+With all four pieces equipped, crouching for about **0.5 seconds** enters phase cloak; taking a hit temporarily reveals the wearer. A complete set also provides **immunity to fire and lava damage** and **+2 blocks of interaction reach**. When every piece still has working medium, the set additionally gains **50% damage reduction, +10% movement speed and +15% attack power while holding a weapon or tool**. These bonuses use attributes and damage rules directly rather than potion effects, so the suit does not produce potion particles.
+
+#### Portable fluid tanks
+
+The three portable tank tiers share the same interactions and differ in capacity:
+
+| Tank | Capacity |
+| --- | ---: |
+| **Copper Fluid Tank** | 1500 mB |
+| **Sturdy Fluid Tank** | 3500 mB |
+| **Resonant Fluid Tank** | 5500 mB |
+
+Portable tanks can be filled and drained through Spouts, faucets and block fluid capabilities, including partial-bucket transfers. They deliberately do not place source blocks like buckets. If the stored fluid is drinkable, it can be consumed directly in **250 mB** portions. While carried in the inventory, only Ether and Molten Amethyst are accepted as automatic working medium for the Resonant Quartz suit.
+
+#### Production materials and utility items
+
+The production chain now includes **Ender Dust, Ether Quartz, Polished Ether Quartz, Resonant Sturdy Sheets, Incomplete Resonant Sheets, incomplete and completed Ether Mechanisms, Molten Amethyst and Ether fluid**. Fluids are available in buckets and bottles; Resonant Sturdy Sheets and Ether Mechanisms continue into the suit, Interlink Tower and higher-tier machine recipes. See the [materials guide](docs/wiki/材料与制作.md) for processing details.
+
+The mod also includes the Distant Stock manual, event receipts, logger paper rolls and Ping parcels used by route diagnostics.
 
 ## How Distant Networks are organized
 
@@ -206,7 +239,7 @@ build/Create-Distant-Stock-<version>+mc1.21.1.jar
 
 ## README and release artwork
 
-The project icon and README device illustrations are rendered offline by the repository's Python renderer from the **actual shipped JSON models and PNG textures**. They do not use generative imagery, and the image files contain no added device names, version strings or promotional copy; captions stay in Markdown.
+The project icon and README illustrations are rendered offline from the **actual shipped JSON models and PNG textures**. Devices assembled from block models plus block-entity partials, such as the Interlink Tower, are composed from those shipped partial models in one depth buffer; equipment and tank previews use their shipped inventory textures directly. No generative imagery is used, and the image files contain no added device names, version strings or promotional copy; captions stay in Markdown.
 
 ```bash
 python3 scripts/render_release_art.py

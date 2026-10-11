@@ -262,7 +262,7 @@ def rasterise_triangle(
 
 
 def render(
-    name: str,
+    name: str | list[str] | tuple[str, ...],
     yaw: float = 30,
     pitch: float = 25,
     size: tuple[int, int] = (240, 250),
@@ -271,8 +271,10 @@ def render(
     bs_x: int = 0,
     bs_y: int = 0,
 ) -> Image.Image:
-    """Render a named block model to a PIL Image."""
-    obj = load_model(name)
+    """Render one model, or several co-located partial models, to one depth-buffered image."""
+    model_names = [name] if isinstance(name, str) else list(name)
+    if not model_names:
+        raise ValueError("render() requires at least one model")
     sy, cy = math.sin(math.radians(yaw)), math.cos(math.radians(yaw))
     sp, cp = math.sin(math.radians(pitch)), math.cos(math.radians(pitch))
 
@@ -298,61 +300,63 @@ def render(
 
     # Collect all faces, sort by average depth (painter's sort for transparent)
     faces_to_draw = []
-    for e in obj.get("elements", []):
-        x0, y0, z0 = e["from"]
-        x1, y1, z1 = e["to"]
-        verts_by_face = face_vertices(x0, y0, z0, x1, y1, z1)
-        elem_rot = e.get("rotation")
+    for model_name in model_names:
+        obj = load_model(model_name)
+        for e in obj.get("elements", []):
+            x0, y0, z0 = e["from"]
+            x1, y1, z1 = e["to"]
+            verts_by_face = face_vertices(x0, y0, z0, x1, y1, z1)
+            elem_rot = e.get("rotation")
 
-        for face_name, face_data in e.get("faces", {}).items():
-            raw_verts = verts_by_face[face_name]
-            # Apply element rotation, then blockstate rotation
-            transformed = []
-            for v in raw_verts:
-                p = np.array(v, dtype=np.float64)
-                p = apply_element_rotation(p, elem_rot)
-                p = apply_blockstate_rotation(p, bs_x, bs_y)
-                transformed.append(p)
+            for face_name, face_data in e.get("faces", {}).items():
+                raw_verts = verts_by_face[face_name]
+                # Apply element rotation, then blockstate rotation
+                transformed = []
+                for v in raw_verts:
+                    p = np.array(v, dtype=np.float64)
+                    p = apply_element_rotation(p, elem_rot)
+                    p = apply_blockstate_rotation(p, bs_x, bs_y)
+                    transformed.append(p)
 
-            # Project all 4 vertices
-            proj = [project(v) for v in transformed]
-            pts_2d = np.array([p[0] for p in proj])
-            dps = np.array([p[1] for p in proj])
+                # Project all 4 vertices
+                proj = [project(v) for v in transformed]
+                pts_2d = np.array([p[0] for p in proj])
+                dps = np.array([p[1] for p in proj])
 
-            # Back-face culling: cross product of first triangle
-            edge1 = pts_2d[1] - pts_2d[0]
-            edge2 = pts_2d[2] - pts_2d[0]
-            cross = edge1[0] * edge2[1] - edge1[1] * edge2[0]
-            if cross >= 0:
-                continue
+                # Back-face culling: cross product of first triangle
+                edge1 = pts_2d[1] - pts_2d[0]
+                edge2 = pts_2d[2] - pts_2d[0]
+                cross = edge1[0] * edge2[1] - edge1[1] * edge2[0]
+                if cross >= 0:
+                    continue
 
-            # Compute face normal for shading after rotation
-            v01 = transformed[1] - transformed[0]
-            v02 = transformed[2] - transformed[0]
-            normal = np.cross(v01, v02)
-            norm_len = np.linalg.norm(normal)
-            if norm_len > 1e-8:
-                normal /= norm_len
-            # Use one diffuse shading term, not MC shading multiplied by a
-            # second directional light (which made pale source textures dark).
-            if not elem_rot and not bs_x and not bs_y:
-                shade = FACE_SHADE.get(face_name, 0.8)
-            else:
-                shade = float(normal[0] ** 2 * 0.6 + normal[2] ** 2 * 0.8
-                              + normal[1] ** 2 * FACE_SHADE.get(face_name, 1.0))
-            if obj.get("shade") is False or e.get("shade") is False:
-                shade = 1.0
+                # Compute face normal for shading after rotation
+                v01 = transformed[1] - transformed[0]
+                v02 = transformed[2] - transformed[0]
+                normal = np.cross(v01, v02)
+                norm_len = np.linalg.norm(normal)
+                if norm_len > 1e-8:
+                    normal /= norm_len
+                # Use one diffuse shading term, not MC shading multiplied by a
+                # second directional light (which made pale source textures dark).
+                if not elem_rot and not bs_x and not bs_y:
+                    shade = FACE_SHADE.get(face_name, 0.8)
+                else:
+                    shade = float(normal[0] ** 2 * 0.6 + normal[2] ** 2 * 0.8
+                                  + normal[1] ** 2 * FACE_SHADE.get(face_name, 1.0))
+                if obj.get("shade") is False or e.get("shade") is False:
+                    shade = 1.0
 
-            avg_depth = float(dps.mean())
-            try:
-                tex = resolve_texture(face_data["texture"], obj["textures"])
-            except (KeyError, FileNotFoundError) as exc:
-                print(f"WARN: {exc}", file=sys.stderr)
-                continue
-            uv = face_data.get("uv", [0, 0, 16, 16])
-            uv_rot = face_data.get("rotation", 0) // 90
+                avg_depth = float(dps.mean())
+                try:
+                    tex = resolve_texture(face_data["texture"], obj["textures"])
+                except (KeyError, FileNotFoundError) as exc:
+                    print(f"WARN: {exc}", file=sys.stderr)
+                    continue
+                uv = face_data.get("uv", [0, 0, 16, 16])
+                uv_rot = face_data.get("rotation", 0) // 90
 
-            faces_to_draw.append((avg_depth, pts_2d, dps, tex, uv, shade, uv_rot))
+                faces_to_draw.append((avg_depth, pts_2d, dps, tex, uv, shade, uv_rot))
 
     # Sort: farthest first (painter's sort helps with transparency)
     faces_to_draw.sort(key=lambda f: -f[0])

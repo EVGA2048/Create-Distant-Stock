@@ -7,11 +7,12 @@
 - `logistics.png`：请求、自动化与跨服运输设备。
 - `tower.png`：互通塔组件。
 - `control.png`：监控、告警与诊断设备。
+- `equipment.png`：谐振石英护甲、三档便携流体罐与关键加工材料。
 - `src/main/resources/distantstock-icon.png`：同一图标的 256 像素版本，供 NeoForge 模组列表使用。
 
 插图本身不写设备名、版本号、宣传语或“离线渲染”等说明文字；所有说明都由 README 的 Markdown 承担。图片只负责展示模型，因此以后模型和材质修改后可以直接重新渲染，而不需要手工编辑图中文字。
 
-图标中央为正式物品模型 `distantstock:item/remote_package`，双向箭头为 Pillow 绘制的几何图形。设备插图是静态离线模型展示，不包含游戏中的动画、UI、动态包裹和方块实体附加渲染，不应当作游戏截图。
+图标中央为正式物品模型 `distantstock:item/remote_package`，双向箭头为 Pillow 绘制的几何图形。设备插图是静态离线模型展示，不包含游戏中的动画、UI 或动态包裹，不应当作游戏截图。对于像以太谐振器这样把主体与 Block Entity partial model 分开渲染的设备，脚本会把正式发布的部件放进同一个深度缓冲中合成，避免发布图缺少转子、光柱等实际可见结构。装备图直接使用正式物品材质。
 
 复现命令：
 
