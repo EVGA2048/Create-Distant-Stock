@@ -7,6 +7,7 @@ import com.simibubi.create.content.logistics.packagePort.frogport.FrogportBlockE
 import com.simibubi.create.foundation.item.SmartInventory;
 import com.simibubi.create.foundation.blockEntity.behaviour.BlockEntityBehaviour;
 import dev.distantstock.diagnostics.ChainDiagnostics;
+import dev.distantstock.diagnostics.PingPackageData;
 import dev.distantstock.menu.CacheFrogportMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -171,6 +172,18 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
      */
     @Override
     public void startAnimation(ItemStack stack, boolean depositing) {
+        // FrogportBlockEntityMixin consumes diagnostic Ping parcels in the vanilla Frogport
+        // startAnimation method. This class overrides that method for immediate high-throughput
+        // intake, so inbound Pings never reach the base method (and therefore never reach the
+        // mixin). A timed-out normal Ping can still be physically circling when this cache takes
+        // over its public address; without this guard the cache stores that stale control packet as
+        // ordinary cargo and may replay it later. Keep diagnostic traffic out of cargo custody and
+        // let the diagnostics state machine decide whether the probe is still live.
+        if (!depositing && PingPackageData.isPing(stack)
+                && level != null && !level.isClientSide) {
+            ChainDiagnostics.pingArrived(this, stack);
+            return;
+        }
         if (depositing || stack == null || stack.isEmpty() || !PackageItem.isPackage(stack)
                 || level == null || level.isClientSide) {
             super.startAnimation(stack, depositing);

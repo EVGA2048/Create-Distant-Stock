@@ -32,10 +32,13 @@ public abstract class ChainConveyorRoutingTableMixin {
                 cir.setReturnValue(normal);
                 return;
             }
-            // Past the blank filter there is no real destination left, so the parcel is genuinely
-            // unroutable and belongs to the diagnostic port. Dropping to ZERO is what lets a
-            // diagnostic on this network pick it up; with none present it loops as it always did.
-            cir.setReturnValue(BlockPos.ZERO);
+            // Past the blank filter there is no real destination left. Do not merely drop to ZERO:
+            // that only works when the diagnostic Frogport happens to live on this same conveyor.
+            // On a multi-conveyor network it strands the parcel on the current loop forever. Route
+            // explicitly toward the advertised diagnostic exit; with no diagnostic present this
+            // naturally remains ZERO and the parcel keeps circulating instead of entering an unset
+            // ordinary Frogport.
+            cir.setReturnValue(ChainDiagnostics.diagnosticExit(entriesByDistance, stack));
             return;
         }
         BlockPos diagnostic = ChainDiagnostics.diagnosticExit(entriesByDistance, stack);

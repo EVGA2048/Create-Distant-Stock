@@ -287,11 +287,17 @@ public final class ChainDiagnostics {
     }
 
     /**
-     * Called by the chain-conveyor mixin instead of PackageItem.matchAddress for the diagnostic
-     * private port. A stale ping explicitly addressed home still matches normally; ordinary parcels
-     * match the diagnostic only when Create has no real route for them.
+     * Called by the chain-conveyor mixin instead of PackageItem.matchAddress for package ports.
+     *
+     * <p>An unset ordinary Frogport is not a destination. Create considers a blank package address
+     * and a blank Frogport filter a match, which is useful for a bare PackagePort in isolation but
+     * disastrous on a routed chain: an address-less parcel is then claimed by whichever unset
+     * Frogport it physically passes first. Keep those ports present in topology, but never let them
+     * claim chain traffic. A stale ping explicitly addressed home still matches normally; ordinary
+     * parcels match the diagnostic only when Create has no real route for them.</p>
      */
     public static boolean matchDiagnosticPort(ChainConveyorBlockEntity conveyor, ItemStack stack, String filter) {
+        if (hasNoAddress(filter)) return false;
         if (!isDiagnosticAddress(filter)) return PackageItem.matchAddress(stack, filter);
         if (PingPackageData.isPing(stack)) return PackageItem.matchAddress(stack, filter);
         return shouldCatchUnroutable(conveyor.routingTable.entriesByDistance, stack);
@@ -940,13 +946,20 @@ public final class ChainDiagnostics {
         if (data == null || frog == null || !(frog.getLevel() instanceof ServerLevel level)) return;
         if (!data.valid()) return; // stale probe returning to its diagnostic Frogport: consume silently
 
-        Probe probe = PROBES.remove(data.probeId());
+        // Do not consume runtime ownership until the envelope has proved that it belongs to this
+        // live probe. Physical Ping items may outlive a timeout, be copied by test/admin tooling, or
+        // cross an unexpected route; none of those should be able to delete an unrelated live Probe
+        // merely by presenting its UUID first.
+        Probe probe = PROBES.get(data.probeId());
         if (probe == null) return; // late or superseded probe; never allowed to recover a route
-        if (!probe.controller().dimension().equals(level.dimension())) return;
+        if (!probe.controller().dimension().equals(level.dimension())
+                || !data.dimension().equals(probe.controller().dimension().location().toString())
+                || !data.controllerPos().equals(probe.controller().pos())
+                || !data.targetPos().equals(probe.targetPos())) return;
 
         long now = level.getGameTime();
         if (now > probe.deadlineTick()) {
-            handleTimeout(level.getServer(), probe);
+            if (PROBES.remove(data.probeId(), probe)) handleTimeout(level.getServer(), probe);
             return;
         }
 
@@ -956,9 +969,10 @@ public final class ChainDiagnostics {
                     || (!isRecoveryAddress(PackageItem.getAddress(stack))
                         && PackageItem.matchAddress(stack, frog.getFilterString())));
         if (!expectedReceiver) {
-            handleTimeout(level.getServer(), probe);
+            if (PROBES.remove(data.probeId(), probe)) handleTimeout(level.getServer(), probe);
             return;
         }
+        if (!PROBES.remove(data.probeId(), probe)) return;
         recordLatency(level, probe.address(), Math.max(0, now - probe.sentTick()), probe.expectedTicks(), now);
         Fault fault = FAULTS.get(new FaultKey(probe.controller(), probe.address()));
         if (probe.recovery() && fault != null) {
