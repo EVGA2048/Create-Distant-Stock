@@ -129,7 +129,7 @@ def crystal(center, width=7, height=17, material='crystal'):
 
 
 def render(mesh, textures, size=(800,900), yaw=32, pitch=18,
-           center=(0,50,0), scale=6, background=BG):
+           center=(0,50,0), scale=6, background=BG, cull_blend=False):
     """Opaque/cutout surfaces, directional shading and a depth buffer."""
     w,h=size
     rgb=np.empty((h,w,4),dtype=np.uint8)
@@ -156,7 +156,7 @@ def render(mesh, textures, size=(800,900), yaw=32, pitch=18,
         cam=(world-np.array(center)) @ camera.T
         projected=np.column_stack((w/2+cam[:,0]*scale,h/2-cam[:,1]*scale,cam[:,2]))
         cross=np.cross(projected[1,:2]-projected[0,:2],projected[2,:2]-projected[0,:2])
-        if cross>=0 and not blend:
+        if cross>=0 and (not blend or cull_blend):
             # Opaque surfaces are cutout in the game and cull their back faces, so they keep the
             # test. Translucent ones do not: Minecraft renders entityTranslucent with NO_CULL, and
             # a glass membrane is visible from both sides. Culling them here made every translucent

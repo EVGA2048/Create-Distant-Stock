@@ -1,5 +1,6 @@
 package dev.distantstock.mixin.client;
 
+import dev.distantstock.client.SuitRenderType;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer;
 import net.minecraft.resources.ResourceLocation;
@@ -7,7 +8,12 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-/** The activated casing stage needs real alpha blending; vanilla armor normally uses cutout only. */
+/**
+ * The activated casing stage needs real alpha blending; vanilla armour normally uses cutout only.
+ *
+ * <p>The choice of render type lives in {@link SuitRenderType}, which is where the comment on why it
+ * has to be the culling one is.
+ */
 @Mixin(HumanoidArmorLayer.class)
 public abstract class HumanoidArmorLayerMixin {
     @Redirect(
@@ -15,10 +21,6 @@ public abstract class HumanoidArmorLayerMixin {
             at = @At(value = "INVOKE",
                     target = "Lnet/minecraft/client/renderer/RenderType;armorCutoutNoCull(Lnet/minecraft/resources/ResourceLocation;)Lnet/minecraft/client/renderer/RenderType;"))
     private RenderType distantstock$translucentResonantQuartz(ResourceLocation texture) {
-        if ("distantstock".equals(texture.getNamespace())
-                && texture.getPath().startsWith("textures/models/armor/ether_casing_layer_")) {
-            return RenderType.entityTranslucent(texture);
-        }
-        return RenderType.armorCutoutNoCull(texture);
+        return SuitRenderType.of(texture);
     }
 }

@@ -118,7 +118,7 @@ def main():
         if mips:
             tex = {k: mipmapped(v, mips) for k, v in textures.items()}
         pic = render(mesh, tex, size=(360, 660), yaw=-24, pitch=6, center=(0, 16, 0),
-                     scale=scale, background=BACKGROUND)
+                     scale=scale, background=BACKGROUND, cull_blend=True)
         pic = pic.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
         pics.append((pic, label, scale))
 

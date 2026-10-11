@@ -45,6 +45,7 @@ public final class SignalLampClientSmoke {
                 LogUtils.getLogger().info(
                         "DISTANTSTOCK_FLUID_TANK_AFTER_RELOAD_OK: 流体罐重载资源之后模型与染色照旧");
                 checkLore();
+                checkSuitRenderType();
             } catch (Throwable failure) {
                 LogUtils.getLogger().error("DISTANTSTOCK_CLIENT_SMOKE_FAILED", failure);
             } finally {
@@ -347,6 +348,41 @@ public final class SignalLampClientSmoke {
      * <p>Run in both smoke phases, because a description is built from the language manager and a
      * resource reload is exactly when that changes underneath it.
      */
+    /**
+     * The suit is drawn blended but culled, and both halves of that matter.
+     *
+     * <p>Blended, because a translucent plate cannot be expressed with vanilla's cutout armour.
+     * Culled, because {@code entityTranslucent} is NO_CULL: the far side of every shell is drawn as
+     * well, so at the suit's quarter opacity you see the inside of the back wall and a leg reads as
+     * an empty glass box. That is the shape of a complaint the user has now made twice ("my legs
+     * have gone transparent again"), and the render type is the whole difference between the two --
+     * average coverage, which is what a distant look is made of, is identical either way.
+     */
+    private static void checkSuitRenderType() {
+        if (Arrays.stream(net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer.class
+                        .getDeclaredMethods())
+                .noneMatch(m -> m.getName().contains("distantstock$translucentResonantQuartz"))) {
+            throw new AssertionError("Armour render type mixin was not applied");
+        }
+        var suit = dev.distantstock.client.SuitRenderType.of(
+                ResourceLocation.fromNamespaceAndPath(DistantStock.MODID,
+                        "textures/models/armor/ether_casing_layer_1.png"));
+        // toString() prints the whole state, cull flag included, which is the property under test.
+        if (!suit.toString().startsWith("RenderType[entity_translucent_cull")
+                || !suit.toString().contains("cull[true]")) {
+            throw new AssertionError("the suit is drawn with " + suit
+                    + ", which draws the far side of every shell too");
+        }
+        var other = dev.distantstock.client.SuitRenderType.of(ResourceLocation.withDefaultNamespace(
+                "textures/models/armor/iron_layer_1.png"));
+        if (!other.toString().contains("armor_cutout_no_cull")
+                || !other.toString().contains("cull[false]")) {
+            throw new AssertionError("armour that is not ours was switched to " + other);
+        }
+        LogUtils.getLogger().info(
+                "DISTANTSTOCK_SUIT_RENDER_TYPE_OK: 护甲走混合+剔除，别人的护甲不受影响");
+    }
+
     private static void checkLore() {
         for (var item : java.util.List.of(
                 dev.distantstock.item.ModItems.ETHER_CASING_HELMET.get(),
