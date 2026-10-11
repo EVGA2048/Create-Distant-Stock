@@ -51,6 +51,30 @@ public final class TankFluidColors {
         return 0xFF9FB6C4;
     }
 
+    /**
+     * ARGB to multiply a fluid's own still texture by, when the icon draws that texture.
+     *
+     * <p>Not the same question as {@link #of}, and the difference is the whole reason this exists.
+     * {@code of} answers "what colour is this fluid", which is what a flat shape and a durability bar
+     * need. This answers "how do I colourise this fluid's texture", and for a fluid that has a
+     * texture, "no opinion" is a real answer: NeoForge's default tint is opaque white, and a mod that
+     * registers a renderer without a tint has usually baked its colour into the texture. Create's tea
+     * is exactly that -- {@code create:fluid/tea_still} is brown already, and forcing it through the
+     * fallback table would paint the steel grey reserved for fluids we know nothing about over a
+     * perfectly good picture of tea.
+     *
+     * <p>So: a fluid that registered a client extension keeps whatever it says, white included. Only
+     * a fluid that registered nothing at all falls through to the table, which is where vanilla's own
+     * water, lava and milk live -- they have no extension, and their textures are grey, so they need
+     * the colour more than anyone.
+     */
+    public static int textureTint(FluidStack fluid) {
+        if (fluid.isEmpty()) return NONE;
+        IClientFluidTypeExtensions extensions = IClientFluidTypeExtensions.of(fluid.getFluidType());
+        if (extensions != IClientFluidTypeExtensions.DEFAULT) return extensions.getTintColor(fluid);
+        return of(fluid);
+    }
+
     private TankFluidColors() {
     }
 }

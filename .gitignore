@@ -10,3 +10,6 @@ run-data/
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
 devtest/
+
+# 概念稿目录里的打包产物：由各自的 build_art.py 生成，不入库
+docs/design/concepts/**/*.zip

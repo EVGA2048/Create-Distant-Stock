@@ -390,54 +390,99 @@ public final class SignalLampClientSmoke {
                 "DISTANTSTOCK_LORE_OK: 十件装备/设备的 Create 式描述都已注册，语言文件里的每一行都能正常渲染");
     }
 
+    /**
+     * The tanks' icons, which are drawn rather than baked and therefore cannot be checked by looking
+     * at a model.
+     *
+     * <p>Four things have to hold. The three shells have to be in the atlas. Each tank's model has to
+     * be a custom-rendered one, because that is the only thing that routes it to
+     * {@code FluidTankItemRenderer} -- a tank whose model lost its {@code builtin/entity} parent
+     * still bakes, still renders, and silently loses the fluid. Every fluid's still sprite has to be
+     * in the atlas too, since the renderer samples it by name. And the tints have to be the ones the
+     * table promises: water must not come out white (the whole reason the fallback exists) and a
+     * fluid that declares its own texture must not be repainted with it.
+     */
     private static void checkFluidTankArt(Minecraft mc) {
         var atlas = mc.getModelManager().getAtlas(net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS);
         var missing = atlas.getSprite(
                 net.minecraft.client.renderer.texture.MissingTextureAtlasSprite.getLocation()).contents().name();
-        for (String sprite : new String[]{"portable_fluid_tank_copper", "portable_fluid_tank_sturdy",
-                "portable_fluid_tank_resonant", "portable_fluid_tank_fluid_empty",
-                "portable_fluid_tank_fluid_level1", "portable_fluid_tank_fluid_level2"}) {
-            var name = ResourceLocation.fromNamespaceAndPath(DistantStock.MODID, "item/" + sprite);
-            if (atlas.getSprite(name).contents().name().equals(missing)) {
-                throw new AssertionError("罐体贴图没有进方块图集: " + name);
-            }
-        }
+
+        var water = new net.neoforged.neoforge.fluids.FluidStack(
+                net.minecraft.world.level.material.Fluids.WATER, 1000);
+        var tea = new net.neoforged.neoforge.fluids.FluidStack(
+                net.minecraft.core.registries.BuiltInRegistries.FLUID.get(
+                        ResourceLocation.fromNamespaceAndPath("create", "tea")), 1000);
 
         for (var holder : ModItems.FLUID_TANKS) {
-            var item = holder.get();
-            BakedModel[] levels = new BakedModel[3];
-            for (int level = 0; level < 3; level++) {
-                ItemStack stack = new ItemStack(item);
-                stack.set(net.minecraft.core.component.DataComponents.CUSTOM_MODEL_DATA,
-                        new net.minecraft.world.item.component.CustomModelData(level));
-                levels[level] = mc.getItemRenderer().getModel(stack, null, null, 0);
-                verify(levels[level], mc);
-            }
-            for (int a = 0; a < 3; a++) {
-                for (int b = a + 1; b < 3; b++) {
-                    if (levels[a] == levels[b]) {
-                        throw new AssertionError(item + " 在液位 " + a + " 和 " + b + " 用的是同一个模型");
-                    }
+            var tank = (dev.distantstock.item.PortableFluidTankItem) holder.get();
+            var shell = dev.distantstock.client.FluidTankItemRenderer.shellTexture(tank);
+            for (var name : new ResourceLocation[]{shell,
+                    ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_still"),
+                    ResourceLocation.fromNamespaceAndPath("create", "fluid/tea_still")}) {
+                if (atlas.getSprite(name).contents().name().equals(missing)) {
+                    throw new AssertionError("罐子要画的贴图没有进方块图集: " + name);
                 }
             }
 
-            ItemStack full = new ItemStack(item);
+            ItemStack full = new ItemStack(tank);
             var handler = filled(full);
-            if (handler == null) throw new AssertionError(item + " has no fluid capability");
-            int contents = mc.getItemColors().getColor(full, 0);
-            if (contents == -1 || contents == 0xFFFFFFFF) {
-                throw new AssertionError(item + " 装水时液体层没有颜色（tint "
-                        + Integer.toHexString(contents) + "）");
+            if (handler == null) throw new AssertionError(tank + " has no fluid capability");
+            BakedModel model = mc.getItemRenderer().getModel(full, null, null, 0);
+            if (model == null || model == mc.getModelManager().getMissingModel()) {
+                throw new AssertionError("罐子的模型缺了: " + tank);
             }
-            if (mc.getItemColors().getColor(full, 1) != -1) {
-                throw new AssertionError(item + " 连罐壳一起染色了");
+            // No quads on purpose: a custom-rendered model is a marker, and everything drawn comes
+            // from FluidTankItemRenderer. Checking it for quads would be checking the wrong object.
+            if (!model.isCustomRenderer()) {
+                throw new AssertionError(tank + " 的模型不是自定义渲染的，图标会退回成一块空壳");
             }
-            if (mc.getItemColors().getColor(new ItemStack(item), 0) != -1) {
-                throw new AssertionError(item + " 给空罐也染了色");
+            if (model.getTransforms().firstPersonRightHand
+                    .equals(net.minecraft.client.renderer.block.model.ItemTransform.NO_TRANSFORM)) {
+                throw new AssertionError(tank + " 丢了 item/generated 的手持姿态，拿在手上会是歪的");
+            }
+
+            // The window the renderer paints into has to be the one the artist left transparent.
+            // Reading the shipped PNG is the only way to catch the two drifting apart: the light
+            // metal is drawn at alpha 200 and the dark at 95, so anything else there means the
+            // rectangle moved and the fluid is now being poured over the wrong pixels.
+            var image = readImage(mc, ResourceLocation.fromNamespaceAndPath(DistantStock.MODID,
+                    "textures/" + shell.getPath() + ".png"));
+            for (int y = dev.distantstock.client.FluidTankItemRenderer.WINDOW_TOP;
+                 y < dev.distantstock.client.FluidTankItemRenderer.WINDOW_BOTTOM; y++) {
+                for (int x = dev.distantstock.client.FluidTankItemRenderer.WINDOW_X0;
+                     x < dev.distantstock.client.FluidTankItemRenderer.WINDOW_X1; x++) {
+                    int alpha = image.getPixelRGBA(x, y) >>> 24;
+                    if (alpha == 0 || alpha == 255) {
+                        throw new AssertionError(tank + " 的窗口 (" + x + "," + y + ") alpha=" + alpha
+                                + "：观察窗要么全透要么不透，流体看不见");
+                    }
+                }
+            }
+            image.close();
+
+            if (dev.distantstock.item.TankFluidColors.of(water) == 0xFFFFFFFF) {
+                throw new AssertionError(tank + " 装水时是白的：兜底色表没接上");
+            }
+            // Create's tea registers a renderer and no tint. Falling through to the table would paint
+            // the steel grey kept for unknown fluids over a perfectly good picture of tea.
+            if (dev.distantstock.item.TankFluidColors.textureTint(tea) == 0xFF9FB6C4) {
+                throw new AssertionError(tank + " 把有自己贴图的流体染成了未知流体的灰");
             }
         }
         LogUtils.getLogger().info(
-                "DISTANTSTOCK_FLUID_TANK_ART_OK: 三档 × 三液位都烘出来了，染色只落在液体层");
+                "DISTANTSTOCK_FLUID_TANK_ART_OK: 三档罐子都走自定义渲染，观察窗与外壳贴图对得上，"
+                        + "水和茶各自的染色正确");
+    }
+
+    private static com.mojang.blaze3d.platform.NativeImage readImage(
+            Minecraft mc, ResourceLocation texture) {
+        var resource = mc.getResourceManager().getResource(texture).orElseThrow(
+                () -> new AssertionError("贴图不在资源包里: " + texture));
+        try (var stream = resource.open()) {
+            return com.mojang.blaze3d.platform.NativeImage.read(stream);
+        } catch (java.io.IOException e) {
+            throw new AssertionError("读不了贴图 " + texture, e);
+        }
     }
 
     private static net.neoforged.neoforge.fluids.capability.IFluidHandlerItem filled(ItemStack stack) {

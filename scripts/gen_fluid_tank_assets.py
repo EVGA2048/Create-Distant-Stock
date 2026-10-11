@@ -1,53 +1,74 @@
 #!/usr/bin/env python3
-"""Ship the three fluid tanks' artwork, and derive the two icons a fluid level needs.
+"""Ship the three fluid tanks' artwork and their item models.
 
-The three shells already exist as accepted concept art under `docs/design/concepts/`; this script
-copies them into the mod and asserts everything the code assumes about them, because the code does
-assume things and a redrawn shell would break them silently:
+The three shells exist as accepted concept art under `docs/design/concepts/`; this script copies them
+into the mod and asserts everything the code assumes about them, because the code does assume things
+and a redrawn shell would break them silently:
 
-  * the three fluid masks are byte-identical, which is what lets one pair of level textures serve
-    all three tanks instead of six pairs;
-  * the window is exactly 24 pixels at x 6..9, y 6..11, so "the lower half" is a defensible split;
+  * the window is exactly 24 pixels at x 6..9, y 6..11 -- that rectangle is written into
+    `FluidTankItemRenderer` as the place the fluid is drawn, so if the art moves, the fluid would be
+    painted over the metal or leave a gap;
   * every shell is transparent over exactly that window, at alphas 24/95/200, which is what makes
-    the fluid visible underneath it at all.
+    the fluid visible underneath it at all;
+  * the silhouette outside the window is the same on all three, so a tank reads as one object at
+    three sizes rather than three unrelated icons.
 
-Nothing is drawn here. The level textures are the same mask with rows removed, so the fluid's shape
-is whatever the artist drew and cannot drift from it.
+The models are generated here too, rather than hand-written, for one reason: all three are the same
+`builtin/entity` model apart from the particle texture, and the display block has to be copied
+verbatim from vanilla's `item/generated` (`ItemTransforms` fills in nothing that a child model does
+not override, so a flat item that forgets it would be held at the wrong angle everywhere).
 
-Outputs, all 16x16, into src/main/resources/assets/distantstock/textures/item/:
+The tanks are drawn by a custom renderer, not by a baked model: see `FluidTankItemRenderer`. That is
+what makes the icon show the fluid's own texture, which no model JSON can select per stack. The
+`particle` texture is still declared so a dropped tank breaks into bits of itself.
 
-  portable_fluid_tank_copper.png         portable_fluid_tank_fluid_empty.png
-  portable_fluid_tank_sturdy.png         portable_fluid_tank_fluid_level1.png
-  portable_fluid_tank_resonant.png       portable_fluid_tank_fluid_level2.png
+Outputs, all 16x16, into src/main/resources/assets/distantstock/:
+  textures/item/portable_fluid_tank_copper.png    models/item/copper_fluid_tank.json
+  textures/item/portable_fluid_tank_sturdy.png    models/item/sturdy_fluid_tank.json
+  textures/item/portable_fluid_tank_resonant.png  models/item/resonant_canister.json
 """
 from __future__ import annotations
 
-import hashlib
+import json
 import pathlib
 
 from PIL import Image
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CONCEPTS = ROOT / "docs/design/concepts"
-OUT = ROOT / "src/main/resources/assets/distantstock/textures/item"
+TEXTURES = ROOT / "src/main/resources/assets/distantstock/textures/item"
+MODELS = ROOT / "src/main/resources/assets/distantstock/models/item"
 
-# tier id -> (shell, mask) as accepted in the concept folders. The tier ids are the same strings the
-# item enum and the model file names use, so a rename here is a rename everywhere or a failed assert.
+# tier id -> (concept folder, concept stem, item model file). The tier ids are the same strings the
+# item enum and the shell texture names use, so a rename here is a rename everywhere or a failed
+# assert. The item model file names are the item registry paths, which cannot be moved.
 CONCEPT = {
-    "copper": ("portable-fluid-tank-v4", "portable_fluid_tank"),
-    "sturdy": ("reinforced-portable-fluid-tank-v1", "reinforced_portable_fluid_tank"),
-    "resonant": ("resonant-portable-fluid-tank-v1", "resonant_portable_fluid_tank"),
+    "copper": ("portable-fluid-tank-v4", "portable_fluid_tank", "copper_fluid_tank"),
+    "sturdy": ("reinforced-portable-fluid-tank-v1", "reinforced_portable_fluid_tank",
+               "sturdy_fluid_tank"),
+    "resonant": ("resonant-portable-fluid-tank-v1", "resonant_portable_fluid_tank",
+                 "resonant_canister"),
 }
 
-# Where the window sits in the mask, and where the fill line falls. Both are asserted, not assumed.
+# Where the window sits in the shell, in texture pixels. FluidTankItemRenderer's WIN_* constants are
+# this rectangle; the assert below is the only thing keeping the two in step.
 WINDOW = {(x, y) for y in range(6, 12) for x in range(6, 10)}
-LOW_ROWS = {(x, y) for y in range(9, 12) for x in range(6, 10)}
 
-MASK_MD5 = "1e423f9e197ba3e12b7247dec03279f6"
+# Vanilla's item/generated, copied: the transforms a flat item is held and dropped with. A
+# builtin/entity model inherits none of them, so they are written out here.
+FLAT_DISPLAY = {
+    "ground": {"rotation": [0, 0, 0], "translation": [0, 2, 0], "scale": [0.5, 0.5, 0.5]},
+    "head": {"rotation": [0, 180, 0], "translation": [0, 13, 7], "scale": [1, 1, 1]},
+    "thirdperson_righthand": {"rotation": [0, 0, 0], "translation": [0, 3, 1],
+                              "scale": [0.55, 0.55, 0.55]},
+    "firstperson_righthand": {"rotation": [0, -90, 25], "translation": [1.13, 3.2, 1.13],
+                              "scale": [0.68, 0.68, 0.68]},
+    "fixed": {"rotation": [0, 180, 0], "scale": [1, 1, 1]},
+}
 
 
 def concept(name: str) -> Image.Image:
-    folder, stem = CONCEPT[name]
+    folder, stem, _ = CONCEPT[name]
     return Image.open(CONCEPTS / folder / "assets/distantstock/textures/item" / f"{stem}.png").convert("RGBA")
 
 
@@ -57,27 +78,6 @@ def opaque(image: Image.Image) -> set[tuple[int, int]]:
 
 def main() -> None:
     shells = {name: concept(name) for name in CONCEPT}
-    masks = {}
-    for name in CONCEPT:
-        folder, stem = CONCEPT[name]
-        path = CONCEPTS / folder / "assets/distantstock/textures/item" / f"{stem}_fluid_mask.png"
-        masks[name] = Image.open(path).convert("RGBA")
-
-    # One silhouette, three tanks. If this ever stops holding, the level textures have to be
-    # generated per tier and the model files have to name their own -- so it is worth failing loudly.
-    fingerprints = {name: hashlib.md5(pathlib.Path(
-        CONCEPTS / CONCEPT[name][0] / "assets/distantstock/textures/item"
-        / f"{CONCEPT[name][1]}_fluid_mask.png").read_bytes()).hexdigest()
-        for name in CONCEPT}
-    assert len(set(fingerprints.values())) == 1, \
-        f"the three masks differ; level art can no longer be shared: {fingerprints}"
-    assert next(iter(fingerprints.values())) == MASK_MD5, \
-        f"the mask was redrawn (md5 {next(iter(fingerprints.values()))}); the level split needs a look"
-
-    master = masks["copper"]
-    assert opaque(master) == WINDOW, f"window moved: {sorted(opaque(master) ^ WINDOW)}"
-    assert all(master.getpixel(p) == (255, 255, 255, 255) for p in WINDOW), \
-        "the mask must be solid white where fluid goes"
 
     for name, shell in shells.items():
         assert shell.size == (16, 16), f"{name}: shell is {shell.size}"
@@ -89,25 +89,28 @@ def main() -> None:
         assert opaque(shell) - WINDOW == opaque(shells["copper"]) - WINDOW, \
             f"{name}: the silhouette outside the window differs from the copper tank's"
 
-    empty = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
-    level1 = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
-    for x, y in LOW_ROWS:
-        level1.putpixel((x, y), (255, 255, 255, 255))
-    assert opaque(level1) < WINDOW, "the low fill must be a strict subset of the window"
-
-    OUT.mkdir(parents=True, exist_ok=True)
+    TEXTURES.mkdir(parents=True, exist_ok=True)
+    MODELS.mkdir(parents=True, exist_ok=True)
     written = []
     for name, shell in shells.items():
-        target = OUT / f"portable_fluid_tank_{name}.png"
+        target = TEXTURES / f"portable_fluid_tank_{name}.png"
         shell.save(target)
         written.append(target)
-    for name, image in (("fluid_empty", empty), ("fluid_level1", level1), ("fluid_level2", master)):
-        target = OUT / f"portable_fluid_tank_{name}.png"
-        image.save(target)
-        written.append(target)
+
+        model = MODELS / f"{CONCEPT[name][2]}.json"
+        model.write_text(json.dumps({
+            "parent": "builtin/entity",
+            "gui_light": "front",
+            "textures": {"particle": f"distantstock:item/portable_fluid_tank_{name}"},
+            "display": FLAT_DISPLAY,
+        }, indent=2) + "\n", encoding="utf-8")
+        written.append(model)
 
     for target in written:
-        assert Image.open(target).size == (16, 16)
+        if target.suffix == ".png":
+            assert Image.open(target).size == (16, 16)
+        else:
+            assert json.loads(target.read_text(encoding="utf-8"))["parent"] == "builtin/entity"
         print(target.relative_to(ROOT))
 
 

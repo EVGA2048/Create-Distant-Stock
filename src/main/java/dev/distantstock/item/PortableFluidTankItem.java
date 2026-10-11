@@ -2,14 +2,12 @@ package dev.distantstock.item;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
@@ -17,7 +15,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemUtils;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.UseAnim;
-import net.minecraft.world.item.component.CustomModelData;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
@@ -55,9 +52,6 @@ public final class PortableFluidTankItem extends Item {
     public static final int DRINK_AMOUNT = 250;
 
     private static final int DRINK_TICKS = 32;
-
-    /** How many icon variants exist per tier: empty, half, full. See {@link #fluidLevel}. */
-    public static final int LEVELS = 3;
 
     public enum Tier {
         COPPER("copper", 1500),
@@ -109,44 +103,20 @@ public final class PortableFluidTankItem extends Item {
     // --- what the icon shows ------------------------------------------------------------------
 
     /**
-     * Which icon variant a fluid amount calls for: 0 empty, 1 up to half, 2 more than half.
+     * How much of the window the icon fills: 0 empty, 1 up to half, 2 more than half.
      *
      * <p>Three states rather than a bar-with-many-steps because the precision is already there --
      * the durability bar under the icon is the real gauge, and it reads in thirteenths. What the
      * icon has to answer is the glance question, "is there anything in there and roughly how much",
      * and two filled states answer it at 16x16 where more would not be tellable apart.
+     *
+     * <p>Read straight off the stack by {@code FluidTankItemRenderer}, which is why there is no
+     * longer any component to keep in step with the contents. Old tanks may still carry the
+     * {@code custom_model_data} this used to write; nothing reads it now.
      */
     public static int fluidLevel(FluidStack fluid, int capacity) {
         if (fluid.isEmpty()) return 0;
         return fluid.getAmount() * 2 <= capacity ? 1 : 2;
-    }
-
-    /**
-     * Keeps {@code custom_model_data} in step with the contents, which is what selects the model.
-     *
-     * <p>Written only on a change: the component is network-synchronized, and setting it every tick
-     * would push a packet per tank per tick for a number that almost never moves.
-     */
-    public static void writeModelIndex(ItemStack stack, FluidStack fluid, int capacity) {
-        int level = fluidLevel(fluid, capacity);
-        CustomModelData current = stack.get(DataComponents.CUSTOM_MODEL_DATA);
-        if (current == null || current.value() != level) {
-            stack.set(DataComponents.CUSTOM_MODEL_DATA, new CustomModelData(level));
-        }
-    }
-
-    /**
-     * Backfill for stacks that did not go through the capability: everything written before this
-     * class existed, anything a command or an editor put together, and the case of a tank whose
-     * fluid was set by a mod that does not know about the component.
-     *
-     * <p>Not merely a safety net for old saves -- without it a 1000 mB canister from an existing
-     * world would draw as an empty tank until something happened to touch its fluid.
-     */
-    @Override
-    public void inventoryTick(ItemStack stack, Level level, Entity entity, int slot, boolean selected) {
-        if (level.isClientSide) return;
-        writeModelIndex(stack, fluid(stack), capacity());
     }
 
     // --- the contents gauge -------------------------------------------------------------------

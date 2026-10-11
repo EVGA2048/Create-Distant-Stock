@@ -314,7 +314,7 @@ public final class FluidTankGameTests {
     }
 
     private static String fluidLevelReport(ItemStack stack) {
-        return "level " + modelIndex(stack);
+        return "level " + level(stack);
     }
 
     /**
@@ -428,46 +428,60 @@ public final class FluidTankGameTests {
                 "honey drunk from a tank did not feed anyone");
 
         // Tea says nothing about itself on the stack; its meaning is the item it fills into, which
-        // is why the tank asks Create's filling recipes.
+        // is why the tank asks Create's filling recipes. The duration is checked, not just the
+        // effect: Create has two dig-speed paths and they are wildly different -- the bottle's food
+        // component gives three minutes, while the handler it registers for open pipes gives
+        // twenty-one ticks and only fires on one game tick in five. A tank that fell through to the
+        // pipe handler would pass an "has the effect" check most of the time and be worth nothing.
         var teaDrinker = h.makeMockPlayer(GameType.SURVIVAL);
         ItemStack tea = tank(PortableFluidTankItem.Tier.COPPER);
         handler(tea).fill(new FluidStack(fluid("create:tea"), 250), IFluidHandler.FluidAction.EXECUTE);
         tea.getItem().finishUsingItem(tea, level, teaDrinker);
-        h.assertTrue(teaDrinker.hasEffect(net.minecraft.world.effect.MobEffects.DIG_SPEED),
-                "tea drunk from a tank was just coloured water");
+        var haste = teaDrinker.getEffect(net.minecraft.world.effect.MobEffects.DIG_SPEED);
+        h.assertTrue(haste != null, "tea drunk from a tank was just coloured water");
+        h.assertTrue(haste.getDuration() > 1000,
+                "tea's effect came from the pipe handler, not the drink: " + haste.getDuration() + " ticks");
         h.succeed();
     }
 
-    /** The icon's level follows the contents, which is what selects the model. */
+    /** The icon's level follows the contents, which is how much of the window the fluid fills. */
     @GameTest(template = "empty", timeoutTicks = 40)
     public static void theIconLevelFollowsTheContents(GameTestHelper h) {
         for (PortableFluidTankItem.Tier tier : TIERS) {
             int capacity = tier.capacity();
             ItemStack stack = tank(tier);
             IFluidHandlerItem handler = handler(stack);
-            // A fresh stack carries no component at all, which draws the root model -- and the root
-            // model is the empty one. There is no reason to write a zero onto every tank ever
-            // crafted just to say so, so absent and 0 are the same answer here.
-            h.assertTrue(modelIndex(stack) == 0, tier + ": a fresh tank is not drawn empty");
+            h.assertTrue(level(stack) == 0, tier + ": a fresh tank is not drawn empty");
 
             handler.fill(new FluidStack(Fluids.WATER, capacity / 4), IFluidHandler.FluidAction.EXECUTE);
-            h.assertTrue(modelIndex(stack) == 1, tier + ": a quarter full reads " + modelIndex(stack));
+            h.assertTrue(level(stack) == 1, tier + ": a quarter full reads " + level(stack));
 
             handler.fill(new FluidStack(Fluids.WATER, capacity), IFluidHandler.FluidAction.EXECUTE);
-            h.assertTrue(modelIndex(stack) == 2, tier + ": full reads " + modelIndex(stack));
+            h.assertTrue(level(stack) == 2, tier + ": full reads " + level(stack));
+
+            // Exactly half is the boundary between the two filled states and the only value the
+            // split can be wrong about -- and it is the one a player reads off the durability bar,
+            // which is half full and would look wrong behind an empty window.
+            handler.drain(capacity / 2, IFluidHandler.FluidAction.EXECUTE);
+            h.assertTrue(level(stack) == 1, tier + ": exactly half reads " + level(stack));
 
             handler.drain(capacity, IFluidHandler.FluidAction.EXECUTE);
-            h.assertTrue(modelIndex(stack) == 0, tier + ": emptied reads " + modelIndex(stack));
-            h.assertTrue(stack.has(DataComponents.CUSTOM_MODEL_DATA),
-                    tier + ": emptying did not go through the capability's hook");
+            h.assertTrue(level(stack) == 0, tier + ": emptied reads " + level(stack));
+            h.assertTrue(PortableFluidTankItem.fluid(stack).isEmpty(),
+                    tier + ": the tank still holds something after being drained");
         }
         h.succeed();
     }
 
-    /** 0 empty, 1 up to half, 2 more than half; absent counts as empty. */
-    private static int modelIndex(ItemStack stack) {
-        var data = stack.get(DataComponents.CUSTOM_MODEL_DATA);
-        return data == null ? 0 : data.value();
+    /**
+     * 0 empty, 1 up to half, 2 more than half -- the icon's level, read the way the renderer reads it.
+     *
+     * <p>Nothing is written to the stack any more: the level is derived from the contents when the
+     * item is drawn, so there is no component to fall out of step and this is the whole rule.
+     */
+    private static int level(ItemStack stack) {
+        return PortableFluidTankItem.fluidLevel(PortableFluidTankItem.fluid(stack),
+                ((PortableFluidTankItem) stack.getItem()).capacity());
     }
 
     /**

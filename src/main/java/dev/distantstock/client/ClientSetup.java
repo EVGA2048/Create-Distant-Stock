@@ -25,6 +25,7 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
+import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
@@ -97,6 +98,30 @@ public final class ClientSetup {
          * whenever Flywheel visualization is available. Our block entity type has no visual by default, so
          * the hatch never appeared; register Create's own visual for our type to get both back.
          */
+        /**
+         * The tanks are drawn, not baked.
+         *
+         * <p>Their icon shows the fluid that is actually in the stack, which is a per-stack
+         * decision no baked model can make -- the old arrangement put a window-shaped mask in the
+         * model and tinted it, and every fluid came out as the same flat blob in a different colour.
+         * The models are {@code builtin/entity} (see {@code gen_fluid_tank_assets.py}) and the work
+         * moves here, where {@code FluidTankItemRenderer} samples the fluid's own still texture
+         * inside the window and lays the shell over it.
+         *
+         * <p>This is the same hook Create's own {@code SimpleCustomRenderer} uses. It only works on
+         * the physical client, which is also the only place an item can be drawn at all.
+         */
+        @SubscribeEvent
+        public static void tankRenderer(RegisterClientExtensionsEvent e) {
+            e.registerItem(new IClientItemExtensions() {
+                @Override
+                public net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer getCustomRenderer() {
+                    return FluidTankItemRenderer.instance();
+                }
+            }, ModItems.COPPER_FLUID_TANK.get(), ModItems.STURDY_FLUID_TANK.get(),
+                    ModItems.RESONANT_CANISTER.get());
+        }
+
         /**
          * Both fluids keep the palette they were authored with. The default water tint would
          * multiply the still texture by the biome colour and darken it.
