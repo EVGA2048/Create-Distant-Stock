@@ -44,7 +44,7 @@ public final class ClientSetup {
         }
 
         /**
-         * The suit's lore, written the way Create writes its own.
+         * Equipment lore, written the way Create writes its own.
          *
          * <p>{@code ItemDescription} reads {@code <item>.tooltip.summary} for the line that always
          * shows, and {@code condition}/{@code behaviour} pairs for the rest, which the player unfolds
@@ -53,16 +53,29 @@ public final class ClientSetup {
          * {@code TooltipModifier.REGISTRY} is how the addons that do not build their items with
          * CreateRegistrate hook it in.
          *
-         * <p>Done here rather than at item registration because a description asks the language
-         * manager for its lines, and that is a client object.
+         * <p>Two things to know before adding a line. Every description line goes through
+         * {@code I18n.get}, which is {@code String.format} in a try/catch: a lone {@code %} renders
+         * the whole line as "Format error: ...", so a literal percent has to be written {@code %%}.
+         * And this has to happen here rather than at item registration, because a description asks
+         * the language manager for its lines and that is a client object.
          */
         @SubscribeEvent
-        public static void suitLore(FMLClientSetupEvent e) {
+        public static void lore(FMLClientSetupEvent e) {
             e.enqueueWork(() -> {
-                for (var item : List.of(ModItems.ETHER_CASING_HELMET.get(),
+                for (var item : List.of(
+                        // The suit.
+                        ModItems.ETHER_CASING_HELMET.get(),
                         ModItems.ETHER_CASING_CHESTPLATE.get(),
                         ModItems.ETHER_CASING_LEGGINGS.get(),
-                        ModItems.ETHER_CASING_BOOTS.get())) {
+                        ModItems.ETHER_CASING_BOOTS.get(),
+                        // The tanks, three sizes of one idea, described once.
+                        ModItems.COPPER_FLUID_TANK.get(),
+                        ModItems.STURDY_FLUID_TANK.get(),
+                        ModItems.RESONANT_CANISTER.get(),
+                        // The broadcast chain: a sender, a receiver, and a local terminal.
+                        ModItems.NETWORK_BROADCASTER.get(),
+                        ModItems.NETWORK_SPEAKER.get(),
+                        ModItems.ANNOUNCER.get())) {
                     com.simibubi.create.foundation.item.TooltipModifier.REGISTRY.register(item,
                             new com.simibubi.create.foundation.item.ItemDescription.Modifier(item,
                                     net.createmod.catnip.lang.FontHelper.Palette.STANDARD_CREATE));

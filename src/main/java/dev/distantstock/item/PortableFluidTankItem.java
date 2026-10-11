@@ -302,6 +302,11 @@ public final class PortableFluidTankItem extends Item {
     }
 
     // --- tooltip ------------------------------------------------------------------------------
+    //
+    // What the tank *is* -- that it holds any fluid, how it is filled and poured, that it can be
+    // drunk from and that it feeds the suit -- is an ItemDescription in Create's own shape,
+    // registered in ClientSetup. What is left here is the half a description cannot say, because it
+    // changes from stack to stack: what is in this one, and what that particular fluid does.
 
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip,
@@ -311,26 +316,24 @@ public final class PortableFluidTankItem extends Item {
         if (fluid.isEmpty()) {
             tooltip.add(Component.translatable("item.distantstock.fluid_tank.empty", capacity())
                     .withStyle(ChatFormatting.DARK_GRAY));
-        } else {
-            tooltip.add(Component.translatable("item.distantstock.fluid_tank.contents",
-                            fluid.getHoverName(), fluid.getAmount(), capacity())
-                    .withStyle(ChatFormatting.GRAY));
-            if (DrinkableFluids.isDrinkable(fluid)) {
-                tooltip.add(Component.translatable("item.distantstock.fluid_tank.drink", DRINK_AMOUNT)
-                        .withStyle(ChatFormatting.GREEN));
-            }
-            DrinkableFluids.WaterBridge bridge = DrinkableFluids.waterBridge();
-            Component purity = bridge == null ? null : bridge.describePurity(fluid);
-            if (purity != null) tooltip.add(purity);
-            // Two batches of the same fluid with different data do not mix -- the capability is
-            // strict about components on purpose, because relaxing it would quietly average away a
-            // purity. Saying so is the least a player deserves when a spout seems to do nothing.
-            if (!fluid.getComponentsPatch().isEmpty()) {
-                tooltip.add(Component.translatable("item.distantstock.fluid_tank.mixed")
-                        .withStyle(ChatFormatting.DARK_GRAY));
-            }
+            return;
         }
-        tooltip.add(Component.translatable("item.distantstock.fluid_tank.usage")
-                .withStyle(ChatFormatting.DARK_GRAY));
+        tooltip.add(Component.translatable("item.distantstock.fluid_tank.contents",
+                        fluid.getHoverName(), fluid.getAmount(), capacity())
+                .withStyle(ChatFormatting.GRAY));
+        if (DrinkableFluids.isDrinkable(fluid)) {
+            tooltip.add(Component.translatable("item.distantstock.fluid_tank.drink", DRINK_AMOUNT)
+                    .withStyle(ChatFormatting.GREEN));
+        }
+        DrinkableFluids.WaterBridge bridge = DrinkableFluids.waterBridge();
+        Component purity = bridge == null ? null : bridge.describePurity(fluid);
+        if (purity != null) tooltip.add(purity);
+        // Two batches of the same fluid with different data do not mix -- the capability is strict
+        // about components on purpose, because relaxing it would quietly average away a purity.
+        // Saying so is the least a player deserves when a spout seems to do nothing.
+        if (!fluid.getComponentsPatch().isEmpty()) {
+            tooltip.add(Component.translatable("item.distantstock.fluid_tank.mixed")
+                    .withStyle(ChatFormatting.DARK_GRAY));
+        }
     }
 }

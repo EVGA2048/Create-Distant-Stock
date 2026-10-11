@@ -8,6 +8,7 @@ import net.minecraft.world.damagesource.CombatRules;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.IllegalFormatException;
 import java.util.List;
 import java.util.Locale;
 
@@ -52,6 +53,7 @@ public final class EtherCasingStatsCheck {
                 193, 161, 113, 71);
 
         checkTooltips();
+        checkLoreFormatting();
         System.out.println("Resonant Quartz stat checks PASSED: charged set is 171 effective health"
                 + " against a 20 damage hit, " + (int) toughness + " toughness, " + (int) armor
                 + " armour points, and both language files agree with the constants.");
@@ -134,6 +136,39 @@ public final class EtherCasingStatsCheck {
             state(lang, file, "item.distantstock.ether_casing_armor.reserve");
         }
         System.out.println("  tooltips  four pieces, two files, every stated figure matches its constant");
+    }
+
+    /**
+     * Every description line has to survive {@code String.format}, because that is what
+     * {@code I18n.get} does to it before it is ever drawn -- inside a try/catch that turns a bad line
+     * into "Format error: ...". A literal percent sign is what goes wrong in practice: it has to be
+     * written {@code %%}, and one that is not costs the player the whole line.
+     *
+     * <p>The client smoke catches that in whatever language it runs in, which is English; this is
+     * the check that runs over every language file the mod ships, at build time.
+     */
+    private static void checkLoreFormatting() {
+        for (String file : List.of("en_us.json", "zh_cn.json")) {
+            JsonObject lang = read(file);
+            int lines = 0;
+            for (String key : lang.keySet()) {
+                if (!key.contains(".tooltip.")) continue;
+                String line = lang.get(key).getAsString();
+                String rendered;
+                try {
+                    // No arguments, exactly as the game builds these: a description line is static
+                    // text, so a format specifier in one is a bug rather than an omission.
+                    rendered = String.format(line);
+                } catch (IllegalFormatException e) {
+                    throw new AssertionError(file + " " + key + " cannot be formatted: " + line, e);
+                }
+                require(!rendered.contains("Format error"),
+                        file + " " + key + " renders as " + rendered);
+                lines++;
+            }
+            require(lines > 0, file + " has no description lines at all");
+            System.out.println("  lore      " + file + ": " + lines + " lines format cleanly");
+        }
     }
 
     /**

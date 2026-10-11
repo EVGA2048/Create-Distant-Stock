@@ -44,7 +44,7 @@ public final class SignalLampClientSmoke {
                 checkFluidTankArt(mc);
                 LogUtils.getLogger().info(
                         "DISTANTSTOCK_FLUID_TANK_AFTER_RELOAD_OK: 流体罐重载资源之后模型与染色照旧");
-                checkArmorLore();
+                checkLore();
             } catch (Throwable failure) {
                 LogUtils.getLogger().error("DISTANTSTOCK_CLIENT_SMOKE_FAILED", failure);
             } finally {
@@ -266,7 +266,7 @@ public final class SignalLampClientSmoke {
             }
             LogUtils.getLogger().info("DISTANTSTOCK_ATLAS_SPRITES_OK: {} sprites stitched", sprites);
             checkFluidTankArt(mc);
-            checkArmorLore();
+            checkLore();
             // A Ponder scene is three things that have to agree and none of which the game checks
             // together: a structure file, a storyboard registered under that name, and one text key
             // per line the scene shows. Get any of them wrong and the scene either never opens or
@@ -336,17 +336,29 @@ public final class SignalLampClientSmoke {
      * against "no colour" rather than merely against -1.
      */
     /**
-     * The suit's lore is Create's description shape, keyed per piece. Two failures would show up
-     * only in front of a player and in one language: the modifiers never being registered, and a
-     * language file losing a line, which renders as a raw translation id. Both are checked here.
+     * The lore of everything that has one, which is Create's description shape: a summary line and
+     * condition/behaviour pairs, keyed per item.
      *
-     * <p>This runs in both smoke phases, because a description is built from the language manager
-     * and a resource reload is exactly when that changes underneath it.
+     * <p>Three failures would show up only in front of a player, and one of them only in one
+     * language: a modifier that was never registered, a language file that lost a line (which
+     * renders as a raw translation id), and a line that {@code I18n.get} refuses to format -- that
+     * one comes back as "Format error: ..." and is what an unescaped percent sign looks like.
+     *
+     * <p>Run in both smoke phases, because a description is built from the language manager and a
+     * resource reload is exactly when that changes underneath it.
      */
-    private static void checkArmorLore() {
-        for (var item : java.util.List.of(ModItems.ETHER_CASING_HELMET.get(),
-                ModItems.ETHER_CASING_CHESTPLATE.get(), ModItems.ETHER_CASING_LEGGINGS.get(),
-                ModItems.ETHER_CASING_BOOTS.get())) {
+    private static void checkLore() {
+        for (var item : java.util.List.of(
+                dev.distantstock.item.ModItems.ETHER_CASING_HELMET.get(),
+                dev.distantstock.item.ModItems.ETHER_CASING_CHESTPLATE.get(),
+                dev.distantstock.item.ModItems.ETHER_CASING_LEGGINGS.get(),
+                dev.distantstock.item.ModItems.ETHER_CASING_BOOTS.get(),
+                dev.distantstock.item.ModItems.COPPER_FLUID_TANK.get(),
+                dev.distantstock.item.ModItems.STURDY_FLUID_TANK.get(),
+                dev.distantstock.item.ModItems.RESONANT_CANISTER.get(),
+                dev.distantstock.item.ModItems.NETWORK_BROADCASTER.get(),
+                dev.distantstock.item.ModItems.NETWORK_SPEAKER.get(),
+                dev.distantstock.item.ModItems.ANNOUNCER.get())) {
             var modifier = com.simibubi.create.foundation.item.TooltipModifier.REGISTRY.get(item);
             if (modifier == null
                     || modifier == com.simibubi.create.foundation.item.TooltipModifier.EMPTY) {
@@ -362,9 +374,16 @@ public final class SignalLampClientSmoke {
             if (description.linesOnShift().isEmpty()) {
                 throw new AssertionError(item + " has no condition/behaviour lines in this language");
             }
+            for (var line : com.google.common.collect.Iterables.concat(
+                    description.lines(), description.linesOnShift())) {
+                String text = line.getString();
+                if (text.contains("Format error:") || text.contains("Invalid lang formatting!")) {
+                    throw new AssertionError(item + " renders an unformatted line: " + text);
+                }
+            }
         }
         LogUtils.getLogger().info(
-                "DISTANTSTOCK_ARMOR_LORE_OK: 四件护甲的 Create 式描述已注册，语言文件里的每一行都在");
+                "DISTANTSTOCK_LORE_OK: 十件装备/设备的 Create 式描述都已注册，语言文件里的每一行都能正常渲染");
     }
 
     private static void checkFluidTankArt(Minecraft mc) {
