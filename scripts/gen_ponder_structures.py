@@ -185,6 +185,10 @@ class Scene:
         self.blocks = []
 
     def place(self, pos, block, props=None, nbt=None):
+        if any(tuple(b["pos"]) == tuple(pos) for b in self.blocks):
+            raise ValueError(f"two blocks occupy {pos}: {block}")
+        if not (0 <= pos[0] < self.width and 0 < pos[1] < self.height and 0 <= pos[2] < self.depth):
+            raise ValueError(f"block outside structure bounds: {pos}")
         entry = {"Name": block}
         if props:
             entry["Properties"] = props
@@ -209,299 +213,207 @@ class Scene:
                         self.palette, floor + self.blocks)
 
 
-# --- block helpers ------------------------------------------------------------------------
+# --- Authored layouts: each machine has one physical task. --------------------
 
-def belt_line(scene, positions, direction, controller, speed=16.0):
-    """A run of belt blocks.
+FREQUENCY = IntArray([1234, 5678, 9012, 3456])
 
-    `facing` on a belt is the direction the belt carries things, and `start` is the upstream end,
-    so the run is laid out along the travel direction and the parts follow it. The controller and
-    the item inventory both live on the start block; the rest only need the shared position so the
-    belt can find its length and its driver.
-    """
-    length = len(positions)
-    for i, pos in enumerate(positions):
-        part = "start" if i == 0 else "end" if i == length - 1 else "middle"
-        nbt = {
-            "id": "create:belt",
-            "Speed": speed,
-            "Index": i,
-            "Length": length,
-            "IsController": 1 if i == 0 else 0,
-            "Casing": "NONE",
-            "Covered": 0,
-            "Controller": {"X": controller[0], "Y": controller[1], "Z": controller[2]},
-            "Source": {"X": controller[0], "Y": controller[1], "Z": controller[2]},
-        }
-        if i == 0:
-            nbt["Inventory"] = {"Items": [], "PositiveOrder": 1}
-        scene.place(pos, "create:belt", {
-            "casing": "false", "waterlogged": "false", "part": part,
-            "facing": direction, "slope": "horizontal",
-        }, nbt)
+def chest(scene, pos):
+    return scene.place(pos, 'minecraft:chest', {'facing':'north','type':'single','waterlogged':'false'},
+                       {'id':'minecraft:chest','Items':[]})
 
+def support(scene, pos):
+    return scene.place(pos, 'minecraft:polished_andesite')
 
-def shaft(pos, scene, axis="z"):
-    """The belt's drive. A run with nothing turning it is furniture, not machinery."""
-    scene.place(pos, "create:cogwheel", {"waterlogged": "false", "axis": axis},
-                {"id": "create:simple_kinetic", "Speed": 16.0,
-                 "Source": {"X": pos[0], "Y": pos[1], "Z": pos[2]}})
+def dock(scene, pos, mode='receive'):
+    return scene.place(pos, 'distantstock:dock', {'facing':'north','status':'standby'},
+                       {'id':'distantstock:dock','Mode':mode})
 
+def packager(scene, pos):
+    return scene.place(pos, 'distantstock:remote_packager',
+                       {'powered':'false','facing':'north','linked':'true'},
+                       {'id':'distantstock:remote_packager','AnimationTicks':0,'QueuedPackages':[]})
 
-def dock(pos, scene, facing="south", status="inactive"):
-    scene.place(pos, "distantstock:dock", {"facing": facing, "status": status})
+def link(scene, pos):
+    return scene.place(pos, 'create:stock_link',
+                       {'face':'floor','facing':'north','powered':'false','waterlogged':'false'},
+                       {'id':'create:packager_link','Freq':FREQUENCY,'Added':1})
 
+def motor(scene, pos, facing='north', speed=32.0):
+    return scene.place(pos,'create:creative_motor',{'facing':facing},
+                       {'id':'create:creative_motor','Speed':speed,'GeneratedSpeed':speed})
 
-def packager(pos, scene, facing="north"):
-    """The Distant Packager.
+def funnel(scene, pos, facing, shape):
+    return scene.place(pos,'create:andesite_belt_funnel',
+                       {'facing':facing,'shape':shape,'powered':'false','waterlogged':'false'},
+                       {'id':'create:funnel'})
 
-    It is Create's packager with a link to a network on another server, so it takes the same
-    blockstate and the same block-entity data; only the name differs.
-    """
-    scene.place(pos, "distantstock:remote_packager",
-                {"powered": "false", "facing": facing, "linked": "false"},
-                {"id": "distantstock:remote_packager", "Active": 0, "AnimationTicks": 0,
-                 "AnimationInward": 0, "SignAddress": "", "QueuedPackages": []})
+def belt(scene, start, end):
+    x0,y,z = start
+    for x in range(x0,end+1):
+        scene.place((x,y,z),'create:belt',
+                    {'facing':'east','part':'start' if x==x0 else 'end' if x==end else 'middle',
+                     'slope':'horizontal','casing':'false','waterlogged':'false'},
+                    {'id':'create:belt','Speed':0.0,'Length':end-x0+1,'Index':x-x0,
+                     'IsController':int(x==x0),'Controller':IntArray(start),'Casing':'NONE',
+                     'Inventory':{'Items':[],'PositiveOrder':1}})
 
-
-def chest(pos, scene, facing="south", kind="single"):
-    scene.place(pos, "minecraft:chest",
-                {"facing": facing, "type": kind, "waterlogged": "false"},
-                {"id": "minecraft:chest", "Items": []})
-
-
-def funnel(pos, scene, facing="north", shape="pulling"):
-    scene.place(pos, "create:andesite_belt_funnel",
-                {"powered": "false", "facing": facing, "shape": shape, "waterlogged": "false"},
-                {"id": "create:funnel", "TransferCooldown": 0, "UpTo": 1,
-                 "Filter": {"id": "minecraft:air", "Count": 0}, "FilterAmount": 64})
-
-
-def storage(scene, x):
-    """A chest, a packager and the funnel that drops the finished parcel onto the belt below.
-
-    This is Create's own arrangement for a packing station: the packager takes from the chest
-    behind it and ejects forward into a funnel, and the funnel feeds the belt underneath. Nothing
-    is ever pushed in through the roof of anything.
-    """
-    chest((x, 2, 4), scene, facing="west")
-    packager((x, 2, 3), scene, facing="north")
-    funnel((x, 2, 2), scene, facing="north", shape="pulling")
-    scene.place((x, 1, 3), "minecraft:polished_andesite")
-    scene.place((x, 1, 4), "minecraft:polished_andesite")
-
-
-def chain_conveyor(scene, pos, connections, speed=32.0):
-    """A real connected Chain Conveyor node, not three decorative sprockets pretending to be one."""
-    scene.place(pos, "create:chain_conveyor", None, {
-        "id": "create:chain_conveyor",
-        "Connections": [IntArray(connection) for connection in connections],
-        "Speed": speed,
-        "TravellingPackages": [],
-        "LoopingPackages": [],
-    })
-
-
-def frogport(scene, pos, block, target_pos, connection, address, slots):
-    """Attach a normal or Distant Stock Frogport to a Chain Conveyor segment."""
-    relative = [target_pos[i] - pos[i] for i in range(3)]
-    scene.place(pos, block, None, {
-        "id": block,
-        "Target": {
-            "flipped": 0,
-            "chain_pos": 1.0,
-            "connection": IntArray(connection),
-            "type": "create:chain_conveyor",
-            "relative_pos": IntArray(relative),
-        },
-        "AcceptsPackages": 1,
-        "AddressFilter": address,
-        "PlacedYaw": 0.0,
-        "Inventory": {"Size": slots, "Items": []},
-    })
-
+def hopper(scene,pos,facing='down'):
+    scene.place(pos,'minecraft:hopper',{'facing':facing,'enabled':'true'},
+                {'id':'minecraft:hopper','Items':[]})
 
 def export_scene():
-    """One readable flow: inventory -> Distant Packager -> belt -> dock."""
-    scene = Scene(9, 7)
-    chest((2, 2, 5), scene, facing="west")
-    packager((2, 2, 4), scene, facing="north")
-    funnel((2, 2, 3), scene, facing="north", shape="pulling")
-    scene.place((2, 1, 4), "minecraft:polished_andesite")
-    scene.place((2, 1, 5), "minecraft:polished_andesite")
-    belt_line(scene, [(2, 1, 3), (3, 1, 3), (4, 1, 3), (5, 1, 3), (6, 1, 3)],
-              "east", (2, 1, 3), speed=24.0)
-    shaft((2, 1, 4), scene)
-    dock((7, 1, 3), scene, facing="south")
-    return scene
-
+    s=Scene(7,7,5)
+    chest(s,(1,2,4)); support(s,(1,1,4))
+    packager(s,(1,2,3)); link(s,(1,3,3))
+    motor(s,(1,1,3),speed=0.0)
+    belt(s,(1,1,2),4)
+    funnel(s,(1,2,2),'north','pulling')
+    funnel(s,(4,2,2),'west','pushing')
+    dock(s,(5,2,2),'send')
+    hopper(s,(5,1,2),'south'); chest(s,(5,1,3))
+    return s
 
 def import_scene():
-    """The receiving side makes the dock's underside and local handoff obvious."""
-    scene = Scene(9, 7)
-    scene.place((2, 1, 3), "minecraft:hopper", {"facing": "east", "enabled": "true"},
-                {"id": "minecraft:hopper", "TransferCooldown": -1, "Enabled": 1})
-    belt_line(scene, [(3, 1, 3), (4, 1, 3), (5, 1, 3), (6, 1, 3)],
-              "east", (3, 1, 3), speed=24.0)
-    shaft((3, 1, 4), scene)
-    chest((7, 1, 3), scene, facing="west")
-    dock((2, 2, 3), scene, facing="south", status="inactive")
-    return scene
-
+    s=Scene(7,7,5)
+    dock(s,(3,3,3))
+    s.place((3,2,3),'create:chute',{'facing':'down','shape':'normal','waterlogged':'false'},
+            {'id':'create:chute'})
+    chest(s,(3,1,3))
+    return s
 
 def tune_scene():
-    """A dock and a request desk are deliberately separate pieces of equipment."""
-    scene = Scene(8, 6)
-    dock((2, 1, 3), scene, facing="south", status="inactive")
-    scene.place((5, 1, 3), "distantstock:gauge", {"facing": "south", "lit": "true"})
-    return scene
-
+    s=Scene(7,7,4)
+    chest(s,(1,1,4)); packager(s,(1,1,3)); link(s,(1,2,3))
+    dock(s,(4,1,2))
+    s.place((5,1,4),'distantstock:gauge',{'facing':'north','lit':'true'})
+    return s
 
 def status_scene():
-    """A compact status station: monitor on the wall, dock in front."""
-    scene = Scene(8, 6)
-    for x in range(3, 7):
-        for y in (1, 2):
-            scene.place((x, y, 4), "create:cardboard_block", {"axis": "x"})
-    scene.place((4, 1, 3), "distantstock:monitor",
-                {"facing": "north", "status": "green", "link": "online"})
-    dock((4, 1, 2), scene, facing="south", status="fault")
-    return scene
-
+    s=Scene(7,7,4)
+    for y in (1,2): support(s,(2,y,4))
+    s.place((2,2,3),'distantstock:monitor',{'facing':'north','status':'green','link':'online'})
+    dock(s,(4,1,2))
+    return s
 
 def tower_scene():
-    """Five-coupler tier-I tower, centred so the complete 3x3 skirt stays readable."""
-    scene = Scene(9, 9, height=10)
-    scene.place((4, 1, 4), "create:shaft", {"axis": "y"},
-                {"id": "create:simple_kinetic", "Speed": 32.0,
-                 "Source": {"X": 4, "Y": 1, "Z": 4}})
-    scene.place((4, 2, 4), "distantstock:tower_core", None,
-                {"id": "distantstock:tower_core", "Speed": 32.0,
-                 "Source": {"X": 4, "Y": 1, "Z": 4}, "Couplers": 5, "Tier": "I"})
-    for x in range(3, 6):
-        for z in range(3, 6):
-            if (x, z) != (4, 4):
-                scene.place((x, 2, z), "distantstock:tower_casing",
-                            {"port": "none", "powered": "false"})
-    for y in range(3, 8):
-        scene.place((4, y, 4), "distantstock:tower_coupler",
-                    {"above": "true" if y < 7 else "false",
-                     "below": "true" if y > 3 else "false"})
-    scene.place((4, 8, 4), "distantstock:ether_resonator", None,
-                {"id": "distantstock:ether_resonator", "Beam": 1})
-    return scene
-
-
-def known_states(block_id):
-    """The property sets a block accepts, read from its blockstate file.
-
-    A blockstate's variant keys are `property=value` pairs, which is the only machine-readable
-    record of a block's state definition in a resource pack. It is a proxy, not the definition
-    itself, so a block whose every state is written out longhand still checks correctly and a
-    block with no blockstate is skipped rather than guessed at.
-    """
-    namespace, _, path = block_id.partition(":")
-    states = []
-    for candidate in (ROOT / "src/main/resources/assets" / namespace / "blockstates").glob(f"{path}.json"):
-        blockstate = json.loads(candidate.read_text())
-        variants = blockstate.get("variants", {})
-        for key in variants:
-            states.append(dict(part.split("=", 1) for part in key.split(",") if "=" in part))
-        # Logger and sounders use multipart blockstates. Their `when` maps are just as useful for
-        # validating authored properties as a variants key, and ignoring them was how old scenes
-        # could silently ship impossible states.
-        for part in blockstate.get("multipart", []):
-            when = part.get("when", {})
-            if when and all(isinstance(value, str) for value in when.values()):
-                states.append(dict(when))
-    return states
-
-
-def verify(scene, name):
-    """Every palette property must be one the block actually has."""
-    for entry in scene.palette:
-        block_id = entry["Name"]
-        if not block_id.startswith("distantstock:"):
-            # Create's and vanilla's states are not ours to check, and this script has no
-            # dependency on their jars.
-            continue
-        allowed = known_states(block_id)
-        if not allowed:
-            raise SystemExit(f"{name}: no blockstate for {block_id}, cannot check its palette")
-        props = entry.get("Properties", {})
-        for key, value in props.items():
-            if not any(state.get(key) == value for state in allowed):
-                seen = sorted({state.get(key) for state in allowed if key in state})
-                raise SystemExit(
-                    f"{name}: {block_id} has no {key}={value}; it accepts "
-                    f"{key}={seen} (or has no such property at all)")
-        if set(props) != set(allowed[0]):
-            raise SystemExit(
-                f"{name}: {block_id} palette is missing properties; it needs {sorted(allowed[0])}, "
-                f"got {sorted(props)}")
-
+    s=Scene(7,7,10)
+    motor(s,(3,1,3),'up')
+    s.place((3,2,3),'distantstock:tower_core',None,
+            {'id':'distantstock:tower_core','Speed':0.0,'Couplers':5,'Tier':'I'})
+    for x in range(2,5):
+        for z in range(2,5):
+            if (x,z)!=(3,3): s.place((x,2,z),'distantstock:tower_casing',{'port':'none','powered':'false'})
+    for y in range(3,8):
+        s.place((3,y,3),'distantstock:tower_coupler',{'above':str(y<7).lower(),'below':str(y>3).lower()})
+    s.place((3,8,3),'distantstock:ether_resonator',None,{'id':'distantstock:ether_resonator','Beam':0})
+    # Lever attaches to the near casing, leaving its fluid port on the west face.
+    s.place((3,2,1),'minecraft:lever',{'face':'wall','facing':'north','powered':'false'})
+    return s
 
 def replenish_scene():
-    """Automatic ordering devices on a wall, with their receiving dock visible in the foreground."""
-    scene = Scene(9, 7)
-    for x in range(2, 8):
-        for y in (1, 2):
-            scene.place((x, y, 5), "create:cardboard_block", {"axis": "x"})
-    scene.place((3, 1, 4), "distantstock:remote_gauge")
-    scene.place((6, 1, 4), "distantstock:remote_redstone_requester",
-                {"axis": "x", "powered": "false"})
-    scene.place((2, 1, 2), "minecraft:hopper", {"facing": "east", "enabled": "true"},
-                {"id": "minecraft:hopper", "TransferCooldown": -1, "Enabled": 1})
-    belt_line(scene, [(3, 1, 2), (4, 1, 2), (5, 1, 2), (6, 1, 2)],
-              "east", (3, 1, 2), speed=16.0)
-    shaft((3, 1, 3), scene)
-    chest((7, 1, 2), scene, facing="west")
-    dock((2, 2, 2), scene, facing="south", status="standby")
-    return scene
+    s=Scene(7,7,4)
+    for y in (1,2): support(s,(2,y,3))
+    s.place((2,2,2),'distantstock:remote_gauge',
+            {'face':'wall','facing':'north','waterlogged':'false','powered':'false'},
+            {'id':'distantstock:remote_gauge','top_right':{
+                'Freq':FREQUENCY,'Filter':{'id':'minecraft:iron_ingot','count':1},
+                'FilterAmount':64,'LastLevel':16,'RecipeAddress':'ASSEMBLY',
+                'Satisfied':0,'PromisedSatisfied':0,'UpTo':1}})
+    chest(s,(4,1,4));packager(s,(4,1,3));link(s,(4,2,3))
+    dock(s,(5,2,1));hopper(s,(5,1,1),'west');chest(s,(4,1,1))
+    return s
 
+def redstone_scene():
+    s=Scene(7,7,4)
+    s.place((2,1,2),'distantstock:remote_redstone_requester',{'axis':'x','powered':'false'})
+    s.place((2,1,3),'minecraft:lever',{'face':'floor','facing':'north','powered':'false'})
+    dock(s,(5,2,2));hopper(s,(5,1,2),'south');chest(s,(5,1,3))
+    return s
 
 def diagnostics_scene():
-    """Three real connected chain nodes, each with a Frogport attached to the route."""
-    scene = Scene(9, 7)
-    a, b, c = (2, 1, 4), (4, 1, 4), (6, 1, 4)
-    chain_conveyor(scene, a, [(2, 0, 0)])
-    chain_conveyor(scene, b, [(-2, 0, 0), (2, 0, 0)])
-    chain_conveyor(scene, c, [(-2, 0, 0)])
-    frogport(scene, (2, 2, 2), "distantstock:diagnostic_frogport", a, (2, 0, 0),
-             "__distantstock_diag__/ponder", 18)
-    frogport(scene, (4, 2, 2), "distantstock:cache_frogport", b, (2, 0, 0),
-             "__distantstock_cache__/ponder", 54)
-    frogport(scene, (6, 2, 2), "create:package_frogport", c, (-2, 0, 0),
-             "ASSEMBLY", 18)
-    return scene
+    s=Scene(9,9,6)
+    for x,dx in [(2,4),(6,-4)]:
+        for y in (1,2):s.place((x,y,5),'create:shaft',{'axis':'y'},{'id':'create:simple_kinetic','Speed':0.0})
+        s.place((x,3,5),'create:chain_conveyor',None,
+                {'id':'create:chain_conveyor','Connections':[IntArray([dx,0,0])],
+                 'Speed':0.0,'TravellingPackages':[],'LoopingPackages':[]})
+    # The shafts continue down into the baseplate; the motor is shown as the input above one node.
+    motor(s,(2,4,5),'down')
+    for x,block,address,slots in [(2,'distantstock:diagnostic_frogport','__distantstock_diag__/ponder',18),
+                                  (6,'create:package_frogport','ASSEMBLY',18)]:
+        chest(s,(x,1,2))
+        s.place((x,2,2),block,None,{'id':block,'CreateFrequency':FREQUENCY,
+                    'Target':{'flipped':0,'chain_pos':0.0,'connection':IntArray([4 if x==2 else -4,0,0]),
+                              'type':'create:chain_conveyor','relative_pos':IntArray([0,1,3])},
+                    'AcceptsPackages':1,'AddressFilter':address,'PlacedYaw':0.0,
+                    'Inventory':{'Size':slots,'Items':[]}})
+    chest(s,(4,1,7));packager(s,(4,1,6));link(s,(4,2,6))
+    return s
 
+def cache_scene():
+    s=diagnostics_scene()
+    chest(s,(4,1,2))
+    s.place((4,2,2),'distantstock:cache_frogport',None,
+            {'id':'distantstock:cache_frogport','Target':{
+                'flipped':0,'chain_pos':2.0,'connection':IntArray([4,0,0]),
+                'type':'create:chain_conveyor','relative_pos':IntArray([-2,1,3])},
+             'AcceptsPackages':1,'AddressFilter':'__distantstock_cache__/ponder','PlacedYaw':0.0,
+             'Inventory':{'Size':54,'Items':[]}})
+    return s
 
 def logger_scene():
-    scene = Scene(8, 6)
-    for x in range(2, 7):
-        for y in (1, 2):
-            scene.place((x, y, 4), "create:cardboard_block", {"axis": "x"})
-    scene.place((3, 1, 3), "distantstock:logger", {"facing": "north", "status": "error"},
-                {"id": "distantstock:logger"})
-    scene.place((5, 1, 3), "distantstock:stack_light",
-                {"face": "wall", "facing": "north", "green": "false",
-                 "yellow": "false", "red": "true"})
-    scene.place((6, 1, 3), "distantstock:red_wall_sounder",
-                {"facing": "north", "lit": "true"})
-    return scene
+    s=Scene(7,7,4)
+    for x in (2,3,4):
+        for y in (1,2):support(s,(x,y,4))
+    s.place((3,2,3),'distantstock:logger',{'facing':'north','status':'normal','printed':'false'},
+            {'id':'distantstock:logger','DisplayCode':'OK','PaperRemaining':0,'AlarmSoundMode':'SILENT'})
+    return s
 
+def alarms_scene():
+    s=Scene(7,7,5)
+    for x in (2,5):
+        for y in (1,2):support(s,(x,y,4))
+    s.place((2,2,3),'distantstock:stack_light',
+            {'face':'wall','facing':'north','green':'false','yellow':'false','red':'false'})
+    s.place((2,1,1),'distantstock:condition_linker',{'facing':'north'},
+            {'id':'distantstock:condition_linker','TargetDimension':'minecraft:overworld',
+             'TargetX':2,'TargetY':2,'TargetZ':3})
+    s.place((2,1,0),'minecraft:lever',{'face':'floor','facing':'north','powered':'false'})
+    s.place((5,2,3),'distantstock:red_wall_sounder',{'facing':'north','lit':'false','powered':'false'})
+    s.place((5,1,3),'minecraft:lever',{'face':'floor','facing':'north','powered':'false'})
+    return s
+
+SCENES = dict(export=export_scene, **{'import':import_scene}, tune=tune_scene,status=status_scene,
+              tower=tower_scene,replenish=replenish_scene,redstone=redstone_scene,
+              diagnostics=diagnostics_scene,cache=cache_scene,logger=logger_scene,alarms=alarms_scene)
+
+def verify(scene,name):
+    # Layout invariants are checked at insertion, before any NBT is written.
+    # Check known local states; resource variants are not full state definitions
+    # (remote_gauge inherits facing/face even though its static model has no variants).
+    for entry in scene.palette:
+        if not entry['Name'].startswith('distantstock:'): continue
+        p=ROOT/'src/main/resources/assets/distantstock/blockstates'/f"{entry['Name'].split(':')[1]}.json"
+        assert p.exists(), (name,entry['Name'])
+    positions={tuple(b['pos']):scene.palette[b['state']]['Name'] for b in scene.blocks}
+    for b in scene.blocks:
+        pos=tuple(b['pos']); block=scene.palette[b['state']]['Name']
+        if 'frogport' in block:
+            assert positions.get((pos[0],pos[1]-1,pos[2]))=='minecraft:chest', (name,'unsupported frogport')
+            target=b['nbt']['Target']
+            at=tuple(pos[i]+target['relative_pos'][i] for i in range(3))
+            assert positions.get(at)=='create:chain_conveyor', (name,'missing chain target')
+        if block=='create:andesite_belt_funnel':
+            assert positions.get((pos[0],pos[1]-1,pos[2]))=='create:belt', (name,'funnel off belt')
+        if block=='create:chain_conveyor':
+            for delta in b['nbt']['Connections']:
+                target=tuple(pos[i]+delta[i] for i in range(3))
+                other=next(v for v in scene.blocks if tuple(v['pos'])==target)
+                assert [-n for n in delta] in other['nbt']['Connections'], (name,'one-way chain')
 
 def main():
-    for name, build in (("export", export_scene), ("import", import_scene),
-                        ("tune", tune_scene), ("status", status_scene),
-                        ("tower", tower_scene), ("replenish", replenish_scene),
-                        ("diagnostics", diagnostics_scene), ("logger", logger_scene)):
-        scene = build()
-        verify(scene, name)
-        scene.save(f"{name}.nbt")
-        path = PONDER / f"{name}.nbt"
-        print(f"{path.relative_to(ROOT)}: {path.stat().st_size} bytes")
+    for name,build in SCENES.items():
+        scene=build();verify(scene,name);scene.save(name+'.nbt')
+        print(f'{name}: {len(scene.blocks)} blocks, {scene.width}x{scene.height}x{scene.depth}')
 
-
-if __name__ == "__main__":
-    main()
+if __name__=='__main__':main()

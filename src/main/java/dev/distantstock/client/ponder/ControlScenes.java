@@ -1,146 +1,88 @@
 package dev.distantstock.client.ponder;
 
-import com.simibubi.create.foundation.ponder.CreateSceneBuilder;
+import dev.distantstock.block.*;
 import dev.distantstock.item.ModItems;
-import net.createmod.catnip.math.Pointing;
-import net.createmod.ponder.api.PonderPalette;
 import net.createmod.ponder.api.scene.SceneBuilder;
 import net.createmod.ponder.api.scene.SceneBuildingUtil;
-import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.phys.Vec3;
+import static dev.distantstock.client.ponder.PonderSteps.*;
 
-/** Terminal, monitor and automatic ordering scenes. */
 public final class ControlScenes {
-
     public static void tune(SceneBuilder builder, SceneBuildingUtil util) {
-        CreateSceneBuilder scene = new CreateSceneBuilder(builder);
-        scene.title("distant_tune", "Binding Distant Stock devices");
-        scene.configureBasePlate(0, 0, 8);
-        scene.showBasePlate();
-        scene.idle(10);
+        var scene=begin(builder,"distant_tune","Binding a local warehouse",7);
 
-        var requester = new ItemStack(ModItems.REQUESTER.get());
-        var dock = util.select().position(2, 1, 3);
-        var desk = util.select().position(5, 1, 3);
-
-        scene.world().showSection(dock, Direction.DOWN);
-        scene.idle(10);
-        scene.overlay().showControls(util.vector().centerOf(2, 1, 3), Pointing.DOWN, 50)
-                .rightClick().withItem(requester);
-        scene.overlay().showText(65)
-                .text("The Requester carries the Distant Stock network and receiving group you selected")
-                .pointAt(util.vector().centerOf(2, 1, 3))
-                .placeNearTarget()
-                .attachKeyFrame();
-        scene.idle(75);
-
-        scene.world().showSection(desk, Direction.DOWN);
-        scene.idle(15);
-        scene.overlay().showOutlineWithText(desk, 70)
-                .text("A Request Desk uses the same network settings, but stays off the item line")
-                .pointAt(util.vector().centerOf(5, 1, 3))
-                .placeNearTarget()
-                .attachKeyFrame();
-        scene.idle(80);
-
-        scene.overlay().showText(55)
-                .text("Configure first; then bind the machines that should use that destination")
-                .independent(28);
-        scene.idle(65);
+        reveal(scene,util.select().fromTo(1,1,3,1,2,4));
+        use(scene,util,1,2,3,new ItemStack(ModItems.DOCK.get()));
+        note(scene,util,1,2,3,"Before placing a Distant Dock, use its item on an existing Stock Link to copy the local logistics network.");
+        reveal(scene,util.select().position(4,1,2));
+        use(scene,util,1,2,3,new ItemStack(ModItems.REQUESTER.get()));
+        note(scene,util,1,2,3,"Tune a portable terminal to the local network, then create or join a Distant Network in its interface.");
+        use(scene,util,4,1,2,new ItemStack(ModItems.REQUESTER.get()));
+        note(scene,util,4,1,2,"Use that terminal on the placed dock to add its local warehouse to the selected Distant Network.");
+        use(scene,util,4,1,2,ItemStack.EMPTY);
+        note(scene,util,4,1,2,"Configure the dock's mode, receiving address and destination in its own interface. Terminal binding does not change these settings.");
+        reveal(scene,util.select().position(5,1,4));
+        note(scene,util,5,1,4,"A Request Desk provides a fixed ordering terminal. It does not need to be inserted into the parcel transport path.");
+        scene.markAsFinished();
     }
 
     public static void status(SceneBuilder builder, SceneBuildingUtil util) {
-        CreateSceneBuilder scene = new CreateSceneBuilder(builder);
-        scene.title("distant_status", "Reading Distant Stock status");
-        scene.configureBasePlate(0, 0, 8);
-        scene.showBasePlate();
-        scene.idle(10);
+        var scene=begin(builder,"distant_status","Reading and resolving dock states",7);
 
-        var wall = util.select().fromTo(3, 1, 4, 6, 2, 4);
-        var monitor = util.select().position(4, 1, 3);
-        var dock = util.select().position(4, 1, 2);
-        scene.world().showSection(wall, Direction.DOWN);
-        scene.world().showSection(monitor, Direction.SOUTH);
-        scene.world().showSection(dock, Direction.SOUTH);
-        scene.idle(20);
-
-        scene.overlay().showOutline(PonderPalette.GREEN, "monitor", monitor, 65);
-        scene.overlay().showText(65)
-                .text("Use the Monitor for link, traffic and tower status")
-                .pointAt(util.vector().centerOf(4, 1, 3))
-                .placeNearTarget()
-                .attachKeyFrame();
-        scene.idle(75);
-
-        scene.overlay().showOutline(PonderPalette.BLUE, "dock", dock, 55);
-        scene.overlay().showText(55)
-                .text("The dock itself is the quick status light: idle, active, blocked or faulted")
-                .pointAt(util.vector().centerOf(4, 1, 2))
-                .placeNearTarget();
-        scene.idle(65);
-
-        scene.overlay().showControls(util.vector().centerOf(4, 1, 2), Pointing.DOWN, 45).rightClick();
-        scene.overlay().showText(55)
-                .text("When a fault requires acknowledgement, clear it deliberately at the device")
-                .pointAt(util.vector().centerOf(4, 1, 2))
-                .placeNearTarget();
-        scene.idle(65);
+        reveal(scene,util.select().position(4,1,2));
+        note(scene,util,4,1,2,"Green indicates a ready dock. The indicator reports the dock's current operating state.");
+        scene.world().modifyBlock(util.grid().at(4,1,2),s -> s.setValue(DockBlock.STATUS,DockStatus.SENDING),false);
+        note(scene,util,4,1,2,"Cyan indicates an active parcel transfer.");
+        scene.world().modifyBlock(util.grid().at(4,1,2),s -> s.setValue(DockBlock.STATUS,DockStatus.BLOCKED),false);
+        note(scene,util,4,1,2,"Orange indicates a blocked return path. Check the extraction path and available storage space.");
+        scene.world().modifyBlock(util.grid().at(4,1,2),s -> s.setValue(DockBlock.STATUS,DockStatus.FAULT),false);
+        reveal(scene,util.select().fromTo(2,1,3,2,2,4));
+        use(scene,util,2,2,3,ItemStack.EMPTY);
+        note(scene,util,2,2,3,"For a red fault state, inspect the link and tower information in the Monitor before attempting recovery.");
+        use(scene,util,4,1,2,createItem("wrench"));
+        scene.world().modifyBlock(util.grid().at(4,1,2),s -> s.setValue(DockBlock.STATUS,DockStatus.STANDBY),false);
+        note(scene,util,4,1,2,"After resolving the cause, use a wrench on the dock to clear its recorded fault. Unresolved faults can recur.");
+        scene.markAsFinished();
     }
 
     public static void replenish(SceneBuilder builder, SceneBuildingUtil util) {
-        CreateSceneBuilder scene = new CreateSceneBuilder(builder);
-        scene.title("distant_replenish", "Automatic remote ordering");
-        scene.configureBasePlate(0, 0, 9);
-        scene.showBasePlate();
-        scene.idle(10);
+        var scene=begin(builder,"distant_replenish","Maintaining remote stock",7);
 
-        var wall = util.select().fromTo(2, 1, 5, 7, 2, 5);
-        var gauge = util.select().position(3, 1, 4);
-        var redstone = util.select().position(6, 1, 4);
-        var dock = util.select().position(2, 2, 2);
-        var receiving = util.select().fromTo(2, 1, 2, 7, 1, 2);
-        scene.world().showSection(wall, Direction.DOWN);
-        scene.world().showSection(gauge, Direction.SOUTH);
-        scene.idle(15);
+        reveal(scene,util.select().fromTo(4,1,3,4,2,4));
+        reveal(scene,util.select().fromTo(2,1,2,2,2,3));
+        use(scene,util,2,2,2,createItem("stock_link"));
+        note(scene,util,2,2,2,"Bind the active gauge panel to the local logistics network whose stock it should monitor.");
+        use(scene,util,2,2,2,new ItemStack(Items.IRON_INGOT));
+        note(scene,util,2,2,2,"Select an item in the filter and configure its target stock in the panel interface.");
+        use(scene,util,2,2,2,new ItemStack(ModItems.REQUESTER.get()));
+        note(scene,util,2,2,2,"Use a tuned terminal on this panel to select the remote source warehouse. Each panel has its own binding.");
+        reveal(scene,util.select().fromTo(4,1,1,5,2,1));
+        note(scene,util,5,2,1,"Set a receiving address matching the local dock. Orders replenish that destination when local stock is below target.");
+        parcel(scene,new ItemStack(ModItems.REMOTE_PACKAGE.get()),new Vec3(5.5,2.4,1.5),new Vec3(5.5,1.3,1.5));
+        note(scene,util,4,1,1,"Extract and unpack the delivery into the monitored inventory. Only then does the local stock level increase.");
+        scene.markAsFinished();
+    }
 
-        ItemStack item = new ItemStack(Items.IRON_INGOT);
-        scene.overlay().showControls(util.vector().centerOf(3, 1, 4), Pointing.DOWN, 45)
-                .rightClick().withItem(item);
-        scene.overlay().showText(60)
-                .text("A Distant Gauge watches one item and maintains the amount you set")
-                .pointAt(util.vector().centerOf(3, 1, 4))
-                .placeNearTarget()
-                .attachKeyFrame();
-        scene.idle(70);
+    public static void redstone(SceneBuilder builder, SceneBuildingUtil util) {
+        var scene=begin(builder,"distant_redstone","Requesting on a redstone pulse",7);
 
-        scene.overlay().showControls(util.vector().centerOf(3, 1, 4), Pointing.DOWN, 45)
-                .rightClick().withItem(new ItemStack(ModItems.REQUESTER.get()));
-        scene.overlay().showText(60)
-                .text("Bind each gauge slot to a tuned Requester to choose its remote warehouse")
-                .pointAt(util.vector().centerOf(3, 1, 4))
-                .placeNearTarget()
-                .attachKeyFrame();
-        scene.idle(70);
-
-        scene.world().showSection(redstone, Direction.SOUTH);
-        scene.idle(10);
-        scene.overlay().showOutlineWithText(redstone, 65)
-                .text("The Distant Redstone Requester sends its configured order on a rising edge")
-                .pointAt(util.vector().centerOf(6, 1, 4))
-                .placeNearTarget()
-                .attachKeyFrame();
-        scene.idle(75);
-
-        scene.world().showSection(receiving, Direction.WEST);
-        scene.world().showSection(dock, Direction.DOWN);
-        scene.idle(15);
-        scene.overlay().showOutline(PonderPalette.GREEN, "receive", dock, 60);
-        scene.overlay().showText(60)
-                .text("Both order into the receiving group; the goods arrive through its dock")
-                .pointAt(util.vector().centerOf(2, 2, 2))
-                .placeNearTarget();
-        scene.idle(70);
+        reveal(scene,util.select().position(2,1,2));
+        use(scene,util,2,1,2,new ItemStack(ModItems.REQUESTER.get()));
+        note(scene,util,2,1,2,"Bind the Distant Redstone Requester to a remote warehouse using a tuned terminal.");
+        use(scene,util,2,1,2,ItemStack.EMPTY);
+        note(scene,util,2,1,2,"Configure the order contents and receiving address before supplying a redstone signal.");
+        reveal(scene,util.select().position(2,1,3));
+        use(scene,util,2,1,3,ItemStack.EMPTY);
+        scene.world().toggleRedstonePower(util.select().fromTo(2,1,2,2,1,3));
+        scene.effects().indicateRedstone(util.grid().at(2,1,2));
+        note(scene,util,2,1,2,"A rising redstone edge submits one configured order. A sustained signal does not continuously submit orders.");
+        scene.world().toggleRedstonePower(util.select().fromTo(2,1,2,2,1,3));
+        scene.idle(20);
+        reveal(scene,util.select().fromTo(5,1,2,5,2,3));
+        note(scene,util,5,2,2,"Parcels arrive at the addressed dock and must be extracted. This device triggers orders; it does not monitor stock targets.");
+        scene.markAsFinished();
     }
 
     private ControlScenes() {}

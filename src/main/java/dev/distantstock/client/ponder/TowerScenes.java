@@ -1,85 +1,42 @@
 package dev.distantstock.client.ponder;
 
-import com.simibubi.create.foundation.ponder.CreateSceneBuilder;
-import dev.distantstock.block.TowerCasingBlock;
-import dev.distantstock.item.ModItems;
-import net.createmod.catnip.math.Pointing;
+import dev.distantstock.block.*;
 import net.createmod.ponder.api.PonderPalette;
 import net.createmod.ponder.api.scene.SceneBuilder;
 import net.createmod.ponder.api.scene.SceneBuildingUtil;
-import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import static dev.distantstock.client.ponder.PonderSteps.*;
 
-/** The tower scene teaches construction order, not a spreadsheet of tier values. */
 public final class TowerScenes {
     public static void tower(SceneBuilder builder, SceneBuildingUtil util) {
-        CreateSceneBuilder scene = new CreateSceneBuilder(builder);
-        scene.title("distant_tower", "Building an Interlink Tower");
-        scene.configureBasePlate(0, 0, 9);
-        scene.scaleSceneView(.8f);
+        var scene=begin(builder,"distant_tower","Building and supplying an Interlink Tower",7);
+
+        scene.scaleSceneView(.7f);
         scene.setSceneOffsetY(-1f);
-        scene.showBasePlate();
-        scene.idle(10);
-
-        var shaft = util.select().position(4, 1, 4);
-        var core = util.select().position(4, 2, 4);
-        var skirt = util.select().fromTo(3, 2, 3, 5, 2, 5).substract(core);
-        var mast = util.select().fromTo(4, 3, 4, 4, 7, 4);
-        var cap = util.select().position(4, 8, 4);
-
-        scene.world().showSection(shaft, Direction.DOWN);
-        scene.world().showSection(core, Direction.DOWN);
-        scene.idle(15);
-        scene.overlay().showText(60)
-                .text("Drive the Tower Core from the shaft directly underneath it")
-                .pointAt(util.vector().centerOf(4, 2, 4))
-                .placeNearTarget()
-                .attachKeyFrame();
-        scene.idle(70);
-
-        scene.world().showSection(skirt, Direction.DOWN);
-        scene.idle(15);
-        scene.overlay().showOutline(PonderPalette.BLUE, "skirt", skirt, 60);
-        scene.overlay().showText(60)
-                .text("Surround the core with a complete 3x3 ring of Distant Casing")
-                .pointAt(util.vector().centerOf(4, 2, 4))
-                .placeNearTarget();
-        scene.idle(70);
-
-        scene.world().showSection(mast, Direction.UP);
-        scene.idle(20);
-        scene.overlay().showText(60)
-                .text("Stack an unbroken mast of Tower Couplers; mast height sets the tier")
-                .pointAt(util.vector().centerOf(4, 5, 4))
-                .placeNearTarget()
-                .attachKeyFrame();
-        scene.idle(70);
-
-        scene.world().showSection(cap, Direction.UP);
-        scene.idle(15);
-        scene.overlay().showText(55)
-                .text("Finish the mast with an Ether Resonator")
-                .pointAt(util.vector().centerOf(4, 8, 4))
-                .placeNearTarget();
-        scene.idle(65);
-
-        scene.overlay().showControls(util.vector().centerOf(3, 2, 4), Pointing.DOWN, 45)
-                .withItem(new ItemStack(ModItems.ETHER_BUCKET.get()));
-        scene.overlay().showText(65)
-                .text("Feed Ether through a side or top casing port; the bottom is reserved for rotation")
-                .pointAt(util.vector().centerOf(3, 2, 4))
-                .placeNearTarget()
-                .attachKeyFrame();
-        scene.idle(75);
-
-        scene.world().modifyBlocks(skirt,
-                state -> state.hasProperty(TowerCasingBlock.POWERED)
-                        ? state.setValue(TowerCasingBlock.POWERED, true) : state, false);
-        scene.overlay().showText(55)
-                .text("Powered casings open their illuminated inspection windows; this is cosmetic")
-                .pointAt(util.vector().centerOf(3, 2, 4))
-                .placeNearTarget();
-        scene.idle(65);
+        reveal(scene,util.select().position(3,1,3));
+        reveal(scene,util.select().position(3,2,3));
+        note(scene,util,3,1,3,"The Tower Base receives rotation only from below. This demonstration uses a motor directly beneath it.");
+        var ring=util.select().fromTo(2,2,2,4,2,4).substract(util.select().position(3,2,3));
+        reveal(scene,ring);
+        scene.overlay().showOutline(PonderPalette.BLUE,"base",ring,90);
+        note(scene,util,3,2,2,"Surround the central base with eight Distant Casings, completing the required 3 by 3 foundation.");
+        for(int y=3;y<=7;y++) { reveal(scene,util.select().position(3,y,3)); }
+        note(scene,util,3,5,3,"Stack at least five consecutive Tower Couplers above the base. Gaps or other blocks interrupt the mast.");
+        reveal(scene,util.select().position(3,8,3));
+        note(scene,util,3,8,3,"Cap the mast with an Ether Resonator. Five couplers form tier I; taller valid masts increase capacity and range.");
+        use(scene,util,2,2,3,createItem("wrench"));
+        scene.world().modifyBlock(util.grid().at(2,2,3),s -> s.setValue(TowerCasingBlock.PORT,TowerCasingBlock.Port.WEST),false);
+        note(scene,util,2,2,3,"Use a wrench on the desired casing face to open a fluid port. Connect Ether supply to that face; each casing has one port.");
+        scene.world().setKineticSpeed(util.select().fromTo(3,1,3,3,2,3),32);
+        scene.world().modifyBlockEntityNBT(util.select().position(3,8,3),BlockEntity.class,t -> t.putInt("Beam",1));
+        note(scene,util,3,2,3,"A complete tower also requires sufficient rotational speed, stress capacity and Ether supply to operate.");
+        reveal(scene,util.select().position(3,2,1));
+        use(scene,util,3,2,1,ItemStack.EMPTY);
+        scene.world().toggleRedstonePower(util.select().position(3,2,1));
+        scene.world().modifyBlocks(ring,s -> s.setValue(TowerCasingBlock.POWERED,true),false);
+        note(scene,util,3,2,2,"Redstone opens the inspection windows of connected casings. The windows do not change the tower's operation.");
+        scene.markAsFinished();
     }
 
     private TowerScenes() {}

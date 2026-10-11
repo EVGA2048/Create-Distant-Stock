@@ -41,12 +41,18 @@ public final class DistantStockPonderPlugin implements PonderPlugin {
                 .addStoryBoard("status", ControlScenes::status);
         helper.forComponents(towerCore, towerCoupler, etherResonator, towerCasing)
                 .addStoryBoard("tower", TowerScenes::tower);
-        helper.forComponents(remoteGauge, remoteRedstoneRequester, requester, manual)
+        helper.forComponents(remoteGauge, requester, manual)
                 .addStoryBoard("replenish", ControlScenes::replenish);
+        helper.forComponents(remoteRedstoneRequester, requester, manual)
+                .addStoryBoard("redstone", ControlScenes::redstone);
         helper.forComponents(diagnosticFrogport, cacheFrogport)
                 .addStoryBoard("diagnostics", DiagnosticScenes::chain);
-        helper.forComponents(logger, stackLight, redSounder, orangeSounder)
+        helper.forComponents(cacheFrogport, diagnosticFrogport)
+                .addStoryBoard("cache", DiagnosticScenes::cache);
+        helper.forComponents(logger, manual)
                 .addStoryBoard("logger", DiagnosticScenes::logger);
+        helper.forComponents(stackLight, redSounder, orangeSounder, id("condition_linker"))
+                .addStoryBoard("alarms", AlarmScenes::alarms);
     }
 
     private static ResourceLocation id(String path) {
