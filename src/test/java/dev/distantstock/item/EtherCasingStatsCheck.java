@@ -109,11 +109,21 @@ public final class EtherCasingStatsCheck {
         for (String file : List.of("en_us.json", "zh_cn.json")) {
             JsonObject lang = read(file);
             state(lang, file, "leggings_bonus", reduction(EtherCasingBalance.LEGGINGS_ABSORB));
-            state(lang, file, "boots_bonus", gainPercent(EtherCasingBalance.BOOTS_SPEED));
-            state(lang, file, "chestplate_bonus", gain(EtherCasingBalance.CHEST_STRENGTH));
+            // The boots carry two numbers and one of them is not a percentage, so it is checked by
+            // name: "one level of Jump Boost" is what the constant buys, and a line that stopped
+            // saying so would be promising an unstated effect.
+            state(lang, file, "boots_bonus", gainPercent(EtherCasingBalance.BOOTS_SPEED),
+                    file.startsWith("zh") ? "跳跃提升" : "Jump Boost");
+            // Both attack lines are shares of the weapon, not flat additions, and both are withheld
+            // until something is in hand -- so the tooltips have to read that way. "+4" on a
+            // chestplate is a promise about a fist, and that promise is exactly what the scaling and
+            // the in-hand condition exist to break.
+            state(lang, file, "chestplate_bonus", gainPercent(EtherCasingBalance.CHEST_STRENGTH),
+                    file.startsWith("zh") ? "武器" : "weapon");
             state(lang, file, "helmet_bonus", gain(EtherCasingBalance.HELMET_OXYGEN),
                     reduction(EtherCasingBalance.HELMET_PROJECTILE_ABSORB));
-            state(lang, file, "charged", reduction(EtherCasingBalance.CHARGED_ABSORB), "+10%", "+2");
+            state(lang, file, "charged", reduction(EtherCasingBalance.CHARGED_ABSORB), "+10%",
+                    gainPercent(EtherCasingBalance.CHARGED_STRENGTH));
             // The fire immunity is a four-piece rule, and it is the one line here that has no number
             // to check against a constant, so what is checked is the claim itself: a player reading
             // the tooltip on a lone helmet has to be told the other three pieces are part of the

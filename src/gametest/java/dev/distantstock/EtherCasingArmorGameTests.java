@@ -1,14 +1,22 @@
 package dev.distantstock;
 
 import dev.distantstock.item.EtherCasingArmorItem;
+import dev.distantstock.item.EtherCasingBalance;
 import dev.distantstock.item.EtherCasingMediumServer;
+import dev.distantstock.item.EtherCasingStatsServer;
 import dev.distantstock.item.ModItems;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -68,6 +76,68 @@ public final class EtherCasingArmorGameTests {
         // early return that swallowed every source would look exactly like this test passing.
         h.assertTrue(taken < 8.0F,
                 "the leggings absorbed nothing: " + taken + " of 8 damage got through");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void theBootsRaiseTheJumpAndGiveItBack(GameTestHelper h) {
+        Player player = h.makeMockPlayer(GameType.SURVIVAL);
+        double bare = player.getAttributeValue(Attributes.JUMP_STRENGTH);
+        h.assertTrue(bare > 0.0, "the mock player has no jump strength to raise");
+
+        player.setItemSlot(EquipmentSlot.FEET, new ItemStack(ModItems.ETHER_CASING_BOOTS.get()));
+        EtherCasingStatsServer.applyWornBonuses(player);
+        double booted = player.getAttributeValue(Attributes.JUMP_STRENGTH);
+        h.assertTrue(Math.abs(booted - (bare + EtherCasingBalance.BOOTS_JUMP)) < 1.0E-6,
+                "the boots gave " + (booted - bare) + " jump strength, not "
+                        + EtherCasingBalance.BOOTS_JUMP);
+
+        // Same rule as the speed: the bonus is the boots', so it leaves with them.
+        player.setItemSlot(EquipmentSlot.FEET, ItemStack.EMPTY);
+        EtherCasingStatsServer.applyWornBonuses(player);
+        h.assertTrue(player.getAttributeValue(Attributes.JUMP_STRENGTH) == bare,
+                "the jump stayed after the boots came off");
+        h.succeed();
+    }
+
+    /**
+     * The attack bonus is for fights, not for pats.
+     *
+     * <p>Two things have to hold at once and they pull in opposite directions: a wearer holding an
+     * axe has to hit harder than the axe alone, and the same wearer with an empty hand has to hit
+     * exactly as hard as anyone else. The middle case -- a block or a torch in hand -- is what
+     * separates "scale the bonus by the weapon" from "only pay out while armed", and it is the one
+     * worth pinning down.
+     */
+    @GameTest(template = "empty", timeoutTicks = 40)
+    public static void theAttackBonusOnlyPaysOutWithSomethingInHand(GameTestHelper h) {
+        Player player = wear(h, GameType.SURVIVAL);
+        AttributeInstance attack = player.getAttribute(Attributes.ATTACK_DAMAGE);
+        h.assertTrue(attack != null, "the mock player has no attack damage attribute");
+        double unarmed = attack.getValue();
+
+        // Something in hand that nobody would call a weapon.
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.TORCH));
+        EtherCasingStatsServer.applyWornBonuses(player);
+        h.assertTrue(attack.getValue() == unarmed,
+                "a torch counted as a weapon: " + unarmed + " -> " + attack.getValue());
+
+        // And now something that is one. The weapon's own damage is added by hand, in the form
+        // vanilla adds it, because a mock player is never ticked and so never runs the equipment
+        // pass that would apply a real sword's modifiers.
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.NETHERITE_SWORD));
+        attack.addTransientModifier(new AttributeModifier(Item.BASE_ATTACK_DAMAGE_ID, 7.0,
+                AttributeModifier.Operation.ADD_VALUE));
+        EtherCasingStatsServer.applyWornBonuses(player);
+        double armed = attack.getValue();
+        h.assertTrue(armed > 12.0, "a netherite sword got little out of the suit: " + armed);
+
+        // Put the weapon away: the bonus goes with it, and the fist is nobody's weapon.
+        attack.removeModifier(Item.BASE_ATTACK_DAMAGE_ID);
+        player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        EtherCasingStatsServer.applyWornBonuses(player);
+        h.assertTrue(attack.getValue() == unarmed,
+                "the suit was still swinging after the sword was put away: " + attack.getValue());
         h.succeed();
     }
 

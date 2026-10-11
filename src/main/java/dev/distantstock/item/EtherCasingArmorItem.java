@@ -4,6 +4,8 @@ import com.simibubi.create.AllDataComponents;
 import com.simibubi.create.content.equipment.armor.BacktankUtil;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.tags.ItemTags;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -17,6 +19,7 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.ArmorMaterial;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.resources.ResourceLocation;
+import net.neoforged.neoforge.common.Tags;
 import net.neoforged.neoforge.fluids.FluidStack;
 
 import java.util.List;
@@ -25,6 +28,11 @@ import java.util.List;
 public final class EtherCasingArmorItem extends ArmorItem {
     private static final String AIR_INITIALIZED = "DistantStockAirInitialized";
     private static final String MEDIUM = "DistantStockMedium";
+
+    /** What counts as a swing. See {@link #swingsWith}. */
+    private static final List<TagKey<Item>> SWUNG = List.of(
+            ItemTags.SWORDS, ItemTags.AXES, ItemTags.PICKAXES, ItemTags.SHOVELS, ItemTags.HOES,
+            Tags.Items.TOOLS, Tags.Items.MELEE_WEAPON_TOOLS);
 
     /** The two fluids the suit runs on, as ids. Stored on the piece, compared as strings. */
     public static final String ETHER_MEDIUM = "distantstock:ether";
@@ -93,6 +101,27 @@ public final class EtherCasingArmorItem extends ArmorItem {
         stack.set(AllDataComponents.BACKTANK_AIR, left);
         if (left <= 0) setMedium(stack, "");
         return used;
+    }
+
+    /**
+     * Whether the wearer is swinging something: a weapon or a tool, as opposed to a bare hand, a
+     * block or a torch.
+     *
+     * <p>The suit's attack bonus is a share of what the swing is worth, so on a bare hand it would
+     * be worth almost nothing anyway -- but "almost" is the wrong answer for a pat. The point of the
+     * share is that the suit makes the wearer strong in a fight, not lethal in passing, so the share
+     * is only granted while something the player swings with is in hand.
+     *
+     * <p>Vanilla's own tool families are listed one by one, plus the conventions NeoForge publishes,
+     * which is also how a modded weapon opts in -- a data pack can tag more.
+     */
+    public static boolean swingsWith(LivingEntity entity) {
+        ItemStack held = entity.getMainHandItem();
+        if (held.isEmpty()) return false;
+        for (TagKey<Item> tag : SWUNG) {
+            if (held.is(tag)) return true;
+        }
+        return false;
     }
 
     public static boolean hasFullSet(LivingEntity entity) {

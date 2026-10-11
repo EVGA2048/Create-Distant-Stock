@@ -41,11 +41,16 @@ public final class EtherCasingStatsServer {
             DistantStock.MODID, "resonant_quartz_chest_strength");
     private static final ResourceLocation OXYGEN_ID = ResourceLocation.fromNamespaceAndPath(
             DistantStock.MODID, "resonant_quartz_helmet_oxygen");
+    private static final ResourceLocation JUMP_ID = ResourceLocation.fromNamespaceAndPath(
+            DistantStock.MODID, "resonant_quartz_boots_jump");
 
     private static final AttributeModifier SPEED = new AttributeModifier(
             SPEED_ID, EtherCasingBalance.BOOTS_SPEED, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+    private static final AttributeModifier JUMP = new AttributeModifier(
+            JUMP_ID, EtherCasingBalance.BOOTS_JUMP, AttributeModifier.Operation.ADD_VALUE);
     private static final AttributeModifier STRENGTH = new AttributeModifier(
-            STRENGTH_ID, EtherCasingBalance.CHEST_STRENGTH, AttributeModifier.Operation.ADD_VALUE);
+            STRENGTH_ID, EtherCasingBalance.CHEST_STRENGTH,
+            AttributeModifier.Operation.ADD_MULTIPLIED_BASE);
     private static final AttributeModifier OXYGEN = new AttributeModifier(
             OXYGEN_ID, EtherCasingBalance.HELMET_OXYGEN, AttributeModifier.Operation.ADD_VALUE);
 
@@ -54,9 +59,26 @@ public final class EtherCasingStatsServer {
         // Server-authoritative, for the reason spelled out in EtherCasingReach: writing the same
         // synced AttributeInstance on the logical client fights the server's attribute packets.
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        update(player.getAttribute(Attributes.MOVEMENT_SPEED), SPEED, wearing(player, EquipmentSlot.FEET));
-        update(player.getAttribute(Attributes.ATTACK_DAMAGE), STRENGTH, wearing(player, EquipmentSlot.CHEST));
-        update(player.getAttribute(Attributes.OXYGEN_BONUS), OXYGEN, wearing(player, EquipmentSlot.HEAD));
+        applyWornBonuses(player);
+    }
+
+    /**
+     * The per-slot bonuses, one attribute each, kept in step with what is worn.
+     *
+     * <p>Split out of the tick handler so a game test can hand a mock wearer the same modifiers
+     * without a ServerPlayer -- the guard above is about which side may write, not about what the
+     * pieces do, and the two are worth testing separately.
+     */
+    public static void applyWornBonuses(LivingEntity wearer) {
+        update(wearer.getAttribute(Attributes.MOVEMENT_SPEED), SPEED,
+                wearing(wearer, EquipmentSlot.FEET));
+        update(wearer.getAttribute(Attributes.JUMP_STRENGTH), JUMP,
+                wearing(wearer, EquipmentSlot.FEET));
+        // Attack power needs both the chest and something to swing: see EtherCasingArmorItem.
+        update(wearer.getAttribute(Attributes.ATTACK_DAMAGE), STRENGTH,
+                wearing(wearer, EquipmentSlot.CHEST) && EtherCasingArmorItem.swingsWith(wearer));
+        update(wearer.getAttribute(Attributes.OXYGEN_BONUS), OXYGEN,
+                wearing(wearer, EquipmentSlot.HEAD));
     }
 
     @SubscribeEvent

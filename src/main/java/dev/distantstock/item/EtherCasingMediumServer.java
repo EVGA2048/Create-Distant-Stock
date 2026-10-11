@@ -31,7 +31,8 @@ public final class EtherCasingMediumServer {
     private static final AttributeModifier SPEED = new AttributeModifier(
             SPEED_ID, 0.10, AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
     private static final AttributeModifier DAMAGE = new AttributeModifier(
-            DAMAGE_ID, 2.0, AttributeModifier.Operation.ADD_VALUE);
+            DAMAGE_ID, EtherCasingBalance.CHARGED_STRENGTH,
+            AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
 
     @SubscribeEvent
     public static void tick(PlayerTickEvent.Post event) {
@@ -47,7 +48,10 @@ public final class EtherCasingMediumServer {
 
         boolean assisted = fullPoweredSet(player);
         EtherCasingStatsServer.update(player.getAttribute(Attributes.MOVEMENT_SPEED), SPEED, assisted);
-        EtherCasingStatsServer.update(player.getAttribute(Attributes.ATTACK_DAMAGE), DAMAGE, assisted);
+        // The charged attack share is worth nothing on a bare hand either, so it carries the same
+        // condition the chest's does: something in hand to swing.
+        EtherCasingStatsServer.update(player.getAttribute(Attributes.ATTACK_DAMAGE), DAMAGE,
+                assisted && EtherCasingArmorItem.swingsWith(player));
 
         if (assisted && player.tickCount % ASSIST_PERIOD == 0 && !player.getAbilities().instabuild) {
             for (EquipmentSlot slot : EquipmentSlot.values()) {
