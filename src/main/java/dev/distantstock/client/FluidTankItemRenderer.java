@@ -27,11 +27,14 @@ import net.neoforged.neoforge.fluids.FluidStack;
  * still sprite is sampled into the window, with the shell blended over it. That is per-stack work,
  * which no baked model can do, so the tanks render through this instead.
  *
- * <p>Everything here is in the space {@code ItemRenderer} hands a custom renderer: the item's own
- * transform has already been applied and the origin moved to the centre, so the 16x16 icon spans
- * -0.5 to 0.5 and lies on the plane vanilla's generated item models use. Nothing is scaled or
- * rotated by hand -- those transforms come from the model JSON, which is why the three tank models
- * are now {@code builtin/entity} with the same display block as {@code item/generated}.
+ * <p>Everything here is drawn in a centred space: the 16x16 icon spans -0.5 to 0.5 and lies on the
+ * plane vanilla's generated item models use. That is not the space the call arrives in, though --
+ * {@code ItemRenderer} translates by (-0.5, -0.5, -0.5) before it hands the pose to a custom
+ * renderer, so block space 0..1 is what comes in, and {@link #renderByItem} moves the origin to
+ * the centre first (without that step every icon sat half a slot down and to the left of its own
+ * slot). Nothing is scaled or rotated by hand -- those transforms come from the model JSON, which
+ * is why the three tank models are now {@code builtin/entity} with the same display block as
+ * {@code item/generated}.
  */
 public final class FluidTankItemRenderer extends BlockEntityWithoutLevelRenderer {
     /** Where a flat item lies: 7.5/16 in model space, less the half-unit centring translate. */
@@ -107,34 +110,46 @@ public final class FluidTankItemRenderer extends BlockEntityWithoutLevelRenderer
     public void renderByItem(ItemStack stack, ItemDisplayContext context, PoseStack pose,
                              MultiBufferSource buffers, int light, int overlay) {
         if (!(stack.getItem() instanceof PortableFluidTankItem tank)) return;
-        FluidStack fluid = PortableFluidTankItem.fluid(stack);
-        float[] band = filledBand(PortableFluidTankItem.fluidLevel(fluid, tank.capacity()));
-        VertexConsumer out = buffers.getBuffer(RenderType.entityTranslucent(TextureAtlas.LOCATION_BLOCKS));
-        var atlas = Minecraft.getInstance().getTextureAtlas(TextureAtlas.LOCATION_BLOCKS);
-        PoseStack.Pose pose1 = pose.last();
+        pose.pushPose();
+        // ItemRenderer translates by (-0.5, -0.5, -0.5) right before calling a custom renderer, so
+        // the pose arrives in block space, 0..1, while everything below is written for the centred
+        // space the class comment describes. Move the origin to the centre, or the icon's centre
+        // lands on the slot's bottom-left corner and only its top-right quarter shows in the slot.
+        pose.translate(0.5, 0.5, 0.5);
+        try {
+            FluidStack fluid = PortableFluidTankItem.fluid(stack);
+            float[] band = filledBand(PortableFluidTankItem.fluidLevel(fluid, tank.capacity()));
+            VertexConsumer out = buffers.getBuffer(RenderType.entityTranslucent(TextureAtlas.LOCATION_BLOCKS));
+            var atlas = Minecraft.getInstance().getTextureAtlas(TextureAtlas.LOCATION_BLOCKS);
+            // Read after pushPose: pose.last() must be this method's own (already translated) pose,
+            // not the one the caller handed in.
+            PoseStack.Pose pose1 = pose.last();
 
-        if (band != null) {
-            ResourceLocation still = stillTexture(fluid);
-            if (still != null) {
-                TextureAtlasSprite sprite = atlas.apply(still);
-                // The band's share of the sampled patch, taken from the bottom of it: a half-full
-                // tank shows the lower half of the same fluid, not a squashed whole.
-                float share = (band[1] - band[0]) / (WIN_TOP - WIN_BOTTOM);
-                float v1 = PATCH_V1;
-                float v0 = PATCH_V1 - (PATCH_V1 - PATCH_V0) * share;
-                int tint = TankFluidColors.textureTint(fluid);
-                quad(out, pose1, WIN_X0, band[0], WIN_X1, band[1], FLUID_Z,
-                        sprite.getU(PATCH_U0), sprite.getU(PATCH_U1),
-                        sprite.getV(v0), sprite.getV(v1),
-                        tint >> 16 & 0xFF, tint >> 8 & 0xFF, tint & 0xFF, tint >>> 24,
-                        light, overlay);
+            if (band != null) {
+                ResourceLocation still = stillTexture(fluid);
+                if (still != null) {
+                    TextureAtlasSprite sprite = atlas.apply(still);
+                    // The band's share of the sampled patch, taken from the bottom of it: a half-full
+                    // tank shows the lower half of the same fluid, not a squashed whole.
+                    float share = (band[1] - band[0]) / (WIN_TOP - WIN_BOTTOM);
+                    float v1 = PATCH_V1;
+                    float v0 = PATCH_V1 - (PATCH_V1 - PATCH_V0) * share;
+                    int tint = TankFluidColors.textureTint(fluid);
+                    quad(out, pose1, WIN_X0, band[0], WIN_X1, band[1], FLUID_Z,
+                            sprite.getU(PATCH_U0), sprite.getU(PATCH_U1),
+                            sprite.getV(v0), sprite.getV(v1),
+                            tint >> 16 & 0xFF, tint >> 8 & 0xFF, tint & 0xFF, tint >>> 24,
+                            light, overlay);
+                }
             }
-        }
 
-        TextureAtlasSprite shell = atlas.apply(shellTexture(tank));
-        quad(out, pose1, -0.5f, -0.5f, 0.5f, 0.5f, SHELL_Z,
-                shell.getU0(), shell.getU1(), shell.getV0(), shell.getV1(),
-                255, 255, 255, 255, light, overlay);
+            TextureAtlasSprite shell = atlas.apply(shellTexture(tank));
+            quad(out, pose1, -0.5f, -0.5f, 0.5f, 0.5f, SHELL_Z,
+                    shell.getU0(), shell.getU1(), shell.getV0(), shell.getV1(),
+                    255, 255, 255, 255, light, overlay);
+        } finally {
+            pose.popPose();
+        }
     }
 
     /** One flat quad, wound the way vanilla's generated item models are (top-left first). */
