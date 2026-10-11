@@ -201,54 +201,56 @@ public final class EtherCasingArmorItem extends ArmorItem {
         return medium(stack).contains("molten_amethyst") ? 0xB56CFF : 0x6ED2C8;
     }
 
+    /**
+     * The suit's lore, in three blocks and always in the same order.
+     *
+     * <p>Every line is a label plus a fact, and the labels are the blocks: what all four pieces give
+     * ({@code 全套 · } and {@code 满套充能 · }), what this one piece gives on its own, then what it
+     * costs to keep running. A player comparing two pieces reads the same shape twice, and a player
+     * reading one piece knows which of its lines are about the suit rather than about the item.
+     *
+     * <p>What lives here is the order and the colour of each block; the words are in the language
+     * files, and the numbers in them are checked against the constants in {@link EtherCasingBalance}
+     * by {@code EtherCasingStatsCheck} -- which is also what fails the build if a line loses one.
+     */
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context,
                                 List<Component> tooltip, TooltipFlag flag) {
         super.appendHoverText(stack, context, tooltip, flag);
-        tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.cloak")
-                .withStyle(ChatFormatting.AQUA));
-        tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.stealth")
-                .withStyle(ChatFormatting.DARK_GRAY));
-        tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.reach")
-                .withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.charged")
-                .withStyle(ChatFormatting.AQUA));
-        tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.fire_immune")
-                .withStyle(ChatFormatting.GOLD));
-        // What this particular piece adds. The numbers are baked into the lang lines, the same way
-        // the reach line above already states its own; EtherCasingStatsCheck is what keeps them
-        // honest against the constants in EtherCasingStatsServer.
-        if (getType() == Type.HELMET) {
-            tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.helmet_bonus")
-                    .withStyle(ChatFormatting.BLUE));
-            tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.goggles")
-                    .withStyle(ChatFormatting.GRAY));
+
+        // Set-wide. Same three lines on every piece, whether or not the other three are worn.
+        send(tooltip, "cloak", ChatFormatting.AQUA);
+        send(tooltip, "fire_immune", ChatFormatting.GOLD);
+        send(tooltip, "reach", ChatFormatting.GRAY);
+        send(tooltip, "charged", ChatFormatting.AQUA);
+
+        // This piece. One line, except for the helmet's goggles and the chestplate's flight.
+        switch (getType()) {
+            case HELMET -> {
+                send(tooltip, "helmet_bonus", ChatFormatting.BLUE);
+                send(tooltip, "goggles", ChatFormatting.GRAY);
+            }
+            case CHESTPLATE -> {
+                send(tooltip, "chestplate_bonus", ChatFormatting.BLUE);
+                send(tooltip, "flight", ChatFormatting.GOLD);
+            }
+            case LEGGINGS -> send(tooltip, "leggings_bonus", ChatFormatting.BLUE);
+            case BOOTS -> send(tooltip, "boots_bonus", ChatFormatting.BLUE);
+            default -> {
+            }
         }
-        if (getType() == Type.CHESTPLATE) {
-            tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.chestplate_bonus")
-                    .withStyle(ChatFormatting.BLUE));
-        }
-        if (getType() == Type.LEGGINGS) {
-            tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.leggings_bonus")
-                    .withStyle(ChatFormatting.BLUE));
-        }
-        if (getType() == Type.BOOTS) {
-            tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.boots_bonus")
-                    .withStyle(ChatFormatting.BLUE));
-        }
+
+        // Upkeep. The reserve is a number, so it is filled in; the last line says what happens when
+        // it runs out and where more comes from.
         tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.reserve",
                         reserve(stack), maxReserve(stack))
                 .withStyle(ChatFormatting.AQUA));
-        tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.wear")
-                .withStyle(ChatFormatting.DARK_GRAY));
-        if (getType() == Type.CHESTPLATE) {
-            tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.flight")
-                    .withStyle(ChatFormatting.GOLD));
-            tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.boost")
-                    .withStyle(ChatFormatting.GRAY));
-            tooltip.add(Component.translatable("item.distantstock.ether_casing_armor.recharge")
-                    .withStyle(ChatFormatting.DARK_GRAY));
-        }
+        send(tooltip, "wear", ChatFormatting.DARK_GRAY);
+    }
+
+    private static void send(List<Component> tooltip, String key, ChatFormatting style) {
+        tooltip.add(Component.translatable("item.distantstock.ether_casing_armor." + key)
+                .withStyle(style));
     }
 
     /**

@@ -129,6 +129,13 @@ public final class EtherCasingStatsCheck {
             // the tooltip on a lone helmet has to be told the other three pieces are part of the
             // deal. EtherCasingArmorGameTests is what proves the rule does what the line says.
             state(lang, file, "fire_immune", file.startsWith("zh") ? "全套" : "Full set");
+            // The rest of the lines the armour draws. None of them states a number, so there is no
+            // constant to check them against -- but this list has to match the send(...) calls in
+            // appendHoverText, because a key that loses its twin in the other language file is a
+            // piece that shows a raw translation id to whoever hovers it, in one language only.
+            for (String key : List.of("cloak", "reach", "goggles", "flight", "reserve", "wear")) {
+                state(lang, file, key);
+            }
         }
         System.out.println("  tooltips  two files, every stated figure matches its constant");
     }
