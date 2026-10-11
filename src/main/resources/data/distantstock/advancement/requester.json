@@ -1,0 +1,40 @@
+{
+  "parent": "distantstock:dock",
+  "display": {
+    "icon": {
+      "id": "distantstock:requester",
+      "count": 1
+    },
+    "title": {
+      "translate": "advancement.distantstock.requester"
+    },
+    "description": {
+      "translate": "advancement.distantstock.requester.desc",
+      "color": "#DBA213"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "acquired": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "distantstock:requester",
+              "distantstock:gauge"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "acquired"
+    ]
+  ]
+}

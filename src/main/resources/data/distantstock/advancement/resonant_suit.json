@@ -1,0 +1,48 @@
+{
+  "parent": "distantstock:resonant_sheet",
+  "display": {
+    "icon": {
+      "id": "distantstock:ether_casing_chestplate",
+      "count": 1
+    },
+    "title": {
+      "translate": "advancement.distantstock.resonant_suit"
+    },
+    "description": {
+      "translate": "advancement.distantstock.resonant_suit.desc",
+      "color": "#DBA213"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "wear_full_suit": {
+      "trigger": "minecraft:tick",
+      "conditions": {
+        "player": {
+          "equipment": {
+            "head": {
+              "items": "distantstock:ether_casing_helmet"
+            },
+            "chest": {
+              "items": "distantstock:ether_casing_chestplate"
+            },
+            "legs": {
+              "items": "distantstock:ether_casing_leggings"
+            },
+            "feet": {
+              "items": "distantstock:ether_casing_boots"
+            }
+          }
+        }
+      }
+    }
+  },
+  "requirements": [
+    [
+      "wear_full_suit"
+    ]
+  ]
+}

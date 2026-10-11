@@ -1,0 +1,71 @@
+{
+  "display": {
+    "icon": {
+      "id": "distantstock:dock",
+      "count": 1
+    },
+    "title": {
+      "translate": "advancement.distantstock.root"
+    },
+    "description": {
+      "translate": "advancement.distantstock.root.desc",
+      "color": "#DBA213"
+    },
+    "frame": "task",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false,
+    "background": "minecraft:textures/block/polished_andesite.png"
+  },
+  "criteria": {
+    "begin": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "distantstock:cache_frogport",
+              "distantstock:copper_fluid_tank",
+              "distantstock:diagnostic_frogport",
+              "distantstock:dock",
+              "distantstock:ether_bottle",
+              "distantstock:ether_bucket",
+              "distantstock:ether_casing_boots",
+              "distantstock:ether_casing_chestplate",
+              "distantstock:ether_casing_helmet",
+              "distantstock:ether_casing_leggings",
+              "distantstock:ether_mechanism",
+              "distantstock:ether_quartz",
+              "distantstock:ether_resonator",
+              "distantstock:event_receipt",
+              "distantstock:gauge",
+              "distantstock:logger",
+              "distantstock:manual",
+              "distantstock:monitor",
+              "distantstock:orange_wall_sounder",
+              "distantstock:polished_ether_quartz",
+              "distantstock:red_wall_sounder",
+              "distantstock:remote_gauge",
+              "distantstock:remote_package",
+              "distantstock:remote_packager",
+              "distantstock:remote_redstone_requester",
+              "distantstock:requester",
+              "distantstock:resonant_canister",
+              "distantstock:resonant_sturdy_sheet",
+              "distantstock:stack_light",
+              "distantstock:sturdy_fluid_tank",
+              "distantstock:tower_casing",
+              "distantstock:tower_core",
+              "distantstock:tower_coupler"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "begin"
+    ]
+  ]
+}

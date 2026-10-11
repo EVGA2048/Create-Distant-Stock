@@ -1,0 +1,39 @@
+{
+  "parent": "distantstock:requester",
+  "display": {
+    "icon": {
+      "id": "distantstock:remote_gauge",
+      "count": 1
+    },
+    "title": {
+      "translate": "advancement.distantstock.remote_gauge"
+    },
+    "description": {
+      "translate": "advancement.distantstock.remote_gauge.desc",
+      "color": "#DBA213"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "acquired": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "distantstock:remote_gauge"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "acquired"
+    ]
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "parent": "distantstock:root",
+  "display": {
+    "icon": {
+      "id": "distantstock:ether_quartz",
+      "count": 1
+    },
+    "title": {
+      "translate": "advancement.distantstock.ether_quartz"
+    },
+    "description": {
+      "translate": "advancement.distantstock.ether_quartz.desc",
+      "color": "#DBA213"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "acquired": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "distantstock:ether_quartz"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "acquired"
+    ]
+  ]
+}

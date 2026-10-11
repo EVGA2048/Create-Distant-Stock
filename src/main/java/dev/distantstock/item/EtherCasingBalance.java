@@ -13,6 +13,8 @@ package dev.distantstock.item;
  * obvious dial and are not.
  */
 public final class EtherCasingBalance {
+    public static final int RESERVE_MULTIPLIER = 4;
+
     // --- the material -----------------------------------------------------------------------
     // Armour points are capped. CombatRules.getDamageAfterAbsorb ends in
     // `Mth.clamp(armor - damage / f, armor * 0.2F, 20.0F)`, so a thirty-first point is discarded

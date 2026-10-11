@@ -1,0 +1,41 @@
+{
+  "parent": "distantstock:resonant_sheet",
+  "display": {
+    "icon": {
+      "id": "distantstock:resonant_canister",
+      "count": 1
+    },
+    "title": {
+      "translate": "advancement.distantstock.portable_tank"
+    },
+    "description": {
+      "translate": "advancement.distantstock.portable_tank.desc",
+      "color": "#DBA213"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "acquired": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "distantstock:copper_fluid_tank",
+              "distantstock:sturdy_fluid_tank",
+              "distantstock:resonant_canister"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "acquired"
+    ]
+  ]
+}

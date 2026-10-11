@@ -409,6 +409,16 @@ public final class DiagnosticFrogportBlockEntity extends FrogportBlockEntity imp
         ListTag badAddresses = tag.getList("UnresolvedBadAddresses", Tag.TAG_STRING);
         for (int i = 0; i < badAddresses.size(); i++) unresolvedBadAddresses.add(badAddresses.getString(i));
 
+        if (!tag.contains("UnresolvedBadAddresses")) {
+            for (int slot = 0; slot < inventory.getSlots(); slot++) {
+                ItemStack stack = inventory.getStackInSlot(slot);
+                if (stack.isEmpty() || PingPackageData.isPing(stack)
+                        || !com.simibubi.create.content.logistics.box.PackageItem.isPackage(stack)) continue;
+                String address = com.simibubi.create.content.logistics.box.PackageItem.getAddress(stack);
+                unresolvedBadAddresses.add(address == null || address.isBlank() ? "<blank>" : address);
+            }
+        }
+
         gaugeBackedBadAddresses.clear();
         ListTag gaugeBacked = tag.getList("GaugeBackedBadAddresses", Tag.TAG_COMPOUND);
         for (int i = 0; i < gaugeBacked.size(); i++) {

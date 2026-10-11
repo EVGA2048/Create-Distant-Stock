@@ -4,6 +4,7 @@
   "package": "dev.distantstock.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "BacktankUtilMixin",
     "LampConnectionMixin",
     "PackagerBlockEntityMixin",
     "compat.FluidPackagerBlockEntityMixin",

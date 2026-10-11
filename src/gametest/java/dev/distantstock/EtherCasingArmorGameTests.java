@@ -39,6 +39,24 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 @PrefixGameTestTemplate(false)
 public final class EtherCasingArmorGameTests {
 
+    @GameTest(template = "empty")
+    public static void largerFuelReserveSurvivesFlightConsumption(GameTestHelper h) {
+        ItemStack chest = new ItemStack(ModItems.ETHER_CASING_CHESTPLATE.get());
+        int original = com.simibubi.create.content.equipment.armor.BacktankUtil.maxAir(0);
+        int capacity = EtherCasingArmorItem.maxReserve(chest);
+        h.assertTrue(capacity == original * 4, "armor reserve was not enlarged fourfold");
+        EtherCasingArmorItem.addReserve(chest, capacity, EtherCasingArmorItem.ETHER_MEDIUM);
+        Player player = h.makeMockPlayer(GameType.SURVIVAL);
+        chest.getItem().elytraFlightTick(chest, player, 10);
+        h.assertTrue(EtherCasingArmorItem.reserve(chest) == capacity - 1,
+                "flight truncated the enlarged reserve to Create's old limit");
+        ItemStack backtank = new ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create", "copper_backtank")));
+        h.assertTrue(com.simibubi.create.content.equipment.armor.BacktankUtil.maxAir(backtank) == original,
+                "ordinary Create backtank capacity changed");
+        h.succeed();
+    }
+
     @GameTest(template = "empty", timeoutTicks = 40)
     public static void theFullSetTurnsFireAndLavaAside(GameTestHelper h) {
         Player player = wear(h, GameType.SURVIVAL);

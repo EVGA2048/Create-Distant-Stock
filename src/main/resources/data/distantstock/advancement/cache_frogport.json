@@ -1,0 +1,39 @@
+{
+  "parent": "distantstock:diagnostic_frogport",
+  "display": {
+    "icon": {
+      "id": "distantstock:cache_frogport",
+      "count": 1
+    },
+    "title": {
+      "translate": "advancement.distantstock.cache_frogport"
+    },
+    "description": {
+      "translate": "advancement.distantstock.cache_frogport.desc",
+      "color": "#DBA213"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "acquired": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "distantstock:cache_frogport"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "acquired"
+    ]
+  ]
+}

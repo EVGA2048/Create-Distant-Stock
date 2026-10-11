@@ -1,0 +1,39 @@
+{
+  "parent": "distantstock:logger",
+  "display": {
+    "icon": {
+      "id": "distantstock:event_receipt",
+      "count": 1
+    },
+    "title": {
+      "translate": "advancement.distantstock.event_receipt"
+    },
+    "description": {
+      "translate": "advancement.distantstock.event_receipt.desc",
+      "color": "#DBA213"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "acquired": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "distantstock:event_receipt"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "acquired"
+    ]
+  ]
+}

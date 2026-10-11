@@ -31,8 +31,6 @@ public final class ChainDiagnostics {
     private static final long SCAN_INTERVAL = 80;
     /** Keep a large factory moving without flooding its chain bus with diagnostic parcels. */
     private static final int MAX_NORMAL_PROBES = 4;
-    /** Once the Frogport mouth is free, stagger new health probes by half a second. */
-    private static final long NORMAL_PROBE_LAUNCH_INTERVAL = 10;
     /** Large industrial rings can exceed the old 512-node safety cap. */
     private static final int MAX_GRAPH_CONVEYORS = 4096;
     /** One-second topology cache; live BE fields (speed/address/inventory) are still read every use. */
@@ -522,7 +520,7 @@ public final class ChainDiagnostics {
             if (sendProbe(controller, graph, key, address, target.getBlockPos(), address,
                     false, level.getGameTime(), planIndex, candidates.size(), addressTargets.size())) {
                 runtime.cursor = Math.floorMod(selectedIndex + 1, candidates.size());
-                runtime.nextScanTick = level.getGameTime() + NORMAL_PROBE_LAUNCH_INTERVAL;
+                runtime.nextScanTick = level.getGameTime() + SCAN_INTERVAL;
                 controller.setDiagnosticInFlight(normalCount + 1);
             } else {
                 // The Frogport mouth itself still serialises physical injection. Retry soon without
@@ -549,8 +547,8 @@ public final class ChainDiagnostics {
             ControllerKey controller = new ControllerKey(level.dimension(), diagnostic.getBlockPos());
             Set<String> quarantinedNow = new LinkedHashSet<>();
 
-            // Migration/safety net: old worlds may contain quarantined packages from before the
-            // durable unresolved-address set existed. Seeing one still creates the durable fault.
+            // Inventory controls whether a one-off incident has been handled, not whether a
+            // successfully repaired route should be faulted again. Legacy migration happens on read.
             for (int slot = 0; slot < diagnostic.inventory.getSlots(); slot++) {
                 ItemStack stack = diagnostic.inventory.getStackInSlot(slot);
                 if (stack.isEmpty() || !PackageItem.isPackage(stack) || PingPackageData.isPing(stack)) continue;
@@ -558,7 +556,6 @@ public final class ChainDiagnostics {
                 if (address == null || address.isBlank()) address = "<blank>";
                 AddressKey key = new AddressKey(level.dimension(), address);
                 quarantinedNow.add(address);
-                diagnostic.rememberBadAddress(address, ADDRESS_NETWORKS.containsKey(key));
             }
 
             for (String address : new ArrayList<>(diagnostic.unresolvedBadAddresses())) {
@@ -953,6 +950,15 @@ public final class ChainDiagnostics {
             return;
         }
 
+        boolean expectedReceiver = !(frog instanceof DiagnosticFrogportBlockEntity)
+                && !(frog instanceof CacheFrogportBlockEntity)
+                && (frog.getBlockPos().equals(probe.targetPos())
+                    || (!isRecoveryAddress(PackageItem.getAddress(stack))
+                        && PackageItem.matchAddress(stack, frog.getFilterString())));
+        if (!expectedReceiver) {
+            handleTimeout(level.getServer(), probe);
+            return;
+        }
         recordLatency(level, probe.address(), Math.max(0, now - probe.sentTick()), probe.expectedTicks(), now);
         Fault fault = FAULTS.get(new FaultKey(probe.controller(), probe.address()));
         if (probe.recovery() && fault != null) {
@@ -1049,6 +1055,11 @@ public final class ChainDiagnostics {
         }
         EventRegistry.get(level.getServer()).clear(EventRegistry.Codes.CHAIN_PING_TIMEOUT, "chain",
                 sourceId(level, controller.getBlockPos(), fault.key.address()), System.currentTimeMillis());
+        // The address stops being bad here, not at some later routine probe. Restoring thaws the
+        // held parcels and releases the cache takeover, and leaving the alarm to a poll four seconds
+        // away would keep the indicator reporting a route that has just been proven healthy -- which
+        // is the half of "recovered" a player actually reads.
+        clearBadAddress(level, fault.key.controller(), fault.key.address(), now);
         controller.recordDiagnosticResult("recovered", fault.key.address());
     }
 

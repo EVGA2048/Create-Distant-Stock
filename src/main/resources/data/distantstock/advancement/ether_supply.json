@@ -1,0 +1,40 @@
+{
+  "parent": "distantstock:tower_components",
+  "display": {
+    "icon": {
+      "id": "distantstock:ether_bucket",
+      "count": 1
+    },
+    "title": {
+      "translate": "advancement.distantstock.ether_supply"
+    },
+    "description": {
+      "translate": "advancement.distantstock.ether_supply.desc",
+      "color": "#DBA213"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "acquired": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "distantstock:ether_bucket",
+              "distantstock:ether_bottle"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "acquired"
+    ]
+  ]
+}

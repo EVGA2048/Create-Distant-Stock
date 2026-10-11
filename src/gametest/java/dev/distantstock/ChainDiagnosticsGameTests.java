@@ -679,7 +679,70 @@ public final class ChainDiagnosticsGameTests {
         h.succeed();
     }
 
-    @GameTest(template = "empty", timeoutTicks = 140)
+    @GameTest(template = "empty")
+    public static void successfulProbeDoesNotRefaultBufferedOldMail(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos chainPos = h.absolutePos(new BlockPos(5, 2, 5));
+        BlockPos diagnosticPos = h.absolutePos(new BlockPos(5, 2, 3));
+        BlockPos receiverAPos = h.absolutePos(new BlockPos(3, 2, 5));
+        BlockPos receiverBPos = h.absolutePos(new BlockPos(7, 2, 5));
+
+        var chainBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "chain_conveyor"));
+        var frogportBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "package_frogport"));
+        level.setBlock(chainPos, chainBlock.defaultBlockState(), 3);
+        level.setBlock(diagnosticPos, ModBlocks.DIAGNOSTIC_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(receiverAPos, frogportBlock.defaultBlockState(), 3);
+        level.setBlock(receiverBPos, frogportBlock.defaultBlockState(), 3);
+
+        ChainConveyorBlockEntity chain = (ChainConveyorBlockEntity) level.getBlockEntity(chainPos);
+        DiagnosticFrogportBlockEntity diagnostic =
+                (DiagnosticFrogportBlockEntity) level.getBlockEntity(diagnosticPos);
+        FrogportBlockEntity receiverA = (FrogportBlockEntity) level.getBlockEntity(receiverAPos);
+        FrogportBlockEntity receiverB = (FrogportBlockEntity) level.getBlockEntity(receiverBPos);
+        h.assertTrue(chain != null && diagnostic != null && receiverA != null && receiverB != null,
+                "planned-polling fixture failed to create block entities");
+
+        chain.setSpeed(128);
+        chain.preventSpeedUpdate = 200;
+        h.onEachTick(() -> chain.setSpeed(128));
+        attachLoopPort(level, chainPos, diagnosticPos, diagnostic, 0);
+        attachLoopPort(level, chainPos, receiverAPos, receiverA, 90);
+        attachLoopPort(level, chainPos, receiverBPos, receiverB, 180);
+
+        receiverA.addressFilter = "A-REFAULT";
+        receiverA.acceptsPackages = true;
+        receiverA.filterChanged();
+        receiverB.addressFilter = "B-REFAULT";
+        receiverB.acceptsPackages = true;
+        receiverB.filterChanged();
+        ItemStack oldMail = new ItemStack(ModItems.REMOTE_PACKAGE.get());
+        PackageItem.addAddress(oldMail, "A-REFAULT");
+        diagnostic.inventory.setStackInSlot(0, oldMail);
+        ChainDiagnostics.unroutableCaptured(diagnostic, oldMail);
+        ChainDiagnostics.tick(level.getServer());
+        ItemStack ping = diagnostic.animatedPackage.copy();
+        h.assertTrue(PingPackageData.read(ping) != null, "no active probe was created");
+        // Enter through the actual receiver mixin, not the fault-clearing helper.
+        receiverA.startAnimation(ping, false);
+        h.assertTrue(ChainDiagnostics.lampState(level, "A-REFAULT") == null, "healthy ping did not clear fault: probe=" + PingPackageData.read(ping)
+                        + " unresolved=" + diagnostic.unresolvedBadAddresses()
+                        + " receiver=" + receiverA.getBlockPos() + " filter=" + receiverA.getFilterString());
+        ChainDiagnostics.tick(level.getServer());
+        h.assertFalse(diagnostic.unresolvedBadAddresses().contains("A-REFAULT"),
+                "old buffered parcel reintroduced a repaired route fault");
+        h.assertTrue(ChainDiagnostics.lampState(level, "A-REFAULT") == null,
+                "old buffered parcel raised the alarm again");
+        var saved = diagnostic.saveWithoutMetadata(level.registryAccess());
+        diagnostic.loadWithComponents(saved, level.registryAccess());
+        ChainDiagnostics.tick(level.getServer());
+        h.assertFalse(diagnostic.unresolvedBadAddresses().contains("A-REFAULT"),
+                "reload treated an explicitly resolved incident as legacy data");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 360)
     public static void diagnosticFrogportCapsNormalProbeConcurrencyAtFour(GameTestHelper h) {
         var level = h.getLevel();
         BlockPos chainPos = h.absolutePos(new BlockPos(5, 2, 5));
@@ -705,9 +768,9 @@ public final class ChainDiagnosticsGameTests {
         h.assertTrue(chain != null && diagnostic != null,
                 "parallel-probe fixture failed to create its chain/diagnostic Frogport");
 
-        chain.setSpeed(128);
+        chain.setSpeed(4);
         chain.preventSpeedUpdate = 1000;
-        h.onEachTick(() -> chain.setSpeed(128));
+        h.onEachTick(() -> chain.setSpeed(4));
         attachLoopPort(level, chainPos, diagnosticPos, diagnostic, 0);
 
         java.util.ArrayList<FrogportBlockEntity> receivers = new java.util.ArrayList<>();
@@ -734,7 +797,9 @@ public final class ChainDiagnosticsGameTests {
         ChainDiagnostics.register(diagnostic);
         ChainDiagnostics.tick(level.getServer());
 
-        h.runAfterDelay(70, () -> {
+        h.runAfterDelay(70, () -> h.assertTrue(diagnostic.diagnosticInFlightCount() == 1,
+                "normal polling launched again before the four-second interval"));
+        h.runAfterDelay(270, () -> {
             int inFlight = diagnostic.diagnosticInFlightCount();
             var pingAddresses = chain.getLoopingPackages().stream()
                     .filter(pkg -> PingPackageData.isPing(pkg.item))

@@ -1,0 +1,69 @@
+{
+  "parent": "distantstock:tower_casing",
+  "display": {
+    "icon": {
+      "id": "distantstock:ether_resonator",
+      "count": 1
+    },
+    "title": {
+      "translate": "advancement.distantstock.tower_components"
+    },
+    "description": {
+      "translate": "advancement.distantstock.tower_components.desc",
+      "color": "#DBA213"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "tower_core": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "distantstock:tower_core"
+            ]
+          }
+        ]
+      }
+    },
+    "tower_coupler": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "distantstock:tower_coupler"
+            ]
+          }
+        ]
+      }
+    },
+    "ether_resonator": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "distantstock:ether_resonator"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    [
+      "tower_core"
+    ],
+    [
+      "tower_coupler"
+    ],
+    [
+      "ether_resonator"
+    ]
+  ]
+}
