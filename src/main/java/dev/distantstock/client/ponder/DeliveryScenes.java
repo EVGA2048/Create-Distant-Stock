@@ -18,6 +18,7 @@ public final class DeliveryScenes {
         var storage = util.select().fromTo(1, 1, 3, 1, 3, 4);
         reveal(scene, storage);
         note(scene,util,1,2,3,"Place the Distant Packager against its source inventory, with a Stock Link above it.");
+        reveal(scene, util.select().fromTo(1,1,0,1,1,1));
         reveal(scene, util.select().fromTo(1,1,2,4,2,2));
         note(scene,util,1,2,2,"An extracting funnel in front of the packager places completed parcels onto the belt below.");
         reveal(scene, util.select().fromTo(5,1,2,5,2,3));
@@ -25,18 +26,18 @@ public final class DeliveryScenes {
         note(scene,util,5,2,2,"Open the bound dock and select Send mode. Configure a default destination when parcels do not already carry one.");
         ItemStack parcel = new ItemStack(ModItems.REMOTE_PACKAGE.get());
         scene.world().modifyBlockEntity(util.grid().at(1,2,3),PackagerBlockEntity.class,be -> {
-            be.heldBox=parcel.copy(); be.animationTicks=20; be.animationInward=false;
+            be.heldBox=parcel.copy(); be.animationTicks=PackagerBlockEntity.CYCLE; be.animationInward=false;
         });
-        scene.idle(20);
+        scene.idle(PackagerBlockEntity.CYCLE + 10);
         scene.world().modifyBlockEntity(util.grid().at(1,2,3),PackagerBlockEntity.class,be -> be.heldBox=ItemStack.EMPTY);
         scene.world().flapFunnel(util.grid().at(1,2,2),true);
-        scene.world().setKineticSpeed(util.select().position(1,1,3),-32);
+        scene.world().setKineticSpeed(util.select().fromTo(1,1,0,1,1,1),-32);
         scene.world().setKineticSpeed(util.select().fromTo(1,1,2,4,1,2),-32);
         scene.world().createItemOnBelt(util.grid().at(1,1,2),Direction.UP,parcel);
         scene.idle(48);
         scene.world().removeItemsFromBelt(util.grid().at(1,1,2));
         scene.world().flapFunnel(util.grid().at(4,2,2),false);
-        scene.world().modifyBlock(util.grid().at(5,2,2),s -> s.setValue(DockBlock.STATUS,DockStatus.SENDING),false);
+        sendParcel(scene,util.grid().at(5,2,2),parcel);
         note(scene,util,4,2,2,"The inserting funnel feeds the dock from the side. The dock transfers one parcel at a time.");
         scene.overlay().showOutline(PonderPalette.RED,"fallback",util.select().fromTo(5,1,2,5,1,3),90);
         note(scene,util,5,1,2,"Provide an extraction path below the dock for returned parcels. This hopper sends them to a separate chest.");

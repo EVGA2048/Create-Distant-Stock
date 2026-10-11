@@ -806,7 +806,18 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         return transmitStartedAt >= 0 && !transmittingStack().isEmpty();
     }
 
+    // Ponder controls this explicitly so pause, scrubbing and replay do not use the live world clock.
+    private float virtualTransmitProgress = -1;
+
+    public void setVirtualTransmitProgress(float progress) {
+        if (isVirtual()) virtualTransmitProgress = progress;
+    }
+
     public float transmitProgress(float partialTicks) {
+        if (isVirtual()) {
+            return virtualTransmitProgress < 0 ? -1
+                    : Math.min(1, virtualTransmitProgress + partialTicks / TRANSMIT_TICKS);
+        }
         if (level == null || transmitStartedAt < 0 || transmittingStack().isEmpty()) {
             return -1;
         }
@@ -1785,6 +1796,7 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
     @Override
     protected void read(CompoundTag tag, HolderLookup.Provider registries, boolean clientPacket) {
         super.read(tag, registries, clientPacket);
+        virtualTransmitProgress = -1;
         freq = tag.hasUUID("Freq") ? tag.getUUID("Freq") : null;
         networkId = tag.contains("RemoteNetwork")
                 ? RemoteNetworkId.read(tag.getCompound("RemoteNetwork")).orElse(null) : null;

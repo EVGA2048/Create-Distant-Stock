@@ -35,6 +35,16 @@ with tempfile.TemporaryDirectory() as tmp:
                 assert LANG['zh_cn'][prefix+f'text_{i}'].strip(),(name,'missing Chinese caption')
             for lang,data in LANG.items():
                 assert len([k for k in data if k.startswith(prefix+'text_')])==len(notes),(name,lang,'caption count')
+            if name=='tower':
+                for x in (0,1):
+                    pipe=occupied[(x,2,3)]
+                    assert pipe['Name']=='create:fluid_pipe', 'tower missing external pipe'
+                    assert all(pipe['Properties'][face]=='true' for face in ('east','west')), 'disconnected supply'
+                assert occupied[(2,2,3)]['Name']=='distantstock:tower_casing', 'pipe misses casing'
+                assert 'TowerCasingBlock.Port.WEST' in method, 'opened port faces away from pipes'
+            if name in ('tower','diagnostics','cache'):
+                z=3 if name=='tower' else 5
+                assert occupied[(0,1,z)]['Name']=='create:cogwheel', (name,'missing boundary drive')
             for b in layout.blocks:
                 state=layout.palette[b['state']];x,y,z=b['pos']
                 if state['Name']=='create:andesite_belt_funnel':

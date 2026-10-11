@@ -15,6 +15,7 @@ import java.util.Map;
 /** Validate real registry states, localized captions and registration without opening a world. */
 final class PonderSceneSmoke {
     static void check(Minecraft mc) throws Exception {
+        checkDockPreviewClock();
         var lines = Map.ofEntries(Map.entry("export",5),Map.entry("import",3),Map.entry("tune",5),
                 Map.entry("status",5),Map.entry("tower",7),Map.entry("replenish",5),
                 Map.entry("redstone",4),Map.entry("diagnostics",5),Map.entry("cache",4),
@@ -52,6 +53,24 @@ final class PonderSceneSmoke {
         for(String name:lines.keySet())
             if(!seen.contains(id(name))) throw new AssertionError("Unregistered storyboard: "+name);
         LogUtils.getLogger().info("DISTANTSTOCK_PONDER_RESOURCES_OK: {} scenes have valid registry states, registration and captions",seen.size());
+    }
+
+    private static void checkDockPreviewClock() {
+        var dock = new dev.distantstock.block.DockBlockEntity(
+                dev.distantstock.block.ModBlockEntities.DOCK.get(), net.minecraft.core.BlockPos.ZERO,
+                dev.distantstock.block.ModBlocks.DOCK.get().defaultBlockState());
+        dock.setVirtualTransmitProgress(.5f);
+        if (dock.transmitProgress(0) != -1) throw new AssertionError("Preview changed a real dock");
+        dock.markVirtual();
+        dock.setVirtualTransmitProgress(.5f);
+        if (dock.transmitProgress(0) != .5f) throw new AssertionError("Preview depends on world time");
+        if (Math.abs(dock.transmitProgress(.5f) - (.5f + .5f / 30)) > .0001f)
+            throw new AssertionError("Missing preview interpolation");
+        dock.setVirtualTransmitProgress(1);
+        if (dock.transmitProgress(1) != 1) throw new AssertionError("Preview exceeds completion");
+        dock.loadClientUpdate(new net.minecraft.nbt.CompoundTag(),
+                net.minecraft.core.RegistryAccess.fromRegistryOfRegistries(BuiltInRegistries.REGISTRY));
+        if (dock.transmitProgress(0) != -1) throw new AssertionError("Replay retained stale animation");
     }
 
     private static ResourceLocation id(String path) {

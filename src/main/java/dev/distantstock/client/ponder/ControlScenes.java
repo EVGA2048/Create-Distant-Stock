@@ -17,12 +17,10 @@ public final class ControlScenes {
         use(scene,util,1,2,3,new ItemStack(ModItems.DOCK.get()));
         note(scene,util,1,2,3,"Before placing a Distant Dock, use its item on an existing Stock Link to copy the local logistics network.");
         reveal(scene,util.select().position(4,1,2));
-        use(scene,util,1,2,3,new ItemStack(ModItems.REQUESTER.get()));
-        note(scene,util,1,2,3,"Tune a portable terminal to the local network, then create or join a Distant Network in its interface.");
-        use(scene,util,4,1,2,new ItemStack(ModItems.REQUESTER.get()));
-        note(scene,util,4,1,2,"Use that terminal on the placed dock to add its local warehouse to the selected Distant Network.");
+        note(scene,util,1,2,3,"Place the tuned dock at the warehouse. It retains the logistics network copied by the item.");
+        note(scene,util,4,1,2,"The dock now serves this local logistics network. Bind additional docks to the networks they should serve before placement.");
         use(scene,util,4,1,2,ItemStack.EMPTY);
-        note(scene,util,4,1,2,"Configure the dock's mode, receiving address and destination in its own interface. Terminal binding does not change these settings.");
+        note(scene,util,4,1,2,"Open the dock with an empty hand to configure its mode, receiving address and default destination.");
         reveal(scene,util.select().position(5,1,4));
         note(scene,util,5,1,4,"A Request Desk provides a fixed ordering terminal. It does not need to be inserted into the parcel transport path.");
         scene.markAsFinished();

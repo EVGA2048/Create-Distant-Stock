@@ -15,8 +15,8 @@ public final class DiagnosticScenes {
         var scene=begin(builder,"distant_diagnostics","Diagnosing a chain route",9);
 
         scene.scaleSceneView(.85f);
-        reveal(scene,util.select().fromTo(2,1,5,6,4,5));
-        scene.world().setKineticSpeed(util.select().fromTo(2,1,5,6,4,5),32);
+        reveal(scene,util.select().fromTo(0,1,5,6,3,5));
+        scene.world().setKineticSpeed(util.select().fromTo(0,1,5,6,3,5),32);
         reveal(scene,util.select().fromTo(6,1,2,6,2,2));
 
         note(scene,util,6,2,2,"Connect the destination Frogport to the chain and set its address. Ordinary parcel routing remains managed by Create.");
@@ -38,8 +38,8 @@ public final class DiagnosticScenes {
         var scene=begin(builder,"distant_cache","Buffering a congested destination",9);
 
         scene.scaleSceneView(.85f);
-        reveal(scene,util.select().fromTo(2,1,5,6,4,5));
-        scene.world().setKineticSpeed(util.select().fromTo(2,1,5,6,4,5),32);
+        reveal(scene,util.select().fromTo(0,1,5,6,3,5));
+        scene.world().setKineticSpeed(util.select().fromTo(0,1,5,6,3,5),32);
         reveal(scene,util.select().fromTo(6,1,2,6,2,2));
 
         reveal(scene,util.select().fromTo(2,1,2,2,2,2));

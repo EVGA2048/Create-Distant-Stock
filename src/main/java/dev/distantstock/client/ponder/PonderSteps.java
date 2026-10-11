@@ -53,5 +53,33 @@ final class PonderSteps {
         scene.world().modifyEntity(entity, e -> e.discard());
     }
 
+    /** Drive the real dock renderer on the storyboard clock, including paused/replayed scenes. */
+    static void sendParcel(CreateSceneBuilder scene, net.minecraft.core.BlockPos pos, ItemStack item) {
+        scene.world().modifyBlockEntity(pos, dev.distantstock.block.DockBlockEntity.class, be -> {
+            var registries = be.getLevel().registryAccess();
+            var tag = be.saveWithoutMetadata(registries);
+            var inventory = new net.neoforged.neoforge.items.ItemStackHandler(1);
+            inventory.setStackInSlot(0, item.copy());
+            tag.put("OutboundInv", inventory.serializeNBT(registries));
+            be.loadClientUpdate(tag, registries);
+        });
+        scene.world().modifyBlock(pos, state -> state.setValue(dev.distantstock.block.DockBlock.STATUS,
+                dev.distantstock.block.DockStatus.SENDING), false);
+        for (int tick = 0; tick < dev.distantstock.block.DockBlockEntity.TRANSMIT_TICKS; tick++) {
+            float progress = tick / (float) dev.distantstock.block.DockBlockEntity.TRANSMIT_TICKS;
+            scene.world().modifyBlockEntity(pos, dev.distantstock.block.DockBlockEntity.class,
+                    be -> be.setVirtualTransmitProgress(progress));
+            scene.idle(1);
+        }
+        scene.world().modifyBlockEntity(pos, dev.distantstock.block.DockBlockEntity.class, be -> {
+            var registries = be.getLevel().registryAccess();
+            var tag = be.saveWithoutMetadata(registries);
+            tag.put("OutboundInv", new net.neoforged.neoforge.items.ItemStackHandler(1).serializeNBT(registries));
+            be.loadClientUpdate(tag, registries);
+        });
+        scene.world().modifyBlock(pos, state -> state.setValue(dev.distantstock.block.DockBlock.STATUS,
+                dev.distantstock.block.DockStatus.STANDBY), false);
+    }
+
     private PonderSteps() {}
 }

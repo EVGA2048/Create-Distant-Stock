@@ -238,9 +238,18 @@ def link(scene, pos):
                        {'face':'floor','facing':'north','powered':'false','waterlogged':'false'},
                        {'id':'create:packager_link','Freq':FREQUENCY,'Added':1})
 
-def motor(scene, pos, facing='north', speed=32.0):
-    return scene.place(pos,'create:creative_motor',{'facing':facing},
-                       {'id':'create:creative_motor','Speed':speed,'GeneratedSpeed':speed})
+def shaft(scene, pos, axis):
+    return scene.place(pos,'create:shaft',{'axis':axis},
+                       {'id':'create:simple_kinetic','Speed':0.0})
+
+def cogwheel(scene, pos, axis):
+    return scene.place(pos,'create:cogwheel',{'axis':axis},
+                       {'id':'create:simple_kinetic','Speed':0.0})
+
+def gearbox(scene, pos):
+    # Axis Z leaves shaft connections on X and Y, turning the input upward.
+    return scene.place(pos,'create:gearbox',{'axis':'z'},
+                       {'id':'create:gearbox','Speed':0.0})
 
 def funnel(scene, pos, facing, shape):
     return scene.place(pos,'create:andesite_belt_funnel',
@@ -265,7 +274,7 @@ def export_scene():
     s=Scene(7,7,5)
     chest(s,(1,2,4)); support(s,(1,1,4))
     packager(s,(1,2,3)); link(s,(1,3,3))
-    motor(s,(1,1,3),speed=0.0)
+    cogwheel(s,(1,1,0),'z'); shaft(s,(1,1,1),'z')
     belt(s,(1,1,2),4)
     funnel(s,(1,2,2),'north','pulling')
     funnel(s,(4,2,2),'west','pushing')
@@ -297,7 +306,13 @@ def status_scene():
 
 def tower_scene():
     s=Scene(7,7,10)
-    motor(s,(3,1,3),'up')
+    cogwheel(s,(0,1,3),'x')
+    for x in (1,2): shaft(s,(x,1,3),'x')
+    gearbox(s,(3,1,3))
+    for x in (0,1):
+        s.place((x,2,3),'create:fluid_pipe',
+                {face:str(face in ('east','west')).lower() for face in ('up','down','north','south','east','west')} | {'waterlogged':'false'},
+                {'id':'create:fluid_pipe'})
     s.place((3,2,3),'distantstock:tower_core',None,
             {'id':'distantstock:tower_core','Speed':0.0,'Couplers':5,'Tier':'I'})
     for x in range(2,5):
@@ -333,12 +348,14 @@ def redstone_scene():
 def diagnostics_scene():
     s=Scene(9,9,6)
     for x,dx in [(2,4),(6,-4)]:
-        for y in (1,2):s.place((x,y,5),'create:shaft',{'axis':'y'},{'id':'create:simple_kinetic','Speed':0.0})
+        shaft(s,(x,2,5),'y')
+        if x==2: gearbox(s,(x,1,5))
+        else: shaft(s,(x,1,5),'y')
         s.place((x,3,5),'create:chain_conveyor',None,
                 {'id':'create:chain_conveyor','Connections':[IntArray([dx,0,0])],
                  'Speed':0.0,'TravellingPackages':[],'LoopingPackages':[]})
-    # The shafts continue down into the baseplate; the motor is shown as the input above one node.
-    motor(s,(2,4,5),'down')
+    # External rotation enters at the scene boundary and turns upward through a gearbox.
+    cogwheel(s,(0,1,5),'x'); shaft(s,(1,1,5),'x')
     for x,block,address,slots in [(2,'distantstock:diagnostic_frogport','__distantstock_diag__/ponder',18),
                                   (6,'create:package_frogport','ASSEMBLY',18)]:
         chest(s,(x,1,2))
@@ -395,6 +412,7 @@ def verify(scene,name):
         if not entry['Name'].startswith('distantstock:'): continue
         p=ROOT/'src/main/resources/assets/distantstock/blockstates'/f"{entry['Name'].split(':')[1]}.json"
         assert p.exists(), (name,entry['Name'])
+    assert all(p['Name']!='create:creative_motor' for p in scene.palette), (name,'visible creative motor')
     positions={tuple(b['pos']):scene.palette[b['state']]['Name'] for b in scene.blocks}
     for b in scene.blocks:
         pos=tuple(b['pos']); block=scene.palette[b['state']]['Name']

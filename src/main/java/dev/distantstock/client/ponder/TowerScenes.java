@@ -14,9 +14,9 @@ public final class TowerScenes {
 
         scene.scaleSceneView(.7f);
         scene.setSceneOffsetY(-1f);
-        reveal(scene,util.select().position(3,1,3));
+        reveal(scene,util.select().fromTo(0,1,3,3,1,3));
         reveal(scene,util.select().position(3,2,3));
-        note(scene,util,3,1,3,"The Tower Base receives rotation only from below. This demonstration uses a motor directly beneath it.");
+        note(scene,util,3,1,3,"Rotation enters from the scene boundary. A vertical gearbox directs it into the underside of the Tower Base.");
         var ring=util.select().fromTo(2,2,2,4,2,4).substract(util.select().position(3,2,3));
         reveal(scene,ring);
         scene.overlay().showOutline(PonderPalette.BLUE,"base",ring,90);
@@ -27,8 +27,14 @@ public final class TowerScenes {
         note(scene,util,3,8,3,"Cap the mast with an Ether Resonator. Five couplers form tier I; taller valid masts increase capacity and range.");
         use(scene,util,2,2,3,createItem("wrench"));
         scene.world().modifyBlock(util.grid().at(2,2,3),s -> s.setValue(TowerCasingBlock.PORT,TowerCasingBlock.Port.WEST),false);
-        note(scene,util,2,2,3,"Use a wrench on the desired casing face to open a fluid port. Connect Ether supply to that face; each casing has one port.");
-        scene.world().setKineticSpeed(util.select().fromTo(3,1,3,3,2,3),32);
+        reveal(scene,util.select().fromTo(0,2,3,1,2,3));
+        scene.world().propagatePipeChange(util.grid().at(0,2,3));
+        note(scene,util,2,2,3,"Open the west casing face with a wrench, then connect fluid pipes. Ether is pumped in from the external supply; each casing has one port.");
+        scene.world().setKineticSpeed(util.select().fromTo(0,1,3,3,2,3),32);
+        scene.world().modifyBlockEntity(util.grid().at(3,2,3),TowerCoreBlockEntity.class,
+                be -> be.tank().fill(new net.neoforged.neoforge.fluids.FluidStack(
+                        dev.distantstock.fluid.ModFluids.ETHER.get(),1000),
+                        net.neoforged.neoforge.fluids.capability.IFluidHandler.FluidAction.EXECUTE));
         scene.world().modifyBlockEntityNBT(util.select().position(3,8,3),BlockEntity.class,t -> t.putInt("Beam",1));
         note(scene,util,3,2,3,"A complete tower also requires sufficient rotational speed, stress capacity and Ether supply to operate.");
         reveal(scene,util.select().position(3,2,1));
