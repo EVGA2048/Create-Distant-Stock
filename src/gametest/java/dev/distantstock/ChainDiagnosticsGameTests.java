@@ -802,6 +802,155 @@ public final class ChainDiagnosticsGameTests {
         h.succeed();
     }
 
+    @GameTest(template = "empty", timeoutTicks = 700)
+    public static void disconnectedReceiverSurvivesNextScanAndRecovers(GameTestHelper h) {
+        disconnectedReceiverRecovers(h, true);
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 700)
+    public static void disconnectedInFlightReceiverIsCachedAndRecovers(GameTestHelper h) {
+        disconnectedReceiverRecovers(h, false);
+    }
+
+    private static void disconnectedReceiverRecovers(GameTestHelper h, boolean beforeSend) {
+        var level = h.getLevel();
+        BlockPos chainPos = h.absolutePos(new BlockPos(5, 2, 5));
+        BlockPos branchPos = h.absolutePos(new BlockPos(9, 2, 5));
+        BlockPos diagnosticPos = h.absolutePos(new BlockPos(5, 2, 3));
+        BlockPos receiverPos = h.absolutePos(new BlockPos(9, 2, 3));
+        var chainBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "chain_conveyor"));
+        var frogBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "package_frogport"));
+        level.setBlock(chainPos, chainBlock.defaultBlockState(), 3);
+        level.setBlock(branchPos, chainBlock.defaultBlockState(), 3);
+        level.setBlock(diagnosticPos, ModBlocks.DIAGNOSTIC_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(receiverPos, frogBlock.defaultBlockState(), 3);
+        var chain = (ChainConveyorBlockEntity) level.getBlockEntity(chainPos);
+        var branch = (ChainConveyorBlockEntity) level.getBlockEntity(branchPos);
+        var diagnostic = (DiagnosticFrogportBlockEntity) level.getBlockEntity(diagnosticPos);
+        var receiver = (FrogportBlockEntity) level.getBlockEntity(receiverPos);
+        connectBothWays(chain, branch);
+        chain.setSpeed(128);
+        branch.setSpeed(128);
+        chain.preventSpeedUpdate = branch.preventSpeedUpdate = 1000;
+        h.onEachTick(() -> { chain.setSpeed(128); branch.setSpeed(128); });
+        attachLoopPort(level, chainPos, diagnosticPos, diagnostic, 0);
+        attachLoopPort(level, branchPos, receiverPos, receiver, 0);
+        BlockPos cachePos = h.absolutePos(new BlockPos(5, 2, 7));
+        if (!beforeSend) {
+            level.setBlock(cachePos, ModBlocks.CACHE_FROGPORT.get().defaultBlockState(), 3);
+            var cache = (CacheFrogportBlockEntity) level.getBlockEntity(cachePos);
+            attachLoopPort(level, chainPos, cachePos, cache, 180);
+            ChainDiagnostics.register(cache);
+        }
+        String address = beforeSend ? "DISCONNECTED-NEXT-SCAN" : "DISCONNECTED-IN-FLIGHT";
+        receiver.addressFilter = address;
+        receiver.acceptsPackages = true;
+        receiver.filterChanged();
+        // Discover the receiver during the launch wait, before a probe is sent.
+        if (beforeSend) {
+            diagnostic.animatedPackage = new ItemStack(ModItems.PING_PACKAGE.get());
+            diagnostic.animationProgress.startWithValue(0).chase(1, .1, LerpedFloat.Chaser.LINEAR);
+        }
+        ChainDiagnostics.register(diagnostic);
+        ChainDiagnostics.tick(level.getServer());
+        h.assertTrue(address.equals(diagnostic.diagnosticAddress()), "receiver was not discovered");
+        h.assertTrue((beforeSend ? "busy" : "waiting").equals(diagnostic.diagnosticPhase()),
+                "fixture did not cut in the requested probe phase: " + diagnostic.diagnosticPhase());
+        chain.removeConnectionTo(branchPos);
+        branch.removeConnectionTo(chainPos);
+        ChainDiagnostics.invalidateGraph(level);
+        if (beforeSend) diagnostic.animatedPackage = ItemStack.EMPTY;
+        h.runAfterDelay(30, () -> {
+            ChainDiagnostics.tick(level.getServer());
+            h.assertTrue(address.equals(diagnostic.diagnosticAddress()),
+                    "disconnected receiver disappeared from the next scan");
+            var saved = diagnostic.saveWithoutMetadata(level.registryAccess());
+            diagnostic.setKnownReceivers(java.util.Map.of());
+            diagnostic.loadWithComponents(saved, level.registryAccess());
+            h.assertTrue(address.equals(diagnostic.knownReceivers().get(receiverPos)),
+                    "disconnected receiver was lost on NBT reload");
+        });
+        h.runAfterDelay(350, () -> {
+            h.assertTrue(ChainDiagnostics.lampState(level, address) != null,
+                    "disconnected receiver did not raise a timeout alarm");
+            if (!beforeSend) {
+                var cache = (CacheFrogportBlockEntity) level.getBlockEntity(cachePos);
+                h.assertTrue(address.equals(cache.takeoverAddress()), "disconnected address was not cached");
+                h.assertTrue(ChainDiagnostics.frozenFilter(receiver) != null,
+                        "disconnected receiver was not retained as a recovery target");
+            }
+            connectBothWays(chain, branch);
+            ChainDiagnostics.invalidateGraph(level);
+        });
+        h.runAfterDelay(650, () -> {
+            h.assertTrue(ChainDiagnostics.lampState(level, address) == null,
+                    "reconnected receiver did not clear its alarm after a successful probe");
+            h.assertTrue(ChainDiagnostics.frozenFilter(receiver) == null, "recovered receiver stayed frozen");
+            if (!beforeSend) {
+                var cache = (CacheFrogportBlockEntity) level.getBlockEntity(cachePos);
+                h.assertTrue(cache.takeoverAddress().isBlank(), "recovered address stayed cached");
+            }
+            h.succeed();
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 400)
+    public static void monitoredReceiversRetireOnlyOnLoadedConfigurationChanges(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos chainPos = h.absolutePos(new BlockPos(5, 2, 5));
+        BlockPos diagnosticPos = h.absolutePos(new BlockPos(5, 2, 3));
+        BlockPos receiverPos = h.absolutePos(new BlockPos(3, 2, 5));
+        var chainBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "chain_conveyor"));
+        var frogBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "package_frogport"));
+        level.setBlock(chainPos, chainBlock.defaultBlockState(), 3);
+        level.setBlock(diagnosticPos, ModBlocks.DIAGNOSTIC_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(receiverPos, frogBlock.defaultBlockState(), 3);
+        var chain = (ChainConveyorBlockEntity) level.getBlockEntity(chainPos);
+        var diagnostic = (DiagnosticFrogportBlockEntity) level.getBlockEntity(diagnosticPos);
+        var receiver = (FrogportBlockEntity) level.getBlockEntity(receiverPos);
+        chain.setSpeed(128);
+        chain.preventSpeedUpdate = 1000;
+        h.onEachTick(() -> chain.setSpeed(128));
+        attachLoopPort(level, chainPos, diagnosticPos, diagnostic, 0);
+        attachLoopPort(level, chainPos, receiverPos, receiver, 90);
+        receiver.addressFilter = "RETIRED-RECEIVER";
+        receiver.acceptsPackages = true;
+        receiver.filterChanged();
+        ChainDiagnostics.register(diagnostic);
+        ChainDiagnostics.tick(level.getServer());
+        h.assertTrue("waiting".equals(diagnostic.diagnosticPhase()), "fixture did not launch its probe");
+        receiver.addressFilter = "RENAMED-RECEIVER";
+        receiver.filterChanged();
+        ChainDiagnostics.tick(level.getServer());
+        h.assertTrue("RENAMED-RECEIVER".equals(diagnostic.knownReceivers().get(receiverPos)),
+                "receiver rename retained the old address");
+        receiver.acceptsPackages = false;
+        ChainDiagnostics.tick(level.getServer());
+        h.assertTrue(!diagnostic.knownReceivers().containsKey(receiverPos),
+                "send-only receiver remained monitored");
+        receiver.acceptsPackages = true;
+        ChainDiagnostics.tick(level.getServer());
+        h.assertTrue(diagnostic.knownReceivers().containsKey(receiverPos), "receiver was not rediscovered");
+        level.removeBlock(receiverPos, false);
+        ChainDiagnostics.tick(level.getServer());
+        h.assertTrue(!diagnostic.knownReceivers().containsKey(receiverPos), "removed receiver remained monitored");
+        BlockPos unloaded = diagnosticPos.offset(100000, 0, 100000);
+        h.assertTrue(!level.isLoaded(unloaded), "unloaded fixture is unexpectedly loaded");
+        diagnostic.setKnownReceivers(java.util.Map.of(unloaded, "UNLOADED-RECEIVER"));
+        ChainDiagnostics.tick(level.getServer());
+        h.assertTrue(diagnostic.knownReceivers().containsKey(unloaded), "unloaded receiver was forgotten");
+        h.assertTrue(!level.isLoaded(unloaded), "monitoring force-loaded a receiver chunk");
+        h.runAfterDelay(350, () -> {
+            h.assertTrue(ChainDiagnostics.lampState(level, "RETIRED-RECEIVER") == null,
+                    "a retired receiver's old in-flight probe raised a ghost alarm");
+            h.succeed();
+        });
+    }
+
     @GameTest(template = "empty", timeoutTicks = 80)
     public static void diagnosticFrogportPublishesPlannedPollingState(GameTestHelper h) {
         var level = h.getLevel();

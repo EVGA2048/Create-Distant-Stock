@@ -103,6 +103,7 @@ public final class ChainDiagnostics {
 
         PROBES.entrySet().removeIf(entry -> entry.getValue().controller().equals(key));
         RUNTIME.remove(key);
+        KNOWN_ADDRESSES.remove(key);
 
         for (Fault fault : new ArrayList<>(FAULTS.values())) {
             if (!fault.key.controller().equals(key)) continue;
@@ -239,16 +240,18 @@ public final class ChainDiagnostics {
     }
 
     private static void thawTargets(ServerLevel level, Fault fault) {
-        for (BlockPos pos : fault.targets) {
-            if (level.getBlockEntity(pos) instanceof FrogportBlockEntity frog && frog.target != null) {
-                // Deregister the private recovery address while FROZEN still controls getFilterString().
-                frog.target.deregister(frog, level, pos);
-            }
-            FROZEN.remove(new PortKey(level.dimension(), pos));
-            if (level.getBlockEntity(pos) instanceof FrogportBlockEntity frog && frog.target != null) {
-                frog.target.register(frog, level, pos);
-            }
+        for (BlockPos pos : fault.targets) thawTarget(level, pos);
+    }
+
+    private static void thawTarget(ServerLevel level, BlockPos pos) {
+        FrogportBlockEntity frog = level.isLoaded(pos)
+                && level.getBlockEntity(pos) instanceof FrogportBlockEntity loaded ? loaded : null;
+        if (frog != null && frog.target != null) {
+            // Deregister while FROZEN still controls the private filter.
+            frog.target.deregister(frog, level, pos);
         }
+        FROZEN.remove(new PortKey(level.dimension(), pos));
+        if (frog != null && frog.target != null) frog.target.register(frog, level, pos);
     }
 
     public static void observeGauge(FactoryPanelBehaviour gauge) {
@@ -436,7 +439,7 @@ public final class ChainDiagnostics {
                             && fault.mitigated() && fault.activeCachePos != null);
             controller.setDiagnosticHealth(liveFaults, cacheMitigating);
 
-            Map<String, List<FrogportBlockEntity>> addresses = receiverAddresses(graph);
+            Map<String, List<BlockPos>> addresses = monitoredReceivers(controller, graph);
             KNOWN_ADDRESSES.put(key, Set.copyOf(addresses.keySet()));
             List<String> candidates = addresses.keySet().stream()
                     .filter(address -> !FAULTS.containsKey(new FaultKey(key, address)))
@@ -509,7 +512,7 @@ public final class ChainDiagnostics {
             }
 
             int planIndex = selectedIndex + 1;
-            List<FrogportBlockEntity> addressTargets = addresses.get(address);
+            List<BlockPos> addressTargets = addresses.get(address);
             if (level.getGameTime() < runtime.nextScanTick) {
                 controller.setDiagnosticPlan("scheduled", address, planIndex, candidates.size(),
                         addressTargets.size(), runtime.nextScanTick, 0, 0);
@@ -519,11 +522,11 @@ public final class ChainDiagnostics {
             // Same-address Frogports are interchangeable to Create: the routing table may choose a
             // different receiver than list index 0. Budget against the slowest receiver so a healthy
             // far branch cannot time out merely because the probe happened to take that branch.
-            FrogportBlockEntity target = addressTargets.stream()
+            BlockPos target = addressTargets.stream()
                     .max(Comparator.comparingLong(candidate ->
-                            estimatedProbeTimeoutTicks(controller, graph, candidate.getBlockPos())))
+                            estimatedProbeTimeoutTicks(controller, graph, candidate)))
                     .orElse(addressTargets.get(0));
-            if (sendProbe(controller, graph, key, address, target.getBlockPos(), address,
+            if (sendProbe(controller, graph, key, address, target, address,
                     false, level.getGameTime(), planIndex, candidates.size(), addressTargets.size())) {
                 runtime.cursor = Math.floorMod(selectedIndex + 1, candidates.size());
                 runtime.nextScanTick = level.getGameTime() + SCAN_INTERVAL;
@@ -659,10 +662,11 @@ public final class ChainDiagnostics {
             return;
         }
 
-        controller.recordDiagnosticResult("timeout", probe.address());
-
         Graph graph = graph(controller);
-        List<FrogportBlockEntity> targets = receiverAddresses(graph).getOrDefault(probe.address(), List.of());
+        List<BlockPos> targets = monitoredReceivers(controller, graph).getOrDefault(probe.address(), List.of());
+        // A loaded receiver that was removed or reconfigured no longer owns this probe's address.
+        if (targets.isEmpty()) return;
+        controller.recordDiagnosticResult("timeout", probe.address());
         FaultKey key = new FaultKey(probe.controller(), probe.address());
         if (FAULTS.containsKey(key)) return;
 
@@ -680,13 +684,15 @@ public final class ChainDiagnostics {
 
         Fault fault = new Fault(key, new LinkedHashSet<>(), cache == null ? null : cache.getBlockPos(),
                 now + RETRY_INTERVAL);
-        for (FrogportBlockEntity target : targets) {
-            fault.targets.add(target.getBlockPos());
-        }
+        fault.targets.addAll(targets);
         FAULTS.put(key, fault);
 
         if (cache != null && !fault.targets.isEmpty()) {
             for (BlockPos targetPos : fault.targets) {
+                if (!level.isLoaded(targetPos)) {
+                    FROZEN.put(new PortKey(level.dimension(), targetPos), key);
+                    continue;
+                }
                 if (level.getBlockEntity(targetPos) instanceof FrogportBlockEntity frog
                         && frog.target != null) {
                     // Remove the public business address before FROZEN changes getFilterString().
@@ -749,8 +755,12 @@ public final class ChainDiagnostics {
                     continue;
                 }
                 fault.targets.removeIf(pos -> {
-                    boolean gone = !(level.getBlockEntity(pos) instanceof FrogportBlockEntity);
-                    if (gone) FROZEN.remove(new PortKey(level.dimension(), pos));
+                    boolean gone = !(level.getBlockEntity(pos) instanceof FrogportBlockEntity frog)
+                            || !frog.acceptsPackages || !fault.key.address().equals(frog.addressFilter);
+                    if (gone) {
+                        thawTarget(level, pos);
+                        fault.passed.remove(pos);
+                    }
                     return gone;
                 });
                 if (fault.targets.isEmpty()) {
@@ -773,13 +783,13 @@ public final class ChainDiagnostics {
                     fault.nextRetryTick = now + 10;
                 }
             } else {
-                List<FrogportBlockEntity> targets = receiverAddresses(graph)
+                List<BlockPos> targets = monitoredReceivers(controller, graph)
                         .getOrDefault(fault.key.address(), List.of());
                 if (targets.isEmpty()) {
-                    fault.nextRetryTick = now + RETRY_INTERVAL;
+                    restore(controller, fault, now);
                     continue;
                 }
-                BlockPos target = targets.get(0).getBlockPos();
+                BlockPos target = targets.get(0);
                 if (sendProbe(controller, graph, controllerKey, fault.key.address(), target,
                         fault.key.address(), true, now,
                         1, Math.max(1, targets.size()), targets.size())) {
@@ -1109,15 +1119,7 @@ public final class ChainDiagnostics {
         for (Fault fault : new ArrayList<>(FAULTS.values())) {
             DiagnosticFrogportBlockEntity controller = controller(fault.key.controller());
             if (controller != null && controller.getLevel() instanceof ServerLevel level) {
-                for (BlockPos pos : fault.targets) {
-                    if (level.getBlockEntity(pos) instanceof FrogportBlockEntity frog && frog.target != null) {
-                        frog.target.deregister(frog, level, pos);
-                    }
-                    FROZEN.remove(new PortKey(level.dimension(), pos));
-                    if (level.getBlockEntity(pos) instanceof FrogportBlockEntity frog && frog.target != null) {
-                        frog.target.register(frog, level, pos);
-                    }
-                }
+                thawTargets(level, fault);
                 BlockPos cachePos = fault.activeCachePos;
                 if (cachePos != null && level.getBlockEntity(cachePos) instanceof CacheFrogportBlockEntity cache
                         && fault.key.address().equals(cache.takeoverAddress())) {
@@ -1198,10 +1200,31 @@ public final class ChainDiagnostics {
         return null;
     }
 
+    /** Reachability is probe evidence, never evidence that a configured receiver was removed. */
+    private static Map<String, List<BlockPos>> monitoredReceivers(
+            DiagnosticFrogportBlockEntity controller, Graph graph) {
+        Level level = controller.getLevel();
+        Map<BlockPos, String> remembered = new LinkedHashMap<>(controller.knownReceivers());
+        // Only retire entries on positive, loaded-world evidence. Do not load remote chunks.
+        remembered.entrySet().removeIf(entry -> level.isLoaded(entry.getKey())
+                && (!(level.getBlockEntity(entry.getKey()) instanceof FrogportBlockEntity frog)
+                    || frog instanceof DiagnosticFrogportBlockEntity
+                    || frog instanceof CacheFrogportBlockEntity
+                    || !frog.acceptsPackages || !entry.getValue().equals(frog.addressFilter)));
+        receiverAddresses(graph).forEach((address, frogs) -> frogs.forEach(
+                frog -> remembered.put(frog.getBlockPos().immutable(), address)));
+        controller.setKnownReceivers(remembered);
+        Map<String, List<BlockPos>> addresses = new LinkedHashMap<>();
+        remembered.forEach((pos, address) ->
+                addresses.computeIfAbsent(address, ignored -> new ArrayList<>()).add(pos));
+        return addresses;
+    }
+
     private static Map<String, List<FrogportBlockEntity>> receiverAddresses(Graph graph) {
         Map<String, List<FrogportBlockEntity>> out = new LinkedHashMap<>();
         for (FrogportBlockEntity frog : graph.frogports()) {
-            if (frog instanceof DiagnosticFrogportBlockEntity || frog instanceof CacheFrogportBlockEntity) continue;
+            if (frog.isRemoved() || frog instanceof DiagnosticFrogportBlockEntity
+                    || frog instanceof CacheFrogportBlockEntity) continue;
             String address = frog.addressFilter;
             if (!frog.acceptsPackages || address == null || address.isBlank() || "*".equals(address)
                     || isDiagnosticAddress(address) || isRecoveryAddress(address)) continue;

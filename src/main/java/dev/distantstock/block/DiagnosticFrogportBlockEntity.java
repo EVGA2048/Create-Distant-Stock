@@ -75,6 +75,7 @@ public final class DiagnosticFrogportBlockEntity extends FrogportBlockEntity imp
     private long probeSentTick;
     private long probeDeadlineTick;
     private UUID createFrequency;
+    private final Map<BlockPos, String> knownReceivers = new LinkedHashMap<>();
     /** Durable unresolved no-route addresses, independent of the transient quarantine inventory. */
     private final Set<String> unresolvedBadAddresses = new LinkedHashSet<>();
     /** Last tick a faulted address was observed on a live Factory Gauge. */
@@ -195,6 +196,17 @@ public final class DiagnosticFrogportBlockEntity extends FrogportBlockEntity imp
         if (Objects.equals(this.createFrequency, createFrequency)) return;
         this.createFrequency = createFrequency;
         syncDiagnosticState();
+    }
+
+    public Map<BlockPos, String> knownReceivers() {
+        return Map.copyOf(knownReceivers);
+    }
+
+    public void setKnownReceivers(Map<BlockPos, String> receivers) {
+        if (knownReceivers.equals(receivers)) return;
+        knownReceivers.clear();
+        knownReceivers.putAll(receivers);
+        setChanged();
     }
 
     public Set<String> unresolvedBadAddresses() {
@@ -373,6 +385,17 @@ public final class DiagnosticFrogportBlockEntity extends FrogportBlockEntity imp
         tag.putLong("DiagnosticProbeDeadline", probeDeadlineTick);
         if (createFrequency != null) tag.putUUID("CreateFrequency", createFrequency);
 
+        if (!clientPacket) {
+            ListTag receivers = new ListTag();
+            knownReceivers.forEach((pos, address) -> {
+                CompoundTag row = new CompoundTag();
+                row.putLong("Pos", pos.asLong());
+                row.putString("Address", address);
+                receivers.add(row);
+            });
+            tag.put("KnownReceivers", receivers);
+        }
+
         ListTag badAddresses = new ListTag();
         for (String address : unresolvedBadAddresses) badAddresses.add(StringTag.valueOf(address));
         tag.put("UnresolvedBadAddresses", badAddresses);
@@ -404,6 +427,17 @@ public final class DiagnosticFrogportBlockEntity extends FrogportBlockEntity imp
         probeSentTick = Math.max(0, tag.getLong("DiagnosticProbeSent"));
         probeDeadlineTick = Math.max(0, tag.getLong("DiagnosticProbeDeadline"));
         createFrequency = tag.hasUUID("CreateFrequency") ? tag.getUUID("CreateFrequency") : null;
+
+        if (!clientPacket) {
+            knownReceivers.clear();
+            ListTag receivers = tag.getList("KnownReceivers", Tag.TAG_COMPOUND);
+            for (int i = 0; i < receivers.size(); i++) {
+                CompoundTag row = receivers.getCompound(i);
+                if (!row.getString("Address").isBlank()) {
+                    knownReceivers.put(BlockPos.of(row.getLong("Pos")), row.getString("Address"));
+                }
+            }
+        }
 
         unresolvedBadAddresses.clear();
         ListTag badAddresses = tag.getList("UnresolvedBadAddresses", Tag.TAG_STRING);
