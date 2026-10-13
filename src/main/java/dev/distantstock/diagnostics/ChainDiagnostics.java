@@ -16,6 +16,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import org.apache.commons.lang3.mutable.MutableInt;
 
 import java.util.*;
 
@@ -29,8 +30,12 @@ import java.util.*;
 public final class ChainDiagnostics {
     /** One normal address is sampled every four seconds per chain network. */
     private static final long SCAN_INTERVAL = 80;
-    /** Keep a large factory moving without flooding its chain bus with diagnostic parcels. */
-    private static final int MAX_NORMAL_PROBES = 4;
+    /** Small/ordinary networks keep the historical four-slot probe budget. */
+    private static final int BASE_NORMAL_PROBES = 4;
+    /** Very large factories may widen the health-probe window, but never flood the chain bus. */
+    private static final int MAX_NORMAL_PROBES = 16;
+    /** Above the baseline, one extra in-flight slot is granted per this many monitored Frogports. */
+    private static final int RECEIVERS_PER_EXTRA_PROBE = 16;
     /** Large industrial rings can exceed the old 512-node safety cap. */
     private static final int MAX_GRAPH_CONVEYORS = 4096;
     /** One-second topology cache; live BE fields (speed/address/inventory) are still read every use. */
@@ -51,6 +56,8 @@ public final class ChainDiagnostics {
     private static final Map<ControllerKey, RuntimeState> RUNTIME = new HashMap<>();
     private static final Map<UUID, Probe> PROBES = new HashMap<>();
     private static final Map<FaultKey, Fault> FAULTS = new LinkedHashMap<>();
+    /** FIFO of generic timeout faults waiting for their first Cache Frogport lease. */
+    private static final Map<ControllerKey, ArrayDeque<FaultKey>> CACHE_WAIT_QUEUES = new HashMap<>();
     private static final Map<PortKey, FaultKey> FROZEN = new HashMap<>();
     private static final Map<AddressKey, Set<ControllerKey>> BAD_ADDRESSES = new HashMap<>();
     private static final Set<FaultKey> FULL_CACHES = new HashSet<>();
@@ -114,13 +121,21 @@ public final class ChainDiagnostics {
         for (Fault fault : new ArrayList<>(FAULTS.values())) {
             if (!fault.key.controller().equals(key)) continue;
             FAULTS.remove(fault.key);
-            thawTargets(level, fault);
+            removeFromCacheQueue(fault.key);
+            Graph graph = graph(diagnostic);
+            purgeAddressRoutes(graph, fault.key.address());
             BlockPos cachePos = fault.activeCachePos;
             if (cachePos != null
                     && level.getBlockEntity(cachePos) instanceof CacheFrogportBlockEntity cache
                     && fault.key.address().equals(cache.takeoverAddress())) {
                 cache.setTakeoverAddress("");
             }
+            // Create's PackagePortTarget deregistration removes routing-table rows by filter
+            // string, not by physical Frogport. If the cache withdrew the public address after we
+            // restored the real receivers, it would erase those freshly-restored public routes too.
+            // Always retire the cache route first, then put the business receivers back.
+            thawTargets(level, fault);
+            primeAddressRoutes(graph, fault.key.address());
             FULL_CACHES.remove(fault.key);
             String source = sourceId(level, diagnostic.getBlockPos(), fault.key.address());
             EventRegistry registry = EventRegistry.get(level.getServer());
@@ -169,8 +184,19 @@ public final class ChainDiagnostics {
                 .toList();
         for (Fault fault : owned) {
             fault.activeCachePos = null;
-            if (!assignNextCacheOwner(level, fault, cachePos)) {
-                abandonCacheMitigation(level, fault, now);
+            FULL_CACHES.remove(fault.key);
+            DiagnosticFrogportBlockEntity diagnostic = controller(fault.key.controller());
+            Graph graph = diagnostic == null ? Graph.EMPTY : graph(diagnostic);
+            purgeAddressRoutes(graph, fault.key.address());
+            // The cache physically disappeared. Fail open before re-queuing so business traffic is
+            // not left pointed at private recovery routes while this fault waits its turn again.
+            thawTargets(level, fault);
+            primeAddressRoutes(graph, fault.key.address());
+            fault.passed.clear();
+            fault.nextRetryTick = now;
+            enqueueCacheWait(fault);
+            if (diagnostic != null) {
+                acquireCacheMitigation(level, diagnostic, graph, fault);
             }
         }
         unregister(cache);
@@ -178,16 +204,21 @@ public final class ChainDiagnostics {
 
     private static void abandonCacheMitigation(ServerLevel level, Fault fault, long now) {
         FAULTS.remove(fault.key);
+        removeFromCacheQueue(fault.key);
         PROBES.entrySet().removeIf(entry -> entry.getValue().recovery()
                 && entry.getValue().controller().equals(fault.key.controller())
                 && entry.getValue().address().equals(fault.key.address()));
 
-        thawTargets(level, fault);
+        DiagnosticFrogportBlockEntity controller = controller(fault.key.controller());
+        Graph graph = controller == null ? Graph.EMPTY : graph(controller);
+        purgeAddressRoutes(graph, fault.key.address());
         BlockPos cachePos = fault.activeCachePos;
         if (cachePos != null && level.getBlockEntity(cachePos) instanceof CacheFrogportBlockEntity cache
                 && fault.key.address().equals(cache.takeoverAddress())) {
             cache.setTakeoverAddress("");
         }
+        thawTargets(level, fault);
+        primeAddressRoutes(graph, fault.key.address());
 
         FULL_CACHES.remove(fault.key);
         EventRegistry registry = EventRegistry.get(level.getServer());
@@ -201,7 +232,6 @@ public final class ChainDiagnostics {
 
         RuntimeState runtime = RUNTIME.computeIfAbsent(fault.key.controller(), ignored -> new RuntimeState());
         runtime.nextScanTick = now;
-        DiagnosticFrogportBlockEntity controller = controller(fault.key.controller());
         if (controller != null) {
             controller.recordDiagnosticResult("cache_removed", fault.key.address());
         }
@@ -213,7 +243,21 @@ public final class ChainDiagnostics {
      * walking through the entire spare-cache pool and starving simultaneous independent faults.
      */
     public static void cacheAcceptedPackage(CacheFrogportBlockEntity cache) {
-        // Intentionally no ownership rotation here.
+        if (cache == null || !(cache.getLevel() instanceof ServerLevel level)) return;
+        String address = cache.takeoverAddress();
+        if (address.isBlank()) return;
+        Fault fault = FAULTS.values().stream()
+                .filter(candidate -> candidate.key.controller().dimension().equals(level.dimension())
+                        && candidate.key.address().equals(address)
+                        && cache.getBlockPos().equals(candidate.activeCachePos))
+                .findFirst().orElse(null);
+        if (fault == null || anotherFaultWaitingForFirstCache(fault)) return;
+
+        // Create does not load-balance multiple Frogports advertising one address. When spare
+        // caches exist, move the single public takeover route after each accepted parcel instead.
+        // FIFO waiting faults always win first-cache capacity, so one hot address can use otherwise
+        // idle buffers without starving an unrelated failure.
+        assignNextCacheOwner(level, fault, cache.getBlockPos());
     }
 
     private static boolean assignNextCacheOwner(ServerLevel level, Fault fault, BlockPos currentPos) {
@@ -228,15 +272,14 @@ public final class ChainDiagnostics {
                 .filter(candidate -> FAULTS.values().stream().noneMatch(other -> other != fault
                         && other.key.controller().dimension().equals(level.dimension())
                         && Objects.equals(other.activeCachePos, candidate.getBlockPos())))
-                .sorted(Comparator.comparingLong(candidate -> candidate.getBlockPos().asLong()))
+                .sorted(Comparator.comparingInt(CacheFrogportBlockEntity::cachedCount)
+                        .thenComparingLong(candidate -> candidate.getBlockPos().asLong()))
                 .toList();
         if (candidates.isEmpty()) return false;
 
-        long currentOrder = currentPos == null ? Long.MIN_VALUE : currentPos.asLong();
-        CacheFrogportBlockEntity next = candidates.stream()
-                .filter(candidate -> candidate.getBlockPos().asLong() > currentOrder)
-                .findFirst().orElse(candidates.get(0));
+        CacheFrogportBlockEntity next = candidates.get(0);
 
+        purgeAddressRoutes(graph, fault.key.address());
         if (currentPos != null
                 && level.getBlockEntity(currentPos) instanceof CacheFrogportBlockEntity current
                 && fault.key.address().equals(current.takeoverAddress())) {
@@ -244,8 +287,218 @@ public final class ChainDiagnostics {
         }
         fault.activeCachePos = next.getBlockPos();
         next.setTakeoverAddress(fault.key.address());
+        primeAddressRoutes(graph, fault.key.address());
         FULL_CACHES.remove(fault.key);
         return true;
+    }
+
+    /**
+     * A spare cache belongs first to a fault that currently has no mitigation at all. A noisy
+     * address whose first cache filled is allowed to rotate only when no other timeout is waiting
+     * for its first cache; otherwise one address could consume the entire pool while a second
+     * congested route remained completely unprotected.
+     */
+    private static boolean anotherFaultWaitingForFirstCache(Fault current) {
+        ArrayDeque<FaultKey> queue = CACHE_WAIT_QUEUES.get(current.key.controller());
+        return queue != null && !queue.isEmpty();
+    }
+
+    private static void enqueueCacheWait(Fault fault) {
+        if (fault == null || fault.cause != FaultCause.PING_TIMEOUT || fault.mitigated()
+                || fault.targets.isEmpty()) return;
+        ArrayDeque<FaultKey> queue = CACHE_WAIT_QUEUES.computeIfAbsent(
+                fault.key.controller(), ignored -> new ArrayDeque<>());
+        if (!queue.contains(fault.key)) queue.addLast(fault.key);
+    }
+
+    private static void removeFromCacheQueue(FaultKey key) {
+        if (key == null) return;
+        ArrayDeque<FaultKey> queue = CACHE_WAIT_QUEUES.get(key.controller());
+        if (queue == null) return;
+        queue.removeIf(key::equals);
+        if (queue.isEmpty()) CACHE_WAIT_QUEUES.remove(key.controller());
+    }
+
+    private static int cacheQueuePosition(Fault fault) {
+        if (fault == null) return 0;
+        ArrayDeque<FaultKey> queue = CACHE_WAIT_QUEUES.get(fault.key.controller());
+        if (queue == null) return 0;
+        int position = 1;
+        for (FaultKey key : queue) {
+            if (key.equals(fault.key)) return position;
+            position++;
+        }
+        return 0;
+    }
+
+    private static int cacheQueueSize(ControllerKey controller) {
+        ArrayDeque<FaultKey> queue = CACHE_WAIT_QUEUES.get(controller);
+        return queue == null ? 0 : queue.size();
+    }
+
+    private static int normalProbeLimit(Map<String, List<BlockPos>> addresses) {
+        int receivers = addresses.values().stream().mapToInt(List::size).sum();
+        if (receivers <= BASE_NORMAL_PROBES * RECEIVERS_PER_EXTRA_PROBE) {
+            return BASE_NORMAL_PROBES;
+        }
+        return Math.min(MAX_NORMAL_PROBES,
+                Math.max(BASE_NORMAL_PROBES,
+                        (receivers + RECEIVERS_PER_EXTRA_PROBE - 1) / RECEIVERS_PER_EXTRA_PROBE));
+    }
+
+    /**
+     * Turn an already-reported Ping timeout into active cache mitigation.
+     *
+     * <p>This must be retryable, not a one-shot decision made only when the fault is first created.
+     * A cache can be absent from the graph for a tick, still contain cargo from an older incident,
+     * or become available only after a CHAIN_STOPPED fault is promoted to a real transport timeout.
+     * In all of those cases the fault must begin intercepting business traffic as soon as a cache is
+     * actually available instead of sitting forever in the recovery-Ping loop.</p>
+     */
+    private static boolean acquireCacheMitigation(ServerLevel level,
+                                                  DiagnosticFrogportBlockEntity controller,
+                                                  Graph graph, Fault fault) {
+        if (fault == null) return false;
+        if (fault.mitigated()) {
+            removeFromCacheQueue(fault.key);
+            return true;
+        }
+        if (fault.cause != FaultCause.PING_TIMEOUT || fault.targets.isEmpty()) {
+            removeFromCacheQueue(fault.key);
+            return false;
+        }
+
+        // A network with no Cache Frogports has nothing to queue for. Keep the historical
+        // fail-open recovery probing in that case so a transient congestion/disconnect can clear
+        // itself without requiring the player to build a cache first.
+        if (graph == null || graph.caches().isEmpty()) {
+            removeFromCacheQueue(fault.key);
+            return false;
+        }
+
+        // All faults contend through one FIFO. Only the head may claim the next free cache; callers
+        // can invoke this opportunistically every tick without turning cache assignment into a race.
+        enqueueCacheWait(fault);
+        ArrayDeque<FaultKey> queue = CACHE_WAIT_QUEUES.get(fault.key.controller());
+        if (queue == null || !fault.key.equals(queue.peekFirst())) return false;
+
+        CacheFrogportBlockEntity cache = graph.caches().stream()
+                .filter(CacheFrogportBlockEntity::availableForNewLease)
+                .filter(candidate -> FAULTS.values().stream().noneMatch(other -> other != fault
+                        && other.key.controller().dimension().equals(level.dimension())
+                        && Objects.equals(other.activeCachePos, candidate.getBlockPos())))
+                .min(Comparator.comparingInt(CacheFrogportBlockEntity::cachedCount)
+                        .thenComparingLong(be -> be.getBlockPos().asLong()))
+                .orElse(null);
+        if (cache == null || fault.targets.isEmpty()) return false;
+
+        for (BlockPos targetPos : fault.targets) {
+            if (!level.isLoaded(targetPos)) {
+                FROZEN.put(new PortKey(level.dimension(), targetPos), fault.key);
+                continue;
+            }
+            if (level.getBlockEntity(targetPos) instanceof FrogportBlockEntity frog
+                    && frog.target != null) {
+                // Remove the public business route while it is still visible. Once FROZEN is set,
+                // getFilterString() becomes the private recovery address.
+                frog.target.deregister(frog, level, targetPos);
+            }
+            FROZEN.put(new PortKey(level.dimension(), targetPos), fault.key);
+            if (level.getBlockEntity(targetPos) instanceof FrogportBlockEntity frog
+                    && frog.target != null) {
+                frog.target.register(frog, level, targetPos);
+            }
+        }
+
+        // Remove propagated copies of the real business route before advertising the takeover.
+        // Create normally converges routing changes one conveyor hop per tick, which can take
+        // seconds on a factory-scale graph. Prime the equivalent shortest-hop route immediately.
+        purgeAddressRoutes(graph, fault.key.address());
+        fault.activeCachePos = cache.getBlockPos();
+        cache.setTakeoverAddress(fault.key.address());
+        primeAddressRoutes(graph, fault.key.address());
+        removeFromCacheQueue(fault.key);
+        FULL_CACHES.remove(fault.key);
+        controller.recordDiagnosticResult("cache_takeover", fault.key.address());
+        return true;
+    }
+
+    /** Remove every propagated copy of one address from this connected Create chain graph. */
+    private static void purgeAddressRoutes(Graph graph, String address) {
+        if (graph == null || address == null || address.isBlank()) return;
+        for (ChainConveyorBlockEntity conveyor : graph.conveyors()) {
+            if (conveyor.routingTable.entriesByDistance.removeIf(row -> address.equals(row.port()))) {
+                conveyor.routingTable.changed = true;
+                conveyor.routingTable.lastUpdate = 0;
+            }
+        }
+    }
+
+    /**
+     * Make Create's address route converge in one server tick instead of one conveyor hop per tick.
+     *
+     * <p>PackagePort registration has already created the authoritative end-of-route rows on the
+     * owning conveyor(s). Snapshot those rows, remove stale propagated copies, then run the same
+     * shortest-hop propagation Create would eventually perform. Each generated row uses the exact
+     * {@link ChainConveyorRoutingTable.RoutingTableEntry#copyForNeighbour(BlockPos)} semantics, so
+     * nextConnection points toward the destination exactly as native routing expects.</p>
+     */
+    private static void primeAddressRoutes(Graph graph, String address) {
+        if (graph == null || graph.conveyors().isEmpty() || address == null || address.isBlank()) return;
+
+        record RouteSeed(ChainConveyorBlockEntity conveyor,
+                         ChainConveyorRoutingTable.RoutingTableEntry entry) {}
+        List<RouteSeed> seeds = new ArrayList<>();
+        for (ChainConveyorBlockEntity conveyor : graph.conveyors()) {
+            for (var row : conveyor.routingTable.entriesByDistance) {
+                if (address.equals(row.port()) && row.endOfRoute()) {
+                    seeds.add(new RouteSeed(conveyor,
+                            new ChainConveyorRoutingTable.RoutingTableEntry(address, 0,
+                                    row.nextConnection(), new MutableInt(100), true)));
+                }
+            }
+        }
+        if (seeds.isEmpty()) return;
+
+        purgeAddressRoutes(graph, address);
+        Set<BlockPos> graphPositions = graph.conveyors().stream()
+                .map(ChainConveyorBlockEntity::getBlockPos).collect(java.util.stream.Collectors.toSet());
+        Map<BlockPos, Integer> distance = new HashMap<>();
+        ArrayDeque<RouteSeed> queue = new ArrayDeque<>();
+
+        for (RouteSeed seed : seeds) {
+            BlockPos pos = seed.conveyor().getBlockPos();
+            Integer old = distance.putIfAbsent(pos, 0);
+            // Multiple same-address Frogports can terminate on one conveyor. Keep every native
+            // endpoint row there, while expanding the graph only once from that conveyor.
+            seed.conveyor().routingTable.entriesByDistance.add(seed.entry());
+            seed.conveyor().routingTable.changed = true;
+            seed.conveyor().routingTable.lastUpdate = 0;
+            if (old == null) queue.addLast(seed);
+        }
+
+        while (!queue.isEmpty()) {
+            RouteSeed current = queue.removeFirst();
+            int currentDistance = distance.getOrDefault(current.conveyor().getBlockPos(), 0);
+            for (BlockPos relative : current.conveyor().connections) {
+                BlockPos neighbourPos = current.conveyor().getBlockPos().offset(relative);
+                if (!graphPositions.contains(neighbourPos) || distance.containsKey(neighbourPos)) continue;
+                ChainConveyorBlockEntity neighbour = graph.conveyors().stream()
+                        .filter(row -> row.getBlockPos().equals(neighbourPos)).findFirst().orElse(null);
+                if (neighbour == null) continue;
+                var propagated = current.entry().copyForNeighbour(relative);
+                distance.put(neighbourPos, currentDistance + 1);
+                neighbour.routingTable.entriesByDistance.add(propagated);
+                neighbour.routingTable.changed = true;
+                neighbour.routingTable.lastUpdate = 0;
+                queue.addLast(new RouteSeed(neighbour, propagated));
+            }
+        }
+
+        for (ChainConveyorBlockEntity conveyor : graph.conveyors()) {
+            conveyor.routingTable.entriesByDistance.sort(
+                    Comparator.comparingInt(ChainConveyorRoutingTable.RoutingTableEntry::distance));
+        }
     }
 
     private static void thawTargets(ServerLevel level, Fault fault) {
@@ -417,7 +670,7 @@ public final class ChainDiagnostics {
                     && fault.key.controller().dimension().equals(cache.getLevel().dimension())
                     && fault.activeCachePos.equals(cache.getBlockPos())
                     && fault.key.address().equals(cache.takeoverAddress()));
-            if (!owned) cache.setTakeoverAddress("");
+            if (!owned) clearOrphanedCacheTakeover(cache);
         }
         ADDRESS_NETWORKS.entrySet().removeIf(entry -> {
             ServerLevel level = server.getLevel(entry.getKey().dimension());
@@ -487,6 +740,17 @@ public final class ChainDiagnostics {
                 continue;
             }
 
+            ArrayDeque<FaultKey> cacheQueue = CACHE_WAIT_QUEUES.get(key);
+            Fault queuedFault = cacheQueue == null || cacheQueue.isEmpty()
+                    ? null : FAULTS.get(cacheQueue.peekFirst());
+            if (queuedFault != null && !queuedFault.mitigated()
+                    && queuedFault.cause == FaultCause.PING_TIMEOUT) {
+                controller.setDiagnosticPlan("cache_queue", queuedFault.key.address(),
+                        1, cacheQueue.size(), Math.max(1, queuedFault.targets.size()),
+                        queuedFault.nextRetryTick, 0, 0);
+                continue;
+            }
+
             Fault stoppedFault = FAULTS.values().stream()
                     .filter(fault -> fault.key.controller().equals(key)
                             && fault.cause == FaultCause.CHAIN_STOPPED
@@ -517,9 +781,12 @@ public final class ChainDiagnostics {
                 continue;
             }
 
-            // Four ordinary probes may be in flight together. Never send a second probe for the same
-            // business address; concurrent slots are for widening coverage, not duplicate traffic.
-            if (normalCount >= MAX_NORMAL_PROBES) {
+            // Small networks retain the historical four-slot budget. Very large networks widen the
+            // window in proportion to their monitored Frogport count, up to MAX_NORMAL_PROBES.
+            // Never send a second probe for the same business address; concurrent slots are for
+            // widening coverage, not duplicate traffic.
+            int normalProbeLimit = normalProbeLimit(addresses);
+            if (normalCount >= normalProbeLimit) {
                 if (oldestNormal != null) {
                     controller.setDiagnosticPlan("waiting", oldestNormal.address(),
                             oldestNormal.planIndex(), oldestNormal.planTotal(),
@@ -731,41 +998,11 @@ public final class ChainDiagnostics {
         }
         controller.recordDiagnosticResult("timeout", probe.address());
 
-        CacheFrogportBlockEntity cache = graph.caches().stream()
-                // A cache lease is exclusive by fault/address. Never reuse a frog that still
-                // contains parcels from an earlier incident, even if its public route is blank.
-                // Those parcels may leave by replay, bottom extraction or manual removal; reuse is
-                // allowed only after the inventory is observably empty.
-                .filter(CacheFrogportBlockEntity::availableForNewLease)
-                .filter(candidate -> FAULTS.values().stream().noneMatch(other ->
-                        other.key.controller().dimension().equals(level.dimension())
-                                && Objects.equals(other.activeCachePos, candidate.getBlockPos())))
-                .min(Comparator.comparingLong(be -> be.getBlockPos().asLong()))
-                .orElse(null);
-
-        Fault fault = new Fault(key, new LinkedHashSet<>(), cache == null ? null : cache.getBlockPos(),
+        Fault fault = new Fault(key, new LinkedHashSet<>(), null,
                 now + RETRY_INTERVAL, FaultCause.PING_TIMEOUT, probe.targetPos());
         fault.targets.addAll(targets);
         FAULTS.put(key, fault);
-
-        if (cache != null && !fault.targets.isEmpty()) {
-            for (BlockPos targetPos : fault.targets) {
-                if (!level.isLoaded(targetPos)) {
-                    FROZEN.put(new PortKey(level.dimension(), targetPos), key);
-                    continue;
-                }
-                if (level.getBlockEntity(targetPos) instanceof FrogportBlockEntity frog
-                        && frog.target != null) {
-                    // Remove the public business address before FROZEN changes getFilterString().
-                    frog.target.deregister(frog, level, targetPos);
-                }
-                FROZEN.put(new PortKey(level.dimension(), targetPos), key);
-                if (level.getBlockEntity(targetPos) instanceof FrogportBlockEntity frog) {
-                    if (frog.target != null) frog.target.register(frog, level, targetPos);
-                }
-            }
-            cache.setTakeoverAddress(probe.address());
-        }
+        acquireCacheMitigation(level, controller, graph, fault);
 
         String source = sourceId(level, probe.controller().pos(), probe.address());
         EventRegistry registry = EventRegistry.get(server);
@@ -805,6 +1042,7 @@ public final class ChainDiagnostics {
         registry.clear(EventRegistry.Codes.CHAIN_STOPPED, "chain", source, eventNow);
         registry.raise(EventRegistry.Severity.ERROR, EventRegistry.Codes.CHAIN_PING_TIMEOUT,
                 "chain", source, fault.key.address(), controller.createFrequency(), null, eventNow);
+        acquireCacheMitigation(level, controller, graph(controller), fault);
     }
 
     private static void maintainFaults(DiagnosticFrogportBlockEntity controller, Graph graph,
@@ -816,6 +1054,29 @@ public final class ChainDiagnostics {
         for (Fault fault : faults) {
             if (!(controller.getLevel() instanceof ServerLevel level)) continue;
 
+            // A generic transport timeout should intercept business traffic whenever a cache becomes
+            // available. This deliberately runs every maintenance pass so a fault that was created
+            // without a lease (or promoted from CHAIN_STOPPED) cannot get stuck sending recovery
+            // probes forever while an idle Cache Frogport sits next to it.
+            if (fault.cause == FaultCause.PING_TIMEOUT && !fault.mitigated()) {
+                acquireCacheMitigation(level, controller, graph, fault);
+                if (!fault.mitigated()) {
+                    int queuePosition = cacheQueuePosition(fault);
+                    if (queuePosition > 0) {
+                        // Waiting for scarce cache capacity is a resource-queue state, not another
+                        // transport experiment. Do not keep injecting recovery Pings while this
+                        // fault has no cache to protect the business route.
+                        fault.nextRetryTick = Math.max(fault.nextRetryTick, now + 20);
+                        if (queuePosition == 1) {
+                            controller.setDiagnosticPlan("cache_queue", fault.key.address(),
+                                    queuePosition, Math.max(1, cacheQueueSize(controllerKey)),
+                                    Math.max(1, fault.targets.size()), fault.nextRetryTick, 0, 0);
+                        }
+                        continue;
+                    }
+                }
+            }
+
             if (fault.activeCachePos != null && level.isLoaded(fault.activeCachePos)
                     && level.getBlockEntity(fault.activeCachePos) instanceof CacheFrogportBlockEntity cache) {
                 // A cache is one physical Frogport and Create intentionally keeps one route per
@@ -823,7 +1084,8 @@ public final class ChainDiagnostics {
                 // current owner fills, hand the public address to the next available cache before
                 // declaring the mitigation full.
                 boolean backedUp = cache.isBackedUp();
-                if (backedUp && assignNextCacheOwner(level, fault, cache.getBlockPos())) {
+                if (backedUp && !anotherFaultWaitingForFirstCache(fault)
+                        && assignNextCacheOwner(level, fault, cache.getBlockPos())) {
                     backedUp = false;
                 }
                 if (backedUp) {
@@ -1172,15 +1434,56 @@ public final class ChainDiagnostics {
                 sourceId(level, controller.pos(), address), System.currentTimeMillis());
     }
 
+    /**
+     * A cache takeover address is persisted, but FAULTS/FROZEN are runtime-only. After an unclean
+     * stop the cache can therefore reload still advertising an old public address while the normal
+     * Frogports have already returned to their saved business filters. Create 6.0.10 deregisters a
+     * PackagePort route by filter string, so simply clearing the cache would also erase the normal
+     * Frogports' same-address routing rows. Re-register those loaded receivers immediately.
+     */
+    private static void clearOrphanedCacheTakeover(CacheFrogportBlockEntity cache) {
+        if (!(cache.getLevel() instanceof ServerLevel level)) {
+            cache.setTakeoverAddress("");
+            return;
+        }
+        String address = cache.takeoverAddress();
+        if (address.isBlank()) return;
+        for (DiagnosticFrogportBlockEntity diagnostic : new ArrayList<>(DIAGNOSTICS)) {
+            if (diagnostic != null && diagnostic.getLevel() == level) {
+                purgeAddressRoutes(graph(diagnostic), address);
+            }
+        }
+        cache.setTakeoverAddress("");
+
+        Set<BlockPos> restored = new HashSet<>();
+        for (DiagnosticFrogportBlockEntity diagnostic : new ArrayList<>(DIAGNOSTICS)) {
+            if (diagnostic == null || diagnostic.getLevel() != level) continue;
+            Graph graph = graph(diagnostic);
+            for (FrogportBlockEntity frog : graph.frogports()) {
+                if (frog instanceof DiagnosticFrogportBlockEntity || frog instanceof CacheFrogportBlockEntity
+                        || frog.isRemoved() || !frog.acceptsPackages || frog.target == null
+                        || !address.equals(frog.addressFilter) || !restored.add(frog.getBlockPos())) continue;
+                frog.target.register(frog, level, frog.getBlockPos());
+            }
+            primeAddressRoutes(graph, address);
+        }
+    }
+
     private static void restore(DiagnosticFrogportBlockEntity controller, Fault fault, long now) {
         if (!(controller.getLevel() instanceof ServerLevel level)) return;
         FAULTS.remove(fault.key);
-        thawTargets(level, fault);
+        removeFromCacheQueue(fault.key);
+        Graph graph = graph(controller);
+        purgeAddressRoutes(graph, fault.key.address());
         BlockPos cachePos = fault.activeCachePos;
         if (cachePos != null && level.getBlockEntity(cachePos) instanceof CacheFrogportBlockEntity cache
                 && fault.key.address().equals(cache.takeoverAddress())) {
             cache.setTakeoverAddress("");
         }
+        // See diagnosticRemoved(): cache deregistration is address-wide in Create 6.0.10. The
+        // cache must relinquish the public route before normal Frogports re-register it.
+        thawTargets(level, fault);
+        primeAddressRoutes(graph, fault.key.address());
         if (FULL_CACHES.remove(fault.key)) {
             EventRegistry.get(level.getServer()).clear(EventRegistry.Codes.CHAIN_CACHE_FULL, "chain",
                     sourceId(level, controller.getBlockPos(), fault.key.address()) + "/cache",
@@ -1230,16 +1533,20 @@ public final class ChainDiagnostics {
         for (Fault fault : new ArrayList<>(FAULTS.values())) {
             DiagnosticFrogportBlockEntity controller = controller(fault.key.controller());
             if (controller != null && controller.getLevel() instanceof ServerLevel level) {
-                thawTargets(level, fault);
+                Graph graph = graph(controller);
+                purgeAddressRoutes(graph, fault.key.address());
                 BlockPos cachePos = fault.activeCachePos;
                 if (cachePos != null && level.getBlockEntity(cachePos) instanceof CacheFrogportBlockEntity cache
                         && fault.key.address().equals(cache.takeoverAddress())) {
                     cache.setTakeoverAddress("");
                 }
+                thawTargets(level, fault);
+                primeAddressRoutes(graph, fault.key.address());
             }
         }
         PROBES.clear();
         FAULTS.clear();
+        CACHE_WAIT_QUEUES.clear();
         FROZEN.clear();
         BAD_ADDRESSES.clear();
         FULL_CACHES.clear();
@@ -1259,6 +1566,7 @@ public final class ChainDiagnostics {
         RUNTIME.keySet().removeIf(key -> key.dimension().equals(level.dimension()));
         PROBES.values().removeIf(p -> p.controller().dimension().equals(level.dimension()));
         FAULTS.keySet().removeIf(k -> k.controller().dimension().equals(level.dimension()));
+        CACHE_WAIT_QUEUES.keySet().removeIf(k -> k.dimension().equals(level.dimension()));
         FROZEN.keySet().removeIf(k -> k.dimension().equals(level.dimension()));
         BAD_ADDRESSES.keySet().removeIf(k -> k.dimension().equals(level.dimension()));
         FULL_CACHES.removeIf(k -> k.controller().dimension().equals(level.dimension()));

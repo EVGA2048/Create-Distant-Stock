@@ -31,7 +31,7 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
     public static final int CACHE_SLOTS = 54;
 
     private String takeoverAddress = "";
-    /** Address whose parcels are still physically held here, even after active takeover ended. */
+    /** Address summary for parcels still physically held here. May be "<mixed>". */
     private String cargoOwnerAddress = "";
     private long nextReleaseTick;
     private int releaseDelaySeconds = 5;
@@ -75,9 +75,9 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
         return cargoOwnerAddress;
     }
 
-    /** A cache may be leased only when it owns no old cargo and advertises no current takeover. */
+    /** A cache may be leased whenever it is not already taking over and still has free room. */
     public boolean availableForLease() {
-        return takeoverAddress.isBlank() && cargoOwnerAddress.isBlank() && cachedCount() == 0;
+        return takeoverAddress.isBlank() && cachedCount() < inventory.getSlots();
     }
 
     public int cachedCount() {
@@ -91,13 +91,13 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
     /**
      * Whether this cache can accept a new fault lease.
      *
-     * <p>How the previous cargo disappeared is deliberately irrelevant. It may have replayed onto
-     * the chain, been extracted from the bottom by automation, or been removed by an operator. The
-     * only safe reuse boundary is observable state: no active public takeover address and no parcel
-     * left in the buffer. A single residual parcel keeps the cache reserved from unrelated faults.
+     * <p>Buffered parcels retain their own package address, so a draining cache does not need to be
+     * completely empty before it can catch a later fault. Replay is suspended while a takeover is
+     * active, then each old/new parcel is re-injected with its original address afterwards. Prefer
+     * empty caches in the allocator, but allow a partially occupied one when capacity remains.
      */
     public boolean availableForNewLease() {
-        return takeoverAddress.isBlank() && cachedCount() == 0;
+        return takeoverAddress.isBlank() && cachedCount() < inventory.getSlots();
     }
 
     public int releaseDelaySeconds() {
@@ -134,9 +134,7 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
         }
         takeoverAddress = next;
         if (!next.isBlank()) {
-            // Starting a lease also establishes cargo custody, even before the first package arrives.
-            // The custody label deliberately survives when takeoverAddress later becomes blank.
-            cargoOwnerAddress = next;
+            noteCargoAddress(next);
         } else {
             reconcileCargoCustody();
         }
@@ -191,9 +189,7 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
         }
 
         String incomingAddress = PackageItem.getAddress(stack);
-        if (cargoOwnerAddress.isBlank()) {
-            cargoOwnerAddress = incomingAddress == null ? "" : incomingAddress;
-        }
+        noteCargoAddress(incomingAddress);
         ItemStack remainder = ItemHandlerHelper.insertItemStacked(inventory, stack.copy(), false);
         if (!remainder.isEmpty()) {
             // This should only be reachable if another insertion filled the final slot between
@@ -443,6 +439,18 @@ public final class CacheFrogportBlockEntity extends FrogportBlockEntity implemen
             cargoOwnerAddress = "";
             setChanged();
             sendData();
+        }
+    }
+
+    private void noteCargoAddress(String address) {
+        String next = address == null ? "" : address;
+        if (next.isBlank()) return;
+        if (cargoOwnerAddress.isBlank()) {
+            cargoOwnerAddress = next;
+            return;
+        }
+        if (!cargoOwnerAddress.equals(next) && !"<mixed>".equals(cargoOwnerAddress)) {
+            cargoOwnerAddress = "<mixed>";
         }
     }
 

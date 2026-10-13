@@ -590,6 +590,7 @@
   "goggle.distantstock.diagnostic.phase.scheduled": "Scheduled polling",
   "goggle.distantstock.diagnostic.phase.waiting": "Waiting for Ping return",
   "goggle.distantstock.diagnostic.phase.recovery": "Fault recovery probe",
+  "goggle.distantstock.diagnostic.phase.cache_queue": "Waiting for Cache Frogport",
   "goggle.distantstock.diagnostic.phase.busy": "Waiting for send window",
   "goggle.distantstock.diagnostic.phase.stopped": "Chain stopped; waiting for motion",
   "goggle.distantstock.diagnostic.result.ok": "Healthy",

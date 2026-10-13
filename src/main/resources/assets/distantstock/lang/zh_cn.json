@@ -590,6 +590,7 @@
   "goggle.distantstock.diagnostic.phase.scheduled": "计划轮询等待",
   "goggle.distantstock.diagnostic.phase.waiting": "等待 Ping 回包",
   "goggle.distantstock.diagnostic.phase.recovery": "故障恢复复测",
+  "goggle.distantstock.diagnostic.phase.cache_queue": "等待缓存蛙港",
   "goggle.distantstock.diagnostic.phase.busy": "等待发送窗口",
   "goggle.distantstock.diagnostic.phase.stopped": "锁链停转，等待恢复",
   "goggle.distantstock.diagnostic.result.ok": "正常",
