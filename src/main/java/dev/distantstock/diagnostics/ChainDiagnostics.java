@@ -37,6 +37,7 @@ public final class ChainDiagnostics {
     private static final long GRAPH_CACHE_TICKS = 20;
     private static final long FALLBACK_PROBE_TIMEOUT = 300;
     private static final long RETRY_INTERVAL = 60;
+    private static final float MIN_TRANSPORT_SPEED = 1.0e-4f;
 
     private static final String DIAG_PREFIX = "__distantstock_diag__/";
     private static final String RECOVERY_PREFIX = "__distantstock_probe__/";
@@ -90,6 +91,11 @@ public final class ChainDiagnostics {
         }
     }
 
+    private enum FaultCause {
+        PING_TIMEOUT,
+        CHAIN_STOPPED
+    }
+
     public static void unregister(DiagnosticFrogportBlockEntity be) {
         DIAGNOSTICS.remove(be);
         if (be != null) invalidateGraph(be.getLevel());
@@ -118,6 +124,7 @@ public final class ChainDiagnostics {
             FULL_CACHES.remove(fault.key);
             String source = sourceId(level, diagnostic.getBlockPos(), fault.key.address());
             EventRegistry registry = EventRegistry.get(level.getServer());
+            registry.clear(EventRegistry.Codes.CHAIN_STOPPED, "chain", source, eventNow);
             registry.clear(EventRegistry.Codes.CHAIN_PING_TIMEOUT, "chain", source, eventNow);
             registry.clear(EventRegistry.Codes.CHAIN_CACHE_FULL, "chain", source + "/cache", eventNow);
         }
@@ -187,6 +194,8 @@ public final class ChainDiagnostics {
         long eventNow = System.currentTimeMillis();
         registry.clear(EventRegistry.Codes.CHAIN_CACHE_FULL, "chain",
                 sourceId(level, fault.key.controller().pos(), fault.key.address()) + "/cache", eventNow);
+        registry.clear(EventRegistry.Codes.CHAIN_STOPPED, "chain",
+                sourceId(level, fault.key.controller().pos(), fault.key.address()), eventNow);
         registry.clear(EventRegistry.Codes.CHAIN_PING_TIMEOUT, "chain",
                 sourceId(level, fault.key.controller().pos(), fault.key.address()), eventNow);
 
@@ -241,6 +250,23 @@ public final class ChainDiagnostics {
 
     private static void thawTargets(ServerLevel level, Fault fault) {
         for (BlockPos pos : fault.targets) thawTarget(level, pos);
+    }
+
+    /**
+     * A timeout can be attributed to stopped chain kinetics only when the receiver is still in the
+     * same topological chain graph and every Create-minimum-hop route to it is blocked by zero RPM.
+     * A missing/disconnected receiver deliberately returns false and remains a generic Ping timeout.
+     */
+    private static boolean probeRouteKineticallyStopped(DiagnosticFrogportBlockEntity controller, Graph graph,
+                                                        BlockPos targetPos) {
+        if (controller == null || graph == null || targetPos == null) return false;
+        ChainConveyorBlockEntity source = owningConveyor(graph, controller.getBlockPos());
+        ChainConveyorBlockEntity target = owningConveyor(graph, targetPos);
+        if (source == null || target == null) return false;
+        if (Math.abs(source.getSpeed()) < MIN_TRANSPORT_SPEED
+                || Math.abs(target.getSpeed()) < MIN_TRANSPORT_SPEED) return true;
+        if (source == target) return false;
+        return !Double.isFinite(createRouteTravelTicks(graph, source, target));
     }
 
     private static void thawTarget(ServerLevel level, BlockPos pos) {
@@ -461,6 +487,20 @@ public final class ChainDiagnostics {
                 continue;
             }
 
+            Fault stoppedFault = FAULTS.values().stream()
+                    .filter(fault -> fault.key.controller().equals(key)
+                            && fault.cause == FaultCause.CHAIN_STOPPED
+                            && fault.causeTarget != null
+                            && probeRouteKineticallyStopped(controller, graph, fault.causeTarget))
+                    .findFirst().orElse(null);
+            if (stoppedFault != null) {
+                controller.setDiagnosticPlan("stopped", stoppedFault.key.address(),
+                        Math.max(1, stoppedFault.passed.size() + 1),
+                        Math.max(1, stoppedFault.targets.size()), Math.max(1, stoppedFault.targets.size()),
+                        stoppedFault.nextRetryTick, 0, 0);
+                continue;
+            }
+
             int normalCount = normalProbeCount(key);
             Probe oldestNormal = oldestNormalProbe(key);
             if (candidates.isEmpty()) {
@@ -526,6 +566,10 @@ public final class ChainDiagnostics {
                     .max(Comparator.comparingLong(candidate ->
                             estimatedProbeTimeoutTicks(controller, graph, candidate)))
                     .orElse(addressTargets.get(0));
+            if (probeRouteKineticallyStopped(controller, graph, target)) {
+                createStoppedFault(level, controller, key, address, addressTargets, target, level.getGameTime());
+                continue;
+            }
             if (sendProbe(controller, graph, key, address, target, address,
                     false, level.getGameTime(), planIndex, candidates.size(), addressTargets.size())) {
                 runtime.cursor = Math.floorMod(selectedIndex + 1, candidates.size());
@@ -613,19 +657,24 @@ public final class ChainDiagnostics {
     private static void clearOrphanedPersistentChainFaults(MinecraftServer server) {
         EventRegistry registry = EventRegistry.get(server);
         Set<String> liveTimeouts = new HashSet<>();
+        Set<String> liveStopped = new HashSet<>();
         Set<String> liveFullCaches = new HashSet<>();
         for (Fault fault : FAULTS.values()) {
             ServerLevel level = server.getLevel(fault.key.controller().dimension());
             if (level == null) continue;
             String base = sourceId(level, fault.key.controller().pos(), fault.key.address());
-            liveTimeouts.add(base);
+            if (fault.cause == FaultCause.CHAIN_STOPPED) liveStopped.add(base);
+            else liveTimeouts.add(base);
             if (FULL_CACHES.contains(fault.key)) liveFullCaches.add(base + "/cache");
         }
 
         long eventNow = System.currentTimeMillis();
         for (EventRegistry.Record record : new ArrayList<>(registry.active())) {
             if (!"chain".equals(record.sourceType())) continue;
-            if (EventRegistry.Codes.CHAIN_PING_TIMEOUT.equals(record.code())
+            if (EventRegistry.Codes.CHAIN_STOPPED.equals(record.code())
+                    && !liveStopped.contains(record.sourceId())) {
+                registry.clear(record.code(), record.sourceType(), record.sourceId(), eventNow);
+            } else if (EventRegistry.Codes.CHAIN_PING_TIMEOUT.equals(record.code())
                     && !liveTimeouts.contains(record.sourceId())) {
                 registry.clear(record.code(), record.sourceType(), record.sourceId(), eventNow);
             } else if (EventRegistry.Codes.CHAIN_CACHE_FULL.equals(record.code())
@@ -657,7 +706,13 @@ public final class ChainDiagnostics {
 
         if (probe.recovery()) {
             Fault fault = FAULTS.get(new FaultKey(probe.controller(), probe.address()));
-            if (fault != null) fault.nextRetryTick = now + RETRY_INTERVAL;
+            if (fault != null) {
+                fault.nextRetryTick = now + RETRY_INTERVAL;
+                if (fault.cause == FaultCause.CHAIN_STOPPED
+                        && !probeRouteKineticallyStopped(controller, graph(controller), probe.targetPos())) {
+                    promoteStoppedFaultToTimeout(level, controller, fault);
+                }
+            }
             controller.recordDiagnosticResult("recovery_timeout", probe.address());
             return;
         }
@@ -666,9 +721,15 @@ public final class ChainDiagnostics {
         List<BlockPos> targets = monitoredReceivers(controller, graph).getOrDefault(probe.address(), List.of());
         // A loaded receiver that was removed or reconfigured no longer owns this probe's address.
         if (targets.isEmpty()) return;
-        controller.recordDiagnosticResult("timeout", probe.address());
         FaultKey key = new FaultKey(probe.controller(), probe.address());
         if (FAULTS.containsKey(key)) return;
+        boolean chainStopped = probeRouteKineticallyStopped(controller, graph, probe.targetPos());
+        if (chainStopped) {
+            createStoppedFault(level, controller, probe.controller(), probe.address(), targets,
+                    probe.targetPos(), now);
+            return;
+        }
+        controller.recordDiagnosticResult("timeout", probe.address());
 
         CacheFrogportBlockEntity cache = graph.caches().stream()
                 // A cache lease is exclusive by fault/address. Never reuse a frog that still
@@ -683,7 +744,7 @@ public final class ChainDiagnostics {
                 .orElse(null);
 
         Fault fault = new Fault(key, new LinkedHashSet<>(), cache == null ? null : cache.getBlockPos(),
-                now + RETRY_INTERVAL);
+                now + RETRY_INTERVAL, FaultCause.PING_TIMEOUT, probe.targetPos());
         fault.targets.addAll(targets);
         FAULTS.put(key, fault);
 
@@ -706,9 +767,44 @@ public final class ChainDiagnostics {
             cache.setTakeoverAddress(probe.address());
         }
 
-        EventRegistry.get(server).raise(EventRegistry.Severity.ERROR,
-                EventRegistry.Codes.CHAIN_PING_TIMEOUT, "chain", sourceId(level, probe.controller().pos(), probe.address()),
-                probe.address(), controller.createFrequency(), null, System.currentTimeMillis());
+        String source = sourceId(level, probe.controller().pos(), probe.address());
+        EventRegistry registry = EventRegistry.get(server);
+        registry.clear(EventRegistry.Codes.CHAIN_STOPPED, "chain", source, System.currentTimeMillis());
+        registry.raise(EventRegistry.Severity.ERROR, EventRegistry.Codes.CHAIN_PING_TIMEOUT,
+                "chain", source, probe.address(), controller.createFrequency(), null,
+                System.currentTimeMillis());
+    }
+
+    private static void createStoppedFault(ServerLevel level, DiagnosticFrogportBlockEntity controller,
+                                           ControllerKey controllerKey, String address,
+                                           Collection<BlockPos> targets, BlockPos causeTarget, long now) {
+        FaultKey key = new FaultKey(controllerKey, address);
+        if (FAULTS.containsKey(key)) return;
+        Fault fault = new Fault(key, new LinkedHashSet<>(targets), null, now + 20,
+                FaultCause.CHAIN_STOPPED, causeTarget);
+        FAULTS.put(key, fault);
+
+        String source = sourceId(level, controllerKey.pos(), address);
+        EventRegistry registry = EventRegistry.get(level.getServer());
+        long eventNow = System.currentTimeMillis();
+        registry.clear(EventRegistry.Codes.CHAIN_PING_TIMEOUT, "chain", source, eventNow);
+        registry.raise(EventRegistry.Severity.ERROR, EventRegistry.Codes.CHAIN_STOPPED,
+                "chain", source, address, controller.createFrequency(), null, eventNow);
+        controller.recordDiagnosticResult("chain_stopped", address);
+        controller.setDiagnosticPlan("stopped", address, 1, Math.max(1, targets.size()),
+                Math.max(1, targets.size()), fault.nextRetryTick, 0, 0);
+    }
+
+    private static void promoteStoppedFaultToTimeout(ServerLevel level,
+                                                     DiagnosticFrogportBlockEntity controller,
+                                                     Fault fault) {
+        fault.cause = FaultCause.PING_TIMEOUT;
+        String source = sourceId(level, fault.key.controller().pos(), fault.key.address());
+        EventRegistry registry = EventRegistry.get(level.getServer());
+        long eventNow = System.currentTimeMillis();
+        registry.clear(EventRegistry.Codes.CHAIN_STOPPED, "chain", source, eventNow);
+        registry.raise(EventRegistry.Severity.ERROR, EventRegistry.Codes.CHAIN_PING_TIMEOUT,
+                "chain", source, fault.key.address(), controller.createFrequency(), null, eventNow);
     }
 
     private static void maintainFaults(DiagnosticFrogportBlockEntity controller, Graph graph,
@@ -746,6 +842,19 @@ public final class ChainDiagnostics {
 
             if (recoveryInFlight) continue;
             if (now < fault.nextRetryTick) continue;
+
+            if (fault.cause == FaultCause.CHAIN_STOPPED && fault.causeTarget != null
+                    && probeRouteKineticallyStopped(controller, graph, fault.causeTarget)) {
+                // The timeout is already a real reported fault. While the chain is still stopped,
+                // however, retrying cannot produce new evidence: Create rejects export at zero RPM.
+                // Poll the kinetic state cheaply and do not create/re-send Ping packages until motion
+                // returns. Once it does, the normal recovery path below performs the actual proof.
+                fault.nextRetryTick = now + 20;
+                controller.setDiagnosticPlan("stopped", fault.key.address(),
+                        Math.max(1, fault.passed.size() + 1), Math.max(1, fault.targets.size()),
+                        Math.max(1, fault.targets.size()), fault.nextRetryTick, 0, 0);
+                continue;
+            }
 
             if (fault.mitigated()) {
                 // Chunk unload means "unknown", not "healthy" and not "removed". Pause the
@@ -1077,6 +1186,8 @@ public final class ChainDiagnostics {
                     sourceId(level, controller.getBlockPos(), fault.key.address()) + "/cache",
                     System.currentTimeMillis());
         }
+        EventRegistry.get(level.getServer()).clear(EventRegistry.Codes.CHAIN_STOPPED, "chain",
+                sourceId(level, controller.getBlockPos(), fault.key.address()), System.currentTimeMillis());
         EventRegistry.get(level.getServer()).clear(EventRegistry.Codes.CHAIN_PING_TIMEOUT, "chain",
                 sourceId(level, controller.getBlockPos(), fault.key.address()), System.currentTimeMillis());
         // The address stops being bad here, not at some later routine probe. Restoring thaws the
@@ -1374,12 +1485,17 @@ public final class ChainDiagnostics {
         final Set<BlockPos> passed = new LinkedHashSet<>();
         BlockPos activeCachePos;
         long nextRetryTick;
+        FaultCause cause;
+        final BlockPos causeTarget;
 
-        Fault(FaultKey key, Set<BlockPos> targets, BlockPos cachePos, long nextRetryTick) {
+        Fault(FaultKey key, Set<BlockPos> targets, BlockPos cachePos, long nextRetryTick,
+              FaultCause cause, BlockPos causeTarget) {
             this.key = key;
             this.targets = targets;
             this.activeCachePos = cachePos;
             this.nextRetryTick = nextRetryTick;
+            this.cause = cause;
+            this.causeTarget = causeTarget;
         }
 
         boolean mitigated() {

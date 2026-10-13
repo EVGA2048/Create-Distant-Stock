@@ -812,6 +812,154 @@ public final class ChainDiagnosticsGameTests {
         disconnectedReceiverRecovers(h, false);
     }
 
+    @GameTest(template = "empty", timeoutTicks = 520)
+    public static void stoppedChainTimesOutThenRecoversExactlyOnce(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos chainPos = h.absolutePos(new BlockPos(5, 2, 5));
+        BlockPos diagnosticPos = h.absolutePos(new BlockPos(5, 2, 3));
+        BlockPos receiverPos = h.absolutePos(new BlockPos(5, 2, 7));
+        BlockPos cachePos = h.absolutePos(new BlockPos(7, 2, 5));
+        String address = "STOPPED-CHAIN-TIMEOUT";
+
+        var chainBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "chain_conveyor"));
+        var frogBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "package_frogport"));
+        level.setBlock(chainPos, chainBlock.defaultBlockState(), 3);
+        level.setBlock(diagnosticPos, ModBlocks.DIAGNOSTIC_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(receiverPos, frogBlock.defaultBlockState(), 3);
+        level.setBlock(cachePos, ModBlocks.CACHE_FROGPORT.get().defaultBlockState(), 3);
+
+        var chain = (ChainConveyorBlockEntity) level.getBlockEntity(chainPos);
+        var diagnostic = (DiagnosticFrogportBlockEntity) level.getBlockEntity(diagnosticPos);
+        var receiver = (FrogportBlockEntity) level.getBlockEntity(receiverPos);
+        var cache = (CacheFrogportBlockEntity) level.getBlockEntity(cachePos);
+        h.assertTrue(chain != null && diagnostic != null && receiver != null && cache != null,
+                "stopped-chain fixture did not create its block entities");
+
+        AtomicBoolean powered = new AtomicBoolean(true);
+        chain.setSpeed(128);
+        chain.preventSpeedUpdate = 1000;
+        h.onEachTick(() -> chain.setSpeed(powered.get() ? 128 : 0));
+        attachLoopPort(level, chainPos, diagnosticPos, diagnostic, 0);
+        attachLoopPort(level, chainPos, receiverPos, receiver, 180);
+        attachLoopPort(level, chainPos, cachePos, cache, 270);
+        receiver.addressFilter = address;
+        receiver.acceptsPackages = true;
+        receiver.filterChanged();
+
+        ChainDiagnostics.register(diagnostic);
+        ChainDiagnostics.register(cache);
+        ChainDiagnostics.tick(level.getServer());
+        h.assertTrue("waiting".equals(diagnostic.diagnosticPhase()),
+                "stopped-chain fixture did not launch its initial probe");
+        powered.set(false);
+
+        h.runAfterDelay(180, () -> {
+            h.assertTrue(ChainDiagnostics.lampState(level, address) != null,
+                    "zero RPM did not become a Ping timeout fault");
+            h.assertTrue(cache.takeoverAddress().isBlank(),
+                    "pure stopped-chain fault unnecessarily consumed a cache Frogport");
+            h.assertTrue(ChainDiagnostics.frozenFilter(receiver) == null,
+                    "pure stopped-chain fault unnecessarily froze the receiver route");
+            h.assertTrue(EventRegistry.get(level.getServer()).active().stream()
+                            .anyMatch(row -> EventRegistry.Codes.CHAIN_STOPPED.equals(row.code())
+                                    && address.equals(row.detail())),
+                    "stopped-chain timeout was not reported as CHAIN_STOPPED");
+            h.assertTrue(EventRegistry.get(level.getServer()).active().stream()
+                            .noneMatch(row -> EventRegistry.Codes.CHAIN_PING_TIMEOUT.equals(row.code())
+                                    && address.equals(row.detail())),
+                    "stopped-chain timeout also raised the generic ping-timeout alarm");
+        });
+
+        h.runAfterDelay(300, () -> {
+            h.assertTrue("stopped".equals(diagnostic.diagnosticPhase()),
+                    "stopped fault kept retrying instead of waiting for chain motion: "
+                            + diagnostic.diagnosticPhase());
+            h.assertTrue("chain_stopped".equals(diagnostic.diagnosticLastResult()),
+                    "stopped fault was overwritten by a retry result: " + diagnostic.diagnosticLastResult());
+            powered.set(true);
+        });
+
+        h.runAfterDelay(500, () -> {
+            h.assertTrue(ChainDiagnostics.lampState(level, address) == null,
+                    "restoring chain RPM left the timeout fault active");
+            h.assertTrue(cache.takeoverAddress().isBlank(),
+                    "successful recovery left the cache takeover active");
+            h.assertTrue(ChainDiagnostics.frozenFilter(receiver) == null,
+                    "successful recovery left the real Frogport frozen");
+            h.assertTrue(EventRegistry.get(level.getServer()).active().stream()
+                            .noneMatch(row -> (EventRegistry.Codes.CHAIN_STOPPED.equals(row.code())
+                                    || EventRegistry.Codes.CHAIN_PING_TIMEOUT.equals(row.code()))
+                                    && address.equals(row.detail())),
+                    "successful recovery left a chain diagnostic alarm active");
+            h.succeed();
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 420)
+    public static void alreadyStoppedChainReportsFaultWithoutRetryingProbeExport(GameTestHelper h) {
+        var level = h.getLevel();
+        BlockPos chainPos = h.absolutePos(new BlockPos(5, 2, 5));
+        BlockPos diagnosticPos = h.absolutePos(new BlockPos(5, 2, 3));
+        BlockPos receiverPos = h.absolutePos(new BlockPos(5, 2, 7));
+        String address = "STOPPED-BEFORE-PING";
+
+        var chainBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "chain_conveyor"));
+        var frogBlock = BuiltInRegistries.BLOCK.get(
+                ResourceLocation.fromNamespaceAndPath("create", "package_frogport"));
+        level.setBlock(chainPos, chainBlock.defaultBlockState(), 3);
+        level.setBlock(diagnosticPos, ModBlocks.DIAGNOSTIC_FROGPORT.get().defaultBlockState(), 3);
+        level.setBlock(receiverPos, frogBlock.defaultBlockState(), 3);
+
+        var chain = (ChainConveyorBlockEntity) level.getBlockEntity(chainPos);
+        var diagnostic = (DiagnosticFrogportBlockEntity) level.getBlockEntity(diagnosticPos);
+        var receiver = (FrogportBlockEntity) level.getBlockEntity(receiverPos);
+        h.assertTrue(chain != null && diagnostic != null && receiver != null,
+                "already-stopped fixture did not create its block entities");
+
+        AtomicBoolean powered = new AtomicBoolean(false);
+        chain.setSpeed(0);
+        chain.preventSpeedUpdate = 1000;
+        h.onEachTick(() -> chain.setSpeed(powered.get() ? 128 : 0));
+        attachLoopPort(level, chainPos, diagnosticPos, diagnostic, 0);
+        attachLoopPort(level, chainPos, receiverPos, receiver, 180);
+        receiver.addressFilter = address;
+        receiver.acceptsPackages = true;
+        receiver.filterChanged();
+
+        ChainDiagnostics.register(diagnostic);
+        ChainDiagnostics.tick(level.getServer());
+        h.assertTrue("stopped".equals(diagnostic.diagnosticPhase()),
+                "zero-RPM chain entered send retry instead of stopped fault state: "
+                        + diagnostic.diagnosticPhase());
+        h.assertTrue(diagnostic.diagnosticInFlightCount() == 0,
+                "zero-RPM chain created an in-flight probe that could not be exported");
+
+        h.runAfterDelay(140, () -> {
+            h.assertTrue("stopped".equals(diagnostic.diagnosticPhase()),
+                    "zero-RPM chain left the stopped state and resumed retrying exports");
+            h.assertTrue(chain.getLoopingPackages().stream().noneMatch(pkg -> PingPackageData.isPing(pkg.item)),
+                    "zero-RPM chain accumulated a physical Ping package");
+            h.assertTrue(EventRegistry.get(level.getServer()).active().stream()
+                            .anyMatch(row -> EventRegistry.Codes.CHAIN_STOPPED.equals(row.code())
+                                    && address.equals(row.detail())),
+                    "zero-RPM chain did not raise CHAIN_STOPPED");
+            powered.set(true);
+        });
+
+        h.runAfterDelay(360, () -> {
+            h.assertTrue(ChainDiagnostics.lampState(level, address) == null,
+                    "chain motion returned but recovery Ping did not clear the stopped fault");
+            h.assertTrue(EventRegistry.get(level.getServer()).active().stream()
+                            .noneMatch(row -> EventRegistry.Codes.CHAIN_STOPPED.equals(row.code())
+                                    && address.equals(row.detail())),
+                    "CHAIN_STOPPED stayed active after a successful recovery Ping");
+            h.succeed();
+        });
+    }
+
     private static void disconnectedReceiverRecovers(GameTestHelper h, boolean beforeSend) {
         var level = h.getLevel();
         BlockPos chainPos = h.absolutePos(new BlockPos(5, 2, 5));

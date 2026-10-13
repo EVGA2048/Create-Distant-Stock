@@ -9,6 +9,8 @@ public final class EventText {
         return switch (code) {
             case EventRegistry.Codes.CHAIN_NO_ROUTE ->
                     Component.translatable("event.distantstock.chain.no_route.title");
+            case EventRegistry.Codes.CHAIN_STOPPED ->
+                    Component.translatable("event.distantstock.chain.stopped.title");
             case EventRegistry.Codes.CHAIN_PING_TIMEOUT ->
                     Component.translatable("event.distantstock.chain.ping_timeout.title");
             case EventRegistry.Codes.CHAIN_CACHE_FULL ->
@@ -24,6 +26,8 @@ public final class EventText {
         return switch (code) {
             case EventRegistry.Codes.CHAIN_NO_ROUTE ->
                     Component.translatable("event.distantstock.chain.no_route.detail", value);
+            case EventRegistry.Codes.CHAIN_STOPPED ->
+                    Component.translatable("event.distantstock.chain.stopped.detail", value);
             case EventRegistry.Codes.CHAIN_PING_TIMEOUT ->
                     Component.translatable("event.distantstock.chain.ping_timeout.detail", value);
             case EventRegistry.Codes.CHAIN_CACHE_FULL ->
