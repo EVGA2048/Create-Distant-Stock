@@ -347,12 +347,15 @@ def redstone_scene():
 
 def diagnostics_scene():
     s=Scene(9,9,6)
-    for x,dx in [(2,4),(6,-4)]:
-        shaft(s,(x,2,5),'y')
-        if x==2: gearbox(s,(x,1,5))
-        else: shaft(s,(x,1,5),'y')
-        s.place((x,3,5),'create:chain_conveyor',None,
-                {'id':'create:chain_conveyor','Connections':[IntArray([dx,0,0])],
+    nodes = [(2,3,5), (6,3,5), (6,3,7), (2,3,7)]
+    for i,(x,y,z) in enumerate(nodes):
+        shaft(s,(x,2,z),'y')
+        if i==0: gearbox(s,(x,1,z))
+        else: shaft(s,(x,1,z),'y')
+        neighbours = [nodes[(i-1)%4], nodes[(i+1)%4]]
+        s.place((x,y,z),'create:chain_conveyor',None,
+                {'id':'create:chain_conveyor',
+                 'Connections':[IntArray([nx-x,ny-y,nz-z]) for nx,ny,nz in neighbours],
                  'Speed':0.0,'TravellingPackages':[],'LoopingPackages':[]})
     # External rotation enters at the scene boundary and turns upward through a gearbox.
     cogwheel(s,(0,1,5),'x'); shaft(s,(1,1,5),'x')
@@ -360,7 +363,7 @@ def diagnostics_scene():
                                   (6,'create:package_frogport','ASSEMBLY',18)]:
         chest(s,(x,1,2))
         s.place((x,2,2),block,None,{'id':block,'CreateFrequency':FREQUENCY,
-                    'Target':{'flipped':0,'chain_pos':0.0,'connection':IntArray([4 if x==2 else -4,0,0]),
+                    'Target':{'flipped':0,'chain_pos':180.0,
                               'type':'create:chain_conveyor','relative_pos':IntArray([0,1,3])},
                     'AcceptsPackages':1,'AddressFilter':address,'PlacedYaw':0.0,
                     'Inventory':{'Size':slots,'Items':[]}})

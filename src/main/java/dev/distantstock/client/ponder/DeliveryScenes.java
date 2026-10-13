@@ -35,8 +35,10 @@ public final class DeliveryScenes {
         scene.world().setKineticSpeed(util.select().fromTo(1,1,2,4,1,2),-32);
         scene.world().createItemOnBelt(util.grid().at(1,1,2),Direction.UP,parcel);
         scene.idle(48);
-        scene.world().removeItemsFromBelt(util.grid().at(1,1,2));
+        // Create removes only items over the specified segment, not the entire controller belt.
+        for (int x = 1; x <= 4; x++) scene.world().removeItemsFromBelt(util.grid().at(x,1,2));
         scene.world().flapFunnel(util.grid().at(4,2,2),false);
+        scene.idle(8);
         sendParcel(scene,util.grid().at(5,2,2),parcel);
         note(scene,util,4,2,2,"The inserting funnel feeds the dock from the side. The dock transfers one parcel at a time.");
         scene.overlay().showOutline(PonderPalette.RED,"fallback",util.select().fromTo(5,1,2,5,1,3),90);

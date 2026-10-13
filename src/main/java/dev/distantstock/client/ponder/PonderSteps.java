@@ -81,5 +81,54 @@ final class PonderSteps {
                 dev.distantstock.block.DockStatus.STANDBY), false);
     }
 
+    /** Script the physical handoff: Ponder's client world does not run server-side port routing. */
+    static void chainDelivery(CreateSceneBuilder scene, net.minecraft.core.BlockPos from,
+                              net.minecraft.core.BlockPos to, net.minecraft.core.BlockPos receiver,
+                              ItemStack item, boolean retain) {
+        var connection = to.subtract(from);
+        scene.world().modifyBlockEntity(from,
+                com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorBlockEntity.class, be -> {
+            be.setSpeed(0);
+            be.prepareStats();
+            be.getTravellingPackages().computeIfAbsent(connection, k -> new java.util.ArrayList<>()).clear();
+            be.addTravellingPackage(new com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorPackage(
+                    0, item.copy()), connection);
+        });
+        for (int frame = 0; frame < 60; frame++) {
+            float fraction = frame / 60f;
+            scene.world().modifyBlockEntity(from,
+                    com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorBlockEntity.class, be -> {
+                be.prepareStats();
+                var stats = be.connectionStats.get(connection);
+                var packages = be.getTravellingPackages().get(connection);
+                if (stats != null && packages != null)
+                    packages.forEach(p -> p.chainPosition = fraction * stats.chainLength());
+            });
+            scene.idle(1);
+        }
+        scene.world().modifyBlockEntity(from,
+                com.simibubi.create.content.kinetics.chainConveyor.ChainConveyorBlockEntity.class,
+                be -> { be.getTravellingPackages().remove(connection); be.setSpeed(32); });
+        receiveFrog(scene, receiver, item, retain);
+    }
+
+    static void receiveFrog(CreateSceneBuilder scene, net.minecraft.core.BlockPos pos,
+                            ItemStack item, boolean retain) {
+        scene.world().modifyBlockEntity(pos,
+                com.simibubi.create.content.logistics.packagePort.frogport.FrogportBlockEntity.class,
+                be -> be.startAnimation(item.copy(), false));
+        scene.idle(15);
+        if (retain) scene.world().modifyBlockEntity(pos,
+                com.simibubi.create.content.logistics.packagePort.frogport.FrogportBlockEntity.class,
+                be -> net.neoforged.neoforge.items.ItemHandlerHelper.insertItemStacked(be.inventory, item.copy(), false));
+    }
+
+    static void sendFrog(CreateSceneBuilder scene, net.minecraft.core.BlockPos pos, ItemStack item) {
+        scene.world().modifyBlockEntity(pos,
+                com.simibubi.create.content.logistics.packagePort.frogport.FrogportBlockEntity.class,
+                be -> be.startAnimation(item.copy(), true));
+        scene.idle(15);
+    }
+
     private PonderSteps() {}
 }
