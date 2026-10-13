@@ -46,6 +46,7 @@ public final class SignalLampClientSmoke {
                         "DISTANTSTOCK_FLUID_TANK_AFTER_RELOAD_OK: 流体罐重载资源之后模型与染色照旧");
                 checkLore();
                 checkSuitRenderType();
+                SuitSkinRenderSmoke.check();
             } catch (Throwable failure) {
                 LogUtils.getLogger().error("DISTANTSTOCK_CLIENT_SMOKE_FAILED", failure);
             } finally {
@@ -316,16 +317,7 @@ public final class SignalLampClientSmoke {
      * <p>Run in both smoke phases, because a description is built from the language manager and a
      * resource reload is exactly when that changes underneath it.
      */
-    /**
-     * The suit is drawn blended but culled, and both halves of that matter.
-     *
-     * <p>Blended, because a translucent plate cannot be expressed with vanilla's cutout armour.
-     * Culled, because {@code entityTranslucent} is NO_CULL: the far side of every shell is drawn as
-     * well, so at the suit's quarter opacity you see the inside of the back wall and a leg reads as
-     * an empty glass box. That is the shape of a complaint the user has now made twice ("my legs
-     * have gone transparent again"), and the render type is the whole difference between the two --
-     * average coverage, which is what a distant look is made of, is identical either way.
-     */
+    /** Verify separate body/shell passes as well as the armour mixin after resource reload. */
     private static void checkSuitRenderType() {
         if (Arrays.stream(net.minecraft.client.renderer.entity.layers.HumanoidArmorLayer.class
                         .getDeclaredMethods())
@@ -341,6 +333,16 @@ public final class SignalLampClientSmoke {
             throw new AssertionError("the suit is drawn with " + suit
                     + ", which draws the far side of every shell too");
         }
+        var skinTexture = ResourceLocation.withDefaultNamespace("textures/entity/player/wide/steve.png");
+        var skin = dev.distantstock.client.SuitRenderType.skin(skinTexture);
+        if (!skin.toString().contains("entity_cutout_no_cull")
+                || !skin.toString().contains("no_transparency")) {
+            throw new AssertionError("Visible suit wearer must establish opaque skin before glass: " + skin);
+        }
+        if (Arrays.stream(net.minecraft.client.renderer.entity.LivingEntityRenderer.class.getDeclaredMethods())
+                .noneMatch(m -> m.getName().contains("distantstock$phaseBodyOut"))) {
+            throw new AssertionError("Suit wearer skin/cloak mixin was not applied");
+        }
         var other = dev.distantstock.client.SuitRenderType.of(ResourceLocation.withDefaultNamespace(
                 "textures/models/armor/iron_layer_1.png"));
         if (!other.toString().contains("armor_cutout_no_cull")
@@ -348,7 +350,7 @@ public final class SignalLampClientSmoke {
             throw new AssertionError("armour that is not ours was switched to " + other);
         }
         LogUtils.getLogger().info(
-                "DISTANTSTOCK_SUIT_RENDER_TYPE_OK: 护甲走混合+剔除，别人的护甲不受影响");
+                "DISTANTSTOCK_SUIT_RENDER_TYPE_OK: 皮肤使用 cutout、护甲保留混合+剔除，其他护甲不受影响");
     }
 
     private static void checkLore() {

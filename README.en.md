@@ -26,7 +26,7 @@
 
 **Create: Distant Stock** extends Create with cross-server warehousing, ordering and physical parcel transport.
 
-It is deliberately not an infinite remote inventory. Every warehouse remains a real, independent Create logistics network: the source warehouse receives the order and packs it, Distant Docks hand the parcel to Transerver, and the destination server returns it to local Create belts, chain conveyors, Frogports and sorting systems.
+Each warehouse retains an independent Create logistics network. The source warehouse receives orders and packs parcels, Distant Docks transfer them through Transerver, and the destination server routes them through local Create belts, chain conveyors, Frogports and sorting systems.
 
 ```text
 Source Create warehouse
@@ -109,7 +109,7 @@ With the default configuration, each outgoing cross-server parcel costs the send
 | **Diagnostic Frogport** | Probes chain-conveyor addresses with Ping parcels and catches unroutable parcels as a diagnostic/quarantine exit. |
 | **Cache Frogport** | Temporarily takes over a blocked business address, stores real parcels and releases them again at a controlled rate after recovery. |
 
-Diagnostic Frogports expose a bottom-only extraction path for bad parcels. Cache Frogports hold 54 real inventory slots rather than a hidden infinite queue. See the [device guide](docs/wiki/设备.md) and [monitoring guide](docs/wiki/监控与日志.md) for the complete recovery behaviour.
+Diagnostic Frogports expose a bottom-only extraction path for bad parcels. Cache Frogports provide 54 inventory slots for temporary parcel storage. See the [device guide](docs/wiki/设备.md) and [monitoring guide](docs/wiki/监控与日志.md) for the complete recovery behaviour.
 
 ### Equipment, portable fluids and materials
 
@@ -117,7 +117,7 @@ Diagnostic Frogports expose a bottom-only extraction path for bad parcels. Cache
 
 #### Resonant Quartz suit
 
-The Resonant Quartz suit is engineering equipment rather than a simple late-game armour upgrade. Every piece carries an internal working-medium reserve and can refill automatically from portable tanks in the player's inventory using **Ether** or **Molten Amethyst**. Medium-powered assistance turns off when a piece runs dry, while the armour itself remains wearable and can be repaired with Polished Ether Quartz.
+The Resonant Quartz suit combines protection, mobility assistance and phase cloaking. Every piece carries an internal working-medium reserve and can refill automatically from portable tanks in the player's inventory using **Ether** or **Molten Amethyst**. Medium-powered assistance turns off when a piece runs dry, while the armour itself remains wearable and can be repaired with Polished Ether Quartz.
 
 | Piece | Standalone capability |
 | --- | --- |
@@ -146,7 +146,7 @@ The production chain now includes **Ender Dust, Ether Quartz, Polished Ether Qua
 
 The mod also includes the Distant Stock manual, event receipts, logger paper rolls and Ping parcels used by route diagnostics.
 
-## How Distant Networks are organized
+## Distant Networks and membership
 
 Distant Stock does not expose every Create logistics network on a server to every player. The normal flow is:
 
@@ -201,7 +201,7 @@ See the [step-by-step quick start](docs/wiki/快速开始.md) for the full inter
 
 ## Interruptions and parcel recovery
 
-Distant Stock maintains persistent custody state for cross-server parcels and includes acknowledgements, duplicate-message handling, retries, returns and quarantine paths. When the destination server is offline, a receiving dock is blocked, an address is wrong or local routing fails, the system prefers to retain the parcel and expose a fault instead of silently consuming it.
+Distant Stock maintains persistent custody state for cross-server parcels and includes acknowledgements, duplicate-message handling, retries, returns and quarantine paths. When the destination server is offline, a receiving dock is blocked, an address is wrong or local routing fails, the system retains the parcel and reports the fault to support recovery and troubleshooting.
 
 These mechanisms reduce the risk of loss and duplicate delivery, but the mod is still in active testing; regular backups are recommended on important servers. A useful bug report should include:
 
@@ -251,6 +251,6 @@ The renderer requires Pillow, NumPy and the Create JAR configured in `scripts/re
 
 Thank you to **MUL, KNaMg_Rana, w4yw and BSGM** for feedback and suggestions during early development and multiplayer testing.
 
-Thanks to the **Create** team for the machinery, kinetics and logistics systems. Parts of the portable terminal model layout and Bee Port material artwork are adapted from Tim Heidler's [Create: Mobile Packages](https://github.com/timplay33/Create-Mobile-Packages) under its MIT license; the bundled [third-party license](src/main/resources/META-INF/LICENSE-mobile-packages.txt) is retained.
+Thanks to the **Create** team for the machinery, kinetics and logistics systems. The Portable Distant Terminal takes design inspiration from the portable warehouse manager in Tim Heidler's [Create: Mobile Packages](https://github.com/timplay33/Create-Mobile-Packages). The associated [third-party license](src/main/resources/META-INF/LICENSE-mobile-packages.txt) is retained.
 
 Create: Distant Stock itself is released under the [MIT License](LICENSE).
