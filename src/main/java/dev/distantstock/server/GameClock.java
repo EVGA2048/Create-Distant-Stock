@@ -81,6 +81,7 @@ public final class GameClock {
         dev.distantstock.diagnostics.ChainDiagnostics.stop();
         dev.distantstock.block.TowerCasingBlock.clearWindowRipples();
         if (transerverActive) {
+            NetworkAnnouncementService.stop();
             DistantNetworkJoinService.stop();
             ReceiverProbeService.stop();
             ProtocolHelloService.stop();

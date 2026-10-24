@@ -22,6 +22,23 @@ public final class DistantNetworkGameTests {
             UUID.fromString("44444444-4444-4444-4444-444444444444");
 
     @GameTest(template = "empty", timeoutTicks = 20)
+    public static void emptyNetworkKeepsRecoverableCodeWithoutWarehouse(GameTestHelper h) {
+        var directory = new DistantNetworkDirectory();
+        var network = directory.create("VL4 empty network", OWNER_NODE, OWNER_PLAYER);
+        var saved = directory.save(new CompoundTag(), h.getLevel().registryAccess());
+        var loaded = DistantNetworkDirectory.load(saved, h.getLevel().registryAccess());
+        var recovered = loaded.findOwnedByName(network.name(), OWNER_PLAYER, OWNER_NODE).orElseThrow();
+        h.assertTrue(recovered.joinCode().equals(network.joinCode())
+                        && loaded.members(network.id()).isEmpty(),
+                "owner could not recover a persisted code without a warehouse");
+        h.assertTrue(loaded.findOwnedByName(network.name(), UUID.randomUUID(), OWNER_NODE).isEmpty(),
+                "another player could recover the code");
+        h.assertTrue(loaded.findOwnedByName(network.name(), OWNER_PLAYER, UUID.randomUUID()).isEmpty(),
+                "code recovery accepted the wrong authority node");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
     public static void networkSaveRoundTripKeepsCodeAndCreateMembership(GameTestHelper h) {
         DistantNetworkDirectory directory = new DistantNetworkDirectory();
         RemoteNetworkId member = member();

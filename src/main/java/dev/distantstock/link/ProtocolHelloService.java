@@ -54,6 +54,7 @@ public final class ProtocolHelloService {
         caps.add("parcel-trace-v1");
         caps.add("chain-diagnostics-v2");
         caps.add("cache-lease-v1");
+        caps.add("network-catalog-v1");
         if (ModList.get().isLoaded("fluidlogistics")) caps.add("fluid-package-v2");
         return Set.copyOf(caps);
     }

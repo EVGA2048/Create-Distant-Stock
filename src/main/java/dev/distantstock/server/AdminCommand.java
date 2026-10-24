@@ -133,11 +133,16 @@ public final class AdminCommand {
                                         .executes(ctx -> distantNetworkDelete(ctx, false))
                                         .then(Commands.literal("confirm")
                                                 .executes(ctx -> distantNetworkDelete(ctx, true)))))
-                        .then(Commands.literal("code").executes(AdminCommand::distantNetworkCode))
+                        .then(Commands.literal("code").executes(AdminCommand::distantNetworkCode)
+                                .then(Commands.argument("name", StringArgumentType.string())
+                                        .executes(AdminCommand::distantNetworkCode)))
                         .then(Commands.literal("reset-code").executes(AdminCommand::distantNetworkResetCode))
                         .then(Commands.literal("join")
                                 .then(Commands.argument("code", StringArgumentType.word())
                                         .executes(AdminCommand::distantNetworkJoin)))
+                        .then(Commands.literal("join-terminal")
+                                .then(Commands.argument("code", StringArgumentType.word())
+                                        .executes(AdminCommand::distantNetworkJoinTerminal)))
                         .then(Commands.literal("leave").executes(AdminCommand::distantNetworkLeave)))
                 .then(Commands.literal("group")
                         .executes(AdminCommand::groupList)
@@ -206,8 +211,9 @@ public final class AdminCommand {
                 "  /distantstock tower                 每座塔的状态 + 哪些设备没被带载、为什么",
                 "  /distantstock network create <名字>  用当前终端绑定的本地仓储网络创建远仓网络",
                 "  /distantstock network delete <名字>  删除远仓网络（要再输一次 confirm）",
-                "  /distantstock network code           查看自己当前远仓网络的长期加入码",
+                "  /distantstock network code [名字]    找回自己在本服创建的网络加入码，无需终端",
                 "  /distantstock network join <加入码>  把当前本地仓储网络加入远仓网络",
+                "  /distantstock network join-terminal <加入码>  手持终端加入，无需先绑定仓库",
                 "  /distantstock network reset-code     重置加入码，现有成员不掉线",
                 "  /distantstock network leave          让当前仓储网络退出并回到 Legacy 域",
                 "  /distantstock group list            列出所有系统（港组）",
@@ -242,6 +248,16 @@ public final class AdminCommand {
             lines.add("  " + network.name() + " · " + network.id().toString().substring(0, 8)
                     + " · 本机仓储成员 " + localMembers + suffix);
         }
+        var known = directory.all().stream().map(dev.distantstock.routing.DistantNetworkDirectory.Network::id)
+                .collect(java.util.stream.Collectors.toSet());
+        dev.distantstock.link.NetworkAnnouncementService.remoteCatalog().forEach((node, networks) -> {
+            for (var network : networks) {
+                if (known.add(network.id())) {
+                    lines.add("  " + network.name() + " · " + network.id().toString().substring(0, 8)
+                            + " · 远端可发现，未在本服加入 · 主节点 " + node.toString().substring(0, 8));
+                }
+            }
+        });
         if (lines.isEmpty()) {
             lines.add("  暂无远仓网络");
         }
@@ -322,15 +338,25 @@ public final class AdminCommand {
     private static int distantNetworkCode(CommandContext<CommandSourceStack> ctx)
             throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
-        var member = localTerminalNetwork(ctx, player);
-        if (member == null) return 0;
         var directory = dev.distantstock.routing.DistantNetworkDirectory.get(player.getServer());
-        var network = directory.networkForOwnedMember(member, player.getUUID()).orElse(null);
-        if (network == null || network.joinCode().isEmpty()) {
-            return failure(ctx, "只有远仓网络的创建者能查看加入码。");
+        UUID localNode = TranserverBridge.localNodeUuid();
+        String name;
+        try {
+            name = StringArgumentType.getString(ctx, "name");
+        } catch (IllegalArgumentException absent) {
+            name = null;
         }
-        ctx.getSource().sendSuccess(() -> Component.literal(
-                network.name() + " · 加入码 " + network.joinCode()), false);
+        String wanted = name;
+        List<String> codes = directory.all().stream()
+                .filter(network -> network.ownedBy(player.getUUID()) && network.authoritativeOn(localNode))
+                .filter(network -> wanted == null || network.name().equalsIgnoreCase(wanted))
+                .filter(network -> !network.joinCode().isEmpty())
+                .map(network -> network.name() + " · 加入码 " + network.joinCode())
+                .toList();
+        if (codes.isEmpty()) {
+            return failure(ctx, "本服没有你创建的对应远仓网络。请回到创建网络的服务器查询加入码。");
+        }
+        ctx.getSource().sendSuccess(() -> Component.literal(String.join("\n", codes)), false);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -374,6 +400,26 @@ public final class AdminCommand {
             return failure(ctx, "加入请求没有发出去：请检查加入码和 Transerver 连接。");
         }
         ctx.getSource().sendSuccess(() -> Component.literal("已发送远仓网络加入请求。"), false);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** Bind a portable terminal before selecting a warehouse, just like the network screen. */
+    private static int distantNetworkJoinTerminal(CommandContext<CommandSourceStack> ctx)
+            throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+        var hand = dev.distantstock.item.RequesterFind.preferredHand(player);
+        ItemStack stack = player.getItemInHand(hand);
+        if (!(stack.getItem() instanceof dev.distantstock.item.RequesterItem)) {
+            return failure(ctx, "请把要加入网络的远仓终端拿在手中，无需先绑定仓库。");
+        }
+        UUID scope = dev.distantstock.item.RequesterData.distantNetwork(stack).orElse(null);
+        if (dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope)) {
+            return failure(ctx, "这台终端已经加入远仓网络，请先在终端界面退出。");
+        }
+        boolean sent = dev.distantstock.link.DistantNetworkJoinService.requestTerminal(
+                player.getServer(), player, hand, StringArgumentType.getString(ctx, "code"));
+        if (!sent) return failure(ctx, "加入请求没有发出去：请检查加入码和 Transerver 连接。");
+        ctx.getSource().sendSuccess(() -> Component.literal("已提交终端加入请求，请等待验证结果。"), false);
         return Command.SINGLE_SUCCESS;
     }
 

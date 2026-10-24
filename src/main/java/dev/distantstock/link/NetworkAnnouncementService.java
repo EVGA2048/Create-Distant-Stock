@@ -32,6 +32,29 @@ public final class NetworkAnnouncementService {
     private static List<NetworkAnnouncementCodec.Group> lastGroups = List.of();
     private static Set<String> lastRecipients = Set.of();
     private static long lastSentAt;
+    private static Set<String> lastCatalogRecipients = Set.of();
+    private static List<NetworkAnnouncementCodec.CatalogEntry> lastNetworks = List.of();
+    private record PeerCatalog(List<NetworkAnnouncementCodec.CatalogEntry> networks, long receivedAt) {}
+    private static final Map<UUID, PeerCatalog> CATALOG = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Discovery only: an advertised network does not grant membership or reveal its join code. */
+    public static Map<UUID, List<NetworkAnnouncementCodec.CatalogEntry>> remoteCatalog() {
+        long cutoff = System.nanoTime() - java.util.concurrent.TimeUnit.MINUTES.toNanos(5);
+        CATALOG.entrySet().removeIf(entry -> entry.getValue().receivedAt() < cutoff);
+        Map<UUID, List<NetworkAnnouncementCodec.CatalogEntry>> result = new java.util.LinkedHashMap<>();
+        CATALOG.forEach((node, catalog) -> result.put(node, catalog.networks()));
+        return Map.copyOf(result);
+    }
+
+    public static void stop() {
+        CATALOG.clear();
+        lastLocal = List.of();
+        lastGroups = List.of();
+        lastNetworks = List.of();
+        lastRecipients = Set.of();
+        lastCatalogRecipients = Set.of();
+        lastSentAt = 0;
+    }
 
     public static void register() {
         TranserverBridge.handler(RoutingChannels.NETWORK_ANNOUNCE, NetworkAnnouncementService::receive);
@@ -66,26 +89,44 @@ public final class NetworkAnnouncementService {
         if (recipients.isEmpty()) {
             return;
         }
+        Set<String> catalogRecipients = recipients.stream().filter(node -> {
+            var peer = ProtocolHelloService.peer(node);
+            return peer != null && peer.capabilities().contains("network-catalog-v1");
+        }).collect(java.util.stream.Collectors.toSet());
         List<NetworkAnnouncementCodec.Group> groups = localGroups();
+        MinecraftServer server = TranserverBridge.server();
+        if (server == null) return;
+        List<NetworkAnnouncementCodec.CatalogEntry> networks =
+                dev.distantstock.routing.DistantNetworkDirectory.get(server).all().stream()
+                        .filter(network -> network.authoritativeOn(self))
+                        .map(network -> new NetworkAnnouncementCodec.CatalogEntry(network.id(), network.name()))
+                        .toList();
         long now = System.currentTimeMillis();
         boolean changed = !local.equals(lastLocal) || !groups.equals(lastGroups)
-                || !recipients.equals(lastRecipients);
+                || !recipients.equals(lastRecipients) || !networks.equals(lastNetworks)
+                || !catalogRecipients.equals(lastCatalogRecipients);
         if (!changed && now - lastSentAt < REFRESH_MS) {
             return;
         }
         try {
             byte[] payload = NetworkAnnouncementCodec.encode(local,
+                    LinkSnapshot.localTps, LinkSnapshot.localMspt, groups, networks);
+            byte[] legacyPayload = NetworkAnnouncementCodec.encode(local,
                     LinkSnapshot.localTps, LinkSnapshot.localMspt, groups);
             for (String node : recipients) {
                 if (!node.equals(self.toString())) {
-                    TranserverBridge.send(node, RoutingChannels.NETWORK_ANNOUNCE, payload, null);
+                    TranserverBridge.send(node, RoutingChannels.NETWORK_ANNOUNCE,
+                            catalogRecipients.contains(node) ? payload : legacyPayload, null);
                 }
             }
+            lastCatalogRecipients = Set.copyOf(catalogRecipients);
+            lastNetworks = List.copyOf(networks);
             lastLocal = List.copyOf(local);
             lastGroups = List.copyOf(groups);
             lastRecipients = Set.copyOf(recipients);
             lastSentAt = now;
-        } catch (IOException ignored) {
+        } catch (IOException error) {
+            LOG.warn("Could not encode network announcement", error);
         }
     }
 
@@ -169,6 +210,7 @@ public final class NetworkAnnouncementService {
             // into LinkSnapshot: Transerver can have many peers, so a single process-wide peer TPS
             // has no stable owner and produces misleading monitor readings.
             List<NetworkAnnouncementCodec.Group> groups = announcement.groups();
+            CATALOG.put(source, new PeerCatalog(announcement.networks(), System.nanoTime()));
             NetworkDirectory.replacePeer(message.source(), entries);
             String alias = entries.stream().map(NetworkDirectory.Entry::server)
                     .filter(name -> name != null && !name.isBlank())

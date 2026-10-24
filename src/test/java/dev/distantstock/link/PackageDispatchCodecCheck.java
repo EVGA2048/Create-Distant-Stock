@@ -95,6 +95,28 @@ public final class PackageDispatchCodecCheck {
                 new NetworkAnnouncementCodec.Group(UUID.randomUUID(), distantNetwork, "无主", true,
                         null, false, 0, List.of()));
         byte[] announcement = NetworkAnnouncementCodec.encode(directory, 19.75, 4.25, groups);
+        // An empty network must be discoverable without a warehouse or dock row.
+        var catalog = List.of(new NetworkAnnouncementCodec.CatalogEntry(UUID.randomUUID(), "VL4 空网络"));
+        byte[] catalogBytes = NetworkAnnouncementCodec.encode(List.of(), 20, 1, List.of(), catalog);
+        var emptyNetwork = NetworkAnnouncementCodec.decodeAnnouncement(catalogBytes);
+        require(emptyNetwork.entries().isEmpty() && emptyNetwork.groups().isEmpty()
+                        && emptyNetwork.networks().equals(catalog),
+                "empty distant network was not independently advertised");
+        require(java.nio.ByteBuffer.wrap(announcement).getInt(4) == 5,
+                "legacy peers must still receive v5 announcements");
+        require(NetworkAnnouncementCodec.decodeAnnouncement(announcement).networks().isEmpty(),
+                "v5 announcement inherited a catalog");
+        byte[] truncatedCatalog = Arrays.copyOf(catalogBytes, catalogBytes.length - 1);
+        try {
+            NetworkAnnouncementCodec.decodeAnnouncement(truncatedCatalog);
+            throw new AssertionError("truncated catalog accepted");
+        } catch (IOException expected) { }
+        byte[] duplicateCatalog = NetworkAnnouncementCodec.encode(List.of(), 20, 1, List.of(),
+                List.of(catalog.getFirst(), catalog.getFirst()));
+        try {
+            NetworkAnnouncementCodec.decodeAnnouncement(duplicateCatalog);
+            throw new AssertionError("duplicate catalog identity accepted");
+        } catch (IOException expected) { }
         List<NetworkDirectory.Entry> readBack = NetworkAnnouncementCodec.decode(announcement);
         require(readBack.size() == 1, "the announcement came back with " + readBack.size() + " networks");
         require(readBack.getFirst().freq().equals(network.createFrequency()),

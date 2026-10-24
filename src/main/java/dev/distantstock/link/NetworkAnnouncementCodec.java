@@ -19,14 +19,16 @@ public final class NetworkAnnouncementCodec {
      * Version 1 carried only the network list; 2 appends the sender's own tick metrics; 3 adds
      * whether each network has a machine that can pack for it, and the sender's dock groups.
      * Version 4 adds the Distant Stock network that contains each Create network and receiving
-     * address. Peers on 3 are treated as members of the hidden legacy network.
+     * address. Version 6 adds an authority catalog without join codes; send it only to peers
+     * advertising network-catalog-v1. Peers on 3 are treated as members of the hidden legacy network.
      *
      * <p>Older payloads are still read: every field added since 1 is read only when the version
      * says it is there, and a peer that speaks 2 leaves the newer answers at their defaults. The
      * defaults are the permissive ones — "can pack" and "no opinion about who may use this group" —
      * so a mixed pair of versions loses a warning, never an order.
      */
-    private static final int VERSION = 5;
+    private static final int VERSION = 6;
+    private static final int VERSION_WITH_CATALOG = 6;
     private static final int VERSION_WITH_WAREHOUSE_NAME = 5;
     private static final int VERSION_WITH_DISTANT_NETWORK = 4;
     private static final int VERSION_WITH_GROUPS = 3;
@@ -50,6 +52,21 @@ public final class NetworkAnnouncementCodec {
      */
     public static byte[] encode(List<NetworkDirectory.Entry> entries, double tps, double mspt,
                                 List<Group> groups) throws IOException {
+        return encodeVersion(entries, tps, mspt, groups, List.of(), VERSION_WITH_WAREHOUSE_NAME);
+    }
+
+    /** Public authority catalog, including networks with no loaded warehouses or docks. */
+    public record CatalogEntry(UUID id, String name) {}
+
+    public static byte[] encode(List<NetworkDirectory.Entry> entries, double tps, double mspt,
+                                List<Group> groups, List<CatalogEntry> networks) throws IOException {
+        return encodeVersion(entries, tps, mspt, groups, networks, VERSION);
+    }
+
+    private static byte[] encodeVersion(List<NetworkDirectory.Entry> entries, double tps, double mspt,
+                                       List<Group> groups, List<CatalogEntry> networks, int version)
+            throws IOException {
+        if (networks.size() > MAX_NETWORKS) throw new IOException("Too many catalog networks");
         if (entries.size() > MAX_NETWORKS) {
             throw new IOException("Too many announced networks");
         }
@@ -59,7 +76,7 @@ public final class NetworkAnnouncementCodec {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
         out.writeInt(MAGIC);
-        out.writeInt(VERSION);
+        out.writeInt(version);
         out.writeInt(entries.size());
         for (NetworkDirectory.Entry entry : entries) {
             if (entry.networkId() == null) {
@@ -99,6 +116,13 @@ public final class NetworkAnnouncementCodec {
                 string(out, member.name());
             }
         }
+        if (version >= VERSION_WITH_CATALOG) {
+            out.writeInt(networks.size());
+            for (CatalogEntry network : networks) {
+                uuid(out, network.id());
+                string(out, network.name());
+            }
+        }
         return bytes.toByteArray();
     }
 
@@ -135,10 +159,11 @@ public final class NetworkAnnouncementCodec {
 
     /** One self-contained decode result. Safe when several peers announce concurrently. */
     public record Announcement(List<NetworkDirectory.Entry> entries, Metrics metrics,
-                               List<Group> groups) {
+                               List<Group> groups, List<CatalogEntry> networks) {
         public Announcement {
             entries = List.copyOf(entries);
             groups = List.copyOf(groups);
+            networks = List.copyOf(networks);
         }
     }
 
@@ -210,10 +235,27 @@ public final class NetworkAnnouncementCodec {
         if (version >= VERSION_WITH_GROUPS) {
             groups = readGroups(in, version);
         }
+        List<CatalogEntry> networks = new ArrayList<>();
+        if (version >= VERSION_WITH_CATALOG) {
+            int networkCount = in.readInt();
+            if (networkCount < 0 || networkCount > MAX_NETWORKS) {
+                throw new IOException("Network catalog count is invalid");
+            }
+            var ids = new java.util.HashSet<UUID>();
+            for (int i = 0; i < networkCount; i++) {
+                UUID id = uuid(in);
+                String name = string(in);
+                if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(id)
+                        || name.isBlank() || name.length() > 48 || !ids.add(id)) {
+                    throw new IOException("Invalid network catalog entry");
+                }
+                networks.add(new CatalogEntry(id, name));
+            }
+        }
         if (in.available() != 0) {
             throw new IOException("Network announcement contains trailing data");
         }
-        return new Announcement(entries, metrics, groups);
+        return new Announcement(entries, metrics, groups, networks);
     }
 
     private static List<Group> readGroups(DataInputStream in, int version) throws IOException {
