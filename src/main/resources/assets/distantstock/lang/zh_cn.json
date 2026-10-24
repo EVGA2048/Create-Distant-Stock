@@ -453,6 +453,8 @@
   "message.distantstock.network.left": "终端已退出远仓网络「%s」。",
   "message.distantstock.network.joined": "已加入远仓网络「%s」。",
   "message.distantstock.network.code_not_found": "未找到这个远仓网络加入码。",
+  "message.distantstock.network.join_timeout": "加入请求在 60 秒内未收到确认。请检查邀请码、创建网络的服务器是否在线，以及 Transerver 队列后重试。",
+  "message.distantstock.network.join_target_changed": "等待期间手持终端或其网络已改变，本次加入已取消，请重新发起。",
   "goggle.distantstock.fallback.no_route": "已退回：包裹缺少远仓路由",
   "goggle.distantstock.fallback.no_address": "已退回：未设置接收港地址",
   "goggle.distantstock.fallback.address_conflict": "已退回：接收港地址存在冲突",

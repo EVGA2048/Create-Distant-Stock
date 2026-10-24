@@ -453,6 +453,8 @@
   "message.distantstock.network.left": "The terminal left Distant Stock network “%s”.",
   "message.distantstock.network.joined": "Joined Distant Stock network “%s”.",
   "message.distantstock.network.code_not_found": "No Distant Stock network uses that join code.",
+  "message.distantstock.network.join_timeout": "No join confirmation arrived within 60 seconds. Check the invite code, authority server and Transerver queues, then retry.",
+  "message.distantstock.network.join_target_changed": "The held terminal or its network changed while waiting. This join was cancelled; please try again.",
   "goggle.distantstock.fallback.no_route": "Returned: parcel has no Distant Stock route",
   "goggle.distantstock.fallback.no_address": "Returned: no receiving address is set",
   "goggle.distantstock.fallback.address_conflict": "Returned: receiving-address conflict",

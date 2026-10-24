@@ -39,11 +39,11 @@ public final class DistantNetworkJoinService {
     }
 
     private record Pending(UUID player, RemoteNetworkId member, InteractionHand hand,
-                           DeviceTarget device, long sentAt) {
+                           DeviceTarget device, ItemStack terminal, long sentAt) {
     }
 
     private static final Map<UUID, Pending> PENDING = new ConcurrentHashMap<>();
-    private static final long TIMEOUT_MS = 10_000L;
+    private static final long TIMEOUT_NANOS = java.util.concurrent.TimeUnit.SECONDS.toNanos(60);
 
     public static void register() {
         TranserverBridge.handler(RoutingChannels.DISTANT_NETWORK_JOIN_REQUEST,
@@ -61,14 +61,16 @@ public final class DistantNetworkJoinService {
      * A local code is applied immediately without going over Transerver.
      */
     public static boolean request(MinecraftServer server, UUID player, RemoteNetworkId member, String code) {
-        return request(server, player, member, null, null, code);
+        return request(server, player, member, null, null, null, code);
     }
 
     /** Join only the portable terminal to a Distant Stock network; no Create warehouse is enrolled. */
     public static boolean requestTerminal(MinecraftServer server, ServerPlayer player,
                                           InteractionHand hand, String code) {
         if (player == null || hand == null) return false;
-        return request(server, player.getUUID(), null, hand, null, code);
+        ItemStack terminal = player.getItemInHand(hand);
+        if (!(terminal.getItem() instanceof RequesterItem)) return false;
+        return request(server, player.getUUID(), null, hand, null, terminal, code);
     }
 
     /** Join one placed device/panel to a Distant Stock network without selecting a warehouse yet. */
@@ -77,11 +79,11 @@ public final class DistantNetworkJoinService {
                                         String code) {
         if (player == null || dimension == null || pos == null) return false;
         return request(server, player.getUUID(), null, null,
-                new DeviceTarget(dimension, pos.immutable(), slot), code);
+                new DeviceTarget(dimension, pos.immutable(), slot), null, code);
     }
 
     private static boolean request(MinecraftServer server, UUID player, RemoteNetworkId member,
-                                   InteractionHand hand, DeviceTarget device, String code) {
+                                   InteractionHand hand, DeviceTarget device, ItemStack terminal, String code) {
         if (server == null || player == null
                 || (member == null && hand == null && device == null)) return false;
         String normalized;
@@ -98,9 +100,13 @@ public final class DistantNetworkJoinService {
             if (member == null) {
                 boolean bound = serverPlayer != null && (device != null
                         ? bindDevice(server, device, local.id())
-                        : bindTerminal(serverPlayer, hand, local.id()));
+                        : bindTerminal(serverPlayer, hand, terminal, local.id()));
                 if (!bound) {
                     return false;
+                }
+                if (serverPlayer.containerMenu instanceof dev.distantstock.menu.RequesterMenu menu
+                        && device == null && menu.hand == hand && !menu.isGauge()) {
+                    menu.refresh(serverPlayer);
                 }
                 notify(server, player, "message.distantstock.network.joined", local.name());
                 if (device == null) {
@@ -155,7 +161,7 @@ public final class DistantNetworkJoinService {
         } catch (IOException exception) {
             return false;
         }
-        PENDING.put(requestId, new Pending(player, member, hand, device, System.currentTimeMillis()));
+        PENDING.put(requestId, new Pending(player, member, hand, device, terminal, System.nanoTime()));
         int sent = 0;
         UUID localNode = TranserverBridge.localNodeUuid();
         String self = localNode == null ? "" : localNode.toString();
@@ -224,10 +230,10 @@ public final class DistantNetworkJoinService {
 
     public static void tick(MinecraftServer server) {
         acknowledgeCompleted();
-        long cutoff = System.currentTimeMillis() - TIMEOUT_MS;
+        long now = System.nanoTime();
         PENDING.entrySet().removeIf(entry -> {
-            if (entry.getValue().sentAt() >= cutoff) return false;
-            notify(server, entry.getValue().player(), "message.distantstock.network.code_not_found");
+            if (now - entry.getValue().sentAt() < TIMEOUT_NANOS) return false;
+            notify(server, entry.getValue().player(), "message.distantstock.network.join_timeout");
             return true;
         });
     }
@@ -249,16 +255,14 @@ public final class DistantNetworkJoinService {
         if (server == null || !server.isRunning()) {
             return CompletableFuture.completedFuture(DeliveryResult.RETRY);
         }
-        CompletableFuture<DeliveryResult> result = new CompletableFuture<>();
-        server.execute(() -> {
+        return onServer(server, () -> {
             DistantNetworkDirectory directory = DistantNetworkDirectory.get(server);
             var network = directory.findByCode(request.joinCode()).orElse(null);
             if (network == null || network.ownerNode() == null
                     || !network.ownerNode().equals(TranserverBridge.localNodeUuid())) {
                 // The request is deliberately broadcast. "Not mine" is a handled no-op, not a
                 // reason for Transerver to retry it for seven days.
-                result.complete(DeliveryResult.APPLIED);
-                return;
+                return DeliveryResult.APPLIED;
             }
             // The authority grants membership but does not persist the remote Create network as its
             // own SavedData membership. The warehouse's node is authoritative for that relationship
@@ -271,24 +275,21 @@ public final class DistantNetworkJoinService {
                 UUID sent = TranserverBridge.send(source.toString(),
                         RoutingChannels.DISTANT_NETWORK_JOIN_ACCEPT, payload,
                         request.requestId().toString());
-                result.complete(sent == null ? DeliveryResult.RETRY : DeliveryResult.APPLIED);
+                return sent == null ? DeliveryResult.RETRY : DeliveryResult.APPLIED;
             } catch (IOException exception) {
-                result.complete(DeliveryResult.REJECTED);
+                return DeliveryResult.REJECTED;
             }
         });
-        return result;
     }
 
-    private static boolean bindTerminal(ServerPlayer player, InteractionHand hand, UUID scope) {
+    private static boolean bindTerminal(ServerPlayer player, InteractionHand hand, ItemStack expected, UUID scope) {
         if (player == null || hand == null || !DistantNetworkDirectory.isFormalId(scope)) return false;
         ItemStack stack = player.getItemInHand(hand);
-        if (!(stack.getItem() instanceof RequesterItem)) return false;
+        if (stack != expected || !(stack.getItem() instanceof RequesterItem)) return false;
+        UUID current = RequesterData.distantNetwork(stack).orElse(null);
+        if (DistantNetworkDirectory.isFormalId(current) && !scope.equals(current)) return false;
         RequesterData.setDistantNetwork(stack, scope);
         player.getInventory().setChanged();
-        if (player.containerMenu instanceof dev.distantstock.menu.RequesterMenu menu) {
-            menu.persistDistantNetworkContext(player, scope);
-            menu.refresh(player);
-        }
         return true;
     }
 
@@ -301,72 +302,100 @@ public final class DistantNetworkJoinService {
         } catch (IOException | IllegalArgumentException exception) {
             return CompletableFuture.completedFuture(DeliveryResult.REJECTED);
         }
-        if (!source.equals(accept.ownerNode())) {
+        if (!source.equals(accept.ownerNode())
+                || !DistantNetworkDirectory.isFormalId(accept.networkId())
+                || accept.networkName().isBlank()
+                || accept.networkName().trim().length() > DistantNetworkDirectory.MAX_NAME_LENGTH) {
             return CompletableFuture.completedFuture(DeliveryResult.REJECTED);
         }
         MinecraftServer server = TranserverBridge.server();
         if (server == null || !server.isRunning()) {
             return CompletableFuture.completedFuture(DeliveryResult.RETRY);
         }
-        Pending pending = PENDING.get(accept.requestId());
-        if (pending == null) {
-            // Transerver is at-least-once. If we already applied this acceptance, acknowledge a
-            // duplicate instead of turning it into a retry loop/dead letter.
+        // SavedData and the pending-to-applied transition belong to the game thread, including
+        // duplicate deliveries. A transport callback must not read Minecraft SavedData directly.
+        return onServer(server, () -> {
             DistantNetworkDirectory directory = DistantNetworkDirectory.get(server);
-            boolean alreadyApplied = accept.member() == null
-                    ? directory.find(accept.networkId()).isPresent()
-                    : directory.networkOf(accept.member()).map(accept.networkId()::equals).orElse(false);
-            return CompletableFuture.completedFuture(
-                    alreadyApplied ? DeliveryResult.APPLIED : DeliveryResult.REJECTED);
-        }
-        if (!Objects.equals(pending.member(), accept.member())) {
-            return CompletableFuture.completedFuture(DeliveryResult.REJECTED);
-        }
-        CompletableFuture<DeliveryResult> result = new CompletableFuture<>();
-        server.execute(() -> {
-            Pending accepted = PENDING.remove(accept.requestId());
-            if (accepted == null || !Objects.equals(accepted.member(), accept.member())) {
-                result.complete(DeliveryResult.REJECTED);
-                return;
+            Pending pending = PENDING.get(accept.requestId());
+            var known = directory.find(accept.networkId()).orElse(null);
+            if (known != null && !Objects.equals(known.ownerNode(), accept.ownerNode())) {
+                return DeliveryResult.REJECTED;
             }
-            DistantNetworkDirectory directory = DistantNetworkDirectory.get(server);
-            directory.rememberReplica(accept.networkId(), accept.networkName(), accept.ownerNode());
+            if (pending == null) {
+                boolean applied = known != null && (accept.member() == null
+                        || directory.formalNetworkOf(accept.member()).filter(accept.networkId()::equals).isPresent());
+                return applied ? DeliveryResult.APPLIED : DeliveryResult.REJECTED;
+            }
+            if (!Objects.equals(pending.member(), accept.member())) return DeliveryResult.REJECTED;
+            if (System.nanoTime() - pending.sentAt() >= TIMEOUT_NANOS) return DeliveryResult.REJECTED;
             if (accept.member() == null) {
-                ServerPlayer serverPlayer = server.getPlayerList().getPlayer(accepted.player());
-                boolean bound = serverPlayer != null && (accepted.device() != null
-                        ? bindDevice(server, accepted.device(), accept.networkId())
-                        : bindTerminal(serverPlayer, accepted.hand(), accept.networkId()));
-                if (!bound) {
-                    result.complete(DeliveryResult.REJECTED);
-                    return;
+                ServerPlayer player = server.getPlayerList().getPlayer(pending.player());
+                if (player == null) return DeliveryResult.REJECTED;
+                if (pending.device() == null) {
+                    ItemStack held = pending.hand() == null ? ItemStack.EMPTY : player.getItemInHand(pending.hand());
+                    UUID current = RequesterData.distantNetwork(held).orElse(null);
+                    if (held != pending.terminal() || !(held.getItem() instanceof RequesterItem)
+                            || (DistantNetworkDirectory.isFormalId(current) && !accept.networkId().equals(current))) {
+                        PENDING.remove(accept.requestId());
+                        notify(server, pending.player(), "message.distantstock.network.join_target_changed");
+                        return DeliveryResult.REJECTED;
+                    }
                 }
-                notify(server, accepted.player(), "message.distantstock.network.joined", accept.networkName());
-                if (accepted.device() == null) {
-                    dev.distantstock.net.DistantNetworkStateS2C.sendScope(serverPlayer, accept.networkId());
+                // Validate the target before writing a replica; a declined join must not create
+                // a phantom entry in the local network list.
+                boolean bound = pending.device() != null
+                        ? bindDevice(server, pending.device(), accept.networkId())
+                        : bindTerminal(player, pending.hand(), pending.terminal(), accept.networkId());
+                if (!bound) return DeliveryResult.REJECTED;
+                directory.rememberReplica(accept.networkId(), accept.networkName(), accept.ownerNode());
+                if (player.containerMenu instanceof dev.distantstock.menu.RequesterMenu menu) menu.refresh(player);
+                PENDING.remove(accept.requestId());
+                notify(server, pending.player(), "message.distantstock.network.joined", accept.networkName());
+                if (pending.device() == null) {
+                    dev.distantstock.net.DistantNetworkStateS2C.sendScope(player, accept.networkId());
                 } else {
-                    dev.distantstock.net.DistantDeviceStateS2C.send(serverPlayer, accepted.device());
+                    dev.distantstock.net.DistantDeviceStateS2C.send(player, pending.device());
                 }
-                result.complete(DeliveryResult.APPLIED);
-                return;
+                return DeliveryResult.APPLIED;
             }
-            UUID current = directory.networkOf(accept.member()).orElse(null);
+            UUID current = directory.formalNetworkOf(accept.member()).orElse(null);
             if (current != null && !current.equals(accept.networkId())) {
-                result.complete(DeliveryResult.REJECTED);
-                return;
+                PENDING.remove(accept.requestId());
+                return DeliveryResult.REJECTED;
             }
-            directory.attach(accept.member(), accept.networkId());
+            directory.rememberReplica(accept.networkId(), accept.networkName(), accept.ownerNode());
+            if (!accept.networkId().equals(current) && !directory.attach(accept.member(), accept.networkId())) {
+                return DeliveryResult.REJECTED;
+            }
+            PENDING.remove(accept.requestId());
             dev.distantstock.stock.StockScanner.scan(server);
-            notify(server, accepted.player(), "message.distantstock.network.joined", accept.networkName());
-            ServerPlayer serverPlayer = server.getPlayerList().getPlayer(accepted.player());
-            if (serverPlayer != null) {
-                if (serverPlayer.containerMenu instanceof dev.distantstock.menu.RequesterMenu menu) {
-                    menu.persistDistantNetworkScope(serverPlayer, accept.member(), accept.networkId());
-                    menu.refresh(serverPlayer);
+            notify(server, pending.player(), "message.distantstock.network.joined", accept.networkName());
+            ServerPlayer player = server.getPlayerList().getPlayer(pending.player());
+            if (player != null) {
+                if (player.containerMenu instanceof dev.distantstock.menu.RequesterMenu menu) {
+                    menu.persistDistantNetworkScope(player, accept.member(), accept.networkId());
+                    menu.refresh(player);
                 }
-                dev.distantstock.net.DistantNetworkStateS2C.send(serverPlayer, accept.member());
+                dev.distantstock.net.DistantNetworkStateS2C.send(player, accept.member());
             }
-            result.complete(DeliveryResult.APPLIED);
+            return DeliveryResult.APPLIED;
         });
+    }
+
+    private static CompletableFuture<DeliveryResult> onServer(MinecraftServer server,
+                                                              java.util.function.Supplier<DeliveryResult> action) {
+        CompletableFuture<DeliveryResult> result = new CompletableFuture<>();
+        try {
+            server.execute(() -> {
+                try {
+                    result.complete(action.get());
+                } catch (RuntimeException error) {
+                    result.completeExceptionally(error);
+                }
+            });
+        } catch (RuntimeException error) {
+            result.completeExceptionally(error);
+        }
         return result;
     }
 
@@ -385,7 +414,15 @@ public final class DistantNetworkJoinService {
         if (server == null || playerId == null) return;
         ServerPlayer player = server.getPlayerList().getPlayer(playerId);
         if (player != null) {
-            player.displayClientMessage(Component.translatable(key, args), false);
+            String fallback = switch (key) {
+                case "message.distantstock.network.join_timeout" ->
+                        "加入请求在 60 秒内未收到确认，请检查邀请码、主节点和 Transerver 队列后重试。";
+                case "message.distantstock.network.join_target_changed" ->
+                        "等待期间手持终端或其网络已改变，本次加入已取消，请重新发起。";
+                default -> null;
+            };
+            player.displayClientMessage(fallback == null ? Component.translatable(key, args)
+                    : Component.translatableWithFallback(key, fallback, args), false);
         }
     }
 
