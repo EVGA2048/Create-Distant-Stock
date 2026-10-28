@@ -22,21 +22,23 @@ public final class DistantNetworkDeleteService {
                 DistantNetworkDeleteService::receive);
     }
 
-    public static void broadcast(DistantNetworkDirectory.Network network) {
-        if (network == null || network.legacy() || network.ownerNode() == null) return;
+    public static CompletableFuture<Void> broadcast(DistantNetworkDirectory.Network network) {
+        if (network == null || network.legacy() || network.ownerNode() == null) return CompletableFuture.completedFuture(null);
         UUID self = TranserverBridge.localNodeUuid();
-        if (self == null || !self.equals(network.ownerNode())) return;
+        if (self == null || !self.equals(network.ownerNode())) return CompletableFuture.failedFuture(new IllegalStateException("Not network owner"));
         byte[] payload;
         try {
             payload = encode(network.id(), network.ownerNode());
         } catch (IOException impossible) {
-            return;
+            return CompletableFuture.failedFuture(impossible);
         }
+        var sends = new java.util.ArrayList<CompletableFuture<UUID>>();
         for (String node : TranserverBridge.knownNodes()) {
             if (node.equals(self.toString())) continue;
-            TranserverBridge.send(node, RoutingChannels.DISTANT_NETWORK_DELETE, payload,
-                    network.id().toString());
+            sends.add(TranserverBridge.sendAsync(node, RoutingChannels.DISTANT_NETWORK_DELETE, payload,
+                    network.id().toString()));
         }
+        return CompletableFuture.allOf(sends.toArray(CompletableFuture[]::new));
     }
 
     public static void tick() {

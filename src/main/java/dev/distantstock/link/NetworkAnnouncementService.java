@@ -115,7 +115,7 @@ public final class NetworkAnnouncementService {
                     LinkSnapshot.localTps, LinkSnapshot.localMspt, groups);
             for (String node : recipients) {
                 if (!node.equals(self.toString())) {
-                    TranserverBridge.send(node, RoutingChannels.NETWORK_ANNOUNCE,
+                    TranserverBridge.queueSend(node, RoutingChannels.NETWORK_ANNOUNCE,
                             catalogRecipients.contains(node) ? payload : legacyPayload, null);
                 }
             }

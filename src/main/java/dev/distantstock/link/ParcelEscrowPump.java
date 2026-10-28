@@ -59,6 +59,8 @@ public final class ParcelEscrowPump {
      */
     public static final long HOLD_TIMEOUT_TICKS = 36000;
 
+    private static final Set<UUID> SUBMITTING = ConcurrentHashMap.newKeySet();
+
     private static final Map<UUID, Long> REJECTED_SINCE = new ConcurrentHashMap<>();
 
     public static void tick(MinecraftServer server) {
@@ -97,7 +99,7 @@ public final class ParcelEscrowPump {
     private static void expireHeld(MinecraftServer server, ParcelEscrow escrow) {
         long gameTime = server.overworld().getGameTime();
         for (ParcelEscrow.Record record : escrow.records()) {
-            if (record.state() != ParcelEscrow.State.HELD) {
+            if (record.state() != ParcelEscrow.State.HELD || SUBMITTING.contains(record.parcelId())) {
                 continue;
             }
             if (record.createdAt() > gameTime) {
@@ -133,7 +135,7 @@ public final class ParcelEscrowPump {
     private static void submitHeld(MinecraftServer server, ParcelEscrow escrow) {
         int sent = 0;
         for (ParcelEscrow.Record record : escrow.records()) {
-            if (sent >= 8 || record.state() != ParcelEscrow.State.HELD) {
+            if (sent >= 8 || record.state() != ParcelEscrow.State.HELD || SUBMITTING.contains(record.parcelId())) {
                 continue;
             }
             try {
@@ -186,17 +188,29 @@ public final class ParcelEscrowPump {
                     // record deliberately stays HELD so a later tick can finish the delivery.
                     continue;
                 }
-                UUID messageId = TranserverBridge.send(record.destinationNode(), RoutingChannels.PACKAGE_DISPATCH,
-                        PackageDispatchCodec.encode(dispatch), record.parcelId().toString());
-                if (messageId != null) {
-                    escrow.submitted(record.parcelId(), messageId);
-                    ParcelJournal.get(server).record(record.parcelId(), "SUBMITTED",
-                            "message=" + messageId + " target=" + record.destinationNode());
-                    LOG.info("[DistantStock/Parcel] submitted parcel={} message={} target={} group={} strips={}",
-                            record.parcelId(), messageId, record.destinationNode(),
-                            record.receivingDockGroupId(), record.strips());
-                    sent++;
-                }
+                byte[] payload = PackageDispatchCodec.encode(dispatch);
+                SUBMITTING.add(record.parcelId());
+                TranserverBridge.sendAsync(record.destinationNode(), RoutingChannels.PACKAGE_DISPATCH,
+                        payload, record.parcelId().toString()).whenComplete((messageId, error) -> {
+                    if (TranserverBridge.server() != server || !server.isRunning()) {
+                        SUBMITTING.remove(record.parcelId());
+                        return;
+                    }
+                    server.execute(() -> {
+                        try {
+                            if (error == null) {
+                                escrow.submitted(record.parcelId(), messageId);
+                                ParcelJournal.get(server).record(record.parcelId(), "SUBMITTED",
+                                        "message=" + messageId + " target=" + record.destinationNode());
+                            } else {
+                                LOG.debug("[DistantStock/Parcel] persistence deferred parcel={}", record.parcelId(), error);
+                            }
+                        } finally {
+                            SUBMITTING.remove(record.parcelId());
+                        }
+                    });
+                });
+                sent++;
             } catch (RuntimeException ignored) {
                 break;
             }
@@ -215,6 +229,7 @@ public final class ParcelEscrowPump {
             try {
                 UUID parcelId = PackageDispatchCodec.decode(completed.payload()).parcelId();
                 ParcelEscrow.Record record = escrow.find(parcelId).orElse(null);
+                if (SUBMITTING.contains(parcelId)) continue;
                 // A stripped parcel is re-sent under the same parcel ID, so only the receipt that matches
                 // the message currently in flight may change its state.
                 if (record != null && completed.messageId().equals(record.messageId())) {
@@ -247,6 +262,7 @@ public final class ParcelEscrowPump {
                                        ParcelQuarantine quarantine) {
         long gameTime = server.overworld().getGameTime();
         for (ParcelEscrow.Record record : escrow.records()) {
+            if (SUBMITTING.contains(record.parcelId())) continue;
             boolean wantsStrip = !record.stripIds().isEmpty();
             if (record.state() != ParcelEscrow.State.REJECTED && !wantsStrip) {
                 REJECTED_SINCE.remove(record.parcelId());

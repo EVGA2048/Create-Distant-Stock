@@ -38,7 +38,7 @@ public final class PackageTraceService {
             return;
         }
         try {
-            TranserverBridge.send(sourceNode, RoutingChannels.PACKAGE_TRACE,
+            TranserverBridge.queueSend(sourceNode, RoutingChannels.PACKAGE_TRACE,
                     PackageTraceCodec.encode(new PackageTraceCodec.Notice(
                             parcelId, System.currentTimeMillis(), stage, detail)), parcelId.toString());
         } catch (IOException ignored) {

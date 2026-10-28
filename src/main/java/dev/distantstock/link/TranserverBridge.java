@@ -43,11 +43,13 @@ public final class TranserverBridge {
     private static volatile List<CompletedSend> cachedCompletedSends = List.of();
     private static final Set<UUID> ACK_PENDING = ConcurrentHashMap.newKeySet();
     private static ScheduledExecutorService maintenance;
+    private static volatile AsyncSender sender;
     private static final int COMPLETION_BATCH = 4096;
     private static final int ACKS_PER_PASS = 128;
 
     public static void start(MinecraftServer minecraftServer) {
         server = minecraftServer;
+        sender = new AsyncSender();
         attachIfReady();
         startMaintenance();
     }
@@ -75,6 +77,9 @@ public final class TranserverBridge {
 
     public static synchronized void stop() {
         server = null;
+        AsyncSender previousSender = sender;
+        sender = null;
+        if (previousSender != null) previousSender.close();
         attached = null;
         cachedStatus = null;
         cachedIdentity = null;
@@ -92,14 +97,30 @@ public final class TranserverBridge {
         return server;
     }
 
-    public static UUID send(String destination, String channel, byte[] payload, String correlationId) {
+    public static CompletableFuture<UUID> sendAsync(String destination, String channel, byte[] payload,
+                                                    String correlationId) {
         TranserverApi api = attached;
-        if (api == null) {
-            return null;
-        }
-        return api.send(destination, channel, payload,
-                new SendOptions(correlationId, "application/x-distantstock", Instant.now().plus(7, ChronoUnit.DAYS)))
-                .messageId();
+        AsyncSender io = sender;
+        if (api == null || io == null) return CompletableFuture.failedFuture(
+                new IllegalStateException("Transerver is unavailable"));
+        boolean recurring = RoutingChannels.PROTOCOL_HELLO.equals(channel)
+                || RoutingChannels.NETWORK_ANNOUNCE.equals(channel);
+        boolean transientMessage = recurring || RoutingChannels.STOCK_QUERY.equals(channel)
+                || RoutingChannels.STOCK_RESULT.equals(channel)
+                || RoutingChannels.RECEIVER_PROBE_REQUEST.equals(channel)
+                || RoutingChannels.RECEIVER_PROBE_RESULT.equals(channel);
+        var options = new SendOptions(correlationId, "application/x-distantstock",
+                transientMessage ? Instant.now().plusSeconds(120) : Instant.now().plus(7, ChronoUnit.DAYS));
+        return io.submit(api, destination, channel, payload, options, recurring);
+    }
+
+    /** For retriable queries/telemetry only. Cargo must await sendAsync before changing custody. */
+    public static boolean queueSend(String destination, String channel, byte[] payload, String correlationId) {
+        var sent = sendAsync(destination, channel, payload, correlationId);
+        sent.whenComplete((id, error) -> {
+            if (error != null) LOG.debug("Transport submission deferred: channel={} destination={}", channel, destination);
+        });
+        return !sent.isCompletedExceptionally();
     }
 
     public static TranserverApi attachedApi() {

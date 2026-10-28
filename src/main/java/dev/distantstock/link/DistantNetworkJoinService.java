@@ -167,8 +167,8 @@ public final class DistantNetworkJoinService {
         String self = localNode == null ? "" : localNode.toString();
         for (String node : TranserverBridge.knownNodes()) {
             if (node.equals(self)) continue;
-            if (TranserverBridge.send(node, RoutingChannels.DISTANT_NETWORK_JOIN_REQUEST,
-                    payload, requestId.toString()) != null) {
+            if (TranserverBridge.queueSend(node, RoutingChannels.DISTANT_NETWORK_JOIN_REQUEST,
+                    payload, requestId.toString())) {
                 sent++;
             }
         }
@@ -255,14 +255,14 @@ public final class DistantNetworkJoinService {
         if (server == null || !server.isRunning()) {
             return CompletableFuture.completedFuture(DeliveryResult.RETRY);
         }
-        return onServer(server, () -> {
+        return DistantNetworkJoinService.<CompletableFuture<DeliveryResult>>onServer(server, () -> {
             DistantNetworkDirectory directory = DistantNetworkDirectory.get(server);
             var network = directory.findByCode(request.joinCode()).orElse(null);
             if (network == null || network.ownerNode() == null
                     || !network.ownerNode().equals(TranserverBridge.localNodeUuid())) {
                 // The request is deliberately broadcast. "Not mine" is a handled no-op, not a
                 // reason for Transerver to retry it for seven days.
-                return DeliveryResult.APPLIED;
+                return CompletableFuture.completedFuture(DeliveryResult.APPLIED);
             }
             // The authority grants membership but does not persist the remote Create network as its
             // own SavedData membership. The warehouse's node is authoritative for that relationship
@@ -272,14 +272,14 @@ public final class DistantNetworkJoinService {
                 byte[] payload = DistantNetworkJoinCodec.encodeAccept(
                         new DistantNetworkJoinCodec.Accept(request.requestId(), network.id(),
                                 network.name(), network.ownerNode(), request.member()));
-                UUID sent = TranserverBridge.send(source.toString(),
+                var sent = TranserverBridge.sendAsync(source.toString(),
                         RoutingChannels.DISTANT_NETWORK_JOIN_ACCEPT, payload,
                         request.requestId().toString());
-                return sent == null ? DeliveryResult.RETRY : DeliveryResult.APPLIED;
+                return sent.handle((id, error) -> error == null ? DeliveryResult.APPLIED : DeliveryResult.RETRY);
             } catch (IOException exception) {
-                return DeliveryResult.REJECTED;
+                return CompletableFuture.completedFuture(DeliveryResult.REJECTED);
             }
-        });
+        }).thenCompose(result -> result);
     }
 
     private static boolean bindTerminal(ServerPlayer player, InteractionHand hand, ItemStack expected, UUID scope) {
@@ -382,9 +382,9 @@ public final class DistantNetworkJoinService {
         });
     }
 
-    private static CompletableFuture<DeliveryResult> onServer(MinecraftServer server,
-                                                              java.util.function.Supplier<DeliveryResult> action) {
-        CompletableFuture<DeliveryResult> result = new CompletableFuture<>();
+    private static <T> CompletableFuture<T> onServer(MinecraftServer server,
+                                                              java.util.function.Supplier<T> action) {
+        CompletableFuture<T> result = new CompletableFuture<>();
         try {
             server.execute(() -> {
                 try {

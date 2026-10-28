@@ -99,10 +99,10 @@ public final class ReceiverProbeService {
             if (pending != null) PENDING_BY_ID.remove(pending.probeId(), key);
             UUID probeId = UUID.randomUUID();
             try {
-                UUID message = TranserverBridge.send(destinationNode.toString(),
+                boolean queued = TranserverBridge.queueSend(destinationNode.toString(),
                         RoutingChannels.RECEIVER_PROBE_REQUEST,
                         encodeRequest(new Request(probeId, distantNetwork, group)), probeId.toString());
-                if (message == null) {
+                if (!queued) {
                     return State.UNAVAILABLE;
                 }
                 Pending next = new Pending(probeId, now);
@@ -158,10 +158,10 @@ public final class ReceiverProbeService {
                     && group.distantNetworkId().equals(request.distantNetwork())
                     && LoadedDocks.availableReceiversInGroup(request.group()) > 0;
             try {
-                UUID sent = TranserverBridge.send(message.source(), RoutingChannels.RECEIVER_PROBE_RESULT,
+                var sent = TranserverBridge.sendAsync(message.source(), RoutingChannels.RECEIVER_PROBE_RESULT,
                         encodeResult(new Result(request.probeId(), request.distantNetwork(),
                                 request.group(), available)), request.probeId().toString());
-                applied.complete(sent == null ? DeliveryResult.RETRY : DeliveryResult.APPLIED);
+                sent.whenComplete((id, error) -> applied.complete(error == null ? DeliveryResult.APPLIED : DeliveryResult.RETRY));
             } catch (IOException | RuntimeException exception) {
                 applied.complete(DeliveryResult.RETRY);
             }

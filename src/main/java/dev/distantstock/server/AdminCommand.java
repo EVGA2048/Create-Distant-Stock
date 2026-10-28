@@ -325,13 +325,17 @@ public final class AdminCommand {
             return Command.SINGLE_SUCCESS;
         }
 
-        dev.distantstock.link.DistantNetworkDeleteService.broadcast(network);
-        dev.distantstock.routing.DistantNetworkDeletion.apply(server, network.id());
-        // Push the changed local warehouse/group snapshot immediately instead of waiting for the
-        // next heartbeat, so peers stop offering this network's destinations quickly.
-        dev.distantstock.link.NetworkAnnouncementService.publish();
-        ctx.getSource().sendSuccess(() -> Component.literal(
-                "已删除远仓网络「" + network.name() + "」。"), true);
+        dev.distantstock.link.DistantNetworkDeleteService.broadcast(network).whenComplete((ignored, error) ->
+                server.execute(() -> {
+                    if (error != null) {
+                        ctx.getSource().sendFailure(Component.literal("删除通知未能全部落盘，请稍后重试。"));
+                        return;
+                    }
+                    dev.distantstock.routing.DistantNetworkDeletion.apply(server, network.id());
+                    dev.distantstock.link.NetworkAnnouncementService.publish();
+                    ctx.getSource().sendSuccess(() -> Component.literal(
+                            "已删除远仓网络「" + network.name() + "」。"), true);
+                }));
         return Command.SINGLE_SUCCESS;
     }
 

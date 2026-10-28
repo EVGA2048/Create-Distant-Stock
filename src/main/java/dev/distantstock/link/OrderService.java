@@ -160,18 +160,13 @@ public final class OrderService {
                     scope, receivingDockGroupId, destinationNode, correlationId, childOrderId,
                     address == null ? "" : address, receivingAddress,
                     homeAddress == null ? "" : homeAddress, lines);
-            UUID messageId = TranserverBridge.send(sourceNetwork.nodeId().toString(), RoutingChannels.ORDER_REQUEST,
+            var queued = TranserverBridge.sendAsync(sourceNetwork.nodeId().toString(), RoutingChannels.ORDER_REQUEST,
                     OrderRequestCodec.encode(request), correlationId.toString());
-            if (messageId != null) {
-                LOG.info("[DistantStock/Order] queued message={} correlation={} child={} target={} network={} group={} lines={}",
-                        messageId, correlationId, childOrderId, sourceNetwork.nodeId(),
-                        sourceNetwork.createFrequency(), receivingDockGroupId, lines.size());
-            } else {
-                LOG.warn("[DistantStock/Order] transport unavailable correlation={} child={} target={} network={} group={}",
-                        correlationId, childOrderId, sourceNetwork.nodeId(),
-                        sourceNetwork.createFrequency(), receivingDockGroupId);
-            }
-            return messageId == null ? Result.NO_PEER : Result.QUEUED;
+            queued.whenComplete((id, error) -> {
+                if (error != null) LOG.warn("[DistantStock/Order] submission failed correlation={} target={}",
+                        correlationId, sourceNetwork.nodeId(), error);
+            });
+            return queued.isCompletedExceptionally() ? Result.NO_PEER : Result.QUEUED;
         } catch (IOException | RuntimeException exception) {
             LOG.warn("[DistantStock/Order] encode/send failed target={} network={} group={}",
                     sourceNetwork.nodeId(), sourceNetwork.createFrequency(), receivingDockGroupId, exception);

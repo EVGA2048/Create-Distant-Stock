@@ -134,7 +134,7 @@ def modpackMods = file("${System.getProperty('user.home')}/Documents/minecraft_l
 def createJar = new File(modpackMods, 'create-1.21.1-6.0.10.jar')
 def ponderJar = file("libs/ponder-neoforge-1.0.82+mc1.21.1.jar")
 def flywheelJar = file("libs/flywheel-neoforge-1.21.1-1.0.6.jar")
-def transerverJar = file("../Transerver/build/libs/Transerver-0.1.0-SNAPSHOT.jar")
+def transerverJar = file("../Transerver/build/libs/Transerver-0.1.1.jar")
 
 /*
  * Create: Deployer API and Extra Gauges, from the same pack Create comes from.
@@ -314,3 +314,12 @@ tasks.register('verifyPackagerParity', Exec) {
 tasks.withType(Test).configureEach {
     failOnNoDiscoveredTests = false
 }
+
+tasks.register('verifyAsyncSender', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'dev.distantstock.link.AsyncSenderCheck'
+}
+tasks.named('check').configure { dependsOn 'verifyAsyncSender' }
+
+dependencies { testImplementation files(transerverJar) }

@@ -220,7 +220,7 @@ public final class TranserverPackageService {
         try {
             PackageStripCodec.Notice notice = new PackageStripCodec.Notice(parcelId, missing,
                     "missing_registry_entries");
-            TranserverBridge.send(sourceNode, RoutingChannels.PACKAGE_STRIP,
+            TranserverBridge.queueSend(sourceNode, RoutingChannels.PACKAGE_STRIP,
                     PackageStripCodec.encode(notice), parcelId.toString());
         } catch (IOException ignored) {
             // Without the notice the source falls back to returning the whole parcel to its own dock.

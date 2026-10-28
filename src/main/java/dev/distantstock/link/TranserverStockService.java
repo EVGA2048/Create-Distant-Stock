@@ -111,9 +111,9 @@ public final class TranserverStockService {
             }
             try {
                 UUID queryId = UUID.randomUUID();
-                UUID messageId = TranserverBridge.send(network.nodeId().toString(), RoutingChannels.STOCK_QUERY,
+                boolean queued = TranserverBridge.queueSend(network.nodeId().toString(), RoutingChannels.STOCK_QUERY,
                         StockWireCodec.encodeQuery(new StockWireCodec.Query(queryId, network)), queryId.toString());
-                if (messageId != null) {
+                if (queued) {
                     OUTSTANDING.put(network, new Pending(queryId, System.currentTimeMillis()));
                 }
             } catch (IOException ignored) {
@@ -157,11 +157,10 @@ public final class TranserverStockService {
                 var lines = CreateStock.summary(query.networkId().createFrequency()).stream()
                         .map(item -> new LinkQueues.Line(item.itemId, item.count)).toList();
                 StockWireCodec.Result result = new StockWireCodec.Result(query.queryId(), query.networkId(), lines);
-                UUID sent = TranserverBridge.send(message.source(), RoutingChannels.STOCK_RESULT,
+                var sent = TranserverBridge.sendAsync(message.source(), RoutingChannels.STOCK_RESULT,
                         StockWireCodec.encodeResult(result), query.queryId().toString());
-                noteQuery(shortId(query.networkId()) + " 答 " + lines.size() + " 条 → "
-                        + (sent == null ? "发不出去 RETRY" : "APPLIED"));
-                applied.complete(sent == null ? DeliveryResult.RETRY : DeliveryResult.APPLIED);
+                sent.whenComplete((id, error) -> applied.complete(
+                        error == null ? DeliveryResult.APPLIED : DeliveryResult.RETRY));
             } catch (IOException | RuntimeException exception) {
                 noteQuery(shortId(query.networkId()) + " 出错 " + exception.getClass().getSimpleName()
                         + " → RETRY");

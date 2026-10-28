@@ -72,7 +72,7 @@ public final class ProtocolHelloService {
                     CURRENT_PROTOCOL, localCapabilities()));
             for (String node : recipients) {
                 if (!node.equals(self.toString())) {
-                    TranserverBridge.send(node, RoutingChannels.PROTOCOL_HELLO, payload, null);
+                    TranserverBridge.queueSend(node, RoutingChannels.PROTOCOL_HELLO, payload, null);
                 }
             }
             lastSentAt = now;
