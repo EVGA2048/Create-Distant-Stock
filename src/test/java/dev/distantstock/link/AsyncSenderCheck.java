@@ -28,15 +28,24 @@ public final class AsyncSenderCheck {
         var api = new Api(); api.block = true;
         try (var sender = new AsyncSender()) {
             byte[] payload = {7};
-            var sent = sender.submit(api, "offline", "hello", payload, SendOptions.defaults(), true);
+            var sent = sender.submit(api, "offline", "hello", payload,
+                    new SendOptions("generation-a", "application/octet-stream", null), true);
             check(api.entered.await(2, TimeUnit.SECONDS), "worker started");
             check(!sent.isDone(), "acceptance waits for durable API send");
             payload[0] = 9;
-            check(sender.submit(api, "offline", "hello", payload, SendOptions.defaults(), true) == sent, "heartbeat coalesced");
-            api.release.countDown(); sent.get(2, TimeUnit.SECONDS);
+            check(sender.submit(api, "offline", "hello", payload,
+                    new SendOptions("generation-a", "application/octet-stream", null), true) == sent,
+                    "same heartbeat generation coalesced");
+            var upgraded = sender.submit(api, "offline", "hello", payload,
+                    new SendOptions("generation-b", "application/octet-stream", null), true);
+            check(upgraded != sent, "new wire generation is not hidden behind an older heartbeat");
+            api.release.countDown();
+            sent.get(2, TimeUnit.SECONDS);
+            upgraded.get(2, TimeUnit.SECONDS);
             check(api.payloads.getFirst()[0] == 7, "payload copied before returning");
             check(api.thread.equals("distantstock-send-io"), "send runs off main thread");
-            for (int i = 0; i < 63; i++) sender.submit(api, "offline", "query", new byte[1], SendOptions.defaults(), false).get(2, TimeUnit.SECONDS);
+            // The two control-plane generations above also occupy this peer's outstanding budget.
+            for (int i = 0; i < 62; i++) sender.submit(api, "offline", "query", new byte[1], SendOptions.defaults(), false).get(2, TimeUnit.SECONDS);
             check(sender.submit(api, "offline", "query", new byte[1], SendOptions.defaults(), false).isCompletedExceptionally(), "offline quota bounded");
             sender.submit(api, "online", "query", new byte[1], SendOptions.defaults(), false).get(2, TimeUnit.SECONDS);
             sender.submit(api, "offline", "announce", new byte[1], SendOptions.defaults(), true).get(2, TimeUnit.SECONDS);

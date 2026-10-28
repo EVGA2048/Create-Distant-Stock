@@ -25,7 +25,12 @@ final class AsyncSender implements AutoCloseable {
 
     synchronized CompletableFuture<UUID> submit(TranserverApi api, String destination, String channel,
                                                  byte[] payload, SendOptions options, boolean coalesce) {
-        String key = destination + "\0" + channel;
+        // A channel can have distinct control-plane generations in flight. In particular, startup
+        // sends a legacy network announcement before the capability hello arrives, then must send
+        // the catalog-bearing announcement immediately afterwards. Coalesce repetitions of the
+        // same generation, never two wire formats that happen to share a channel.
+        String key = destination + "\0" + channel + "\0"
+                + (options == null || options.correlationId() == null ? "" : options.correlationId());
         if (coalesce) {
             var previous = recurring.get(key);
             if (previous != null) return previous;

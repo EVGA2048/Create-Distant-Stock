@@ -115,8 +115,10 @@ public final class NetworkAnnouncementService {
                     LinkSnapshot.localTps, LinkSnapshot.localMspt, groups);
             for (String node : recipients) {
                 if (!node.equals(self.toString())) {
+                    boolean catalog = catalogRecipients.contains(node);
                     TranserverBridge.queueSend(node, RoutingChannels.NETWORK_ANNOUNCE,
-                            catalogRecipients.contains(node) ? payload : legacyPayload, null);
+                            catalog ? payload : legacyPayload,
+                            catalog ? "catalog-v1" : "legacy-v5");
                 }
             }
             lastCatalogRecipients = Set.copyOf(catalogRecipients);
