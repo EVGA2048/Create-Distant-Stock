@@ -20,6 +20,8 @@ public final class RequesterData {
      */
     public static final String HOME_ADDRESS = "HomeAddress";
     public static final String NETWORK = "RemoteNetwork";
+    /** Persistent identity for asynchronous join confirmation across ItemStack re-instantiation. */
+    private static final String JOIN_IDENTITY = "DistantStockJoinIdentity";
     /** The Distant Stock network containing {@link #NETWORK}; persisted so a quiet peer stays scoped. */
     public static final String DISTANT_NETWORK = "DistantNetwork";
     public static final String RECEIVING_GROUP = "ReceivingDockGroup";
@@ -28,6 +30,23 @@ public final class RequesterData {
 
     public static boolean tuned(ItemStack stack) {
         return freq(stack) != null;
+    }
+
+    public static Optional<UUID> joinIdentity(ItemStack stack) {
+        if (stack == null || !(stack.getItem() instanceof RequesterItem)) return Optional.empty();
+        CompoundTag data = tag(stack);
+        return data.hasUUID(JOIN_IDENTITY) ? Optional.of(data.getUUID(JOIN_IDENTITY)) : Optional.empty();
+    }
+
+    /** Server side only. This ID belongs to the physical terminal, not the selected warehouse. */
+    public static UUID ensureJoinIdentity(ItemStack stack) {
+        if (stack == null || !(stack.getItem() instanceof RequesterItem))
+            throw new IllegalArgumentException("not a portable requester");
+        Optional<UUID> existing = joinIdentity(stack);
+        if (existing.isPresent()) return existing.get();
+        UUID identity = UUID.randomUUID();
+        update(stack, tag -> tag.putUUID(JOIN_IDENTITY, identity));
+        return identity;
     }
 
     public static UUID freq(ItemStack stack) {

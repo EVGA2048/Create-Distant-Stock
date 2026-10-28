@@ -932,6 +932,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             return Component.translatable("gui.distantstock.untuned");
         }
         if (menu.stock.isEmpty()) {
+            if (menu.networks.stream().anyMatch(row -> row.remote()
+                    && menu.freq(minecraft.player) != null
+                    && menu.freq(minecraft.player).equals(row.freq()))) {
+                return Component.literal("远端库存同步中，或对端暂无可用库存");
+            }
             return Component.translatable("create.gui.stock_keeper.inventories_empty");
         }
         return Component.translatable("create.gui.stock_keeper.no_search_results");

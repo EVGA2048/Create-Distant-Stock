@@ -935,6 +935,9 @@ public final class AdminCommand {
                     + (refusal <= 0 ? "" : " · 对面说没有过，还要等 " + refusal / 1000 + " 秒")), false);
         }
         var recent = dev.distantstock.link.TranserverStockService.recentQueries();
+        ctx.getSource().sendSuccess(() -> Component.literal("等待本地库存采样的跨服查询 "
+                + dev.distantstock.link.TranserverStockService.deferredReplyCount()
+                + " 条（不立即 RETRY、不在打开面板时扫描整库）"), false);
         ctx.getSource().sendSuccess(() -> Component.literal(recent.isEmpty()
                 ? "别人来问过库存吗：一次都没有" : "最近别人来问库存，我们这样答的（最新在前）："), false);
         for (String line : recent) {

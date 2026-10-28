@@ -50,7 +50,8 @@ public final class DistantNetworkJoinService {
     }
 
     private record Pending(UUID player, RemoteNetworkId member, InteractionHand hand,
-                           DeviceTarget device, ItemStack terminal, long sentAt) {
+                           DeviceTarget device, UUID terminalId, UUID originalScope,
+                           String joinCode, long sentAt) {
     }
 
     private static final Map<UUID, Pending> PENDING = new ConcurrentHashMap<>();
@@ -89,6 +90,8 @@ public final class DistantNetworkJoinService {
         if (player == null || hand == null) return false;
         ItemStack terminal = player.getItemInHand(hand);
         if (!(terminal.getItem() instanceof RequesterItem)) return false;
+        RequesterData.ensureJoinIdentity(terminal);
+        player.getInventory().setChanged();
         return request(server, player.getUUID(), null, hand, null, terminal, code);
     }
 
@@ -112,6 +115,9 @@ public final class DistantNetworkJoinService {
             return false;
         }
 
+        UUID terminalId = terminal == null ? null : RequesterData.ensureJoinIdentity(terminal);
+        UUID originalScope = terminal == null ? null : RequesterData.distantNetwork(terminal).orElse(null);
+
         DistantNetworkDirectory directory = DistantNetworkDirectory.get(server);
         var local = directory.findByCode(normalized).orElse(null);
         if (local != null) {
@@ -119,7 +125,7 @@ public final class DistantNetworkJoinService {
             if (member == null) {
                 boolean bound = serverPlayer != null && (device != null
                         ? bindDevice(server, device, local.id())
-                        : bindTerminal(serverPlayer, hand, terminal, local.id()));
+                        : bindTerminal(serverPlayer, hand, terminalId, originalScope, local.id()));
                 if (!bound) {
                     return false;
                 }
@@ -165,14 +171,22 @@ public final class DistantNetworkJoinService {
         }
         // Double-clicking Join should not create two independent timers. Otherwise one request may
         // succeed and the other later emit a bogus "not found" message for the same warehouse.
-        boolean alreadyPending = PENDING.values().stream()
-                .anyMatch(pending -> pending.player().equals(player)
-                        && Objects.equals(pending.member(), member)
-                        && pending.hand() == hand
-                        && Objects.equals(pending.device(), device));
+        boolean alreadyPending = PENDING.values().stream().anyMatch(pending ->
+                pending.player().equals(player) && pending.hand() == hand
+                        && Objects.equals(pending.device(), device)
+                        && Objects.equals(pending.terminalId(), terminalId)
+                        && Objects.equals(pending.originalScope(), originalScope)
+                        && pending.joinCode().equals(normalized)
+                        && System.nanoTime() - pending.sentAt()
+                        < java.util.concurrent.TimeUnit.SECONDS.toNanos(15));
         if (alreadyPending) {
             return true;
         }
+        // A new click on another terminal or code supersedes old in-flight confirmations;
+        // otherwise old replies can spam 'target changed' and the new request gets coalesced away.
+        PENDING.entrySet().removeIf(entry -> entry.getValue().player().equals(player)
+                && entry.getValue().hand() == hand
+                && Objects.equals(entry.getValue().device(), device));
         UUID requestId = UUID.randomUUID();
         byte[] payload;
         try {
@@ -181,7 +195,8 @@ public final class DistantNetworkJoinService {
         } catch (IOException exception) {
             return false;
         }
-        PENDING.put(requestId, new Pending(player, member, hand, device, terminal, System.nanoTime()));
+        PENDING.put(requestId, new Pending(player, member, hand, device,
+                terminalId, originalScope, normalized, System.nanoTime()));
         int sent = 0;
         UUID localNode = TranserverBridge.localNodeUuid();
         String self = localNode == null ? "" : localNode.toString();
@@ -323,11 +338,15 @@ public final class DistantNetworkJoinService {
         }).thenCompose(result -> result);
     }
 
-    private static boolean bindTerminal(ServerPlayer player, InteractionHand hand, ItemStack expected, UUID scope) {
+    private static boolean bindTerminal(ServerPlayer player, InteractionHand hand, UUID terminalId,
+                                        UUID originalScope, UUID scope) {
         if (player == null || hand == null || !DistantNetworkDirectory.isFormalId(scope)) return false;
         ItemStack stack = player.getItemInHand(hand);
-        if (stack != expected || !(stack.getItem() instanceof RequesterItem)) return false;
+        if (!(stack.getItem() instanceof RequesterItem)
+                || terminalId == null || !RequesterData.joinIdentity(stack).filter(terminalId::equals).isPresent())
+            return false;
         UUID current = RequesterData.distantNetwork(stack).orElse(null);
+        if (!Objects.equals(originalScope, current)) return false;
         if (DistantNetworkDirectory.isFormalId(current) && !scope.equals(current)) return false;
         if (!scope.equals(current)) {
             // Joining a Distant Stock network does not enroll the Create warehouse this
@@ -369,11 +388,7 @@ public final class DistantNetworkJoinService {
             if (known != null && !Objects.equals(known.ownerNode(), accept.ownerNode())) {
                 return DeliveryResult.REJECTED;
             }
-            if (pending == null) {
-                boolean applied = known != null && (accept.member() == null
-                        || directory.formalNetworkOf(accept.member()).filter(accept.networkId()::equals).isPresent());
-                return applied ? DeliveryResult.APPLIED : DeliveryResult.REJECTED;
-            }
+            if (pending == null) return DeliveryResult.APPLIED; // old/duplicate receipt: no action, no dead letter
             if (!Objects.equals(pending.member(), accept.member())) return DeliveryResult.REJECTED;
             if (System.nanoTime() - pending.sentAt() >= TIMEOUT_NANOS) return DeliveryResult.REJECTED;
             if (accept.member() == null) {
@@ -382,19 +397,25 @@ public final class DistantNetworkJoinService {
                 if (pending.device() == null) {
                     ItemStack held = pending.hand() == null ? ItemStack.EMPTY : player.getItemInHand(pending.hand());
                     UUID current = RequesterData.distantNetwork(held).orElse(null);
-                    if (held != pending.terminal() || !(held.getItem() instanceof RequesterItem)
-                            || (DistantNetworkDirectory.isFormalId(current) && !accept.networkId().equals(current))) {
+                    if (!(held.getItem() instanceof RequesterItem)
+                            || !RequesterData.joinIdentity(held).filter(pending.terminalId()::equals).isPresent()
+                            || !Objects.equals(current, pending.originalScope())) {
                         PENDING.remove(accept.requestId());
                         notify(server, pending.player(), "message.distantstock.network.join_target_changed");
-                        return DeliveryResult.REJECTED;
+                        return DeliveryResult.APPLIED; // canceled, don't keep dead-lettering an old acceptance
                     }
                 }
                 // Validate the target before writing a replica; a declined join must not create
                 // a phantom entry in the local network list.
                 boolean bound = pending.device() != null
                         ? bindDevice(server, pending.device(), accept.networkId())
-                        : bindTerminal(player, pending.hand(), pending.terminal(), accept.networkId());
-                if (!bound) return DeliveryResult.REJECTED;
+                        : bindTerminal(player, pending.hand(), pending.terminalId(),
+                                pending.originalScope(), accept.networkId());
+                if (!bound) {
+                    PENDING.remove(accept.requestId());
+                    notify(server, pending.player(), "message.distantstock.network.join_target_changed");
+                    return DeliveryResult.APPLIED;
+                }
                 directory.rememberReplica(accept.networkId(), accept.networkName(), accept.ownerNode());
                 if (player.containerMenu instanceof dev.distantstock.menu.RequesterMenu menu) {
                     menu.selectedFreq = null;

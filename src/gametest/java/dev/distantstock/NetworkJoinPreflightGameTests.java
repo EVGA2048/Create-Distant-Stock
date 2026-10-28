@@ -29,6 +29,71 @@ import java.util.concurrent.CompletableFuture;
 @PrefixGameTestTemplate(false)
 public final class NetworkJoinPreflightGameTests {
     @GameTest(template = "empty", timeoutTicks = 20)
+    public static void coldRemoteStockIsWatchedThenServedFromSharedCache(GameTestHelper h) throws Exception {
+        UUID frequency = UUID.randomUUID();
+        var logistics = new LogisticsNetwork(frequency);
+        logistics.loadedLinks.add(GlobalPos.of(h.getLevel().dimension(),
+                h.absolutePos(net.minecraft.core.BlockPos.ZERO)));
+        Create.LOGISTICS.logisticsNetworks.put(frequency, logistics);
+        try {
+            var server = h.getLevel().getServer();
+            dev.distantstock.stock.StockScanner.scan(server);
+            var entry = dev.distantstock.stock.NetworkDirectory.findByFreq(frequency).orElseThrow();
+            var method = TranserverStockService.class.getDeclaredMethod("servedSnapshot", RemoteNetworkId.class);
+            method.setAccessible(true);
+            h.assertTrue(method.invoke(null, entry.networkId()) == null,
+                    "a cold stock query must not synchronously enumerate a Create warehouse");
+            h.assertTrue(dev.distantstock.stock.StockCache.watchedNetworks(5 * 60_000L)
+                            .contains(entry.networkId()),
+                    "the cold query failed to schedule the warehouse for the scanner");
+            // In production the next bounded scanner beat fills this shared local cache.
+            dev.distantstock.stock.StockCache.put(entry.networkId(),
+                    java.util.List.of(new dev.distantstock.stock.StockCache.Entry("minecraft:iron_ingot", 42)),
+                    dev.distantstock.stock.StockCache.Source.LOCAL);
+            var snapshot = method.invoke(null, entry.networkId());
+            var getter = snapshot.getClass().getDeclaredMethod("items");
+            getter.setAccessible(true);
+            var items = (java.util.List<?>) getter.invoke(snapshot);
+            h.assertTrue(items.size() == 1 && items.getFirst() instanceof LinkQueues.Line line
+                            && line.count() == 42,
+                    "a remote stock query saw an empty warehouse after its cache was ready");
+            // A previously advertised empty snapshot must become invalid promptly when the
+            // real Create inventory becomes available; it cannot mask the warehouse for 15m.
+            var snapshotType = snapshot.getClass();
+            var ctor = snapshotType.getDeclaredConstructor(java.util.List.class, long.class);
+            ctor.setAccessible(true);
+            var snapshotsField = TranserverStockService.class.getDeclaredField("SERVED_SNAPSHOTS");
+            snapshotsField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            var snapshots = (Map<RemoteNetworkId, Object>) snapshotsField.get(null);
+            snapshots.put(entry.networkId(), ctor.newInstance(java.util.List.of(),
+                    System.currentTimeMillis() - 6_000L));
+            var refreshed = method.invoke(null, entry.networkId());
+            h.assertTrue(((java.util.List<?>) getter.invoke(refreshed)).size() == 1,
+                    "an earlier empty snapshot hid the now-stocked warehouse");
+        } finally {
+            Create.LOGISTICS.logisticsNetworks.remove(frequency);
+            dev.distantstock.stock.StockScanner.scan(h.getLevel().getServer());
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 80)
+    public static void staleJoinAcceptanceIsSilentlyConsumedOnce(GameTestHelper h) throws Exception {
+        UUID requestId = UUID.randomUUID();
+        UUID networkId = UUID.randomUUID();
+        var directory = DistantNetworkDirectory.get(h.getLevel().getServer());
+        var reply = receive(accept(requestId, null, networkId, UUID.randomUUID()));
+        h.runAfterDelay(5, () -> {
+            h.assertTrue(reply.isDone() && reply.join() == DeliveryResult.APPLIED,
+                    "an unknown old acceptance became a repeated durable dead letter");
+            h.assertTrue(directory.find(networkId).isEmpty(),
+                    "a stale accepted message created an unauthorized network replica");
+            h.succeed();
+        });
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
     public static void chatNetworkCreationDoesNotEnrollSelectedWarehouse(GameTestHelper h) throws Exception {
         var player = net.neoforged.neoforge.common.util.FakePlayerFactory.get(h.getLevel(),
                 new com.mojang.authlib.GameProfile(UUID.randomUUID(), "NoAutoEnroll"));
@@ -298,31 +363,37 @@ public final class NetworkJoinPreflightGameTests {
                 "minecraft:overworld", UUID.randomUUID());
         dev.distantstock.item.RequesterData.setNetwork(original, previous,
                 DistantNetworkDirectory.LEGACY_NETWORK_ID);
-        var replacement = original.copy();
+        UUID token = dev.distantstock.item.RequesterData.ensureJoinIdentity(original);
+        var recreated = original.copy();
+        var replacement = new net.minecraft.world.item.ItemStack(dev.distantstock.item.ModItems.REQUESTER.get());
+        UUID differentToken = dev.distantstock.item.RequesterData.ensureJoinIdentity(replacement);
+        h.assertTrue(!token.equals(differentToken), "distinct requesters must not share the same join identity");
         var method = DistantNetworkJoinService.class.getDeclaredMethod("bindTerminal",
                 net.minecraft.server.level.ServerPlayer.class, net.minecraft.world.InteractionHand.class,
-                net.minecraft.world.item.ItemStack.class, UUID.class);
+                UUID.class, UUID.class, UUID.class);
         method.setAccessible(true);
         UUID network = UUID.randomUUID();
         player.setItemInHand(hand, replacement);
-        h.assertFalse((boolean) method.invoke(null, player, hand, original, network),
+        h.assertFalse((boolean) method.invoke(null, player, hand, token,
+                        DistantNetworkDirectory.LEGACY_NETWORK_ID, network),
                 "reply bound a replacement terminal");
-        h.assertTrue(dev.distantstock.item.RequesterData.network(replacement)
-                        .filter(previous::equals).isPresent()
-                        && dev.distantstock.item.RequesterData.distantNetwork(replacement)
-                        .filter(DistantNetworkDirectory.LEGACY_NETWORK_ID::equals).isPresent(),
+        h.assertTrue(dev.distantstock.item.RequesterData.distantNetwork(replacement).isEmpty(),
                 "replacement terminal was mutated");
-        player.setItemInHand(hand, original);
-        h.assertTrue((boolean) method.invoke(null, player, hand, original, network),
-                "reply failed to bind the original terminal");
-        h.assertTrue(dev.distantstock.item.RequesterData.network(original).isEmpty()
-                        && dev.distantstock.item.RequesterData.freq(original) == null,
+        player.setItemInHand(hand, recreated);
+        h.assertTrue((boolean) method.invoke(null, player, hand, token,
+                        DistantNetworkDirectory.LEGACY_NETWORK_ID, network),
+                "the same requester recreated by inventory synchronization was rejected");
+        h.assertTrue(dev.distantstock.item.RequesterData.network(recreated).isEmpty()
+                        && dev.distantstock.item.RequesterData.freq(recreated) == null,
                 "successful network join kept a stale warehouse selection from another network");
-        h.assertTrue(dev.distantstock.item.RequesterData.distantNetwork(original)
+        h.assertTrue(dev.distantstock.item.RequesterData.distantNetwork(recreated)
                         .filter(network::equals).isPresent(),
                 "clearing the stale selection also cleared the joined network");
-        h.assertFalse((boolean) method.invoke(null, player, hand, original, UUID.randomUUID()),
+        h.assertFalse((boolean) method.invoke(null, player, hand, token,
+                        DistantNetworkDirectory.LEGACY_NETWORK_ID, UUID.randomUUID()),
                 "reply overwrote an existing network");
+        h.assertTrue(dev.distantstock.item.RequesterData.joinIdentity(recreated).filter(token::equals).isPresent(),
+                "joining the network wiped the requester's persistent identity");
         h.succeed();
     }
 

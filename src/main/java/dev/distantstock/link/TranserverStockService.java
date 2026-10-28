@@ -33,7 +33,10 @@ public final class TranserverStockService {
     private static Snapshot servedSnapshot(RemoteNetworkId network) {
         long now = System.currentTimeMillis();
         Snapshot existing = SERVED_SNAPSHOTS.get(network);
-        if (existing != null && now - existing.createdAt() < SNAPSHOT_LIFETIME_MS) return existing;
+        // An empty first capture can precede chunk loading or Create's initial inventory
+        // summary. It must not pin an apparently empty warehouse for fifteen minutes.
+        if (existing != null && now - existing.createdAt()
+                < (existing.items().isEmpty() ? 5_000L : SNAPSHOT_LIFETIME_MS)) return existing;
         var canonical = NetworkDirectory.findByFreq(network.createFrequency())
                 .filter(NetworkDirectory.Entry::local).map(NetworkDirectory.Entry::networkId).orElse(null);
         if (canonical == null) return null;
@@ -60,6 +63,8 @@ public final class TranserverStockService {
     }
 
     public static void stop() {
+        DEFERRED_REPLIES.values().forEach(pending -> pending.completion().complete(DeliveryResult.RETRY));
+        DEFERRED_REPLIES.clear();
         OUTSTANDING.clear();
         NEXT_PAGE.clear();
         ASSEMBLING.clear();
@@ -80,6 +85,11 @@ public final class TranserverStockService {
         Assembly(int totalPages) { this.totalPages = totalPages; }
     }
     private static final Map<RemoteNetworkId, Long> LAST_ATTEMPT = new ConcurrentHashMap<>();
+    private record DeferredReply(ReceivedMessage message, StockWireCodec.Query query,
+                                 CompletableFuture<DeliveryResult> completion, long createdAt) {}
+    private static final Map<UUID, DeferredReply> DEFERRED_REPLIES = new ConcurrentHashMap<>();
+    private static final int MAX_DEFERRED_REPLIES = 32;
+    private static final long DEFERRED_REPLY_TIMEOUT_MS = 30_000;
 
     /**
      * 发出去、还没等到回音的查询。
@@ -220,28 +230,20 @@ public final class TranserverStockService {
             try {
                 Snapshot snapshot = servedSnapshot(query.networkId());
                 if (snapshot == null) {
-                    // An inbound request only marks the stock as watched. Let StockScanner
-                    // perform the expensive Create enumeration in its bounded background beat.
-                    applied.complete(DeliveryResult.RETRY);
+                    // An inbound request warms the watched warehouse but must NOT scan the
+                    // entire Create inventory synchronously. Instead keep this delivery open
+                    // until the next StockScanner beat fills the cache. Immediate RETRY caused
+                    // durable retries/dead letters and empty requester menus under load.
+                    if (DEFERRED_REPLIES.size() >= MAX_DEFERRED_REPLIES) {
+                        applied.complete(DeliveryResult.RETRY);
+                        return;
+                    }
+                    DEFERRED_REPLIES.put(message.messageId(),
+                            new DeferredReply(message, query, applied, System.currentTimeMillis()));
+                    noteQuery(shortId(query.networkId()) + " 首次查询已等待缓存采样，不重投");
                     return;
                 }
-                int totalPages = Math.max(1, (snapshot.items().size() + StockWireCodec.PAGE_ITEMS - 1)
-                        / StockWireCodec.PAGE_ITEMS);
-                if (query.page() >= totalPages) {
-                    applied.complete(DeliveryResult.REJECTED);
-                    return;
-                }
-                int start = query.page() * StockWireCodec.PAGE_ITEMS;
-                var lines = snapshot.items().subList(start,
-                        Math.min(snapshot.items().size(), start + StockWireCodec.PAGE_ITEMS));
-                StockWireCodec.Result result = new StockWireCodec.Result(query.queryId(), query.networkId(),
-                        query.page(), totalPages, lines);
-                var sent = TranserverBridge.sendAsync(message.source(), RoutingChannels.STOCK_RESULT,
-                        StockWireCodec.queryVersion(message.payload()) == 1
-                                ? StockWireCodec.encodeLegacyResult(result)
-                                : StockWireCodec.encodeResult(result), query.queryId().toString());
-                sent.whenComplete((id, error) -> applied.complete(
-                        error == null ? DeliveryResult.APPLIED : DeliveryResult.RETRY));
+                sendStockReply(message, query, snapshot, applied);
             } catch (IOException | RuntimeException exception) {
                 noteQuery(shortId(query.networkId()) + " 出错 " + exception.getClass().getSimpleName()
                         + " → RETRY");
@@ -250,6 +252,59 @@ public final class TranserverStockService {
         });
         return applied;
     }
+
+    private static void sendStockReply(ReceivedMessage message, StockWireCodec.Query query,
+                                       Snapshot snapshot, CompletableFuture<DeliveryResult> applied)
+            throws IOException {
+        int totalPages = Math.max(1, (snapshot.items().size() + StockWireCodec.PAGE_ITEMS - 1)
+                / StockWireCodec.PAGE_ITEMS);
+        if (query.page() >= totalPages) {
+            applied.complete(DeliveryResult.REJECTED);
+            return;
+        }
+        int start = query.page() * StockWireCodec.PAGE_ITEMS;
+        var lines = snapshot.items().subList(start,
+                Math.min(snapshot.items().size(), start + StockWireCodec.PAGE_ITEMS));
+        StockWireCodec.Result result = new StockWireCodec.Result(query.queryId(), query.networkId(),
+                query.page(), totalPages, lines);
+        var sent = TranserverBridge.sendAsync(message.source(), RoutingChannels.STOCK_RESULT,
+                StockWireCodec.queryVersion(message.payload()) == 1
+                        ? StockWireCodec.encodeLegacyResult(result)
+                        : StockWireCodec.encodeResult(result), query.queryId().toString());
+        sent.whenComplete((id, error) -> applied.complete(
+                error == null ? DeliveryResult.APPLIED : DeliveryResult.RETRY));
+        noteQuery(shortId(query.networkId()) + " 已发送库存 " + lines.size()
+                + " 行 · 第 " + (query.page() + 1) + "/" + totalPages + " 页");
+    }
+
+    /** Called AFTER StockScanner.scan on the game thread; never enumerates Create itself. */
+    public static void flushDeferredReplies() {
+        long now = System.currentTimeMillis();
+        for (var row : new ArrayList<>(DEFERRED_REPLIES.entrySet())) {
+            DeferredReply pending = row.getValue();
+            if (pending.completion().isDone()) {
+                DEFERRED_REPLIES.remove(row.getKey(), pending);
+                continue;
+            }
+            if (now - pending.createdAt() > DEFERRED_REPLY_TIMEOUT_MS) {
+                DEFERRED_REPLIES.remove(row.getKey(), pending);
+                pending.completion().complete(DeliveryResult.RETRY);
+                noteQuery(shortId(pending.query().networkId()) + " 采样超时 · 延后重试");
+                continue;
+            }
+            try {
+                Snapshot snapshot = servedSnapshot(pending.query().networkId());
+                if (snapshot == null) continue;
+                DEFERRED_REPLIES.remove(row.getKey(), pending);
+                sendStockReply(pending.message(), pending.query(), snapshot, pending.completion());
+            } catch (IOException | RuntimeException error) {
+                DEFERRED_REPLIES.remove(row.getKey(), pending);
+                pending.completion().complete(DeliveryResult.RETRY);
+            }
+        }
+    }
+
+    public static int deferredReplyCount() { return DEFERRED_REPLIES.size(); }
 
     private static CompletableFuture<DeliveryResult> result(ReceivedMessage message) {
         final StockWireCodec.Result result;

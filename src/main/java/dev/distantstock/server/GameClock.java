@@ -171,6 +171,7 @@ public final class GameClock {
         if (ticks % 20 == 0) {
             AlarmSampler.tick(e.getServer(), transerverActive);
             StockScanner.scan(e.getServer());
+            if (transerverActive) TranserverStockService.flushDeferredReplies();
         }
 
         if (ticks % 40 == 0) {
