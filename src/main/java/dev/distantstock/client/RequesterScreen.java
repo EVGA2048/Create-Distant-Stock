@@ -755,6 +755,11 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
 
         Component title = Component.translatable("gui.distantstock.title");
         g.drawString(font, title, x + WINDOW_W / 2 - font.width(title) / 2, y + 4, TITLE, false);
+        if (menu.stockTotal > menu.stock.size() && !warehousePickerOpen) {
+            String loading = "库存同步 " + menu.stock.size() + "/" + menu.stockTotal;
+            g.drawString(font, loading, x + WINDOW_W - 26 - font.width(loading),
+                    y + imageHeight - 145, TITLE, false);
+        }
         if (showCreateLock()) {
             (createLocked
                     ? com.simibubi.create.foundation.gui.AllGuiTextures.STOCK_KEEPER_REQUEST_LOCKED
@@ -1018,7 +1023,9 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             g.drawString(font, label, x + 31, ry + 3,
                     blend(entry.local() ? INK : 0xFFC8B6E8, faded), false);
             String location = entry.local()
-                    ? Component.translatable("gui.distantstock.local").getString()
+                    ? (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(entry.distantNetworkId())
+                    ? "未加入 · 点击纳入本网络"
+                    : Component.translatable("gui.distantstock.local").getString())
                     : entry.server();
             g.drawString(font, location, x + 31, ry + 10, blend(0x3A7774, faded), false);
             Component links = entry.packable()

@@ -41,6 +41,8 @@ import org.apache.logging.log4j.Logger;
 public final class GameClock {
     private static final Logger LOG = LogManager.getLogger();
     private static int ticks;
+    private static int uiStockCursor;
+    private static final int UI_STOCK_PAGES_PER_BEAT = 8;
     private static boolean transerverActive;
     private static boolean legacyActive;
 
@@ -83,6 +85,7 @@ public final class GameClock {
         if (transerverActive) {
             NetworkAnnouncementService.stop();
             DistantNetworkJoinService.stop();
+            TranserverStockService.stop();
             ReceiverProbeService.stop();
             ProtocolHelloService.stop();
             TranserverBridge.stop();
@@ -171,13 +174,23 @@ public final class GameClock {
         }
 
         if (ticks % 40 == 0) {
-            for (ServerPlayer player : e.getServer().getPlayerList().getPlayers()) {
+            var players = e.getServer().getPlayerList().getPlayers();
+            int visited = 0;
+            int sentPages = 0;
+            while (!players.isEmpty() && visited < players.size()
+                    && sentPages < UI_STOCK_PAGES_PER_BEAT) {
+                ServerPlayer player = players.get((uiStockCursor + visited) % players.size());
+                visited++;
                 if (player.containerMenu instanceof RequesterMenu menu) {
                     menu.refresh(player);
-                    PacketDistributor.sendToPlayer(player, StockSyncS2C.of(
-                            menu.demo, menu.stock, menu.distantNetworkId(player)));
+                    var page = menu.nextStockPage(player);
+                    if (page != null) {
+                        PacketDistributor.sendToPlayer(player, page);
+                        sentPages++;
+                    }
                 }
             }
+            if (!players.isEmpty()) uiStockCursor = (uiStockCursor + visited) % players.size();
         }
 
         if (legacyActive) {

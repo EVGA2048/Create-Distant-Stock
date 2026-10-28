@@ -74,9 +74,30 @@ public record JoinNetworkC2S(UUID freq, RemoteNetworkId networkId) implements Cu
             // formal Distant Stock network context, and only from that network's member set. The
             // server enforces this even if a crafted client sends an arbitrary Create frequency.
             java.util.UUID currentScope = menu.distantNetworkId(player);
-            if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(currentScope)
-                    || !currentScope.equals(targetScope)) {
+            if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(currentScope)) {
                 return;
+            }
+            if (!currentScope.equals(targetScope)) {
+                // The member picker doubles as explicit enrollment for local Legacy warehouses.
+                // The authority-side creator can recover an existing EMPTY network by selecting
+                // the actual Create warehouse; there is no need to delete/recreate the network.
+                if (!entry.local() || entry.networkId() == null
+                        || dev.distantstock.routing.DistantNetworkDirectory.isFormalId(targetScope)) return;
+                if (!CreateNetworkAccess.mayAdministrate(entry.networkId(), entry.freq(), player)) {
+                    player.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                            "只有本地 Create 仓库的管理员才能把它纳入远仓网络。"), true);
+                    return;
+                }
+                var directory = dev.distantstock.routing.DistantNetworkDirectory.get(player.getServer());
+                if (!directory.isFormalNetwork(currentScope)
+                        || !directory.attach(entry.networkId(), currentScope)) {
+                    player.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                            "仓库未能纳入网络：请检查仓库是否已加入其他远仓网络。"), true);
+                    return;
+                }
+                dev.distantstock.stock.StockScanner.scan(player.getServer());
+                player.displayClientMessage(net.minecraft.network.chat.Component.literal(
+                        "本地 Create 仓库已加入远仓网络，其他服务器将在下一次公告中看到它。"), true);
             }
             if (entry.local() && !CreateNetworkAccess.mayInteract(entry.networkId(), entry.freq(), player)) {
                 player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
@@ -100,6 +121,7 @@ public record JoinNetworkC2S(UUID freq, RemoteNetworkId networkId) implements Cu
                 }
             }
             menu.selectedFreq = msg.freq;
+            menu.resetStockStream();
             if (entry.networkId() != null) {
                 // 玩家又选了一次这张网络：之前「对面说不认识它」的退避作废，马上去问。
                 dev.distantstock.stock.StockCache.clearRefusal(entry.networkId());

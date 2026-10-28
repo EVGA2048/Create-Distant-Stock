@@ -98,8 +98,13 @@ public record DistantNetworkActionC2S(int action, String value) implements Custo
                             created.name(), created.id());
                 }
                 menu.persistDistantNetworkContext(player, created.id());
+                menu.resetStockStream();
+                DistantNetworkJoinService.enrollSelectedLocalWarehouse(
+                        player.getServer(), player, menu.device(player), created.id());
                 menu.refresh(player);
                 say(player, "message.distantstock.network.created", created.name());
+                PacketDistributor.sendToPlayer(player, StockSyncS2C.of(
+                        menu.demo, menu.stock, created.id()));
                 DistantNetworkStateS2C.sendScope(player, created.id());
                 return;
             }

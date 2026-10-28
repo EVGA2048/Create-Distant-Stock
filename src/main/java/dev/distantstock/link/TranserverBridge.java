@@ -109,8 +109,12 @@ public final class TranserverBridge {
                 || RoutingChannels.STOCK_RESULT.equals(channel)
                 || RoutingChannels.RECEIVER_PROBE_REQUEST.equals(channel)
                 || RoutingChannels.RECEIVER_PROBE_RESULT.equals(channel);
+        boolean joinHandshake = RoutingChannels.DISTANT_NETWORK_JOIN_REQUEST.equals(channel)
+                || RoutingChannels.DISTANT_NETWORK_JOIN_ACCEPT.equals(channel);
         var options = new SendOptions(correlationId, "application/x-distantstock",
-                transientMessage ? Instant.now().plusSeconds(120) : Instant.now().plus(7, ChronoUnit.DAYS));
+                transientMessage ? Instant.now().plusSeconds(120)
+                        : joinHandshake ? Instant.now().plusSeconds(360)
+                        : Instant.now().plus(7, ChronoUnit.DAYS));
         return io.submit(api, destination, channel, payload, options, recurring);
     }
 

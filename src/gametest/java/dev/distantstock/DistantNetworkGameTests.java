@@ -475,10 +475,18 @@ public final class DistantNetworkGameTests {
             String good = java.util.UUID.randomUUID().toString();
             dev.distantstock.link.ProtocolHelloService.rememberForTesting(good,
                     dev.distantstock.link.ProtocolHelloService.CURRENT_PROTOCOL,
-                    java.util.Set.of("package-dispatch-v1", "manifest-v1", "parcel-return-v1"));
+                    java.util.Set.of("package-dispatch-v1", "manifest-v1", "parcel-return-v1", "stock-pages-v2"));
             h.assertTrue(dev.distantstock.link.ProtocolHelloService.compatibility(good)
                             == dev.distantstock.link.ProtocolHelloService.Compatibility.COMPATIBLE,
                     "peer with required capabilities was not compatible");
+
+            String old = java.util.UUID.randomUUID().toString();
+            dev.distantstock.link.ProtocolHelloService.rememberForTesting(old,
+                    dev.distantstock.link.ProtocolHelloService.CURRENT_PROTOCOL,
+                    java.util.Set.of("package-dispatch-v1", "manifest-v1", "parcel-return-v1"));
+            h.assertTrue(dev.distantstock.link.ProtocolHelloService.compatibility(old)
+                            == dev.distantstock.link.ProtocolHelloService.Compatibility.INCOMPATIBLE,
+                    "old peers without paged stock must not silently accept the new wire format");
 
             String bad = java.util.UUID.randomUUID().toString();
             dev.distantstock.link.ProtocolHelloService.rememberForTesting(bad,

@@ -2,10 +2,16 @@ package dev.distantstock;
 
 import dev.distantstock.link.DistantNetworkJoinCodec;
 import dev.distantstock.link.DistantNetworkJoinService;
+import dev.distantstock.link.TranserverStockService;
+import dev.distantstock.link.StockWireCodec;
+import dev.distantstock.link.LinkQueues;
 import dev.distantstock.link.TranserverBridge;
 import dev.distantstock.routing.DistantNetworkDirectory;
 import dev.distantstock.routing.RemoteNetworkId;
 import dev.distantstock.routing.RoutingChannels;
+import com.simibubi.create.Create;
+import com.simibubi.create.content.logistics.packagerLink.LogisticsNetwork;
+import net.minecraft.core.GlobalPos;
 import dev.transerver.api.DeliveryResult;
 import dev.transerver.api.ReceivedMessage;
 import net.minecraft.gametest.framework.GameTest;
@@ -22,6 +28,127 @@ import java.util.concurrent.CompletableFuture;
 @GameTestHolder("distantstock")
 @PrefixGameTestTemplate(false)
 public final class NetworkJoinPreflightGameTests {
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void chatCreatedReceivingGroupBelongsToJoinedNetwork(GameTestHelper h) throws Exception {
+        var server = h.getLevel().getServer();
+        var player = net.neoforged.neoforge.common.util.FakePlayerFactory.get(h.getLevel(),
+                new com.mojang.authlib.GameProfile(UUID.randomUUID(), "AddressScopeTest"));
+        UUID scope = UUID.randomUUID();
+        var item = new net.minecraft.world.item.ItemStack(dev.distantstock.item.ModItems.REQUESTER.get());
+        dev.distantstock.item.RequesterData.setDistantNetwork(item, scope);
+        player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, item);
+        String name = "delivery-" + UUID.randomUUID().toString().substring(0, 8);
+        server.getCommands().getDispatcher().execute(
+                "distantstock group create " + name,
+                player.createCommandSourceStack().withPermission(2));
+        var group = dev.distantstock.routing.DockGroupDirectory.get(server)
+                .findByName(scope, name).orElse(null);
+        h.assertTrue(group != null, "the group-create command created an unusable Legacy address");
+        h.assertTrue(dev.distantstock.routing.OrderDestination.resolve(
+                        server, player.getUUID(), scope, group.id()).allowed(),
+                "a newly created receiving address could not be used for cross-server ordering");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 80)
+    @SuppressWarnings("unchecked")
+    public static void fiveThousandStockRowsAreReassembledWithoutLargePackets(GameTestHelper h) throws Exception {
+        var remote = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, UUID.randomUUID(),
+                UUID.randomUUID(), "minecraft:overworld", UUID.randomUUID());
+        var field = TranserverStockService.class.getDeclaredField("OUTSTANDING");
+        field.setAccessible(true);
+        var pending = (Map<RemoteNetworkId, Object>) field.get(null);
+        var type = Class.forName(TranserverStockService.class.getName() + "$Pending");
+        var constructor = type.getDeclaredConstructors()[0];
+        constructor.setAccessible(true);
+        var handler = TranserverStockService.class.getDeclaredMethod("result", ReceivedMessage.class);
+        handler.setAccessible(true);
+        int totalItems = 5_000;
+        int pages = (totalItems + StockWireCodec.PAGE_ITEMS - 1) / StockWireCodec.PAGE_ITEMS;
+        try {
+            for (int page = 0; page < pages; page++) {
+                UUID queryId = UUID.randomUUID();
+                pending.put(remote, constructor.newInstance(queryId, page, System.currentTimeMillis()));
+                var rows = new java.util.ArrayList<LinkQueues.Line>();
+                int n = Math.min(StockWireCodec.PAGE_ITEMS,
+                        totalItems - page * StockWireCodec.PAGE_ITEMS);
+                for (int i = 0; i < n; i++) rows.add(new LinkQueues.Line("minecraft:stone", page * 128 + i + 1));
+                var stock = new StockWireCodec.Result(queryId, remote, page, pages, rows);
+                byte[] wire = StockWireCodec.encodeResult(stock);
+                h.assertTrue(wire.length <= StockWireCodec.MAX_BYTES,
+                        "warehouse generated an oversized Transerver message");
+                var received = new ReceivedMessage(UUID.randomUUID(), RoutingChannels.STOCK_RESULT,
+                        remote.nodeId().toString(), TranserverBridge.localNodeId(), queryId.toString(),
+                        Instant.now(), Instant.now().plusSeconds(120), "application/x-distantstock", wire);
+                var result = (CompletableFuture<DeliveryResult>) handler.invoke(null, received);
+                h.assertTrue(result.join() == DeliveryResult.APPLIED,
+                        "stock page was not accepted: " + page);
+            }
+            h.assertTrue(dev.distantstock.stock.StockCache.size(remote) == totalItems,
+                    "large warehouse lost stock rows while streaming between servers");
+            var cached = dev.distantstock.stock.StockCache.get(remote);
+            var first = dev.distantstock.net.StockSyncS2C.pageOf(false, cached, UUID.randomUUID(), 0);
+            var last = dev.distantstock.net.StockSyncS2C.pageOf(false, cached, UUID.randomUUID(), pages - 1);
+            h.assertTrue(first.items().size() == 128 && first.total() == totalItems
+                            && last.offset() + last.items().size() == totalItems,
+                    "client UI could not page through the complete stock without a giant packet");
+        } finally {
+            pending.remove(remote);
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void joiningLocalWarehouseActuallyAdvertisesStockNetwork(GameTestHelper h) {
+        var server = h.getLevel().getServer();
+        var player = net.neoforged.neoforge.common.util.FakePlayerFactory.get(h.getLevel(),
+                new com.mojang.authlib.GameProfile(UUID.randomUUID(), "JoinStockCheck"));
+        UUID frequency = UUID.randomUUID();
+        var logistics = new LogisticsNetwork(frequency);
+        logistics.owner = player.getUUID();
+        logistics.loadedLinks.add(GlobalPos.of(h.getLevel().dimension(), h.absolutePos(net.minecraft.core.BlockPos.ZERO)));
+        Create.LOGISTICS.logisticsNetworks.put(frequency, logistics);
+        try {
+            dev.distantstock.stock.StockScanner.scan(server);
+            var local = dev.distantstock.stock.NetworkDirectory.findByFreq(frequency).orElseThrow();
+            var item = new net.minecraft.world.item.ItemStack(dev.distantstock.item.ModItems.REQUESTER.get());
+            dev.distantstock.item.RequesterData.setNetwork(item, local.networkId(),
+                    DistantNetworkDirectory.LEGACY_NETWORK_ID);
+            var directory = DistantNetworkDirectory.get(server);
+            var network = directory.create("enroll-" + frequency.toString().substring(0, 8),
+                    TranserverBridge.localNodeUuid(), player.getUUID());
+            h.assertTrue(DistantNetworkJoinService.enrollSelectedLocalWarehouse(
+                            server, player, item, network.id()),
+                    "a Create owner joining via the network page did not enroll the tuned warehouse");
+            h.assertTrue(directory.formalNetworkOf(local.networkId()).filter(network.id()::equals).isPresent(),
+                    "joining the network did not persist the Create warehouse membership");
+            var published = dev.distantstock.stock.NetworkDirectory.local().stream()
+                    .filter(entry -> network.id().equals(entry.distantNetworkId())).toList();
+            h.assertTrue(published.size() == 1 && published.getFirst().networkId().equals(local.networkId()),
+                    "network catalog became visible but its warehouse was not advertised");
+            var wire = dev.distantstock.link.NetworkAnnouncementCodec.encode(published, 20, 1,
+                    java.util.List.of(), java.util.List.of(
+                            new dev.distantstock.link.NetworkAnnouncementCodec.CatalogEntry(
+                                    network.id(), network.name())));
+            var decoded = dev.distantstock.link.NetworkAnnouncementCodec.decodeAnnouncement(wire);
+            h.assertTrue(decoded.entries().size() == 1 &&
+                            network.id().equals(decoded.entries().getFirst().distantNetworkId()),
+                    "ES2 would not receive VL4's warehouse despite seeing the formal network");
+            h.assertTrue(dev.distantstock.net.StockSyncS2C.of(false, java.util.List.of(),
+                            network.id()).networks().stream().anyMatch(row -> frequency.equals(row.freq())),
+                    "the terminal warehouse list did not include the enrolled source network");
+            h.assertFalse(DistantNetworkJoinService.enrollSelectedLocalWarehouse(
+                            server, player, item, UUID.randomUUID()),
+                    "a warehouse was silently moved out of an existing network");
+        } catch (Exception error) {
+            h.fail(error.toString());
+        } finally {
+            Create.LOGISTICS.logisticsNetworks.remove(frequency);
+            dev.distantstock.stock.StockScanner.scan(server);
+        }
+        h.succeed();
+    }
+
     @GameTest(template = "empty", timeoutTicks = 20)
     public static void actualAnnouncementDiscoversEmptyNetworkWithoutJoining(GameTestHelper h) throws Exception {
         UUID source = UUID.randomUUID();
@@ -53,12 +180,12 @@ public final class NetworkJoinPreflightGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 80)
-    public static void queuedAcceptAfterFifteenSecondsStillJoins(GameTestHelper h) throws Exception {
+    public static void queuedAcceptAfterThreeMinutesStillJoins(GameTestHelper h) throws Exception {
         var directory = DistantNetworkDirectory.get(h.getLevel().getServer());
         var member = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, TranserverBridge.localNodeUuid(),
                 UUID.randomUUID(), "minecraft:overworld", UUID.randomUUID());
         UUID network = UUID.randomUUID();
-        var result = receive(accept(pending(member, 15), member, network, UUID.randomUUID()));
+        var result = receive(accept(pending(member, 180), member, network, UUID.randomUUID()));
         h.runAfterDelay(5, () -> {
             h.assertTrue(result.isDone() && result.join() == DeliveryResult.APPLIED,
                     "a queued response within the new timeout failed");
@@ -74,7 +201,7 @@ public final class NetworkJoinPreflightGameTests {
         var member = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, TranserverBridge.localNodeUuid(),
                 UUID.randomUUID(), "minecraft:overworld", UUID.randomUUID());
         UUID network = UUID.randomUUID();
-        var result = receive(accept(pending(member, 61), member, network, UUID.randomUUID()));
+        var result = receive(accept(pending(member, 301), member, network, UUID.randomUUID()));
         h.runAfterDelay(5, () -> {
             h.assertTrue(result.isDone() && result.join() == DeliveryResult.REJECTED,
                     "expired request was applied");

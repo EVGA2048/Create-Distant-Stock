@@ -12,6 +12,7 @@ import dev.distantstock.link.TranserverBridge;
 
 /** 主线程定时把 LogisticsManager 扫进 StockCache。 */
 public final class StockScanner {
+    private static final int MAX_LARGE_STOCK_SCANS_PER_BEAT = 2;
     private static final List<Supplier<Iterable<UUID>>> EXTRA = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public static void extra(Supplier<Iterable<UUID>> src) {
@@ -43,9 +44,19 @@ public final class StockScanner {
                         distantNetworks.memberName(entry.networkId()).orElse("")))
                 .toList();
         NetworkDirectory.replaceLocal(local);
+        var watchedNetworks = new java.util.HashSet<>(StockCache.watchedNetworks(5 * 60_000L));
+        var snapshots = new java.util.HashMap<UUID, List<StockCache.Entry>>();
         for (NetworkDirectory.Entry entry : local) {
-            if (entry.networkId() != null) {
-                StockCache.put(entry.networkId(), CreateStock.summary(entry.freq()), StockCache.Source.LOCAL);
+            // A big warehouse must not be fully enumerated every second merely because a
+            // Distant Stock node exists. Only watched inventories are sampled, at most every
+            // five seconds; several open terminals consume the same cached snapshot.
+            if (entry.networkId() != null && watchedNetworks.contains(entry.networkId())
+                    && (StockCache.ageMs(entry.networkId()) < 0
+                    || StockCache.ageMs(entry.networkId()) >= 5_000L)
+                    && (snapshots.containsKey(entry.freq())
+                    || snapshots.size() < MAX_LARGE_STOCK_SCANS_PER_BEAT)) {
+                StockCache.put(entry.networkId(), snapshots.computeIfAbsent(entry.freq(),
+                        CreateStock::summary), StockCache.Source.LOCAL);
             }
         }
         Set<UUID> freqs = new LinkedHashSet<>(StockCache.watched(5 * 60_000L));
@@ -62,8 +73,12 @@ public final class StockScanner {
         }
         for (UUID freq : freqs) {
             StockCache.watch(freq);
-            if (CreateStock.hasNetwork(freq)) {
-                StockCache.put(freq, CreateStock.summary(freq), StockCache.Source.LOCAL);
+            if (CreateStock.hasNetwork(freq) && (StockCache.ageMs(freq) < 0
+                    || StockCache.ageMs(freq) >= 5_000L)
+                    && (snapshots.containsKey(freq)
+                    || snapshots.size() < MAX_LARGE_STOCK_SCANS_PER_BEAT)) {
+                StockCache.put(freq, snapshots.computeIfAbsent(freq, CreateStock::summary),
+                        StockCache.Source.LOCAL);
             }
         }
     }

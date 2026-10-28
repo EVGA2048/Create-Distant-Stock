@@ -20,7 +20,7 @@ public final class ProtocolHelloService {
     private static final long REFRESH_MS = 45_000;
     private static final long STALE_MS = 120_000;
     private static final Set<String> REQUIRED = Set.of(
-            "package-dispatch-v1", "manifest-v1", "parcel-return-v1");
+            "package-dispatch-v1", "manifest-v1", "parcel-return-v1", "stock-pages-v2");
     private static final Map<String, Info> PEERS = new ConcurrentHashMap<>();
     private static volatile long lastSentAt;
 
@@ -55,6 +55,7 @@ public final class ProtocolHelloService {
         caps.add("chain-diagnostics-v2");
         caps.add("cache-lease-v1");
         caps.add("network-catalog-v1");
+        caps.add("stock-pages-v2");
         if (ModList.get().isLoaded("fluidlogistics")) caps.add("fluid-package-v2");
         return Set.copyOf(caps);
     }

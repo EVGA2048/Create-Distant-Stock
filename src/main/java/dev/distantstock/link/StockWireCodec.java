@@ -15,15 +15,28 @@ import java.util.UUID;
 public final class StockWireCodec {
     private static final int QUERY_MAGIC = 0x44535351;
     private static final int RESULT_MAGIC = 0x44535352;
-    private static final int VERSION = 1;
-    private static final int MAX_ITEMS = 4096;
+    private static final int VERSION = 2;
+    /** Each Router message is deliberately small, even when a warehouse has thousands of SKUs. */
+    public static final int PAGE_ITEMS = 128;
+    public static final int MAX_PAGES = 256;
+    public static final int MAX_BYTES = 48 * 1024;
 
-    public record Query(UUID queryId, RemoteNetworkId networkId) {
+    public record Query(UUID queryId, RemoteNetworkId networkId, int page) {
+        public Query(UUID queryId, RemoteNetworkId networkId) { this(queryId, networkId, 0); }
+        public Query {
+            if (page < 0 || page >= MAX_PAGES) throw new IllegalArgumentException("Invalid stock page");
+        }
     }
 
-    public record Result(UUID queryId, RemoteNetworkId networkId, List<LinkQueues.Line> items) {
+    public record Result(UUID queryId, RemoteNetworkId networkId, int page, int totalPages,
+                         List<LinkQueues.Line> items) {
+        public Result(UUID queryId, RemoteNetworkId networkId, List<LinkQueues.Line> items) {
+            this(queryId, networkId, 0, 1, items);
+        }
         public Result {
             items = List.copyOf(items);
+            if (page < 0 || totalPages < 1 || totalPages > MAX_PAGES || page >= totalPages
+                    || items.size() > PAGE_ITEMS) throw new IllegalArgumentException("Invalid stock result page");
         }
     }
 
@@ -34,36 +47,62 @@ public final class StockWireCodec {
         out.writeInt(VERSION);
         uuid(out, query.queryId());
         network(out, query.networkId());
+        out.writeInt(query.page());
         return bytes.toByteArray();
     }
 
     public static Query decodeQuery(byte[] payload) throws IOException {
         DataInputStream in = input(payload, 16 * 1024);
-        if (in.readInt() != QUERY_MAGIC || in.readInt() != VERSION) {
+        int magic = in.readInt();
+        int version = in.readInt();
+        if (magic != QUERY_MAGIC || (version != 1 && version != VERSION)) {
             throw new IOException("Unsupported stock query");
         }
-        Query query = new Query(uuid(in), network(in));
+        UUID id = uuid(in);
+        RemoteNetworkId network = network(in);
+        Query query = new Query(id, network, version >= 2 ? in.readInt() : 0);
         end(in);
         return query;
     }
 
     public static byte[] encodeResult(Result result) throws IOException {
-        if (result.items().size() > MAX_ITEMS) {
+        return encodeResultVersion(result, VERSION);
+    }
+
+    /** Reply safely to old v1 queries still queued during an upgrade, without huge frames. */
+    public static byte[] encodeLegacyResult(Result result) throws IOException {
+        return encodeResultVersion(result, 1);
+    }
+
+    public static int queryVersion(byte[] payload) throws IOException {
+        DataInputStream in = input(payload, 16 * 1024);
+        if (in.readInt() != QUERY_MAGIC) throw new IOException("Unsupported stock query");
+        int version = in.readInt();
+        if (version != 1 && version != VERSION) throw new IOException("Unsupported stock query version");
+        return version;
+    }
+
+    private static byte[] encodeResultVersion(Result result, int version) throws IOException {
+        if (result.items().size() > PAGE_ITEMS) {
             throw new IOException("Stock result has too many items");
         }
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
         out.writeInt(RESULT_MAGIC);
-        out.writeInt(VERSION);
+        out.writeInt(version);
         uuid(out, result.queryId());
         network(out, result.networkId());
+        if (version >= 2) {
+            out.writeInt(result.page());
+            out.writeInt(result.totalPages());
+        }
         out.writeInt(result.items().size());
         for (LinkQueues.Line line : result.items()) {
             text(out, line.itemId(), 256);
             out.writeInt(line.count());
         }
         byte[] payload = bytes.toByteArray();
-        if (payload.length > 1024 * 1024) {
+        if (payload.length > MAX_BYTES) {
             throw new IOException("Stock result exceeds wire limit");
         }
         return payload;
@@ -71,13 +110,17 @@ public final class StockWireCodec {
 
     public static Result decodeResult(byte[] payload) throws IOException {
         DataInputStream in = input(payload, 1024 * 1024);
-        if (in.readInt() != RESULT_MAGIC || in.readInt() != VERSION) {
+        int magic = in.readInt();
+        int version = in.readInt();
+        if (magic != RESULT_MAGIC || (version != 1 && version != VERSION)) {
             throw new IOException("Unsupported stock result");
         }
         UUID queryId = uuid(in);
         RemoteNetworkId networkId = network(in);
+        int page = version >= 2 ? in.readInt() : 0;
+        int pages = version >= 2 ? in.readInt() : 1;
         int size = in.readInt();
-        if (size < 0 || size > MAX_ITEMS) {
+        if (size < 0 || size > (version == 1 ? 4096 : PAGE_ITEMS)) {
             throw new IOException("Stock result item count is invalid");
         }
         List<LinkQueues.Line> items = new ArrayList<>(size);
@@ -90,7 +133,11 @@ public final class StockWireCodec {
             items.add(new LinkQueues.Line(item, count));
         }
         end(in);
-        return new Result(queryId, networkId, items);
+        if (version == 1 && size > PAGE_ITEMS) {
+            // Old peers used one large result. Keep reading it but bound the visible snapshot.
+            return new Result(queryId, networkId, 0, 1, items.subList(0, PAGE_ITEMS));
+        }
+        return new Result(queryId, networkId, page, pages, items);
     }
 
     private static void network(DataOutputStream out, RemoteNetworkId id) throws IOException {

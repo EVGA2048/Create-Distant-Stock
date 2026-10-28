@@ -26,8 +26,60 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class TranserverStockService {
     /** 一次还没等到回音的查询，以及它是什么时候发出去的。 */
-    private record Pending(UUID queryId, long sentAt) {
+    private record Pending(UUID queryId, int page, long sentAt) {
     }
+
+    /** One bounded immutable snapshot per warehouse; repeated panel opens reuse the same scan. */
+    private static Snapshot servedSnapshot(RemoteNetworkId network) {
+        long now = System.currentTimeMillis();
+        Snapshot existing = SERVED_SNAPSHOTS.get(network);
+        if (existing != null && now - existing.createdAt() < SNAPSHOT_LIFETIME_MS) return existing;
+        var canonical = NetworkDirectory.findByFreq(network.createFrequency())
+                .filter(NetworkDirectory.Entry::local).map(NetworkDirectory.Entry::networkId).orElse(null);
+        if (canonical == null) return null;
+        StockCache.watch(canonical);
+        long age = StockCache.ageMs(canonical);
+        if (age < 0 || age > 10_000L) return null;
+        var full = StockCache.get(canonical);
+        if (full.size() > (long) StockWireCodec.PAGE_ITEMS * StockWireCodec.MAX_PAGES) {
+            noteQuery(shortId(network) + " 库存超过 "
+                    + (StockWireCodec.PAGE_ITEMS * StockWireCodec.MAX_PAGES)
+                    + " 种物品；当前快照按安全上限截断");
+        }
+        var lines = full.stream()
+                .limit((long) StockWireCodec.PAGE_ITEMS * StockWireCodec.MAX_PAGES)
+                .map(item -> new LinkQueues.Line(item.itemId, item.count)).toList();
+        if (SERVED_SNAPSHOTS.size() >= SNAPSHOT_LIMIT) {
+            SERVED_SNAPSHOTS.entrySet().stream()
+                    .min(java.util.Comparator.comparingLong(entry -> entry.getValue().createdAt()))
+                    .ifPresent(entry -> SERVED_SNAPSHOTS.remove(entry.getKey(), entry.getValue()));
+        }
+        Snapshot created = new Snapshot(lines, now);
+        SERVED_SNAPSHOTS.put(network, created);
+        return created;
+    }
+
+    public static void stop() {
+        OUTSTANDING.clear();
+        NEXT_PAGE.clear();
+        ASSEMBLING.clear();
+        LAST_ATTEMPT.clear();
+        SERVED_SNAPSHOTS.clear();
+    }
+    private record Snapshot(java.util.List<LinkQueues.Line> items, long createdAt) {}
+    private static final Map<RemoteNetworkId, Snapshot> SERVED_SNAPSHOTS = new ConcurrentHashMap<>();
+    private static final int SNAPSHOT_LIMIT = 16;
+    private static final long SNAPSHOT_LIFETIME_MS = 15 * 60_000L;
+    private static final int QUERIES_PER_BEAT = 4;
+    private static final Map<RemoteNetworkId, Integer> NEXT_PAGE = new ConcurrentHashMap<>();
+    private static final Map<RemoteNetworkId, Assembly> ASSEMBLING = new ConcurrentHashMap<>();
+    private static final class Assembly {
+        int nextPage;
+        int totalPages;
+        final java.util.ArrayList<StockCache.Entry> items = new java.util.ArrayList<>();
+        Assembly(int totalPages) { this.totalPages = totalPages; }
+    }
+    private static final Map<RemoteNetworkId, Long> LAST_ATTEMPT = new ConcurrentHashMap<>();
 
     /**
      * 发出去、还没等到回音的查询。
@@ -92,10 +144,19 @@ public final class TranserverStockService {
         if (local == null) {
             return;
         }
-        for (RemoteNetworkId network : StockCache.watchedNetworks(5 * 60_000L)) {
+        var candidates = new ArrayList<>(StockCache.watchedNetworks(5 * 60_000L));
+        candidates.sort(java.util.Comparator.comparingLong(
+                network -> LAST_ATTEMPT.getOrDefault(network, 0L)));
+        int sent = 0;
+        for (RemoteNetworkId network : candidates) {
+            if (sent >= QUERIES_PER_BEAT) break;
             if (network.nodeId().equals(local)) {
                 continue;
             }
+            // V2 pages require both nodes updated. A legacy peer cannot understand the new
+            // query frame; sending it anyhow would just manufacture dead letters indefinitely.
+            if (ProtocolHelloService.compatibility(network.nodeId().toString())
+                    != ProtocolHelloService.Compatibility.COMPATIBLE) continue;
             // 对面刚说过"不认识它"就先别追问 —— 但只是**等一等**，不是永远不问。这条以前是永久的
             // （unwatch），于是对面重启一次就把这张网络在这边按死了，终端里永远是空的。
             if (StockCache.refusalWaitMs(network) > 0) {
@@ -106,15 +167,18 @@ public final class TranserverStockService {
                 continue;
             }
             long age = StockCache.ageMs(network);
-            if (age >= 0 && age < 5_000L) {
+            if (!ASSEMBLING.containsKey(network) && age >= 0 && age < 15_000L) {
                 continue;
             }
             try {
                 UUID queryId = UUID.randomUUID();
+                int page = NEXT_PAGE.getOrDefault(network, 0);
                 boolean queued = TranserverBridge.queueSend(network.nodeId().toString(), RoutingChannels.STOCK_QUERY,
-                        StockWireCodec.encodeQuery(new StockWireCodec.Query(queryId, network)), queryId.toString());
+                        StockWireCodec.encodeQuery(new StockWireCodec.Query(queryId, network, page)), queryId.toString());
                 if (queued) {
-                    OUTSTANDING.put(network, new Pending(queryId, System.currentTimeMillis()));
+                    OUTSTANDING.put(network, new Pending(queryId, page, System.currentTimeMillis()));
+                    LAST_ATTEMPT.put(network, System.currentTimeMillis());
+                    sent++;
                 }
             } catch (IOException ignored) {
             }
@@ -154,11 +218,28 @@ public final class TranserverStockService {
                 return;
             }
             try {
-                var lines = CreateStock.summary(query.networkId().createFrequency()).stream()
-                        .map(item -> new LinkQueues.Line(item.itemId, item.count)).toList();
-                StockWireCodec.Result result = new StockWireCodec.Result(query.queryId(), query.networkId(), lines);
+                Snapshot snapshot = servedSnapshot(query.networkId());
+                if (snapshot == null) {
+                    // An inbound request only marks the stock as watched. Let StockScanner
+                    // perform the expensive Create enumeration in its bounded background beat.
+                    applied.complete(DeliveryResult.RETRY);
+                    return;
+                }
+                int totalPages = Math.max(1, (snapshot.items().size() + StockWireCodec.PAGE_ITEMS - 1)
+                        / StockWireCodec.PAGE_ITEMS);
+                if (query.page() >= totalPages) {
+                    applied.complete(DeliveryResult.REJECTED);
+                    return;
+                }
+                int start = query.page() * StockWireCodec.PAGE_ITEMS;
+                var lines = snapshot.items().subList(start,
+                        Math.min(snapshot.items().size(), start + StockWireCodec.PAGE_ITEMS));
+                StockWireCodec.Result result = new StockWireCodec.Result(query.queryId(), query.networkId(),
+                        query.page(), totalPages, lines);
                 var sent = TranserverBridge.sendAsync(message.source(), RoutingChannels.STOCK_RESULT,
-                        StockWireCodec.encodeResult(result), query.queryId().toString());
+                        StockWireCodec.queryVersion(message.payload()) == 1
+                                ? StockWireCodec.encodeLegacyResult(result)
+                                : StockWireCodec.encodeResult(result), query.queryId().toString());
                 sent.whenComplete((id, error) -> applied.complete(
                         error == null ? DeliveryResult.APPLIED : DeliveryResult.RETRY));
             } catch (IOException | RuntimeException exception) {
@@ -186,6 +267,27 @@ public final class TranserverStockService {
         }
         CompletableFuture<DeliveryResult> applied = new CompletableFuture<>();
         server.execute(() -> {
+            Pending pending = OUTSTANDING.get(result.networkId());
+            // Delayed/out-of-order replies must never replace a newer snapshot or assemble pages
+            // from two different captures into a corrupt inventory list.
+            if (pending == null || !pending.queryId().equals(result.queryId())
+                    || pending.page() != result.page()) {
+                applied.complete(DeliveryResult.APPLIED);
+                return;
+            }
+            Assembly assembly = ASSEMBLING.get(result.networkId());
+            if (result.page() == 0) {
+                assembly = new Assembly(result.totalPages());
+                ASSEMBLING.put(result.networkId(), assembly);
+            }
+            if (assembly == null || assembly.nextPage != result.page()
+                    || assembly.totalPages != result.totalPages()) {
+                ASSEMBLING.remove(result.networkId());
+                NEXT_PAGE.remove(result.networkId());
+                settle(result.networkId(), result.queryId());
+                applied.complete(DeliveryResult.RETRY);
+                return;
+            }
             var entries = new ArrayList<StockCache.Entry>();
             for (LinkQueues.Line line : result.items()) {
                 ResourceLocation id = ResourceLocation.tryParse(line.itemId());
@@ -194,7 +296,15 @@ public final class TranserverStockService {
                 }
                 entries.add(new StockCache.Entry(line.itemId(), line.count()));
             }
-            StockCache.put(result.networkId(), entries, StockCache.Source.PEER);
+            assembly.items.addAll(entries);
+            assembly.nextPage++;
+            StockCache.put(result.networkId(), assembly.items, StockCache.Source.PEER);
+            if (assembly.nextPage == assembly.totalPages) {
+                ASSEMBLING.remove(result.networkId());
+                NEXT_PAGE.remove(result.networkId());
+            } else {
+                NEXT_PAGE.put(result.networkId(), assembly.nextPage);
+            }
             // 对面答上来了：这张网络是活的，之前那些"不认识它"的退避一笔勾销。
             StockCache.clearRefusal(result.networkId());
             settle(result.networkId(), result.queryId());
@@ -257,6 +367,8 @@ public final class TranserverStockService {
                     StockWireCodec.Query query = StockWireCodec.decodeQuery(completed.payload());
                     if (completed.state() == dev.transerver.api.DeliveryState.REJECTED) {
                         settle(query.networkId(), query.queryId());
+                        NEXT_PAGE.remove(query.networkId());
+                        ASSEMBLING.remove(query.networkId());
                         // 对面说没有这张网络：**退避**，不是永远不问。以前这里是 unwatch —— 而"对面
                         // 还没起来"和"对面真没有"在那一刻长得一模一样，于是服务器重启一次就把这张
                         // 网络在这边永久静音了。现在连着被拒最多也就五分钟问一次，而对面答上来或者

@@ -16,7 +16,9 @@ import java.util.ArrayList;
 import java.util.List;
 import dev.distantstock.routing.RemoteNetworkId;
 
-public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> networks) implements CustomPacketPayload {
+public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> networks,
+                           int offset, int total) implements CustomPacketPayload {
+    public static final int PAGE_ITEMS = 128;
     public record Line(String itemId, int count) {
     }
 
@@ -44,6 +46,8 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
             ByteBufCodecs.BOOL, StockSyncS2C::demo,
             ByteBufCodecs.collection(ArrayList::new, LINE_CODEC), StockSyncS2C::items,
             ByteBufCodecs.collection(ArrayList::new, NETWORK_CODEC), StockSyncS2C::networks,
+            ByteBufCodecs.VAR_INT, StockSyncS2C::offset,
+            ByteBufCodecs.VAR_INT, StockSyncS2C::total,
             StockSyncS2C::new);
 
     @Override
@@ -52,22 +56,34 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
     }
 
     public static StockSyncS2C of(boolean demo, List<StockCache.Entry> stock, java.util.UUID scope) {
+        return pageOf(demo, stock, scope, 0);
+    }
+
+    public static StockSyncS2C pageOf(boolean demo, List<StockCache.Entry> stock,
+                                      java.util.UUID scope, int page) {
         List<Line> lines = new ArrayList<>();
-        int n = Math.min(stock.size(), 512);
-        for (int i = 0; i < n; i++) {
+        int start = Math.max(0, page) * PAGE_ITEMS;
+        int n = Math.min(stock.size(), start + PAGE_ITEMS);
+        for (int i = start; i < n; i++) {
             StockCache.Entry e = stock.get(i);
             lines.add(new Line(e.itemId, e.count));
         }
         List<NetworkLine> networks = new ArrayList<>();
         if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope)) {
-            return new StockSyncS2C(demo, lines, networks);
+            return new StockSyncS2C(demo, lines, networks, start, stock.size());
         }
-        for (NetworkDirectory.Entry entry : NetworkDirectory.visible(StockConfig.isHost())) {
-            if (!scope.equals(entry.distantNetworkId())) continue;
-            networks.add(new NetworkLine(entry.freq(), entry.server(), entry.links(), entry.networkId(),
-                    entry.local(), entry.packable(), entry.distantNetworkId(), entry.warehouseName()));
+        if (page == 0) {
+            for (NetworkDirectory.Entry entry : NetworkDirectory.visible(StockConfig.isHost())) {
+                // Let a network owner choose a local unjoined Create warehouse to enroll it.
+                // A remote unjoined warehouse is never eligible, and the JoinNetwork handler
+                // checks Create's administrator permission before changing local membership.
+                if (!scope.equals(entry.distantNetworkId()) && !(entry.local()
+                        && !dev.distantstock.routing.DistantNetworkDirectory.isFormalId(entry.distantNetworkId()))) continue;
+                networks.add(new NetworkLine(entry.freq(), entry.server(), entry.links(), entry.networkId(),
+                        entry.local(), entry.packable(), entry.distantNetworkId(), entry.warehouseName()));
+            }
         }
-        return new StockSyncS2C(demo, lines, networks);
+        return new StockSyncS2C(demo, lines, networks, start, stock.size());
     }
 
     public static void handle(StockSyncS2C msg, IPayloadContext ctx) {
@@ -76,11 +92,20 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
                 return;
             }
             menu.demo = msg.demo;
+            menu.stockTotal = msg.total;
             List<StockCache.Entry> list = new ArrayList<>();
             for (Line line : msg.items) {
                 list.add(new StockCache.Entry(line.itemId, line.count));
             }
-            menu.stock = list;
+            if (msg.offset == 0) {
+                menu.stock = list;
+            } else if (menu.stock.size() == msg.offset) {
+                // Pages are streamed in order, never one giant packet on opening a warehouse.
+                menu.stock.addAll(list);
+            } else {
+                return;
+            }
+            if (msg.offset != 0) return;
             List<NetworkDirectory.Entry> networks = new ArrayList<>();
             for (NetworkLine line : msg.networks) {
                 networks.add(new NetworkDirectory.Entry(line.freq, line.server, line.links, line.networkId,

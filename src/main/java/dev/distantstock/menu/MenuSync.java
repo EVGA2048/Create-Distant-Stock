@@ -100,7 +100,7 @@ public final class MenuSync {
         warm(freq);
         List<StockCache.Entry> list = StockCache.get(freq);
         buf.writeBoolean(StockConfig.DEMO_STOCK.get());
-        int n = Math.min(list.size(), 512);
+        int n = Math.min(list.size(), dev.distantstock.net.StockSyncS2C.PAGE_ITEMS);
         buf.writeVarInt(n);
         for (int i = 0; i < n; i++) {
             StockCache.Entry e = list.get(i);
@@ -110,7 +110,8 @@ public final class MenuSync {
         List<NetworkDirectory.Entry> networks = !dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope)
                 ? List.of()
                 : NetworkDirectory.visible(StockConfig.isHost()).stream()
-                .filter(entry -> scope.equals(entry.distantNetworkId()))
+                .filter(entry -> scope.equals(entry.distantNetworkId()) || (entry.local()
+                        && !dev.distantstock.routing.DistantNetworkDirectory.isFormalId(entry.distantNetworkId())))
                 .toList();
         buf.writeVarInt(Math.min(networks.size(), 128));
         for (int i = 0; i < networks.size() && i < 128; i++) {
@@ -144,6 +145,7 @@ public final class MenuSync {
             list.add(new StockCache.Entry(buf.readUtf(), buf.readVarInt()));
         }
         menu.stock = list;
+        menu.stockTotal = list.size();
         int networks = buf.readVarInt();
         List<NetworkDirectory.Entry> directory = new ArrayList<>(networks);
         for (int i = 0; i < networks; i++) {
@@ -210,9 +212,9 @@ public final class MenuSync {
         }
         StockCache.watch(freq);
         if (CreateStock.hasNetwork(freq)) {
-            List<StockCache.Entry> summary = CreateStock.summary(freq);
-            StockCache.put(freq, summary, StockCache.Source.LOCAL);
-            StockCache.put(networkId, summary, StockCache.Source.LOCAL);
+            // The UI opener never forces a large Create inventory enumeration on the tick that
+            // handles the click. StockScanner populates the shared cache in its bounded beat.
+            if (networkId != null) StockCache.watch(networkId);
         }
         LinkClient.wake();
     }

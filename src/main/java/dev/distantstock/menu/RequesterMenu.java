@@ -22,6 +22,41 @@ import java.util.UUID;
 import dev.distantstock.routing.RemoteNetworkId;
 
 public final class RequesterMenu extends AbstractContainerMenu {
+    private int nextStockPage;
+    private List<StockCache.Entry> streamingStock = List.of();
+    private long finishedStockAt;
+    private int lastStockSize = -1;
+    private UUID lastStockFrequency;
+    public int stockTotal;
+
+    /** At most 128 SKU rows per player per UI beat, with a shared server-side inventory cache. */
+    public dev.distantstock.net.StockSyncS2C nextStockPage(Player player) {
+        long now = System.currentTimeMillis();
+        if (nextStockPage == 0) {
+            UUID frequency = freq(player);
+            if (finishedStockAt > 0 && now - finishedStockAt < 15_000L
+                    && lastStockSize == stock.size()
+                    && java.util.Objects.equals(lastStockFrequency, frequency)) return null;
+            // StockCache already publishes immutable lists. Retain that reference instead of
+            // copying 30k item rows separately for every player opening the same warehouse.
+            streamingStock = stock;
+            lastStockSize = streamingStock.size();
+            lastStockFrequency = frequency;
+        }
+        var page = dev.distantstock.net.StockSyncS2C.pageOf(demo, streamingStock,
+                distantNetworkId(player), nextStockPage++);
+        if (nextStockPage * dev.distantstock.net.StockSyncS2C.PAGE_ITEMS >= streamingStock.size()) {
+            nextStockPage = 0;
+            finishedStockAt = now;
+        }
+        return page;
+    }
+
+    public void resetStockStream() {
+        nextStockPage = 0;
+        finishedStockAt = 0;
+        lastStockSize = -1;
+    }
     public final InteractionHand hand;
     public final BlockPos gaugePos;
     public List<StockCache.Entry> stock = new ArrayList<>();
@@ -597,7 +632,7 @@ public final class RequesterMenu extends AbstractContainerMenu {
         // 这台终端只会按频率 watch，而跨服那条链路问的是网络 id —— 没人去问，库存永远是空的。
         RemoteNetworkId networkId = MenuSync.resolve(networkId(player), freq);
         MenuSync.warm(networkId, freq);
-        stock = new ArrayList<>(networkId == null ? StockCache.get(freq) : StockCache.get(networkId));
+        stock = networkId == null ? StockCache.get(freq) : StockCache.get(networkId);
         demo = StockConfig.DEMO_STOCK.get();
     }
 

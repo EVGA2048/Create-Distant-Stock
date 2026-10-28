@@ -221,6 +221,37 @@ public final class PackageDispatchCodecCheck {
         byte[] stockBytes = StockWireCodec.encodeResult(stockResult);
         require(StockWireCodec.decodeResult(stockBytes).equals(stockResult),
                 "stock result changed during round trip");
+        byte[] legacyStock = StockWireCodec.encodeLegacyResult(stockResult);
+        require(java.nio.ByteBuffer.wrap(legacyStock).getInt(4) == 1
+                        && StockWireCodec.decodeResult(legacyStock).equals(stockResult),
+                "old v1 stock results are no longer readable during rolling upgrade");
+        // A warehouse with 5,000 item types must not create one 5,000-line transport message.
+        // Every page has an explicit index and a strict small byte/count budget.
+        var largeStock = new java.util.ArrayList<LinkQueues.Line>();
+        for (int i = 0; i < 5_000; i++) {
+            largeStock.add(new LinkQueues.Line("minecraft:stone", i + 1));
+        }
+        int pages = (largeStock.size() + StockWireCodec.PAGE_ITEMS - 1) / StockWireCodec.PAGE_ITEMS;
+        require(pages > 1 && pages < StockWireCodec.MAX_PAGES, "invalid test page count");
+        int transferred = 0;
+        for (int page = 0; page < pages; page++) {
+            var requestPage = new StockWireCodec.Query(UUID.randomUUID(), network, page);
+            require(StockWireCodec.decodeQuery(StockWireCodec.encodeQuery(requestPage)).equals(requestPage),
+                    "paged stock query lost the page cursor");
+            int begin = page * StockWireCodec.PAGE_ITEMS;
+            var pageData = new StockWireCodec.Result(requestPage.queryId(), network, page, pages,
+                    largeStock.subList(begin, Math.min(largeStock.size(), begin + StockWireCodec.PAGE_ITEMS)));
+            byte[] pageBytes = StockWireCodec.encodeResult(pageData);
+            require(pageBytes.length <= StockWireCodec.MAX_BYTES &&
+                            StockWireCodec.decodeResult(pageBytes).equals(pageData),
+                    "bounded stock page failed a round trip");
+            transferred += pageData.items().size();
+        }
+        require(transferred == largeStock.size(), "large warehouse stock pages lost item rows");
+        try {
+            new StockWireCodec.Result(UUID.randomUUID(), network, 0, 1, largeStock);
+            throw new AssertionError("an unbounded stock response was allowed");
+        } catch (IllegalArgumentException expected) { }
         try {
             StockWireCodec.decodeResult(Arrays.copyOf(stockBytes, stockBytes.length + 1));
             throw new AssertionError("stock result trailing data was accepted");

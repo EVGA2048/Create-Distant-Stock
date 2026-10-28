@@ -38,12 +38,51 @@ public final class DistantNetworkJoinService {
     public record DeviceTarget(ResourceKey<Level> dimension, BlockPos pos, int slot) {
     }
 
+    private static ItemStack heldTerminal(ServerPlayer player, InteractionHand hand) {
+        return player == null || hand == null ? ItemStack.EMPTY : player.getItemInHand(hand);
+    }
+
+    private static void syncTerminalMenu(ServerPlayer player, dev.distantstock.menu.RequesterMenu menu) {
+        menu.resetStockStream();
+        net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player,
+                dev.distantstock.net.StockSyncS2C.of(menu.demo, menu.stock, menu.distantNetworkId(player)));
+        dev.distantstock.menu.RequesterMenu.sendGroupList(player, menu.device(player));
+    }
+
+    /**
+     * Join an already selected local Create warehouse to the terminal's chosen scope.
+     * Only Create administrators may make this membership change, and existing memberships
+     * in another formal scope are never silently reassigned. An untuned portable requester is
+     * still allowed to join a Distant Stock network without creating a warehouse.
+     */
+    public static boolean enrollSelectedLocalWarehouse(MinecraftServer server, ServerPlayer player,
+                                                       ItemStack terminal, UUID scope) {
+        if (server == null || player == null || terminal.isEmpty()
+                || !DistantNetworkDirectory.isFormalId(scope)) return false;
+        var directory = DistantNetworkDirectory.get(server);
+        UUID freq = RequesterData.freq(terminal);
+        if (freq == null) return false;
+        var entry = dev.distantstock.stock.NetworkDirectory.findByFreq(freq)
+                .filter(dev.distantstock.stock.NetworkDirectory.Entry::local).orElse(null);
+        if (entry == null || entry.networkId() == null
+                || !dev.distantstock.stock.CreateNetworkAccess.mayAdministrate(
+                        entry.networkId(), freq, player)) return false;
+        UUID existing = directory.formalNetworkOf(entry.networkId()).orElse(null);
+        if (existing != null && !existing.equals(scope)) return false;
+        if (existing == null && !directory.attach(entry.networkId(), scope)) return false;
+        dev.distantstock.stock.StockScanner.scan(server);
+        return true;
+    }
+
     private record Pending(UUID player, RemoteNetworkId member, InteractionHand hand,
                            DeviceTarget device, ItemStack terminal, long sentAt) {
     }
 
     private static final Map<UUID, Pending> PENDING = new ConcurrentHashMap<>();
-    private static final long TIMEOUT_NANOS = java.util.concurrent.TimeUnit.SECONDS.toNanos(60);
+    // A durable Router backlog may delay the request AND its acceptance. Expiring at 60 seconds
+    // rejected otherwise-valid replies during routine queue recovery, leaving terminals unjoined.
+    // The wire message expires after 360 seconds, so a late reply cannot mutate the next session.
+    private static final long TIMEOUT_NANOS = java.util.concurrent.TimeUnit.MINUTES.toNanos(5);
 
     public static void register() {
         TranserverBridge.handler(RoutingChannels.DISTANT_NETWORK_JOIN_REQUEST,
@@ -55,6 +94,8 @@ public final class DistantNetworkJoinService {
     public static void stop() {
         PENDING.clear();
     }
+
+    public static int pendingCount() { return PENDING.size(); }
 
     /**
      * Starts a join. Returns false only when nothing could possibly receive the request.
@@ -104,9 +145,15 @@ public final class DistantNetworkJoinService {
                 if (!bound) {
                     return false;
                 }
+                if (device == null) {
+                    enrollSelectedLocalWarehouse(server, serverPlayer,
+                            heldTerminal(serverPlayer, hand), local.id());
+                }
+                dev.distantstock.stock.StockScanner.scan(server);
                 if (serverPlayer.containerMenu instanceof dev.distantstock.menu.RequesterMenu menu
                         && device == null && menu.hand == hand && !menu.isGauge()) {
                     menu.refresh(serverPlayer);
+                    syncTerminalMenu(serverPlayer, menu);
                 }
                 notify(server, player, "message.distantstock.network.joined", local.name());
                 if (device == null) {
@@ -348,7 +395,17 @@ public final class DistantNetworkJoinService {
                         : bindTerminal(player, pending.hand(), pending.terminal(), accept.networkId());
                 if (!bound) return DeliveryResult.REJECTED;
                 directory.rememberReplica(accept.networkId(), accept.networkName(), accept.ownerNode());
-                if (player.containerMenu instanceof dev.distantstock.menu.RequesterMenu menu) menu.refresh(player);
+                // Binding a portable terminal is not the same as enrolling a warehouse. If the
+                // terminal is already tuned to a local warehouse the player administers, enroll
+                // that warehouse as part of the requested join. This lets VL4 advertise its stock
+                // rather than exposing an empty network shell to the other server.
+                enrollSelectedLocalWarehouse(server, player, heldTerminal(player, pending.hand()),
+                        accept.networkId());
+                dev.distantstock.stock.StockScanner.scan(server);
+                if (player.containerMenu instanceof dev.distantstock.menu.RequesterMenu menu) {
+                    menu.refresh(player);
+                    syncTerminalMenu(player, menu);
+                }
                 PENDING.remove(accept.requestId());
                 notify(server, pending.player(), "message.distantstock.network.joined", accept.networkName());
                 if (pending.device() == null) {
@@ -372,9 +429,18 @@ public final class DistantNetworkJoinService {
             notify(server, pending.player(), "message.distantstock.network.joined", accept.networkName());
             ServerPlayer player = server.getPlayerList().getPlayer(pending.player());
             if (player != null) {
+                // /distantstock network join may run from chat with no open requester menu.
+                // Persist the new scope on the same terminal rather than waiting for a menu
+                // callback that will never run in that case.
+                ItemStack terminal = dev.distantstock.item.RequesterFind.find(player);
+                if (!terminal.isEmpty() && accept.member().equals(RequesterData.network(terminal).orElse(null))) {
+                    RequesterData.setNetwork(terminal, accept.member(), accept.networkId());
+                    player.getInventory().setChanged();
+                }
                 if (player.containerMenu instanceof dev.distantstock.menu.RequesterMenu menu) {
                     menu.persistDistantNetworkScope(player, accept.member(), accept.networkId());
                     menu.refresh(player);
+                    syncTerminalMenu(player, menu);
                 }
                 dev.distantstock.net.DistantNetworkStateS2C.send(player, accept.member());
             }
