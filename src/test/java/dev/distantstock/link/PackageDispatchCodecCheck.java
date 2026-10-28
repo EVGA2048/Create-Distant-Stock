@@ -102,6 +102,17 @@ public final class PackageDispatchCodecCheck {
         require(emptyNetwork.entries().isEmpty() && emptyNetwork.groups().isEmpty()
                         && emptyNetwork.networks().equals(catalog),
                 "empty distant network was not independently advertised");
+        require(emptyNetwork.wireVersion() == 6 &&
+                        NetworkAnnouncementCodec.decodeAnnouncement(announcement).wireVersion() == 5,
+                "receiver cannot distinguish catalog announcements from legacy announcements");
+        String revision = NetworkAnnouncementCodec.directoryRevision(List.of(), List.of(), catalog);
+        require(revision.equals(NetworkAnnouncementCodec.directoryRevision(List.of(), List.of(), catalog)),
+                "unchanged network snapshot needs a stable coalescing generation");
+        require(!revision.equals(NetworkAnnouncementCodec.directoryRevision(List.of(), List.of(), List.of())),
+                "adding a network must bypass an old pending announcement");
+        require(!revision.equals(NetworkAnnouncementCodec.directoryRevision(List.of(), List.of(),
+                        List.of(new NetworkAnnouncementCodec.CatalogEntry(catalog.getFirst().id(), "新名字")))),
+                "renaming a network must bypass an old pending announcement");
         require(java.nio.ByteBuffer.wrap(announcement).getInt(4) == 5,
                 "legacy peers must still receive v5 announcements");
         require(NetworkAnnouncementCodec.decodeAnnouncement(announcement).networks().isEmpty(),

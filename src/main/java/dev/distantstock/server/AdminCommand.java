@@ -579,10 +579,25 @@ public final class AdminCommand {
         ctx.getSource().sendSuccess(() -> Component.literal("Protocol   " + view.protocolCompatible()
                 + " compatible · " + view.protocolIncompatible() + " incompatible · "
                 + view.protocolUnknown() + " unknown"), false);
+        var catalogs = dev.distantstock.link.NetworkAnnouncementService.remoteCatalog();
+        long authoritative = dev.distantstock.routing.DistantNetworkDirectory.get(server).all().stream()
+                .filter(network -> network.authoritativeOn(TranserverBridge.localNodeUuid())).count();
+        ctx.getSource().sendSuccess(() -> Component.literal("Catalog    本机发布 " + authoritative
+                + " 个远仓网络 · 已收到 " + catalogs.size() + " 个远端节点目录"), false);
         String selfNode = dev.distantstock.link.TranserverBridge.localNodeId();
         for (String node : dev.distantstock.link.TranserverBridge.knownNodes()) {
             if (node.equals(selfNode)) continue;
             var compatibility = dev.distantstock.link.ProtocolHelloService.compatibility(node);
+            var hello = dev.distantstock.link.ProtocolHelloService.peer(node);
+            UUID peerId;
+            try { peerId = UUID.fromString(node); }
+            catch (IllegalArgumentException invalid) { peerId = null; }
+            var received = peerId == null ? null : catalogs.get(peerId);
+            String catalogStatus = received != null ? received.size() + " 个网络"
+                    : hello == null ? "未收到握手" : !hello.capabilities().contains("network-catalog-v1")
+                    ? "对端不支持目录公告（需要更新模组）" : "尚未收到 V6 目录公告";
+            ctx.getSource().sendSuccess(() -> Component.literal("  · " + shortNode(node)
+                    + " · Catalog " + catalogStatus), false);
             if (compatibility == dev.distantstock.link.ProtocolHelloService.Compatibility.COMPATIBLE) continue;
             var missing = dev.distantstock.link.ProtocolHelloService.missingRequired(node);
             String detail = compatibility == dev.distantstock.link.ProtocolHelloService.Compatibility.UNKNOWN

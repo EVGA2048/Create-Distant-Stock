@@ -7,6 +7,7 @@ import dev.transerver.api.ReceivedMessage;
 import net.minecraft.server.MinecraftServer;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -36,6 +37,8 @@ public final class NetworkAnnouncementService {
     private static List<NetworkAnnouncementCodec.CatalogEntry> lastNetworks = List.of();
     private record PeerCatalog(List<NetworkAnnouncementCodec.CatalogEntry> networks, long receivedAt) {}
     private static final Map<UUID, PeerCatalog> CATALOG = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Serialize apply on the Minecraft thread; skip older announcements arriving after newer ones. */
+    private static final Map<UUID, Instant> LAST_APPLIED = new java.util.HashMap<>();
 
     /** Discovery only: an advertised network does not grant membership or reveal its join code. */
     public static Map<UUID, List<NetworkAnnouncementCodec.CatalogEntry>> remoteCatalog() {
@@ -48,6 +51,7 @@ public final class NetworkAnnouncementService {
 
     public static void stop() {
         CATALOG.clear();
+        LAST_APPLIED.clear();
         lastLocal = List.of();
         lastGroups = List.of();
         lastNetworks = List.of();
@@ -113,20 +117,29 @@ public final class NetworkAnnouncementService {
                     LinkSnapshot.localTps, LinkSnapshot.localMspt, groups, networks);
             byte[] legacyPayload = NetworkAnnouncementCodec.encode(local,
                     LinkSnapshot.localTps, LinkSnapshot.localMspt, groups);
+            String revision = NetworkAnnouncementCodec.directoryRevision(local, groups, networks);
+            boolean allQueued = true;
             for (String node : recipients) {
                 if (!node.equals(self.toString())) {
                     boolean catalog = catalogRecipients.contains(node);
-                    TranserverBridge.queueSend(node, RoutingChannels.NETWORK_ANNOUNCE,
+                    boolean queued = TranserverBridge.queueSend(node, RoutingChannels.NETWORK_ANNOUNCE,
                             catalog ? payload : legacyPayload,
-                            catalog ? "catalog-v1" : "legacy-v5");
+                            (catalog ? "catalog-v1:" : "legacy-v5:") + revision);
+                    if (!queued) {
+                        allQueued = false;
+                        LOG.warn("Network announcement not queued for {} (catalog={}): will retry", node, catalog);
+                    }
                 }
             }
-            lastCatalogRecipients = Set.copyOf(catalogRecipients);
-            lastNetworks = List.copyOf(networks);
-            lastLocal = List.copyOf(local);
-            lastGroups = List.copyOf(groups);
-            lastRecipients = Set.copyOf(recipients);
-            lastSentAt = now;
+            // Do not suppress the next beat when the sender was already at its admission limit.
+            if (allQueued) {
+                lastCatalogRecipients = Set.copyOf(catalogRecipients);
+                lastNetworks = List.copyOf(networks);
+                lastLocal = List.copyOf(local);
+                lastGroups = List.copyOf(groups);
+                lastRecipients = Set.copyOf(recipients);
+                lastSentAt = now;
+            }
         } catch (IOException error) {
             LOG.warn("Could not encode network announcement", error);
         }
@@ -212,21 +225,40 @@ public final class NetworkAnnouncementService {
             // into LinkSnapshot: Transerver can have many peers, so a single process-wide peer TPS
             // has no stable owner and produces misleading monitor readings.
             List<NetworkAnnouncementCodec.Group> groups = announcement.groups();
-            CATALOG.put(source, new PeerCatalog(announcement.networks(), System.nanoTime()));
-            NetworkDirectory.replacePeer(message.source(), entries);
             String alias = entries.stream().map(NetworkDirectory.Entry::server)
                     .filter(name -> name != null && !name.isBlank())
                     .findFirst().orElse("");
+            CompletableFuture<DeliveryResult> applied = new CompletableFuture<>();
             try {
                 server.execute(() -> {
                     try {
+                        if (!server.isRunning()) {
+                            applied.complete(DeliveryResult.RETRY);
+                            return;
+                        }
+                        Instant previous = LAST_APPLIED.get(source);
+                        if (previous != null && message.createdAt().isBefore(previous)) {
+                            // Never regress to an earlier snapshot because the Router delivered
+                            // two durable announcements out of order.
+                            applied.complete(DeliveryResult.APPLIED);
+                            return;
+                        }
                         if (!alias.isBlank()) {
                             dev.distantstock.routing.PeerNames.get(server).remember(source, alias);
                         }
                         rememberGroups(server, source, alias, groups);
+                        NetworkDirectory.replacePeer(message.source(), entries);
+                        // V5 carries no catalog. It must not erase a V6 catalog when a delayed
+                        // startup announcement arrives after the capability handshake.
+                        if (announcement.wireVersion() >= 6) {
+                            CATALOG.put(source, new PeerCatalog(announcement.networks(), System.nanoTime()));
+                        }
+                        LAST_APPLIED.put(source, message.createdAt());
+                        applied.complete(DeliveryResult.APPLIED);
                     } catch (RuntimeException error) {
                         LOG.error("Failed to apply network announcement {} from {} on the server thread",
                                 message.messageId(), message.source(), error);
+                        applied.complete(DeliveryResult.RETRY);
                     }
                 });
             } catch (RuntimeException error) {
@@ -234,10 +266,9 @@ public final class NetworkAnnouncementService {
                         message.messageId(), message.source(), error);
                 return CompletableFuture.completedFuture(DeliveryResult.RETRY);
             }
-            // The volatile/ConcurrentHashMap snapshot is already applied. SavedData work is queued
-            // on Minecraft's thread and this heartbeat repeats, so do not keep Transerver's durable
-            // handler completion coupled to Arclight/NeoForge executor semantics.
-            return CompletableFuture.completedFuture(DeliveryResult.APPLIED);
+            // A transport receipt may only say APPLIED after all updates, including SavedData,
+            // actually ran. An executor failure leaves the durable message available for retry.
+            return applied;
         } catch (IOException exception) {
             LOG.warn("Rejected network announcement {} from {}: {}",
                     message.messageId(), message.source(), exception.getMessage());

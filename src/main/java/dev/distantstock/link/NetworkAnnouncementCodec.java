@@ -9,6 +9,8 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -61,6 +63,22 @@ public final class NetworkAnnouncementCodec {
     public static byte[] encode(List<NetworkDirectory.Entry> entries, double tps, double mspt,
                                 List<Group> groups, List<CatalogEntry> networks) throws IOException {
         return encodeVersion(entries, tps, mspt, groups, networks, VERSION);
+    }
+
+    /**
+     * Fingerprint only the directory state, not the constantly changing TPS/MSPT telemetry.
+     * An announcement queued before a network was created must never coalesce away the newer
+     * catalog while its old Transerver message is waiting for a final receipt.
+     */
+    public static String directoryRevision(List<NetworkDirectory.Entry> entries, List<Group> groups,
+                                           List<CatalogEntry> networks) throws IOException {
+        try {
+            byte[] snapshot = encodeVersion(entries, 0, 0, groups, networks, VERSION);
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(snapshot);
+            return java.util.HexFormat.of().formatHex(digest, 0, 12);
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("Java runtime is missing SHA-256", impossible);
+        }
     }
 
     private static byte[] encodeVersion(List<NetworkDirectory.Entry> entries, double tps, double mspt,
@@ -158,7 +176,7 @@ public final class NetworkAnnouncementCodec {
     }
 
     /** One self-contained decode result. Safe when several peers announce concurrently. */
-    public record Announcement(List<NetworkDirectory.Entry> entries, Metrics metrics,
+    public record Announcement(int wireVersion, List<NetworkDirectory.Entry> entries, Metrics metrics,
                                List<Group> groups, List<CatalogEntry> networks) {
         public Announcement {
             entries = List.copyOf(entries);
@@ -255,7 +273,7 @@ public final class NetworkAnnouncementCodec {
         if (in.available() != 0) {
             throw new IOException("Network announcement contains trailing data");
         }
-        return new Announcement(entries, metrics, groups, networks);
+        return new Announcement(version, entries, metrics, groups, networks);
     }
 
     private static List<Group> readGroups(DataInputStream in, int version) throws IOException {
