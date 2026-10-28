@@ -1,6 +1,7 @@
 package dev.distantstock.net;
 
 import dev.distantstock.DistantStock;
+import dev.distantstock.item.RequesterData;
 import dev.distantstock.link.DistantNetworkJoinService;
 import dev.distantstock.link.TranserverBridge;
 import dev.distantstock.menu.MenuSync;
@@ -54,7 +55,6 @@ public record DistantNetworkActionC2S(int action, String value) implements Custo
                     || msg.value == null || msg.value.length() > 64) {
                 return;
             }
-            StockScanner.scan(player.getServer());
             DistantNetworkDirectory directory = DistantNetworkDirectory.get(player.getServer());
             UUID scope = menu.distantNetworkId(player);
             var current = DistantNetworkDirectory.isFormalId(scope)
@@ -97,10 +97,12 @@ public record DistantNetworkActionC2S(int action, String value) implements Custo
                     LOG.info("Recovered owned Distant network '{}' ({}) for terminal",
                             created.name(), created.id());
                 }
+                // Creating the outer network is not permission to import the terminal's
+                // previously selected Create warehouse. Dock right-click enrolls it later.
+                RequesterData.clearWarehouseBinding(menu.device(player));
+                menu.selectedFreq = null;
                 menu.persistDistantNetworkContext(player, created.id());
                 menu.resetStockStream();
-                DistantNetworkJoinService.enrollSelectedLocalWarehouse(
-                        player.getServer(), player, menu.device(player), created.id());
                 menu.refresh(player);
                 say(player, "message.distantstock.network.created", created.name());
                 PacketDistributor.sendToPlayer(player, StockSyncS2C.of(

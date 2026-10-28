@@ -2,6 +2,7 @@ package dev.distantstock.link;
 
 import dev.transerver.api.SendOptions;
 import dev.transerver.api.TranserverApi;
+import dev.distantstock.routing.RoutingChannels;
 import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -10,8 +11,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 final class AsyncSender implements AutoCloseable {
     private static final int MAX_PAYLOAD = 2 * 1024 * 1024;
     private static final long MAX_BYTES = 8L * 1024 * 1024;
+    private final LinkedBlockingDeque<Runnable> sendQueue = new LinkedBlockingDeque<>(128);
     private final ThreadPoolExecutor worker = new ThreadPoolExecutor(1, 1, 0, TimeUnit.MILLISECONDS,
-            new ArrayBlockingQueue<>(128), runnable -> {
+            sendQueue, runnable -> {
                 Thread thread = new Thread(runnable, "distantstock-send-io");
                 thread.setDaemon(true);
                 return thread;
@@ -72,7 +74,17 @@ final class AsyncSender implements AutoCloseable {
                 result.completeExceptionally(error);
             }
         });
-        try { worker.execute(task); }
+        try {
+            worker.execute(task);
+            // A JOIN request/accept is tiny and interactive. A busy stock/telemetry queue
+            // must not put it behind hundreds of slow durable writes. Only reorder queued
+            // tasks, never interrupt an in-flight write or drop a previously accepted task.
+            if ((RoutingChannels.DISTANT_NETWORK_JOIN_REQUEST.equals(channel)
+                    || RoutingChannels.DISTANT_NETWORK_JOIN_ACCEPT.equals(channel))
+                    && sendQueue.remove(task)) {
+                sendQueue.addFirst(task);
+            }
+        }
         catch (RejectedExecutionException full) {
             if (coalesce) recurring.remove(key, result);
             task.cancel(full);

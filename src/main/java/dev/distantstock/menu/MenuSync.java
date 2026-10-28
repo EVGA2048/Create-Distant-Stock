@@ -97,6 +97,11 @@ public final class MenuSync {
     }
 
     public static void writeCatalog(FriendlyByteBuf buf, UUID freq, UUID scope) {
+        if (dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope) && (freq == null
+                || !NetworkDirectory.findByFreq(freq)
+                        .map(row -> scope.equals(row.distantNetworkId())).orElse(false))) {
+            freq = null; // No cross-scope stock enumeration on menu opening.
+        }
         warm(freq);
         List<StockCache.Entry> list = StockCache.get(freq);
         buf.writeBoolean(StockConfig.DEMO_STOCK.get());
@@ -110,8 +115,7 @@ public final class MenuSync {
         List<NetworkDirectory.Entry> networks = !dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope)
                 ? List.of()
                 : NetworkDirectory.visible(StockConfig.isHost()).stream()
-                .filter(entry -> scope.equals(entry.distantNetworkId()) || (entry.local()
-                        && !dev.distantstock.routing.DistantNetworkDirectory.isFormalId(entry.distantNetworkId())))
+                .filter(entry -> scope.equals(entry.distantNetworkId()))
                 .toList();
         buf.writeVarInt(Math.min(networks.size(), 128));
         for (int i = 0; i < networks.size() && i < 128; i++) {

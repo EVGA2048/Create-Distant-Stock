@@ -170,7 +170,12 @@ public final class DistantNetworkDirectory extends SavedData {
         if (duplicate) {
             throw new IllegalArgumentException("Distant Stock network already exists: " + normalized);
         }
-        Network network = new Network(UUID.randomUUID(), normalized, ownerNode, ownerPlayer,
+        // The first eight hexadecimal digits of the UUID are also a public join alias. Never
+        // allocate one that shadows an existing join code or another network's alias.
+        UUID id;
+        do { id = UUID.randomUUID(); }
+        while (conflictsShortId(id));
+        Network network = new Network(id, normalized, ownerNode, ownerPlayer,
                 newJoinCode(), false);
         networks.put(network.id(), network);
         setDirty();
@@ -213,10 +218,26 @@ public final class DistantNetworkDirectory extends SavedData {
         } catch (IllegalArgumentException exception) {
             return Optional.empty();
         }
-        return networks.values().stream()
+        List<Network> matches = networks.values().stream()
                 .filter(network -> !network.joinCode().isEmpty())
-                .filter(network -> network.joinCode().equalsIgnoreCase(wanted))
-                .findFirst();
+                .filter(network -> network.joinCode().equalsIgnoreCase(wanted)
+                        || shortJoinId(network.id()).equalsIgnoreCase(wanted.replace("-", "")))
+                .toList();
+        // A short UUID prefix is not globally guaranteed unique. Never guess which authority
+        // a duplicate code was intended for, including collisions with ordinary invite codes.
+        return matches.size() == 1 ? Optional.of(matches.getFirst()) : Optional.empty();
+    }
+
+    /** Public eight-character alias of a network UUID, independent of resettable invite codes. */
+    public static String shortJoinId(UUID id) {
+        return id == null ? "" : id.toString().substring(0, 8).toUpperCase(Locale.ROOT);
+    }
+
+    private boolean conflictsShortId(UUID candidate) {
+        String prefix = shortJoinId(candidate);
+        return networks.values().stream().anyMatch(network -> !network.legacy()
+                && (prefix.equals(shortJoinId(network.id()))
+                    || normalizeCode(prefix).equals(network.joinCode())));
     }
 
     /** Find a real network this player owns on this authority node by its human name. */
@@ -507,7 +528,9 @@ public final class DistantNetworkDirectory extends SavedData {
                 raw.append(CODE_ALPHABET[RANDOM.nextInt(CODE_ALPHABET.length)]);
             }
             String code = normalizeCode(raw.toString());
-            if (networks.values().stream().noneMatch(network -> code.equals(network.joinCode()))) {
+            if (networks.values().stream().noneMatch(network -> !network.legacy()
+                    && (code.equals(network.joinCode())
+                    || code.equalsIgnoreCase(normalizeCode(shortJoinId(network.id())))))) {
                 return code;
             }
         }

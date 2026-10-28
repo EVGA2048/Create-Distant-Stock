@@ -631,6 +631,16 @@ public final class RequesterMenu extends AbstractContainerMenu {
         // 只记得频率的设备也要能看见对面那张网络：从目录里把网络 id 补出来。少了这一步，
         // 这台终端只会按频率 watch，而跨服那条链路问的是网络 id —— 没人去问，库存永远是空的。
         RemoteNetworkId networkId = MenuSync.resolve(networkId(player), freq);
+        UUID scope = distantNetworkId(player);
+        if (dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope)
+                && (networkId == null || !NetworkDirectory.find(networkId)
+                        .map(row -> scope.equals(row.distantNetworkId())).orElse(false))) {
+            // A stale terminal/desk selection must not leak or prefetch another player's
+            // Create inventory just because the terminal's outer network changed.
+            stock = List.of();
+            demo = StockConfig.DEMO_STOCK.get();
+            return;
+        }
         MenuSync.warm(networkId, freq);
         stock = networkId == null ? StockCache.get(freq) : StockCache.get(networkId);
         demo = StockConfig.DEMO_STOCK.get();

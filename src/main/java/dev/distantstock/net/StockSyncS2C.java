@@ -74,11 +74,7 @@ public record StockSyncS2C(boolean demo, List<Line> items, List<NetworkLine> net
         }
         if (page == 0) {
             for (NetworkDirectory.Entry entry : NetworkDirectory.visible(StockConfig.isHost())) {
-                // Let a network owner choose a local unjoined Create warehouse to enroll it.
-                // A remote unjoined warehouse is never eligible, and the JoinNetwork handler
-                // checks Create's administrator permission before changing local membership.
-                if (!scope.equals(entry.distantNetworkId()) && !(entry.local()
-                        && !dev.distantstock.routing.DistantNetworkDirectory.isFormalId(entry.distantNetworkId()))) continue;
+                if (!scope.equals(entry.distantNetworkId())) continue;
                 networks.add(new NetworkLine(entry.freq(), entry.server(), entry.links(), entry.networkId(),
                         entry.local(), entry.packable(), entry.distantNetworkId(), entry.warehouseName()));
             }

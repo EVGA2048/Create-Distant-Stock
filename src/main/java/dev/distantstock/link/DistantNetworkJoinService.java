@@ -49,31 +49,6 @@ public final class DistantNetworkJoinService {
         dev.distantstock.menu.RequesterMenu.sendGroupList(player, menu.device(player));
     }
 
-    /**
-     * Join an already selected local Create warehouse to the terminal's chosen scope.
-     * Only Create administrators may make this membership change, and existing memberships
-     * in another formal scope are never silently reassigned. An untuned portable requester is
-     * still allowed to join a Distant Stock network without creating a warehouse.
-     */
-    public static boolean enrollSelectedLocalWarehouse(MinecraftServer server, ServerPlayer player,
-                                                       ItemStack terminal, UUID scope) {
-        if (server == null || player == null || terminal.isEmpty()
-                || !DistantNetworkDirectory.isFormalId(scope)) return false;
-        var directory = DistantNetworkDirectory.get(server);
-        UUID freq = RequesterData.freq(terminal);
-        if (freq == null) return false;
-        var entry = dev.distantstock.stock.NetworkDirectory.findByFreq(freq)
-                .filter(dev.distantstock.stock.NetworkDirectory.Entry::local).orElse(null);
-        if (entry == null || entry.networkId() == null
-                || !dev.distantstock.stock.CreateNetworkAccess.mayAdministrate(
-                        entry.networkId(), freq, player)) return false;
-        UUID existing = directory.formalNetworkOf(entry.networkId()).orElse(null);
-        if (existing != null && !existing.equals(scope)) return false;
-        if (existing == null && !directory.attach(entry.networkId(), scope)) return false;
-        dev.distantstock.stock.StockScanner.scan(server);
-        return true;
-    }
-
     private record Pending(UUID player, RemoteNetworkId member, InteractionHand hand,
                            DeviceTarget device, ItemStack terminal, long sentAt) {
     }
@@ -101,8 +76,11 @@ public final class DistantNetworkJoinService {
      * Starts a join. Returns false only when nothing could possibly receive the request.
      * A local code is applied immediately without going over Transerver.
      */
+    @Deprecated
     public static boolean request(MinecraftServer server, UUID player, RemoteNetworkId member, String code) {
-        return request(server, player, member, null, null, null, code);
+        // A join code only authorizes a TERMINAL, never the Create warehouse selected on it.
+        // The physical dock-click is the single guarded enrollment operation.
+        return false;
     }
 
     /** Join only the portable terminal to a Distant Stock network; no Create warehouse is enrolled. */
@@ -126,7 +104,7 @@ public final class DistantNetworkJoinService {
     private static boolean request(MinecraftServer server, UUID player, RemoteNetworkId member,
                                    InteractionHand hand, DeviceTarget device, ItemStack terminal, String code) {
         if (server == null || player == null
-                || (member == null && hand == null && device == null)) return false;
+                || member != null || (hand == null && device == null)) return false;
         String normalized;
         try {
             normalized = DistantNetworkDirectory.normalizeCode(code);
@@ -145,11 +123,6 @@ public final class DistantNetworkJoinService {
                 if (!bound) {
                     return false;
                 }
-                if (device == null) {
-                    enrollSelectedLocalWarehouse(server, serverPlayer,
-                            heldTerminal(serverPlayer, hand), local.id());
-                }
-                dev.distantstock.stock.StockScanner.scan(server);
                 if (serverPlayer.containerMenu instanceof dev.distantstock.menu.RequesterMenu menu
                         && device == null && menu.hand == hand && !menu.isGauge()) {
                     menu.refresh(serverPlayer);
@@ -212,7 +185,27 @@ public final class DistantNetworkJoinService {
         int sent = 0;
         UUID localNode = TranserverBridge.localNodeUuid();
         String self = localNode == null ? "" : localNode.toString();
-        for (String node : TranserverBridge.knownNodes()) {
+        java.util.Set<String> targets = TranserverBridge.knownNodes();
+        // A known public UUID prefix names one authority already present in the discovered
+        // catalog: avoid broadcasting a durable join request through every other node's backlog.
+        String shortCode = normalized.replace("-", "");
+        if (shortCode.matches("[0-9A-F]{8}")) {
+            java.util.Set<String> matches = new java.util.HashSet<>();
+            for (var peer : NetworkAnnouncementService.remoteCatalog().entrySet()) {
+                if (peer.getValue().stream().anyMatch(network ->
+                        DistantNetworkDirectory.shortJoinId(network.id()).equals(shortCode))) {
+                    matches.add(peer.getKey().toString());
+                }
+            }
+            if (matches.size() > 1) {
+                PENDING.remove(requestId);
+                return false; // ambiguous public short ID: never pick one arbitrarily
+            }
+            if (matches.size() == 1 && targets.contains(matches.iterator().next())) {
+                targets = matches;
+            }
+        }
+        for (String node : targets) {
             if (node.equals(self)) continue;
             if (TranserverBridge.queueSend(node, RoutingChannels.DISTANT_NETWORK_JOIN_REQUEST,
                     payload, requestId.toString())) {
@@ -294,8 +287,9 @@ public final class DistantNetworkJoinService {
         } catch (IOException | IllegalArgumentException exception) {
             return CompletableFuture.completedFuture(DeliveryResult.REJECTED);
         }
-        if (request.member() != null && !source.equals(request.member().nodeId())) {
-            // A node may only enroll a Create network that actually belongs to that node.
+        if (request.member() != null) {
+            // Reject stale v0.3.62 messages that would enroll a warehouse without a physical
+            // dock click. No wire join request may mutate the Create membership directory.
             return CompletableFuture.completedFuture(DeliveryResult.REJECTED);
         }
         MinecraftServer server = TranserverBridge.server();
@@ -335,6 +329,12 @@ public final class DistantNetworkJoinService {
         if (stack != expected || !(stack.getItem() instanceof RequesterItem)) return false;
         UUID current = RequesterData.distantNetwork(stack).orElse(null);
         if (DistantNetworkDirectory.isFormalId(current) && !scope.equals(current)) return false;
+        if (!scope.equals(current)) {
+            // Joining a Distant Stock network does not enroll the Create warehouse this
+            // requester happened to point to beforehand. Drop the stale selection, rather
+            // than displaying or querying an unrelated local inventory after the join.
+            RequesterData.clearWarehouseBinding(stack);
+        }
         RequesterData.setDistantNetwork(stack, scope);
         player.getInventory().setChanged();
         return true;
@@ -350,6 +350,7 @@ public final class DistantNetworkJoinService {
             return CompletableFuture.completedFuture(DeliveryResult.REJECTED);
         }
         if (!source.equals(accept.ownerNode())
+                || accept.member() != null
                 || !DistantNetworkDirectory.isFormalId(accept.networkId())
                 || accept.networkName().isBlank()
                 || accept.networkName().trim().length() > DistantNetworkDirectory.MAX_NAME_LENGTH) {
@@ -395,14 +396,8 @@ public final class DistantNetworkJoinService {
                         : bindTerminal(player, pending.hand(), pending.terminal(), accept.networkId());
                 if (!bound) return DeliveryResult.REJECTED;
                 directory.rememberReplica(accept.networkId(), accept.networkName(), accept.ownerNode());
-                // Binding a portable terminal is not the same as enrolling a warehouse. If the
-                // terminal is already tuned to a local warehouse the player administers, enroll
-                // that warehouse as part of the requested join. This lets VL4 advertise its stock
-                // rather than exposing an empty network shell to the other server.
-                enrollSelectedLocalWarehouse(server, player, heldTerminal(player, pending.hand()),
-                        accept.networkId());
-                dev.distantstock.stock.StockScanner.scan(server);
                 if (player.containerMenu instanceof dev.distantstock.menu.RequesterMenu menu) {
+                    menu.selectedFreq = null;
                     menu.refresh(player);
                     syncTerminalMenu(player, menu);
                 }
@@ -482,7 +477,7 @@ public final class DistantNetworkJoinService {
         if (player != null) {
             String fallback = switch (key) {
                 case "message.distantstock.network.join_timeout" ->
-                        "加入请求在 60 秒内未收到确认，请检查邀请码、主节点和 Transerver 队列后重试。";
+                        "加入请求在 5 分钟内未收到确认，请检查网络 ID、主节点和 Transerver 队列后重试。";
                 case "message.distantstock.network.join_target_changed" ->
                         "等待期间手持终端或其网络已改变，本次加入已取消，请重新发起。";
                 default -> null;

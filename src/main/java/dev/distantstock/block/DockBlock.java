@@ -143,6 +143,13 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                             "message.distantstock.network.required"), true);
                     return ItemInteractionResult.sidedSuccess(false);
                 }
+                // A forged or stale terminal scope is not a membership grant.
+                var directory = dev.distantstock.routing.DistantNetworkDirectory.get(level.getServer());
+                if (!directory.isFormalNetwork(scope)) {
+                    player.displayClientMessage(Component.translatable(
+                            "message.distantstock.network.required"), true);
+                    return ItemInteractionResult.sidedSuccess(false);
+                }
                 RemoteNetworkId dockNetwork = be.networkId();
                 if (dockNetwork == null && be.freq() != null) {
                     dockNetwork = dev.distantstock.stock.NetworkDirectory.findByFreq(be.freq())
@@ -155,7 +162,14 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                             "message.distantstock.dock.bind_create_first"), true);
                     return ItemInteractionResult.sidedSuccess(false);
                 }
-                var directory = dev.distantstock.routing.DistantNetworkDirectory.get(level.getServer());
+                // Only a physical dock bound to a real local Create warehouse can enroll it.
+                boolean liveLocal = dev.distantstock.stock.NetworkDirectory.find(dockNetwork)
+                        .map(dev.distantstock.stock.NetworkDirectory.Entry::local).orElse(false);
+                if (!liveLocal) {
+                    player.displayClientMessage(Component.translatable(
+                            "message.distantstock.dock.bind_create_first"), true);
+                    return ItemInteractionResult.sidedSuccess(false);
+                }
                 java.util.UUID currentScope = directory.formalNetworkOf(dockNetwork).orElse(null);
                 if (currentScope == null) {
                     if (!dev.distantstock.stock.CreateNetworkAccess.mayAdministrate(
@@ -186,6 +200,12 @@ public final class DockBlock extends BaseEntityBlock implements IWrenchable {
                             .orElse(currentScope.toString().substring(0, 8));
                     player.displayClientMessage(Component.translatable(
                             "message.distantstock.network.warehouse_other", name), true);
+                    return ItemInteractionResult.sidedSuccess(false);
+                }
+                if (!dev.distantstock.stock.CreateNetworkAccess.mayInteract(
+                        dockNetwork, dockNetwork.createFrequency(), player)) {
+                    player.displayClientMessage(Component.translatable(
+                            "message.distantstock.network.interact_denied"), true);
                     return ItemInteractionResult.sidedSuccess(false);
                 }
                 RemoteNetworkId selected = RequesterData.network(stack).orElse(null);

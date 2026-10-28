@@ -143,7 +143,6 @@ public final class AdminCommand {
                         .then(Commands.literal("join-terminal")
                                 .then(Commands.argument("code", StringArgumentType.word())
                                         .executes(AdminCommand::distantNetworkJoinTerminal)))
-                        .then(Commands.literal("enroll").executes(AdminCommand::distantNetworkEnroll))
                         .then(Commands.literal("leave").executes(AdminCommand::distantNetworkLeave)))
                 .then(Commands.literal("group")
                         .executes(AdminCommand::groupList)
@@ -202,25 +201,6 @@ public final class AdminCommand {
                 dev.distantstock.routing.DistantNetworkDirectory.LEGACY_NETWORK_ID);
     }
 
-    private static int distantNetworkEnroll(CommandContext<CommandSourceStack> ctx)
-            throws CommandSyntaxException {
-        ServerPlayer player = ctx.getSource().getPlayerOrException();
-        var hand = dev.distantstock.item.RequesterFind.preferredHand(player);
-        ItemStack terminal = player.getItemInHand(hand);
-        if (!(terminal.getItem() instanceof dev.distantstock.item.RequesterItem))
-            return failure(ctx, "请手持远仓终端，并先让它加入远仓网络、选择本地 Create 仓储。");
-        UUID scope = dev.distantstock.item.RequesterData.distantNetwork(terminal).orElse(null);
-        if (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(scope))
-            return failure(ctx, "此终端尚未加入正式远仓网络。");
-        var directory = dev.distantstock.routing.DistantNetworkDirectory.get(player.getServer());
-        if (!directory.isFormalNetwork(scope))
-            return failure(ctx, "本服还没有该远仓网络的授权记录，请重新完成加入码验证。");
-        if (!dev.distantstock.link.DistantNetworkJoinService.enrollSelectedLocalWarehouse(
-                player.getServer(), player, terminal, scope))
-            return failure(ctx, "未成功纳入：请确认已选本地 Create 仓库、拥有管理权限，且仓库未加入其他网络。");
-        ctx.getSource().sendSuccess(() -> Component.literal("已纳入本地 Create 仓库，下一次网络公告会同步至其他服务器。"), false);
-        return Command.SINGLE_SUCCESS;
-    }
 
     /**
      * Every subcommand, in one page.
@@ -244,7 +224,6 @@ public final class AdminCommand {
                 "  /distantstock network code [名字]    找回自己在本服创建的网络加入码，无需终端",
                 "  /distantstock network join <加入码>  把当前本地仓储网络加入远仓网络",
                 "  /distantstock network join-terminal <加入码>  手持终端加入，无需先绑定仓库",
-                "  /distantstock network enroll      将手持终端选中的本地 Create 仓储纳入终端所属远仓网络",
                 "  /distantstock network reset-code     重置加入码，现有成员不掉线",
                 "  /distantstock network leave          让当前仓储网络退出并回到 Legacy 域",
                 "  /distantstock group list            列出所有系统（港组）",
@@ -304,28 +283,32 @@ public final class AdminCommand {
     private static int distantNetworkCreate(CommandContext<CommandSourceStack> ctx)
             throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
-        var member = localTerminalNetwork(ctx, player);
-        if (member == null) {
-            return 0;
-        }
+        var hand = dev.distantstock.item.RequesterFind.preferredHand(player);
+        ItemStack terminal = player.getItemInHand(hand);
+        if (!(terminal.getItem() instanceof dev.distantstock.item.RequesterItem))
+            return failure(ctx, "创建远仓网络时请手持便携远仓终端。");
         var directory = dev.distantstock.routing.DistantNetworkDirectory.get(player.getServer());
-        var existing = directory.networkOf(member).flatMap(directory::find).orElse(null);
-        if (existing != null && !existing.legacy()) {
-            return failure(ctx, "这张 Create 仓储网络已经属于远仓网络「" + existing.name()
-                    + "」。请先退出再加入其它网络。");
-        }
+        if (dev.distantstock.routing.DistantNetworkDirectory.isFormalId(
+                dev.distantstock.item.RequesterData.distantNetwork(terminal).orElse(null)))
+            return failure(ctx, "这台终端已加入远仓网络，请先退出再创建。");
         String name = StringArgumentType.getString(ctx, "name");
         UUID localNode = dev.distantstock.link.TranserverBridge.localNodeUuid();
         if (localNode == null) {
             return failure(ctx, "Transerver 节点身份尚未加载，暂时不能创建远仓网络。");
         }
         try {
-            var created = directory.create(name, localNode, player.getUUID(), member);
-            // The periodic scanner will publish the membership on the next beat. Updating the
-            // in-memory row now makes the command result visible immediately.
-            refreshLocalNetworkMembership(player.getServer(), member, created.id());
+            var created = directory.create(name, localNode, player.getUUID());
+            // Creating an outer network must not import any local Create warehouse. The
+            // owner must visit the already-bound Distant Dock and right-click it with this
+            // terminal to explicitly enroll that particular Create network.
+            dev.distantstock.item.RequesterData.clearWarehouseBinding(terminal);
+            dev.distantstock.item.RequesterData.setDistantNetwork(terminal, created.id());
+            player.getInventory().setChanged();
             ctx.getSource().sendSuccess(() -> Component.literal(
-                    "已创建远仓网络「" + created.name() + "」\n加入码：" + created.joinCode()), false);
+                    "已创建远仓网络「" + created.name() + "」\n网络 ID："
+                    + dev.distantstock.routing.DistantNetworkDirectory.shortJoinId(created.id())
+                    + " · 加入码：" + created.joinCode()
+                    + "\n请手持便携终端右键已绑定 Create 仓储的远仓港，才会把该仓库纳入网络。"), false);
             return Command.SINGLE_SUCCESS;
         } catch (IllegalArgumentException exception) {
             return failure(ctx, exception.getMessage());
@@ -424,40 +407,7 @@ public final class AdminCommand {
 
     private static int distantNetworkJoin(CommandContext<CommandSourceStack> ctx)
             throws CommandSyntaxException {
-        ServerPlayer player = ctx.getSource().getPlayerOrException();
-        String code = StringArgumentType.getString(ctx, "code");
-        var hand = dev.distantstock.item.RequesterFind.preferredHand(player);
-        ItemStack held = player.getItemInHand(hand);
-        if (held.getItem() instanceof dev.distantstock.item.RequesterItem) {
-            // /network join should also work for a portable terminal without a local Create
-            // warehouse: the player may be joining a remote warehouse solely to view its stock.
-            UUID freq = dev.distantstock.item.RequesterData.freq(held);
-            boolean hasLocal = freq != null && dev.distantstock.stock.NetworkDirectory.findByFreq(freq)
-                    .map(dev.distantstock.stock.NetworkDirectory.Entry::local).orElse(false);
-            if (!hasLocal) {
-                if (!dev.distantstock.link.DistantNetworkJoinService.requestTerminal(
-                        player.getServer(), player, hand, code)) {
-                    return failure(ctx, "远仓终端加入请求未发出，请检查加入码及 Transerver 状态。");
-                }
-                ctx.getSource().sendSuccess(() -> Component.literal("已发送远仓终端加入请求，请等待确认。"), false);
-                return Command.SINGLE_SUCCESS;
-            }
-        }
-        var member = localTerminalNetwork(ctx, player);
-        if (member == null) return 0;
-        var directory = dev.distantstock.routing.DistantNetworkDirectory.get(player.getServer());
-        var existing = directory.networkOf(member).flatMap(directory::find).orElse(null);
-        if (existing != null && !existing.legacy()) {
-            return failure(ctx, "这张 Create 仓储网络已经属于远仓网络「" + existing.name()
-                    + "」。请先退出再加入其它网络。");
-        }
-        boolean sent = dev.distantstock.link.DistantNetworkJoinService.request(
-                player.getServer(), player.getUUID(), member, code);
-        if (!sent) {
-            return failure(ctx, "加入请求没有发出去：请检查加入码和 Transerver 连接。");
-        }
-        ctx.getSource().sendSuccess(() -> Component.literal("已发送远仓网络加入请求。"), false);
-        return Command.SINGLE_SUCCESS;
+        return distantNetworkJoinTerminal(ctx);
     }
 
     /** Bind a portable terminal before selecting a warehouse, just like the network screen. */
@@ -489,6 +439,10 @@ public final class AdminCommand {
         var current = directory.networkOf(member).flatMap(directory::find).orElse(null);
         if (current == null || current.legacy()) {
             return failure(ctx, "这张 Create 仓储网络当前没有加入正式远仓网络。");
+        }
+        if (!dev.distantstock.stock.CreateNetworkAccess.mayAdministrate(
+                member, member.createFrequency(), player)) {
+            return failure(ctx, "只有这张 Create 仓库的管理员才能让它退出远仓网络。");
         }
         if (directory.wouldOrphanAuthority(member, player.getUUID(),
                 dev.distantstock.link.TranserverBridge.localNodeUuid())) {

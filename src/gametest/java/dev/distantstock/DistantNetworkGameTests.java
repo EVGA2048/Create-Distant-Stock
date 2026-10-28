@@ -111,7 +111,7 @@ public final class DistantNetworkGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 20)
-    public static void localJoinCodeAcceptsExplicitLegacyMembership(GameTestHelper h) {
+    public static void localJoinCodeCannotEnrollCreateWarehouseWithoutDockClick(GameTestHelper h) {
         var server = h.getLevel().getServer();
         var directory = DistantNetworkDirectory.get(server);
         UUID node = UUID.fromString(dev.distantstock.link.TranserverBridge.localNodeId());
@@ -127,11 +127,11 @@ public final class DistantNetworkGameTests {
                 h.getLevel().dimension().location().toString(), UUID.randomUUID());
         h.assertTrue(directory.attach(joiningMember, DistantNetworkDirectory.LEGACY_NETWORK_ID),
                 "fixture could not put joining member in Legacy");
-        h.assertTrue(dev.distantstock.link.DistantNetworkJoinService.request(
+        h.assertFalse(dev.distantstock.link.DistantNetworkJoinService.request(
                         server, playerId, joiningMember, network.joinCode()),
-                "local join code was rejected before Legacy -> formal migration");
-        h.assertTrue(directory.formalNetworkOf(joiningMember).filter(network.id()::equals).isPresent(),
-                "local join code did not migrate Legacy membership into the formal network");
+                "join code enrolled a Create warehouse without clicking its bound dock");
+        h.assertTrue(directory.formalNetworkOf(joiningMember).isEmpty(),
+                "join code silently migrated Legacy membership into a formal network");
         h.succeed();
     }
 

@@ -1023,9 +1023,7 @@ public final class RequesterScreen extends AbstractContainerScreen<RequesterMenu
             g.drawString(font, label, x + 31, ry + 3,
                     blend(entry.local() ? INK : 0xFFC8B6E8, faded), false);
             String location = entry.local()
-                    ? (!dev.distantstock.routing.DistantNetworkDirectory.isFormalId(entry.distantNetworkId())
-                    ? "未加入 · 点击纳入本网络"
-                    : Component.translatable("gui.distantstock.local").getString())
+                    ? Component.translatable("gui.distantstock.local").getString()
                     : entry.server();
             g.drawString(font, location, x + 31, ry + 10, blend(0x3A7774, faded), false);
             Component links = entry.packable()

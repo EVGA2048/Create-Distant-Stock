@@ -1,6 +1,7 @@
 package dev.distantstock.link;
 
 import dev.transerver.api.*;
+import dev.distantstock.routing.RoutingChannels;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -9,6 +10,7 @@ public final class AsyncSenderCheck {
     static final class Api implements TranserverApi {
         final CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
         final List<byte[]> payloads = new CopyOnWriteArrayList<>();
+        final List<String> channels = new CopyOnWriteArrayList<>();
         final List<CompletableFuture<SendReceipt>> receipts = new CopyOnWriteArrayList<>();
         volatile boolean block;
         volatile String thread;
@@ -16,6 +18,7 @@ public final class AsyncSenderCheck {
             thread = Thread.currentThread().getName(); entered.countDown();
             if (block) try { release.await(); } catch (InterruptedException e) { throw new RuntimeException(e); }
             payloads.add(payload);
+            channels.add(channel);
             var receipt = new CompletableFuture<SendReceipt>(); receipts.add(receipt);
             return new SendHandle(UUID.randomUUID(), receipt);
         }
@@ -59,7 +62,23 @@ public final class AsyncSenderCheck {
         sender.close();
         check(queued.isCompletedExceptionally(), "shutdown resolves queued futures");
         try { active.get(2, TimeUnit.SECONDS); throw new AssertionError("active interrupted"); } catch (ExecutionException expected) {}
-        System.out.println("AsyncSender checks passed: durability, thread, copy, coalescing, peer fairness, size, shutdown");
+        var priorityApi = new Api(); priorityApi.block = true;
+        try (var prioritySender = new AsyncSender()) {
+            var first = prioritySender.submit(priorityApi, "node", "busy", new byte[1],
+                    SendOptions.defaults(), false);
+            check(priorityApi.entered.await(2, TimeUnit.SECONDS), "priority worker entered");
+            var normal = prioritySender.submit(priorityApi, "node", "bulk", new byte[1],
+                    SendOptions.defaults(), false);
+            var join = prioritySender.submit(priorityApi, "node", RoutingChannels.DISTANT_NETWORK_JOIN_REQUEST,
+                    new byte[1], SendOptions.defaults(), false);
+            priorityApi.release.countDown();
+            first.get(2, TimeUnit.SECONDS);
+            join.get(2, TimeUnit.SECONDS);
+            normal.get(2, TimeUnit.SECONDS);
+            check(priorityApi.channels.equals(List.of("busy", RoutingChannels.DISTANT_NETWORK_JOIN_REQUEST,
+                            "bulk")), "join handshake was stuck behind an ordinary outbound backlog");
+        }
+        System.out.println("AsyncSender checks passed: durability, thread, copy, coalescing, peer fairness, size, urgent join, shutdown");
     }
     static void check(boolean value, String label) { if (!value) throw new AssertionError(label); }
 }

@@ -29,6 +29,59 @@ import java.util.concurrent.CompletableFuture;
 @PrefixGameTestTemplate(false)
 public final class NetworkJoinPreflightGameTests {
     @GameTest(template = "empty", timeoutTicks = 20)
+    public static void chatNetworkCreationDoesNotEnrollSelectedWarehouse(GameTestHelper h) throws Exception {
+        var player = net.neoforged.neoforge.common.util.FakePlayerFactory.get(h.getLevel(),
+                new com.mojang.authlib.GameProfile(UUID.randomUUID(), "NoAutoEnroll"));
+        UUID localNode = TranserverBridge.localNodeUuid();
+        var member = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, localNode,
+                UUID.randomUUID(), "minecraft:overworld", UUID.randomUUID());
+        var terminal = new net.minecraft.world.item.ItemStack(dev.distantstock.item.ModItems.REQUESTER.get());
+        dev.distantstock.item.RequesterData.setNetwork(terminal, member,
+                DistantNetworkDirectory.LEGACY_NETWORK_ID);
+        player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, terminal);
+        var directory = DistantNetworkDirectory.get(h.getLevel().getServer());
+        String name = "command-" + UUID.randomUUID().toString().substring(0, 8);
+        h.getLevel().getServer().getCommands().getDispatcher().execute(
+                "distantstock network create " + name,
+                player.createCommandSourceStack().withPermission(2));
+        var network = directory.findByName(name).orElseThrow();
+        h.assertTrue(directory.formalNetworkOf(member).isEmpty(),
+                "chat command silently imported a Create network without a dock click");
+        h.assertTrue(dev.distantstock.item.RequesterData.network(terminal).isEmpty()
+                        && dev.distantstock.item.RequesterData.distantNetwork(terminal)
+                        .filter(network.id()::equals).isPresent(),
+                "chat creation did not keep outer network and warehouse selection separate");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void shortNetworkUuidAndInviteCodeBothJoinSameAuthority(GameTestHelper h) {
+        var directory = DistantNetworkDirectory.get(h.getLevel().getServer());
+        UUID player = UUID.randomUUID();
+        UUID node = TranserverBridge.localNodeUuid();
+        var network = directory.create("short-join-" + UUID.randomUUID().toString().substring(0, 8),
+                node, player);
+        String id = DistantNetworkDirectory.shortJoinId(network.id());
+        h.assertTrue(id.length() == 8 && id.matches("[0-9A-F]{8}"),
+                "the network's public UUID join alias must be eight hex digits");
+        h.assertTrue(directory.findByCode(id).filter(network::equals).isPresent()
+                        && directory.findByCode(id.substring(0, 4) + "-" + id.substring(4))
+                        .filter(network::equals).isPresent(),
+                "both forms of the 8-digit public network ID must resolve the authority");
+        h.assertTrue(directory.findByCode(network.joinCode()).filter(network::equals).isPresent(),
+                "the existing private join code must remain accepted");
+        String reset = directory.resetJoinCode(network.id(), player, node);
+        h.assertTrue(!reset.equals(network.joinCode())
+                        && directory.findByCode(id).map(row -> row.id().equals(network.id())).orElse(false),
+                "resetting the invitation code must not change the network's 8-digit ID");
+        UUID replicaId = UUID.randomUUID();
+        directory.rememberReplica(replicaId, "replica-" + replicaId.toString().substring(0, 8), UUID.randomUUID());
+        h.assertTrue(directory.findByCode(DistantNetworkDirectory.shortJoinId(replicaId)).isEmpty(),
+                "a discovery-only replica must not impersonate the local join-code authority");
+        h.succeed();
+    }
+
+    @GameTest(template = "empty", timeoutTicks = 20)
     public static void chatCreatedReceivingGroupBelongsToJoinedNetwork(GameTestHelper h) throws Exception {
         var server = h.getLevel().getServer();
         var player = net.neoforged.neoforge.common.util.FakePlayerFactory.get(h.getLevel(),
@@ -99,29 +152,51 @@ public final class NetworkJoinPreflightGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 20)
-    public static void joiningLocalWarehouseActuallyAdvertisesStockNetwork(GameTestHelper h) {
+    public static void warehouseJoinsOnlyWhenOwnerClicksItsDock(GameTestHelper h) {
         var server = h.getLevel().getServer();
         var player = net.neoforged.neoforge.common.util.FakePlayerFactory.get(h.getLevel(),
                 new com.mojang.authlib.GameProfile(UUID.randomUUID(), "JoinStockCheck"));
+        var stranger = h.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
         UUID frequency = UUID.randomUUID();
         var logistics = new LogisticsNetwork(frequency);
         logistics.owner = player.getUUID();
+        logistics.locked = true;
         logistics.loadedLinks.add(GlobalPos.of(h.getLevel().dimension(), h.absolutePos(net.minecraft.core.BlockPos.ZERO)));
         Create.LOGISTICS.logisticsNetworks.put(frequency, logistics);
+        UUID anotherFrequency = UUID.randomUUID();
+        var another = new LogisticsNetwork(anotherFrequency);
+        another.owner = stranger.getUUID();
+        another.loadedLinks.add(GlobalPos.of(h.getLevel().dimension(), h.absolutePos(new net.minecraft.core.BlockPos(1, 0, 0))));
+        Create.LOGISTICS.logisticsNetworks.put(anotherFrequency, another);
         try {
             dev.distantstock.stock.StockScanner.scan(server);
             var local = dev.distantstock.stock.NetworkDirectory.findByFreq(frequency).orElseThrow();
             var item = new net.minecraft.world.item.ItemStack(dev.distantstock.item.ModItems.REQUESTER.get());
-            dev.distantstock.item.RequesterData.setNetwork(item, local.networkId(),
-                    DistantNetworkDirectory.LEGACY_NETWORK_ID);
             var directory = DistantNetworkDirectory.get(server);
             var network = directory.create("enroll-" + frequency.toString().substring(0, 8),
                     TranserverBridge.localNodeUuid(), player.getUUID());
-            h.assertTrue(DistantNetworkJoinService.enrollSelectedLocalWarehouse(
-                            server, player, item, network.id()),
-                    "a Create owner joining via the network page did not enroll the tuned warehouse");
+            dev.distantstock.item.RequesterData.setDistantNetwork(item, network.id());
+            var before = dev.distantstock.net.StockSyncS2C.of(false, java.util.List.of(), network.id());
+            h.assertTrue(before.networks().isEmpty(),
+                    "the warehouse picker leaked unjoined Create networks across scopes");
+            h.assertTrue(directory.formalNetworkOf(local.networkId()).isEmpty(),
+                    "network creation silently enrolled an unrelated Create warehouse");
+            var pos = h.absolutePos(new net.minecraft.core.BlockPos(2, 2, 2));
+            h.getLevel().setBlock(pos, dev.distantstock.block.ModBlocks.DOCK.get().defaultBlockState(), 3);
+            var dock = (dev.distantstock.block.DockBlockEntity) h.getLevel().getBlockEntity(pos);
+            dock.setNetwork(local.networkId());
+            var hit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(pos),
+                    net.minecraft.core.Direction.UP, pos, false);
+            stranger.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, item.copy());
+            h.getLevel().getBlockState(pos).useItemOn(stranger.getMainHandItem(), h.getLevel(),
+                    stranger, net.minecraft.world.InteractionHand.MAIN_HAND, hit);
+            h.assertTrue(directory.formalNetworkOf(local.networkId()).isEmpty(),
+                    "stranger could import someone else's Create warehouse via a dock");
+            player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, item);
+            h.getLevel().getBlockState(pos).useItemOn(item, h.getLevel(), player,
+                    net.minecraft.world.InteractionHand.MAIN_HAND, hit);
             h.assertTrue(directory.formalNetworkOf(local.networkId()).filter(network.id()::equals).isPresent(),
-                    "joining the network did not persist the Create warehouse membership");
+                    "the owner dock click did not enroll the bound Create warehouse");
             var published = dev.distantstock.stock.NetworkDirectory.local().stream()
                     .filter(entry -> network.id().equals(entry.distantNetworkId())).toList();
             h.assertTrue(published.size() == 1 && published.getFirst().networkId().equals(local.networkId()),
@@ -137,13 +212,14 @@ public final class NetworkJoinPreflightGameTests {
             h.assertTrue(dev.distantstock.net.StockSyncS2C.of(false, java.util.List.of(),
                             network.id()).networks().stream().anyMatch(row -> frequency.equals(row.freq())),
                     "the terminal warehouse list did not include the enrolled source network");
-            h.assertFalse(DistantNetworkJoinService.enrollSelectedLocalWarehouse(
-                            server, player, item, UUID.randomUUID()),
-                    "a warehouse was silently moved out of an existing network");
+            h.assertTrue(dev.distantstock.net.StockSyncS2C.of(false, java.util.List.of(), network.id())
+                            .networks().stream().noneMatch(row -> anotherFrequency.equals(row.freq())),
+                    "the warehouse picker leaked someone else's unjoined Create network");
         } catch (Exception error) {
             h.fail(error.toString());
         } finally {
             Create.LOGISTICS.logisticsNetworks.remove(frequency);
+            Create.LOGISTICS.logisticsNetworks.remove(anotherFrequency);
             dev.distantstock.stock.StockScanner.scan(server);
         }
         h.succeed();
@@ -180,17 +256,17 @@ public final class NetworkJoinPreflightGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 80)
-    public static void queuedAcceptAfterThreeMinutesStillJoins(GameTestHelper h) throws Exception {
+    public static void queuedLegacyMemberAcceptCannotEnrollWarehouse(GameTestHelper h) throws Exception {
         var directory = DistantNetworkDirectory.get(h.getLevel().getServer());
         var member = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, TranserverBridge.localNodeUuid(),
                 UUID.randomUUID(), "minecraft:overworld", UUID.randomUUID());
         UUID network = UUID.randomUUID();
         var result = receive(accept(pending(member, 180), member, network, UUID.randomUUID()));
         h.runAfterDelay(5, () -> {
-            h.assertTrue(result.isDone() && result.join() == DeliveryResult.APPLIED,
-                    "a queued response within the new timeout failed");
-            h.assertTrue(directory.formalNetworkOf(member).filter(network::equals).isPresent(),
-                    "queued join did not persist");
+            h.assertTrue(result.isDone() && result.join() == DeliveryResult.REJECTED,
+                    "queued pre-upgrade member acceptance bypassed physical dock authorization");
+            h.assertTrue(directory.formalNetworkOf(member).isEmpty(),
+                    "stale queued join silently enrolled a Create network");
             h.succeed();
         });
     }
@@ -217,6 +293,11 @@ public final class NetworkJoinPreflightGameTests {
                 new com.mojang.authlib.GameProfile(UUID.randomUUID(), "JoinPreflight"));
         var hand = net.minecraft.world.InteractionHand.MAIN_HAND;
         var original = new net.minecraft.world.item.ItemStack(dev.distantstock.item.ModItems.REQUESTER.get());
+        var previous = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA,
+                TranserverBridge.localNodeUuid(), UUID.randomUUID(),
+                "minecraft:overworld", UUID.randomUUID());
+        dev.distantstock.item.RequesterData.setNetwork(original, previous,
+                DistantNetworkDirectory.LEGACY_NETWORK_ID);
         var replacement = original.copy();
         var method = DistantNetworkJoinService.class.getDeclaredMethod("bindTerminal",
                 net.minecraft.server.level.ServerPlayer.class, net.minecraft.world.InteractionHand.class,
@@ -226,11 +307,20 @@ public final class NetworkJoinPreflightGameTests {
         player.setItemInHand(hand, replacement);
         h.assertFalse((boolean) method.invoke(null, player, hand, original, network),
                 "reply bound a replacement terminal");
-        h.assertTrue(dev.distantstock.item.RequesterData.distantNetwork(replacement).isEmpty(),
+        h.assertTrue(dev.distantstock.item.RequesterData.network(replacement)
+                        .filter(previous::equals).isPresent()
+                        && dev.distantstock.item.RequesterData.distantNetwork(replacement)
+                        .filter(DistantNetworkDirectory.LEGACY_NETWORK_ID::equals).isPresent(),
                 "replacement terminal was mutated");
         player.setItemInHand(hand, original);
         h.assertTrue((boolean) method.invoke(null, player, hand, original, network),
                 "reply failed to bind the original terminal");
+        h.assertTrue(dev.distantstock.item.RequesterData.network(original).isEmpty()
+                        && dev.distantstock.item.RequesterData.freq(original) == null,
+                "successful network join kept a stale warehouse selection from another network");
+        h.assertTrue(dev.distantstock.item.RequesterData.distantNetwork(original)
+                        .filter(network::equals).isPresent(),
+                "clearing the stale selection also cleared the joined network");
         h.assertFalse((boolean) method.invoke(null, player, hand, original, UUID.randomUUID()),
                 "reply overwrote an existing network");
         h.succeed();
@@ -269,7 +359,7 @@ public final class NetworkJoinPreflightGameTests {
     }
 
     @GameTest(template = "empty", timeoutTicks = 80)
-    public static void remoteAcceptMigratesLegacyAndHandlesDuplicate(GameTestHelper h) throws Exception {
+    public static void remoteMemberAcceptCannotMigrateLegacyOrCreateReplica(GameTestHelper h) throws Exception {
         var directory = DistantNetworkDirectory.get(h.getLevel().getServer());
         UUID node = TranserverBridge.localNodeUuid();
         var member = new RemoteNetworkId(RemoteNetworkId.CURRENT_SCHEMA, node,
@@ -281,17 +371,17 @@ public final class NetworkJoinPreflightGameTests {
         var message = accept(request, member, network, owner);
         var result = receive(message);
         h.runAfterDelay(5, () -> {
-            h.assertTrue(result.isDone() && result.join() == DeliveryResult.APPLIED,
-                    "actual remote accept rejected an explicit Legacy member");
-            h.assertTrue(directory.formalNetworkOf(member).filter(network::equals).isPresent(),
-                    "remote join did not persist membership");
-            h.assertTrue(directory.find(network).orElseThrow().joinCode().isEmpty(),
-                    "remote join replicated the private invite code");
+            h.assertTrue(result.isDone() && result.join() == DeliveryResult.REJECTED,
+                    "remote accept bypassed physical dock authorization");
+            h.assertTrue(directory.formalNetworkOf(member).isEmpty(),
+                    "remote join persisted warehouse membership without clicking a dock");
+            h.assertTrue(directory.find(network).isEmpty(),
+                    "unauthorized member accept created a phantom replica");
             try {
                 var duplicate = receive(message);
                 h.runAfterDelay(5, () -> {
-                    h.assertTrue(duplicate.isDone() && duplicate.join() == DeliveryResult.APPLIED,
-                            "duplicate acceptance was not idempotent");
+                    h.assertTrue(duplicate.isDone() && duplicate.join() == DeliveryResult.REJECTED,
+                            "duplicate legacy member acceptance should remain rejected");
                     h.succeed();
                 });
             } catch (Exception error) {
