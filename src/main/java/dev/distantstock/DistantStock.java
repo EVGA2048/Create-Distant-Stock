@@ -52,6 +52,19 @@ public final class DistantStock {
         if (net.neoforged.fml.ModList.get().isLoaded("thirst")) {
             dev.distantstock.compat.thirst.ThirstDrinkCompat.register();
         }
+        /*
+         * CreateLazyTick 2.7.32 and older caches sequenced-assembly deployer steps by the held
+         * item alone. Every step changes the workpiece's component, not the item, so the cache
+         * hands back the first step's recipe and the deployer consumes the same material again
+         * while progress moves on. Server start is after config load, which is the earliest point
+         * the switch can be changed for the session; 2.7.33 and newer are left alone.
+         */
+        if (net.neoforged.fml.ModList.get().isLoaded("createlazytick")) {
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+                    net.neoforged.neoforge.event.server.ServerAboutToStartEvent.class,
+                    event -> dev.distantstock.compat.createlazytick.CreateLazyTickCompat
+                            .disableBrokenDeployerCache());
+        }
     }
 
 }

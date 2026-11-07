@@ -1,5 +1,6 @@
 package dev.distantstock.item;
 
+import com.simibubi.create.content.processing.sequenced.SequencedAssemblyItem;
 import dev.distantstock.DistantStock;
 import dev.distantstock.block.ModBlocks;
 import net.minecraft.core.registries.Registries;
@@ -109,13 +110,20 @@ public final class ModItems {
      */
     public static final DeferredHolder<Item, Item> RESONANT_STURDY_SHEET = ITEMS.register("resonant_sturdy_sheet",
             () -> new Item(new Item.Properties()));
+    /**
+     * Sequenced-assembly intermediates are {@link SequencedAssemblyItem}, not plain items: Create's
+     * own three transitional stocks are, and that class pins them to a stack size of one. A
+     * stackable intermediate can be merged with another item on a belt or depot, and Create's
+     * processing then sees several workpieces where the recipe assumes one. The progress bar also
+     * comes from this class; without it the item is indistinguishable from a finished part.
+     */
     public static final DeferredHolder<Item, Item> INCOMPLETE_ETHER_MECHANISM = ITEMS.register("incomplete_ether_mechanism",
-            () -> new Item(new Item.Properties()));
+            () -> new SequencedAssemblyItem(new Item.Properties()));
     public static final DeferredHolder<Item, Item> ETHER_MECHANISM = ITEMS.register("ether_mechanism",
             () -> new Item(new Item.Properties()));
     /** The transitional stock of the sheet's sequenced assembly; never obtained by hand. */
     public static final DeferredHolder<Item, Item> INCOMPLETE_RESONANT_SHEET = ITEMS.register("incomplete_resonant_sheet",
-            () -> new Item(new Item.Properties()));
+            () -> new SequencedAssemblyItem(new Item.Properties()));
     public static final DeferredHolder<Item, BucketItem> ETHER_BUCKET = ITEMS.register("ether_bucket",
             () -> new BucketItem(dev.distantstock.fluid.ModFluids.ETHER.get(),
                     new Item.Properties().craftRemainder(Items.BUCKET).stacksTo(1)));
