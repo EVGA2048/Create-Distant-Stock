@@ -4,6 +4,7 @@ import dev.distantstock.DistantStock;
 import dev.distantstock.block.LoadedTowers;
 import dev.distantstock.block.TowerCoreBlockEntity;
 import dev.distantstock.block.TowerTier;
+import dev.distantstock.compat.sable.SableBridge;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
@@ -144,6 +145,18 @@ public final class TowerChunkLoader {
      * release: the tickets exist so the tower's chunk loads again without a player walking past it.
      */
     public static void forget(ServerLevel level, BlockPos owner) {
+        // A tower on a sub-level may hold a Sable ticket instead of a NeoForge one. Both have to
+        // go when the tower does; release() is a no-op for a ground tower.
+        SableBridge.release(level, owner);
+        releaseNeoForge(level, owner);
+    }
+
+    /**
+     * The NeoForge half of {@link #forget}, also used when a tower turns out to live on a sub-level:
+     * plot positions must never keep a vanilla chunk ticket, even one left over from before the
+     * block was assembled onto a ship.
+     */
+    private static void releaseNeoForge(ServerLevel level, BlockPos owner) {
         LongSet chunks = new LongOpenHashSet();
         Tracked tracked = OWNED.remove(TowerSystem.TowerId.of(level.dimension(), owner));
         if (tracked != null) {
@@ -236,11 +249,6 @@ public final class TowerChunkLoader {
                 forget(level, be.getBlockPos());
                 continue;
             }
-            if (isPending(level, be.getBlockPos())) {
-                // The save handed this tower tickets and the grace period has not passed; forcing
-                // anything now would race the tickets that are about to be reinstated.
-                continue;
-            }
             TowerDirectory.Settings settings = directory.settings(
                     TowerSystem.TowerId.of(level.dimension(), be.getBlockPos()));
             if (!settings.loading()) {
@@ -249,6 +257,19 @@ public final class TowerChunkLoader {
                 // or not this loop still wants it, and "the reconciler stopped looking" is exactly
                 // how a switch that does nothing gets written.
                 forget(level, be.getBlockPos());
+                continue;
+            }
+            if (SableBridge.keepLoaded(level, be.getBlockPos())) {
+                // A tower standing on a sub-level keeps its ship loaded through Sable's own ticket
+                // system. Its blocks live at plot coordinates that only Sable's chunk holders know
+                // how to load; handing those positions to the NeoForge controller is the one path
+                // this loader must not take. Any vanilla ticket from an earlier life is released.
+                releaseNeoForge(level, be.getBlockPos());
+                continue;
+            }
+            if (isPending(level, be.getBlockPos())) {
+                // The save handed this tower tickets and the grace period has not passed; forcing
+                // anything now would race the tickets that are about to be reinstated.
                 continue;
             }
             apply(level, be.getBlockPos(), chunksAround(be.getBlockPos(),

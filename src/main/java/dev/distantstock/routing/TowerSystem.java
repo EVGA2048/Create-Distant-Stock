@@ -3,6 +3,7 @@ package dev.distantstock.routing;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -41,6 +42,10 @@ public final class TowerSystem {
     /**
      * One tower as the merge sees it: where it stands, how far it reaches, how much it carries.
      *
+     * <p>{@code base} is the block position used for identity and settings. {@code globalCenter} is
+     * the point the tower actually occupies in the world after Sable projects a sub-level position
+     * out of its plot; on a pack without Sable the two agree.
+     *
      * <p>{@code running} is part of the identity of a working tower rather than a detail of it, and
      * it is the only field that can change without the tower being rebuilt. A stalled tower is
      * dropped from the system entirely — see {@link TowerActivation} for why a dimension whose
@@ -54,7 +59,19 @@ public final class TowerSystem {
      * tower that was never built gives.
      */
     public record Member(TowerId id, BlockPos base, int radius, int devices, boolean running,
-                         boolean carrying) {
+                         boolean carrying, Vec3 globalCenter, String space) {
+        /** A tower outside any sub-level: its block position is its global position. */
+        public Member(TowerId id, BlockPos base, int radius, int devices, boolean running,
+                      boolean carrying) {
+            this(id, base, radius, devices, running, carrying, Vec3.atCenterOf(base),
+                    id.dimension());
+        }
+
+        /** A tower whose global point is known but whose space is still the plain dimension. */
+        public Member(TowerId id, BlockPos base, int radius, int devices, boolean running,
+                      boolean carrying, Vec3 globalCenter) {
+            this(id, base, radius, devices, running, carrying, globalCenter, id.dimension());
+        }
     }
 
     /**
@@ -68,6 +85,15 @@ public final class TowerSystem {
     public record System(List<Member> members) {
         public System {
             members = List.copyOf(members);
+        }
+
+        /**
+         * The coverage space this system belongs to: a dimension, or a dimension plus a Sable
+         * sub-level UUID. Systems never span spaces, so the first member's space is the whole
+         * system's.
+         */
+        public String space() {
+            return members.getFirst().space();
         }
 
         /** The largest reach in the system, for the readout. Coverage itself is per member. */
@@ -98,6 +124,11 @@ public final class TowerSystem {
 
         /** Whether any member reaches this position, carrying or not. */
         public boolean covers(BlockPos pos) {
+            return covers(Vec3.atCenterOf(pos));
+        }
+
+        /** The same question in the global coordinates Sable's sub-levels are compared in. */
+        public boolean covers(Vec3 pos) {
             for (Member member : members) {
                 if (withinReach(member, pos)) {
                     return true;
@@ -114,14 +145,20 @@ public final class TowerSystem {
          * neighbour also reaches it — and is refused, right here, when none does.
          */
         public Member nearest(BlockPos pos) {
+            return nearest(Vec3.atCenterOf(pos));
+        }
+
+        /** The same choice in global coordinates; see {@link #nearest(BlockPos)}. */
+        public Member nearest(Vec3 pos) {
             Member best = null;
-            long bestDistance = Long.MAX_VALUE;
+            double bestDistance = Double.MAX_VALUE;
             for (Member member : members) {
                 if (!member.carrying()) {
                     continue;
                 }
-                long distance = distanceSq(member.base(), pos);
-                if (distance <= (long) member.radius() * member.radius() && distance < bestDistance) {
+                double distance = distanceSq(member.globalCenter(), pos);
+                double radius = member.radius();
+                if (distance <= radius * radius && distance < bestDistance) {
                     best = member;
                     bestDistance = distance;
                 }
@@ -138,12 +175,21 @@ public final class TowerSystem {
         }
     }
 
-    /** A device the merge may carry: where it stands, in the same coordinates as the towers. */
-    public record Device(BlockPos pos, String dimension) {
+    /** A device the merge may carry: its block position and the global point it occupies. */
+    public record Device(BlockPos pos, String dimension, Vec3 globalCenter, String space) {
+        /** A device outside any sub-level: its block position is its global position. */
+        public Device(BlockPos pos, String dimension) {
+            this(pos, dimension, Vec3.atCenterOf(pos), dimension);
+        }
+
+        /** A device whose global point is known but whose space is still the plain dimension. */
+        public Device(BlockPos pos, String dimension, Vec3 globalCenter) {
+            this(pos, dimension, globalCenter, dimension);
+        }
     }
 
     /** A device together with the tower the merge decided carries it. */
-    public record Carried(Device device, TowerId carrier, long distanceSq) {
+    public record Carried(Device device, TowerId carrier, double distanceSq) {
     }
 
     /**
@@ -209,14 +255,18 @@ public final class TowerSystem {
         for (System system : systems) {
             List<Carried> candidates = new ArrayList<>();
             for (Device device : devices) {
-                Member carrier = system.nearest(device.pos());
+                if (!device.space().equals(system.space())) {
+                    continue;
+                }
+                Member carrier = system.nearest(device.globalCenter());
                 if (carrier == null) {
                     continue;
                 }
-                candidates.add(new Carried(device, carrier.id(), distanceSq(carrier.base(), device.pos())));
+                candidates.add(new Carried(device, carrier.id(),
+                        distanceSq(carrier.globalCenter(), device.globalCenter())));
             }
             candidates.sort(Comparator
-                    .comparingLong(Carried::distanceSq)
+                    .comparingDouble(Carried::distanceSq)
                     .thenComparing(carriedDevice -> carriedDevice.device().dimension())
                     .thenComparingLong(carriedDevice -> carriedDevice.device().pos().asLong()));
             carried.addAll(candidates.subList(0, Math.min(system.devices(), candidates.size())));
@@ -224,23 +274,21 @@ public final class TowerSystem {
         return List.copyOf(carried);
     }
 
-    private static boolean withinReach(Member member, BlockPos pos) {
-        return distanceSq(member.base(), pos) <= (long) member.radius() * member.radius();
+    private static boolean withinReach(Member member, Vec3 pos) {
+        double radius = member.radius();
+        return distanceSq(member.globalCenter(), pos) <= radius * radius;
     }
 
     private static boolean overlap(Member first, Member second) {
-        if (!first.id().dimension().equals(second.id().dimension())) {
+        if (!first.space().equals(second.space())) {
             return false;
         }
-        long reach = (long) first.radius() + second.radius();
-        return distanceSq(first.base(), second.base()) <= reach * reach;
+        double reach = (double) first.radius() + second.radius();
+        return distanceSq(first.globalCenter(), second.globalCenter()) <= reach * reach;
     }
 
-    private static long distanceSq(BlockPos from, BlockPos to) {
-        long dx = (long) from.getX() - to.getX();
-        long dy = (long) from.getY() - to.getY();
-        long dz = (long) from.getZ() - to.getZ();
-        return dx * dx + dy * dy + dz * dz;
+    private static double distanceSq(Vec3 from, Vec3 to) {
+        return from.distanceToSqr(to);
     }
 
     private static int find(int[] parent, int index) {

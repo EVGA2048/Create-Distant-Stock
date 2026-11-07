@@ -3,6 +3,7 @@ package dev.distantstock.link;
 import com.simibubi.create.content.logistics.box.PackageItem;
 import dev.distantstock.block.DockBlockEntity;
 import dev.distantstock.block.LoadedDocks;
+import dev.distantstock.compat.sable.SableBridge;
 import dev.distantstock.routing.RoutingChannels;
 import dev.transerver.api.DeliveryResult;
 import dev.transerver.api.ReceivedMessage;
@@ -198,10 +199,14 @@ public final class TranserverPackageService {
             net.minecraft.server.level.ServerPlayer target =
                     server.getPlayerList().getPlayerByName(addressee);
             if (target != null) {
+                // A dock on a Sable ship sits at plot coordinates; the player needs the point they
+                // would actually walk to, not the storage coordinate the ship's blocks live at.
+                var at = dock.getLevel() == null
+                        ? dock.getBlockPos()
+                        : SableBridge.globalBlockPos(dock.getLevel(), dock.getBlockPos());
                 target.displayClientMessage(net.minecraft.network.chat.Component.translatable(
                         "message.distantstock.parcel.arrived",
-                        dock.getBlockPos().getX() + ", " + dock.getBlockPos().getY()
-                                + ", " + dock.getBlockPos().getZ()), false);
+                        at.getX() + ", " + at.getY() + ", " + at.getZ()), false);
             }
         }
         String appliedDetail = (dock.getLevel() == null ? "unknown" : dock.getLevel().dimension().location())

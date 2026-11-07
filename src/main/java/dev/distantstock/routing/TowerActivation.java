@@ -5,6 +5,7 @@ import dev.distantstock.block.LoadedDocks;
 import dev.distantstock.block.LoadedTowers;
 import dev.distantstock.block.TowerCoreBlockEntity;
 import dev.distantstock.block.TowerTier;
+import dev.distantstock.compat.sable.SableBridge;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
@@ -17,6 +18,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -82,25 +84,28 @@ public final class TowerActivation {
     /** A frozen answer: the systems, the dimensions they claim, and the devices they carry. */
     public static final class Snapshot {
         private static final Snapshot EMPTY = new Snapshot(
-                List.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+                List.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
 
         private final List<TowerSystem.System> systems;
-        private final Map<ResourceKey<Level>, LongSet> activated;
-        private final Map<ResourceKey<Level>, Long2ObjectMap<TowerSystem.TowerId>> carriers;
+        private final Map<String, LongSet> activated;
+        private final Map<String, Long2ObjectMap<TowerSystem.TowerId>> carriers;
         private final Map<TowerSystem.TowerId, Usage> usage;
         private final Map<TowerSystem.TowerId, Integer> carriedBy;
         private final Map<TowerSystem.TowerId, Traffic> traffic;
+        /** {@code dimension|packedPos} to the space that position was collected in. */
+        private final Map<String, String> spaces;
 
-        Snapshot(List<TowerSystem.System> systems, Map<ResourceKey<Level>, LongSet> activated,
-                 Map<ResourceKey<Level>, Long2ObjectMap<TowerSystem.TowerId>> carriers,
+        Snapshot(List<TowerSystem.System> systems, Map<String, LongSet> activated,
+                 Map<String, Long2ObjectMap<TowerSystem.TowerId>> carriers,
                  Map<TowerSystem.TowerId, Usage> usage, Map<TowerSystem.TowerId, Integer> carriedBy,
-                 Map<TowerSystem.TowerId, Traffic> traffic) {
+                 Map<TowerSystem.TowerId, Traffic> traffic, Map<String, String> spaces) {
             this.systems = systems;
             this.activated = activated;
             this.carriers = carriers;
             this.usage = usage;
             this.carriedBy = carriedBy;
             this.traffic = traffic;
+            this.spaces = spaces;
         }
 
         public List<TowerSystem.System> systems() {
@@ -108,14 +113,24 @@ public final class TowerActivation {
         }
 
         /**
-         * Whether the given dimension is under a tower system.
+         * Whether the given space is under a tower system.
          *
-         * <p>A dimension that is not in here behaves as if towers had never been added, which is
-         * why the maps are keyed by dimension rather than kept in one global set: the players of a
-         * quiet overworld should not be affected by a tower someone built in the nether.
+         * <p>A space is a dimension, or a dimension plus a Sable sub-level UUID. Keeping the maps
+         * keyed by space is what stops a tower flying through the overworld from gating every
+         * factory standing in it: the ship's devices belong to the ship's own space.
          */
+        public boolean gated(String space) {
+            return activated.containsKey(space);
+        }
+
+        /** Dimension-keyed convenience for the ordinary, non-sub-level case. */
         public boolean gated(ResourceKey<Level> dimension) {
-            return activated.containsKey(dimension);
+            return gated(dimension.location().toString());
+        }
+
+        /** The space a surveyed position belongs to, or the plain dimension if it was not seen. */
+        public String spaceOf(String dimension, BlockPos pos) {
+            return spaces.getOrDefault(positionKey(dimension, pos), dimension);
         }
 
         /** How much of its budget one member's system is using, or null for a tower in no system. */
@@ -142,15 +157,29 @@ public final class TowerActivation {
          * （塔够不着、或者带载名额用完了），答案都是"不工作"。以前这里是反的（{@code on == null}
          * 当作"全都算"），那是"老存档不该停摆"那条已废弃的承诺留下的。
          */
-        public boolean active(ResourceKey<Level> dimension, BlockPos pos) {
-            LongSet on = activated.get(dimension);
+        public boolean active(String space, BlockPos pos) {
+            LongSet on = activated.get(space);
             return on != null && on.contains(pos.asLong());
         }
 
+        /** Dimension-keyed convenience for the ordinary, non-sub-level case. */
+        public boolean active(ResourceKey<Level> dimension, BlockPos pos) {
+            return active(dimension.location().toString(), pos);
+        }
+
         /** The tower that carries a device, or null when nothing does. */
-        public TowerSystem.TowerId carrier(ResourceKey<Level> dimension, BlockPos pos) {
-            Long2ObjectMap<TowerSystem.TowerId> found = carriers.get(dimension);
+        public TowerSystem.TowerId carrier(String space, BlockPos pos) {
+            Long2ObjectMap<TowerSystem.TowerId> found = carriers.get(space);
             return found == null ? null : found.get(pos.asLong());
+        }
+
+        /** Dimension-keyed convenience for the ordinary, non-sub-level case. */
+        public TowerSystem.TowerId carrier(ResourceKey<Level> dimension, BlockPos pos) {
+            return carrier(dimension.location().toString(), pos);
+        }
+
+        private static String positionKey(String dimension, BlockPos pos) {
+            return dimension + "|" + pos.asLong();
         }
 
 
@@ -209,7 +238,8 @@ public final class TowerActivation {
                 return pinned.active();
             }
         }
-        return current.active(level.dimension(), pos);
+        String dimension = level.dimension().location().toString();
+        return current.active(current.spaceOf(dimension, pos), pos);
     }
 
     /** The tower that pays for this device's transfers, or null when nothing carries it. */
@@ -223,7 +253,8 @@ public final class TowerActivation {
                 return pinned.carrier();
             }
         }
-        return current.carrier(level.dimension(), pos);
+        String dimension = level.dimension().location().toString();
+        return current.carrier(current.spaceOf(dimension, pos), pos);
     }
 
     /**
@@ -247,7 +278,9 @@ public final class TowerActivation {
         }
         ResourceKey<Level> dimension = level.dimension();
         TowerSystem.TowerId nearest = null;
-        long bestDistance = Long.MAX_VALUE;
+        double bestDistance = Double.MAX_VALUE;
+        Vec3 deviceGlobal = SableBridge.toGlobal(level, Vec3.atCenterOf(pos));
+        String deviceSpace = SableBridge.spaceKey(level, pos);
         for (TowerCoreBlockEntity tower : LoadedTowers.all()) {
             TowerTier tier = tower.tier();
             if (tier == null || tower.getLevel() == null
@@ -255,21 +288,18 @@ public final class TowerActivation {
                 continue;
             }
             BlockPos base = tower.getBlockPos();
-            long distance = distanceSq(base, pos);
-            if (distance <= (long) tier.radius() * tier.radius() && distance < bestDistance) {
+            if (!deviceSpace.equals(SableBridge.spaceKey(tower.getLevel(), base))) {
+                continue;
+            }
+            Vec3 towerGlobal = SableBridge.toGlobal(tower.getLevel(), Vec3.atCenterOf(base));
+            double distance = SableBridge.distanceSq(level, towerGlobal, deviceGlobal);
+            double radius = tier.radius();
+            if (distance <= radius * radius && distance < bestDistance) {
                 nearest = TowerSystem.TowerId.of(dimension, base);
                 bestDistance = distance;
             }
         }
         return nearest;
-    }
-
-    /** Squared distance, in the same integer arithmetic the merge uses to decide a reach. */
-    private static long distanceSq(BlockPos first, BlockPos second) {
-        long dx = (long) first.getX() - second.getX();
-        long dy = (long) first.getY() - second.getY();
-        long dz = (long) first.getZ() - second.getZ();
-        return dx * dx + dy * dy + dz * dz;
     }
 
     /** What the system this tower belongs to carries, or null when it is in no system. */
@@ -348,23 +378,30 @@ public final class TowerActivation {
         }
         List<TowerSystem.Carried> carried = TowerSystem.carry(systems, devices);
 
-        Map<ResourceKey<Level>, LongSet> activated = new HashMap<>();
-        Map<ResourceKey<Level>, Long2ObjectMap<TowerSystem.TowerId>> carriers = new HashMap<>();
+        Map<String, LongSet> activated = new HashMap<>();
+        Map<String, Long2ObjectMap<TowerSystem.TowerId>> carriers = new HashMap<>();
+        Map<String, String> spaces = new HashMap<>();
         for (TowerSystem.System system : systems) {
             for (TowerSystem.Member member : system.members()) {
-                // An empty set, not a missing entry: a claimed dimension with nothing carried in
-                // it has to read as "everything here is off", not as "towers do not apply here".
-                ResourceKey<Level> dimension = dimensionKey(member.id().dimension());
-                activated.computeIfAbsent(dimension, ignored -> new LongOpenHashSet());
-                carriers.computeIfAbsent(dimension, ignored -> new Long2ObjectOpenHashMap<>());
+                // An empty set, not a missing entry: a claimed space with nothing carried in it
+                // has to read as "everything here is off", not as "towers do not apply here".
+                activated.computeIfAbsent(member.space(), ignored -> new LongOpenHashSet());
+                carriers.computeIfAbsent(member.space(), ignored -> new Long2ObjectOpenHashMap<>());
+                spaces.put(Snapshot.positionKey(member.id().dimension(), member.base()),
+                        member.space());
             }
         }
+        for (TowerSystem.Device device : devices) {
+            spaces.put(Snapshot.positionKey(device.dimension(), device.pos()), device.space());
+        }
         for (TowerSystem.Carried entry : carried) {
-            ResourceKey<Level> dimension = dimensionKey(entry.carrier().dimension());
-            activated.computeIfAbsent(dimension, ignored -> new LongOpenHashSet())
+            String space = entry.device().space();
+            activated.computeIfAbsent(space, ignored -> new LongOpenHashSet())
                     .add(entry.device().pos().asLong());
-            carriers.computeIfAbsent(dimension, ignored -> new Long2ObjectOpenHashMap<>())
+            carriers.computeIfAbsent(space, ignored -> new Long2ObjectOpenHashMap<>())
                     .put(entry.device().pos().asLong(), entry.carrier());
+            spaces.put(Snapshot.positionKey(entry.device().dimension(), entry.device().pos()),
+                    space);
         }
 
         Map<TowerSystem.TowerId, Usage> usage = new HashMap<>();
@@ -390,14 +427,16 @@ public final class TowerActivation {
             }
         }
         return new Snapshot(List.copyOf(systems), Map.copyOf(activated), Map.copyOf(carriers),
-                Map.copyOf(usage), Map.copyOf(carriedBy), Map.copyOf(trafficByTower));
+                Map.copyOf(usage), Map.copyOf(carriedBy), Map.copyOf(trafficByTower),
+                Map.copyOf(spaces));
     }
 
     /**
      * The world half: reads every loaded tower and every loaded device, in place.
      *
-     * <p>Devices are only collected in dimensions a running tower stands in. That is not just an
-     * optimisation: it is the rule. A dimension with no running tower has no coverage to compute.
+     * <p>Devices are only collected in a space a running tower stands in. That is not just an
+     * optimisation: it is the rule. A space with no running tower has no coverage to compute.
+     * A space is a dimension, or a Sable sub-level inside one; see {@code SableBridge.spaceKey}.
      */
     public static Snapshot survey(MinecraftServer server) {
         if (server == null) {
@@ -412,12 +451,14 @@ public final class TowerActivation {
             }
             TowerSystem.TowerId id = TowerSystem.TowerId.of(be.getLevel().dimension(), be.getBlockPos());
             towers.add(new TowerSystem.Member(id, be.getBlockPos(), tier.radius(), tier.devices(),
-                    be.isRunning(), directory.settings(id).carrying()));
+                    be.isRunning(), directory.settings(id).carrying(),
+                    SableBridge.toGlobal(be.getLevel(), Vec3.atCenterOf(be.getBlockPos())),
+                    SableBridge.spaceKey(be.getLevel(), be.getBlockPos())));
         }
         Set<String> claimed = new HashSet<>();
         for (TowerSystem.Member member : towers) {
             if (member.running()) {
-                claimed.add(member.id().dimension());
+                claimed.add(member.space());
             }
         }
         // 没有塔在转 = 没有设备被带着。这里**不能**提前返回"一切照旧"（原来是那样）：那正是
@@ -497,13 +538,15 @@ public final class TowerActivation {
             return null;
         }
         String dimension = level.dimension().location().toString();
-        if (!claimed.contains(dimension)) {
+        String space = SableBridge.spaceKey(level, pos);
+        if (!claimed.contains(space)) {
             return null;
         }
-        if (!seen.computeIfAbsent(dimension, ignored -> new LongOpenHashSet()).add(pos.asLong())) {
+        if (!seen.computeIfAbsent(space, ignored -> new LongOpenHashSet()).add(pos.asLong())) {
             return null;
         }
-        TowerSystem.Device device = new TowerSystem.Device(pos, dimension);
+        TowerSystem.Device device = new TowerSystem.Device(pos, dimension,
+                SableBridge.toGlobal(level, Vec3.atCenterOf(pos)), space);
         devices.add(device);
         return device;
     }

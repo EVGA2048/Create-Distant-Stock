@@ -137,6 +137,19 @@ def flywheelJar = file("libs/flywheel-neoforge-1.21.1-1.0.6.jar")
 def transerverJar = file("../Transerver/build/libs/Transerver-0.1.1.jar")
 
 /*
+ * Sable (physics sub-levels) and the companion API nested inside its jar.
+ *
+ * Compile-only and optional at runtime: every Sable type lives in compat/sable and is only named
+ * inside a ModList branch, so a pack without Sable keeps the vanilla-coordinate path. The companion
+ * jar is extracted from Sable's own META-INF/jarjar because the API classes used by Sable expose
+ * its Pose3d types; packing the whole Sable jar into libs/ would be 7 MB for two dozen classes.
+ */
+def sablePackJar = new File(modpackMods, 'sable-neoforge-1.21.1-2.0.5.jar')
+def sableDevJar = file('libs/sable-neoforge-1.21.1-2.0.5.jar')
+def sableJar = sablePackJar.exists() ? sablePackJar : sableDevJar
+def sableCompanionJar = file('libs/sable-companion-common-1.21.1-1.6.0.jar')
+
+/*
  * Create: Deployer API and Extra Gauges, from the same pack Create comes from.
  *
  * Deployer turns Create's factory panel into a board that can host panel types it does not know
@@ -194,8 +207,21 @@ tasks.register('extractFlywheel') {
     }
 }
 
+tasks.register('extractSableCompanion') {
+    onlyIf { !sableCompanionJar.exists() && sableJar.exists() }
+    doLast {
+        copy {
+            from zipTree(sableJar)
+            include 'META-INF/jarjar/sable-companion-common-*.jar'
+            eachFile { it.path = it.name }
+            into 'libs'
+            includeEmptyDirs = false
+        }
+    }
+}
+
 tasks.named('compileJava').configure {
-    dependsOn 'extractPonder', 'extractFlywheel'
+    dependsOn 'extractPonder', 'extractFlywheel', 'extractSableCompanion'
 }
 
 dependencies {
@@ -205,6 +231,10 @@ dependencies {
     compileOnly files(flywheelJar)
     compileOnly files(transerverJar)
     runtimeOnly files(transerverJar)
+    if (sableJar.exists()) {
+        compileOnly files(sableJar)
+        compileOnly files(sableCompanionJar)
+    }
     if (deployerJar.exists()) {
         compileOnly files(deployerJar)
         runtimeOnly files(deployerJar)

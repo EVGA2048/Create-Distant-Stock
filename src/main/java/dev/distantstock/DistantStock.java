@@ -65,6 +65,20 @@ public final class DistantStock {
                     event -> dev.distantstock.compat.createlazytick.CreateLazyTickCompat
                             .disableBrokenDeployerCache());
         }
+        /*
+         * Sable is optional and the implementation class imports its API, so the class is only
+         * named inside this branch. The try is for a pack that has Sable but a version whose API
+         * has moved: the bridge keeps its vanilla fallback rather than taking the whole mod down.
+         */
+        if (net.neoforged.fml.ModList.get().isLoaded("sable")) {
+            try {
+                dev.distantstock.compat.sable.SableCompat.init();
+            } catch (Exception | LinkageError failure) {
+                org.apache.logging.log4j.LogManager.getLogger().error(
+                        "[DistantStock/Sable] could not enable sub-level support; "
+                                + "towers keep vanilla block coordinates", failure);
+            }
+        }
     }
 
 }

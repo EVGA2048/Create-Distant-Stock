@@ -21,6 +21,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
@@ -147,6 +148,45 @@ public final class TowerActivationGameTests {
                 new BlockPos(0, 64, 0), 20, 8, true, true);
         h.assertTrue(TowerSystem.merge(List.of(first, elsewhere)).size() == 2,
                 "a tower in another dimension joined the system");
+        h.succeed();
+    }
+
+    /**
+     * A Sable sub-level is its own coverage space, even inside the same dimension.
+     *
+     * <p>The two towers here overlap in global coordinates and would merge under the old
+     * dimension-only rule. That is exactly what must not happen: a ship's tower must not inherit a
+     * ground tower's budget, and a ground device must not be carried by a tower flying overhead.
+     */
+    @GameTest(template = "empty", timeoutTicks = 20)
+    public static void differentSpacesDoNotMergeOrCarry(GameTestHelper h) {
+        String shipSpace = TEST_DIMENSION + "#test-ship";
+        TowerSystem.Member ground = new TowerSystem.Member(
+                new TowerSystem.TowerId(TEST_DIMENSION, new BlockPos(0, 64, 0).asLong()),
+                new BlockPos(0, 64, 0), 20, 8, true, true,
+                new Vec3(0.5, 64.5, 0.5), TEST_DIMENSION);
+        TowerSystem.Member ship = new TowerSystem.Member(
+                new TowerSystem.TowerId(TEST_DIMENSION, new BlockPos(10, 64, 0).asLong()),
+                new BlockPos(10, 64, 0), 20, 8, true, true,
+                new Vec3(10.5, 64.5, 0.5), shipSpace);
+
+        List<TowerSystem.System> systems = TowerSystem.merge(List.of(ground, ship));
+        h.assertTrue(systems.size() == 2, "towers in different spaces merged");
+
+        TowerSystem.Device groundDevice = new TowerSystem.Device(new BlockPos(1, 64, 0), TEST_DIMENSION,
+                new Vec3(1.5, 64.5, 0.5), TEST_DIMENSION);
+        TowerSystem.Device shipDevice = new TowerSystem.Device(new BlockPos(11, 64, 0), TEST_DIMENSION,
+                new Vec3(11.5, 64.5, 0.5), shipSpace);
+        List<TowerSystem.Carried> carried = TowerSystem.carry(systems,
+                List.of(groundDevice, shipDevice));
+
+        h.assertTrue(carried.size() == 2, "a device in a different space was dropped or duplicated");
+        h.assertTrue(carried.stream().anyMatch(entry -> entry.device().equals(groundDevice)
+                        && entry.carrier().equals(ground.id())),
+                "the ground device was not carried by the ground tower");
+        h.assertTrue(carried.stream().anyMatch(entry -> entry.device().equals(shipDevice)
+                        && entry.carrier().equals(ship.id())),
+                "the ship device was not carried by the ship tower");
         h.succeed();
     }
 
