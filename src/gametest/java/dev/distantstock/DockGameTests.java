@@ -150,6 +150,82 @@ public final class DockGameTests {
         });
     }
 
+    /**
+     * A routed parcel may have no Create address at all.
+     *
+     * <p>The Create address is only the local sort key after landing. A remote order whose terminal
+     * left both address fields blank is packed with an empty address, and the route — not the
+     * address — says which dock receives it. The dock used to reject such a parcel before it even
+     * looked at the route, which stranded a delivery that had a perfectly good destination.
+     */
+    @GameTest(template = "empty", timeoutTicks = 300)
+    public static void routedParcelWithoutCreateAddressStillCrosses(GameTestHelper h) {
+        var level = h.getLevel();
+        UUID node = dev.distantstock.link.TranserverBridge.localNodeUuid();
+        h.assertTrue(node != null, "stable local node identity is unavailable");
+
+        BlockPos alphaPos = h.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos betaPos = h.absolutePos(new BlockPos(6, 2, 2));
+        level.setBlock(alphaPos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        level.setBlock(betaPos, ModBlocks.DOCK.get().defaultBlockState(), 3);
+        DockBlockEntity alpha = (DockBlockEntity) level.getBlockEntity(alphaPos);
+        DockBlockEntity beta = (DockBlockEntity) level.getBlockEntity(betaPos);
+        h.assertTrue(alpha != null && beta != null, "alpha/beta docks did not create");
+
+        String stamp = UUID.randomUUID().toString().substring(0, 8);
+        UUID alphaFreq = UUID.randomUUID();
+        UUID betaFreq = UUID.randomUUID();
+        var alphaMember = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA, node,
+                dev.distantstock.routing.WorldIdentity.get(level),
+                level.dimension().location().toString(), alphaFreq);
+        var betaMember = new dev.distantstock.routing.RemoteNetworkId(
+                dev.distantstock.routing.RemoteNetworkId.CURRENT_SCHEMA, node,
+                dev.distantstock.routing.WorldIdentity.get(level),
+                level.dimension().location().toString(), betaFreq);
+        var networkDirectory = dev.distantstock.routing.DistantNetworkDirectory.get(level.getServer());
+        var distant = networkDirectory.create("blank-addr-" + stamp, node, UUID.randomUUID(), alphaMember);
+        h.assertTrue(networkDirectory.attach(betaMember, distant.id()),
+                "second Create warehouse could not join the same Distant Stock network");
+        var groups = dev.distantstock.routing.DockGroupDirectory.get(level.getServer());
+        var alphaGroup = groups.createForNetwork("alpha-" + stamp, null, distant.id(),
+                dev.distantstock.routing.DockGroup.Visibility.PUBLIC);
+        var betaGroup = groups.createForNetwork("beta-" + stamp, null, distant.id(),
+                dev.distantstock.routing.DockGroup.Visibility.PUBLIC);
+
+        alpha.setGroupId(alphaGroup.id());
+        beta.setGroupId(betaGroup.id());
+        alpha.setBidirectional(alphaFreq);
+        beta.setBidirectional(betaFreq);
+        dev.distantstock.block.LoadedDocks.add(alpha);
+        dev.distantstock.block.LoadedDocks.add(beta);
+        TestTowers.carried(h, alphaPos);
+        TestTowers.carried(h, betaPos);
+
+        ItemStack parcel = com.simibubi.create.content.logistics.box.PackageStyles.getDefaultBox();
+        h.assertTrue(com.simibubi.create.content.logistics.box.PackageItem.getAddress(parcel).isBlank(),
+                "test parcel unexpectedly carries a Create address");
+        var custom = parcel.getOrDefault(net.minecraft.core.component.DataComponents.CUSTOM_DATA,
+                net.minecraft.world.item.component.CustomData.EMPTY).copyTag();
+        var routeHint = new net.minecraft.nbt.CompoundTag();
+        routeHint.putString("ReceivingAddress", betaGroup.name());
+        custom.put("DistantStockRoute", routeHint);
+        parcel.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA,
+                net.minecraft.world.item.component.CustomData.of(custom));
+
+        var intake = level.getCapability(Capabilities.ItemHandler.BLOCK, alphaPos, Direction.UP);
+        h.assertTrue(intake != null && intake.insertItem(0, parcel, false).isEmpty(),
+                "parcel could not enter alpha");
+
+        h.runAfterDelay(160, () -> {
+            h.assertTrue(alpha.displayedStack().isEmpty(),
+                    "alpha held a routed parcel because its Create address was blank");
+            h.assertTrue(!beta.displayedStack().isEmpty(),
+                    "blank-address parcel never reached its routed receiving dock");
+            h.succeed();
+        });
+    }
+
     /** Handing a parcel to the dock by hand has to use the same slot a hopper fills. */
     @GameTest(template = "empty", timeoutTicks = 40)
     public static void packageRightClickEntersDock(GameTestHelper h) {

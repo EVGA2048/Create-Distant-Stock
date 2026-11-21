@@ -186,11 +186,6 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         }
 
         String packageAddress = PackageItem.getAddress(stack);
-        if (packageAddress.isBlank()) {
-            holdRoutingFault(NO_ADDRESS_ERROR, EventRegistry.Codes.DOCK_NO_ADDRESS,
-                    "Outbound parcel has no Create package address");
-            return;
-        }
 
         Optional<RemoteRoute> packageRoute = RemoteRouteData.read(stack);
         Optional<RemoteRoute> orderRoute = Optional.empty();
@@ -214,10 +209,20 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
         boolean legacyCanRouteByAddress = dev.distantstock.link.TranserverBridge.attachedApi() == null
                 && dev.distantstock.config.StockConfig.useLegacy()
                 && dev.distantstock.config.StockConfig.hasPeer();
-        if (route.isEmpty() && !legacyCanRouteByAddress) {
-            holdRoutingFault(NO_ROUTE_ERROR, EventRegistry.Codes.DOCK_NO_ROUTE,
-                    "Outbound parcel has no Distant Stock route");
-            return;
+        if (route.isEmpty()) {
+            if (packageAddress.isBlank()) {
+                // A Create address is only a local sort key after landing; without a route it is
+                // also the only thing the legacy transport can route by, so a blank one is fatal
+                // here. With a route it is not: see ship().
+                holdRoutingFault(NO_ADDRESS_ERROR, EventRegistry.Codes.DOCK_NO_ADDRESS,
+                        "Outbound parcel has no Create package address");
+                return;
+            }
+            if (!legacyCanRouteByAddress) {
+                holdRoutingFault(NO_ROUTE_ERROR, EventRegistry.Codes.DOCK_NO_ROUTE,
+                        "Outbound parcel has no Distant Stock route");
+                return;
+            }
         }
         if (route.isPresent()
                 && DockGroupDirectory.DEFAULT_GROUP_ID.equals(route.get().receivingDockGroupId())) {
@@ -1392,11 +1397,6 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
                 continue;
             }
             String destinationAddress = PackageItem.getAddress(stack);
-            if (destinationAddress.isBlank()) {
-                holdRoutingFault(NO_ADDRESS_ERROR, EventRegistry.Codes.DOCK_NO_ADDRESS,
-                        "Outbound parcel has no Create package address");
-                break;
-            }
             Optional<RemoteRoute> packageRoute = RemoteRouteData.read(stack);
             Optional<RemoteRoute> orderRoute = Optional.empty();
             String orderHomeAddress = "";
@@ -1410,20 +1410,29 @@ public final class DockBlockEntity extends SmartBlockEntity implements IHaveGogg
             }
             Optional<RemoteRoute> route = resolveRouteForPackage(stack, packageRoute, orderRoute, true);
             if (route.isEmpty()) {
-                // Legacy peers without Transerver resolve the other side by address themselves, but
-                // only when the parcel actually carries one. Handing a parcel with neither route nor
-                // address to the queue would drop it, so it has to stay here and report instead.
+                // No route: the Create address is all that is left, and the legacy transport needs
+                // it to decide where the parcel goes on the other side. A blank one is fatal here.
                 //
+                // With a route this check deliberately does not run. The Create address only says
+                // how the parcel is sorted *after* it lands; the route says where it lands. A
+                // remote order whose terminal left both address fields blank is packed with an
+                // empty address, and refusing it here stranded a parcel that had a perfectly good
+                // receiving dock. It now crosses and the receiving dock's bottom face (or its
+                // local logistics, once a home address was configured) takes it from there.
+                if (destinationAddress.isBlank()) {
+                    holdRoutingFault(NO_ADDRESS_ERROR, EventRegistry.Codes.DOCK_NO_ADDRESS,
+                            "Outbound parcel has no Create package address");
+                    break;
+                }
                 // The legacy link has to actually be running, and that is not the same question as
-                // whether a parcel has an address. A packager's parcel always has one, so on the
-                // default transport mode — Transerver, no HTTP link — this branch used to take a
-                // parcel that had nowhere to go, remove it from the dock and post it into a queue
-                // nothing drains. The parcel was gone and the dock was empty, which reads exactly
-                // like being sent into the void, because that is what it was.
+                // whether a parcel has an address. On the default transport mode — Transerver, no
+                // HTTP link — this branch used to take a parcel that had nowhere to go, remove it
+                // from the dock and post it into a queue nothing drains. The parcel was gone and
+                // the dock was empty, which reads exactly like being sent into the void, because
+                // that is what it was.
                 if (dev.distantstock.link.TranserverBridge.attachedApi() == null
                         && dev.distantstock.config.StockConfig.useLegacy()
-                        && dev.distantstock.config.StockConfig.hasPeer()
-                        && !destinationAddress.isBlank()) {
+                        && dev.distantstock.config.StockConfig.hasPeer()) {
                     // Pay before the queue takes the parcel: once it is in there, there is no way to
                     // take it back, and a parcel that leaves without paying is the one outcome the
                     // billing rules do not allow. Nothing between the two calls can fail but the
